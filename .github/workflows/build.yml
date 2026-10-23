@@ -1,0 +1,106 @@
+name: Build Electron desktop packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            command: bundle:windows
+            artifact: windows-x64
+          - os: ubuntu-22.04
+            command: bundle:linux
+            artifact: linux-x64
+          - os: ubuntu-22.04-arm
+            command: bundle:linux:arm64
+            artifact: linux-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:desktop
+      - run: npm run test:release
+      - run: npm run test:projects
+      - run: python scripts/test-deb-packaging.py
+      - run: npm run test:java
+      - name: Electron integration smoke
+        if: runner.os == 'Windows'
+        run: npm run test:electron
+      - run: npm run ${{ matrix.command }}
+      - name: Verify packaged Electron app
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --packaged
+      - name: Verify configs preservation in NSIS cleanup
+        if: runner.os == 'Windows'
+        run: node scripts/check-configs-installer.mjs
+      - name: Verify Debian package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for package in artifacts/${{ matrix.artifact }}/*.deb; do
+            python scripts/verify-deb.py "$package"
+            dpkg-deb --info "$package"
+            dpkg-deb --contents "$package"
+            if dpkg-deb -f "$package" Depends | grep -qi webkit; then exit 1; fi
+            sudo dpkg --unpack "$package"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            artifacts/${{ matrix.artifact }}/*.exe
+            artifacts/${{ matrix.artifact }}/*.deb
+            artifacts/${{ matrix.artifact }}/*.txt
+            artifacts/${{ matrix.artifact }}/*.json
+            artifacts/${{ matrix.artifact }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  project-server:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run test:projects
+      - run: npm run bundle:project-server
+      - run: node scripts/check-project-server.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project-center-node24
+          path: |
+            artifacts/release-*/*_node24.zip
+            artifacts/release-*/PROJECT-SERVER-SHA256SUMS
+            artifacts/release-*/project-server.json
+            artifacts/release-*/project-server-verification.json
+          if-no-files-found: error
+          retention-days: 14

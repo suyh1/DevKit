@@ -1,0 +1,2108 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  FolderKanban,
+  Plus,
+  Search,
+  RefreshCw,
+  ExternalLink,
+  Copy,
+  Pencil,
+  Trash2,
+  Archive,
+  Upload,
+  Download,
+  Globe,
+  X,
+  ShieldCheck,
+  Settings2,
+  FolderOpen,
+  LayoutGrid,
+  List,
+  MoreHorizontal,
+  CheckCircle2,
+  AlertCircle,
+  ChevronDown,
+} from "lucide-react";
+import {
+  exportState,
+  importState,
+  resolveProject,
+  mergeProjectState,
+  validateState,
+} from "../shared/projects.mjs";
+import type { Profile, Project, ProjectState } from "../shared/projects.mjs";
+import {
+  newProjectId,
+  openProjectUrl,
+  projectRequest,
+  saveProjects,
+} from "./project-api";
+import type {
+  Session,
+  Sharing,
+  Snapshot,
+  Health,
+  ProjectStorage,
+} from "./project-api";
+import {
+  Modal,
+  ModalCancel,
+  Field,
+  UrlPreview,
+  StateChanges,
+} from "./project-components";
+import { saveText } from "./files";
+import "./projects.css";
+
+function upsert<T extends { id: string }>(items: T[], value: T): T[] {
+  return items.some((item) => item.id === value.id)
+    ? items.map((item) => (item.id === value.id ? value : item))
+    : [...items, value];
+}
+
+export default function ProjectCenter({
+  portal = false,
+}: {
+  portal?: boolean;
+}) {
+  const [session, setSession] = useState<Session | null>(null),
+    [data, setData] = useState<ProjectState | null>(null);
+  const [active, setActive] = useState(
+      () => localStorage.getItem("devkit:project-profile") || "",
+    ),
+    [search, setSearch] = useState(""),
+    [group, setGroup] = useState(""),
+    [filter, setFilter] = useState("all");
+  const [error, setError] = useState(""),
+    [message, setMessage] = useState(""),
+    [busy, setBusy] = useState(false),
+    [password, setPassword] = useState("");
+  const [entry, setEntry] = useState<Project | null>(null),
+    [profileDraft, setProfileDraft] = useState<Profile | null>(null),
+    [overrideMode, setOverrideMode] = useState(false),
+    [overrideUrl, setOverrideUrl] = useState(""),
+    [overrideEnabled, setOverrideEnabled] = useState(true);
+  const [imported, setImported] = useState<ProjectState | null>(null),
+    [history, setHistory] = useState<Snapshot[] | null>(null),
+    [sharing, setSharing] = useState<Sharing | null>(null),
+    [sharePassword, setSharePassword] = useState("");
+  const [health, setHealth] = useState<Record<string, Health>>({});
+  const [storage, setStorage] = useState<ProjectStorage | null>(null),
+    [storageOpen, setStorageOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]),
+    [sort, setSort] = useState("manual");
+  const [view, setView] = useState(() =>
+    localStorage.getItem("devkit:project-view") === "list" ? "list" : "grid",
+  );
+  const [importMode, setImportMode] = useState("merge");
+  const [restoring, setRestoring] = useState<{
+    meta: Snapshot;
+    data: ProjectState;
+  } | null>(null);
+  const [snapshotName, setSnapshotName] = useState("");
+  const [shareSaved, setShareSaved] = useState(0);
+  const [confirmation, setConfirmation] = useState<{
+    title: string;
+    description: string;
+    run: (base: ProjectState) => Promise<void>;
+  } | null>(null);
+  const busyRef = useRef(false),
+    allSelected = useRef<HTMLInputElement>(null);
+  const file = useRef<HTMLInputElement>(null);
+  const openModalKey = entry
+    ? `entry:${entry.id}`
+    : profileDraft
+      ? `profile:${profileDraft.id}`
+      : imported
+        ? "import"
+        : history
+          ? "history"
+          : sharing
+            ? "sharing"
+            : storageOpen
+              ? "storage"
+              : confirmation
+                ? confirmation.title
+                : "";
+  useEffect(() => {
+    if (openModalKey) {
+      setError("");
+      setMessage("");
+    }
+  }, [openModalKey]);
+  const canEdit = session?.role !== "viewer",
+    owner = session?.role === "owner";
+  const profile =
+    data?.profiles.find((item) => item.id === active) || data?.profiles[0];
+  async function action(work: () => Promise<void>) {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await work();
+      return true;
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "操作失败。");
+      return false;
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+  async function load() {
+    const auth = await projectRequest<Session>("session");
+    setSession(auth);
+    if (auth.role === "owner")
+      setStorage(await projectRequest<ProjectStorage>("storage"));
+    if (auth.authenticated) setData(await projectRequest<ProjectState>("get"));
+    else setData(null);
+  }
+  useEffect(() => {
+    void action(load);
+  }, []);
+  useEffect(() => {
+    if (profile) {
+      localStorage.setItem("devkit:project-profile", profile.id);
+      setHealth({});
+      setSelected([]);
+    }
+  }, [profile?.id]);
+  useEffect(() => {
+    localStorage.setItem("devkit:project-view", view);
+  }, [view]);
+  useEffect(() => {
+    const closeMenus = (event: PointerEvent) => {
+      document
+        .querySelectorAll<HTMLDetailsElement>(".project-center .pc-menu[open]")
+        .forEach((menu) => {
+          if (event.target instanceof Node && !menu.contains(event.target))
+            menu.open = false;
+        });
+    };
+    document.addEventListener("pointerdown", closeMenus);
+    return () => document.removeEventListener("pointerdown", closeMenus);
+  }, []);
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(""), 7000);
+    return () => clearTimeout(timer);
+  }, [message]);
+  async function persist(next: ProjectState, revision = data!.revision) {
+    const saved = await saveProjects(next, revision);
+    setData(saved);
+    setSelected((current) =>
+      current.filter((id) => saved.projects.some((item) => item.id === id)),
+    );
+    setHealth({});
+    setMessage(`已保存 · 版本 ${saved.revision}`);
+  }
+  async function refreshSnapshots() {
+    const result = await projectRequest<Snapshot[]>("snapshots");
+    setHistory((current) => (current === null ? null : result));
+  }
+  const projects =
+    data?.projects
+      .filter((item) => {
+        const result = profile && resolveProject(item, profile),
+          needle = search.trim().toLowerCase();
+        return (
+          (!needle ||
+            [item.name, item.code, item.group, item.description, result?.url]
+              .join(" ")
+              .toLowerCase()
+              .includes(needle)) &&
+          (!group || item.group === group) &&
+          (filter === "all" ||
+            (filter === "enabled" && result?.enabled) ||
+            (filter === "disabled" && !result?.enabled) ||
+            (filter === "invalid" && !!result?.error))
+        );
+      })
+      .sort((a, b) =>
+        sort === "name"
+          ? a.name.localeCompare(b.name, "zh-CN")
+          : sort === "group"
+            ? a.group.localeCompare(b.group, "zh-CN") ||
+              a.name.localeCompare(b.name, "zh-CN")
+            : 0,
+      ) || [];
+  useEffect(() => {
+    if (allSelected.current)
+      allSelected.current.indeterminate =
+        projects.some((item) => selected.includes(item.id)) &&
+        !projects.every((item) => selected.includes(item.id));
+  }, [projects, selected]);
+  const selectedProjects =
+    data?.projects.filter((item) => selected.includes(item.id)) || [];
+  async function setEnabled(enabled: boolean, targets = selectedProjects) {
+    const ids = new Set(targets.map((item) => item.id));
+    if (!ids.size || !data || !profile) return;
+    await persist({
+      ...data,
+      profiles: data.profiles.map((item) =>
+        item.id !== profile.id
+          ? item
+          : {
+              ...item,
+              overrides: [
+                ...item.overrides.filter((row) => !ids.has(row.projectId)),
+                ...targets.map((project) => ({
+                  projectId: project.id,
+                  url:
+                    item.overrides.find((row) => row.projectId === project.id)
+                      ?.url || "",
+                  enabled,
+                })),
+              ],
+            },
+      ),
+    });
+  }
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage("已复制。");
+    } catch {
+      const previous = document.activeElement,
+        input = document.createElement("textarea");
+      input.value = text;
+      input.style.cssText =
+        "position:fixed;left:0;top:0;opacity:0;pointer-events:none";
+      (document.querySelector("dialog[open]") || document.body).appendChild(
+        input,
+      );
+      input.select();
+      const copied = document.execCommand("copy");
+      input.remove();
+      if (previous instanceof HTMLElement) previous.focus();
+      setMessage(
+        copied ? "已复制。" : "浏览器未开放剪贴板，可选中文字后手动复制。",
+      );
+    }
+  }
+  function editEntry(project: Project, scoped = false) {
+    setError("");
+    const override = profile?.overrides.find(
+      (item) => item.projectId === project.id,
+    );
+    setEntry(structuredClone(project));
+    setOverrideMode(scoped);
+    setOverrideUrl(override?.url || "");
+    setOverrideEnabled(override?.enabled ?? project.enabled);
+  }
+  async function probe(ids: string[]) {
+    const results = await projectRequest<Health[]>("probe", {
+      profileId: profile!.id,
+      projectIds: ids,
+    });
+    setHealth((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        results.map((item) => [`${profile!.id}:${item.id}`, item]),
+      ),
+    }));
+  }
+  const errorBox = error && (
+    <div className="pc-error" role="alert">
+      <span>{error}</span>
+      <button
+        type="button"
+        className="text-button"
+        disabled={busy}
+        onClick={() => void action(load)}
+      >
+        刷新共享数据
+      </button>
+    </div>
+  );
+  if (!session?.authenticated)
+    return (
+      <section className="project-center pc-login">
+        <FolderKanban size={36} />
+        <h1>DevKit 项目中心</h1>
+        <p>输入主机设置的访问口令，查看项目与配置档案。</p>
+        {errorBox}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void action(async () => {
+              await projectRequest("login", { password });
+              setPassword("");
+              await load();
+            });
+          }}
+        >
+          <Field label="访问口令">
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              minLength={8}
+              maxLength={128}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </Field>
+          <button className="run-button" disabled={busy}>
+            {busy ? "正在连接…" : "进入项目中心"}
+          </button>
+        </form>
+        <small>仅用于可信局域网。HTTP 连接不加密，请勿复用重要账号密码。</small>
+      </section>
+    );
+  if (!data || !profile)
+    return (
+      <section className="project-center">
+        {errorBox}
+        <p>
+          {error
+            ? "项目中心暂不可用，请处理上面的配置目录问题后重新启动。其他工具仍可使用。"
+            : "正在加载项目数据…"}
+        </p>
+        {storage && (
+          <div className="pc-path">
+            <code>{storage.directory}</code>
+            <button
+              className="secondary-button"
+              onClick={() =>
+                void action(async () => {
+                  await projectRequest("open-configs");
+                })
+              }
+            >
+              <FolderOpen size={15} />
+              打开 configs 目录
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  const groups = [...new Set(data.projects.map((item) => item.group))]
+    .filter(Boolean)
+    .sort();
+  const modalOpen =
+    !!entry ||
+    !!profileDraft ||
+    !!imported ||
+    !!history ||
+    !!sharing ||
+    storageOpen ||
+    !!confirmation;
+  const resolved = data.projects.map((item) => resolveProject(item, profile));
+  let importTarget: ProjectState | null = null,
+    importError = "";
+  if (imported)
+    try {
+      importTarget =
+        importMode === "merge" ? mergeProjectState(data, imported) : imported;
+    } catch (failure) {
+      importError = (failure as Error).message;
+    }
+  let draftError = "";
+  try {
+    if (entry && !overrideMode)
+      validateState({ ...data, projects: upsert(data.projects, entry) });
+    if (profileDraft)
+      validateState({ ...data, profiles: upsert(data.profiles, profileDraft) });
+  } catch (failure) {
+    draftError = (failure as Error).message;
+  }
+  return (
+    <section
+      className={`project-center ${portal ? "pc-portal" : ""} ${canEdit ? "" : "pc-viewer"}`}
+    >
+      <header className="pc-heading">
+        <div className="pc-brand">
+          <FolderKanban size={27} />
+          <div>
+            <h1>项目中心</h1>
+            <p>项目定义一次维护，环境差异由配置档案管理。</p>
+          </div>
+        </div>
+        <div className="pc-actions">
+          <span className="pc-role">
+            <ShieldCheck size={13} />
+            {owner ? "主机管理" : canEdit ? "协作编辑" : "只读访问"} · 数据版本
+            {data.revision}
+          </span>
+          <button
+            className="secondary-button"
+            disabled={busy}
+            onClick={() => void action(load)}
+          >
+            <RefreshCw size={14} />
+            刷新
+          </button>
+          {owner && (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => setStorageOpen(true)}
+            >
+              <FolderOpen size={14} />
+              配置文件
+            </button>
+          )}
+          {owner && (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() =>
+                void action(async () => {
+                  setSharing(await projectRequest<Sharing>("sharing"));
+                  setSharePassword("");
+                })
+              }
+            >
+              <Globe size={14} />
+              局域网共享
+            </button>
+          )}
+          {portal && (
+            <>
+              <button
+                className="text-button"
+                onClick={() => {
+                  const root = document.documentElement;
+                  root.dataset.theme =
+                    root.dataset.theme === "dark" ? "light" : "dark";
+                }}
+              >
+                切换主题
+              </button>
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={() =>
+                  void action(async () => {
+                    await projectRequest("logout", {});
+                    setData(null);
+                    setSession(null);
+                    setHealth({});
+                  })
+                }
+              >
+                退出
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+      {!modalOpen && errorBox}
+      {message && (
+        <p className="pc-message" role="status">
+          {message}
+        </p>
+      )}
+      {busy && (
+        <p className="pc-busy" role="status">
+          正在处理，请稍候…
+        </p>
+      )}
+      {storage?.migratedFrom && (
+        <p className="pc-notice">
+          旧版项目数据已迁入安装目录的
+          configs，原文件仍保留。可在“配置文件”查看保存位置。
+        </p>
+      )}
+      <div className="pc-shell">
+        <aside className="pc-profiles">
+          <div className="pc-section-title">
+            <strong>配置档案</strong>
+            <button
+              className="icon-button"
+              title="新建配置档案"
+              aria-label="新建配置档案"
+              disabled={busy || !canEdit}
+              onClick={() =>
+                setProfileDraft({
+                  id: newProjectId(),
+                  name: "",
+                  description: "",
+                  variables: [],
+                  overrides: [],
+                })
+              }
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <p>选择仅影响当前使用者</p>
+          {data.profiles.map((item) => (
+            <button
+              key={item.id}
+              className={`pc-profile ${profile.id === item.id ? "selected" : ""}`}
+              aria-pressed={profile.id === item.id}
+              disabled={busy}
+              onClick={() => {
+                setActive(item.id);
+                setGroup("");
+              }}
+            >
+              <strong>{item.name}</strong>
+              <small>
+                {item.description ||
+                  `${item.variables.length} 个变量 · ${item.overrides.length} 个覆盖`}
+              </small>
+            </button>
+          ))}
+          <div className="pc-profile-tools">
+            <button
+              className="text-button"
+              disabled={busy || !canEdit}
+              onClick={() => setProfileDraft(structuredClone(profile))}
+            >
+              <Settings2 size={14} />
+              编辑当前档案
+            </button>
+            <button
+              className="text-button"
+              disabled={busy || !canEdit}
+              onClick={() =>
+                setProfileDraft({
+                  ...structuredClone(profile),
+                  id: newProjectId(),
+                  name: (() => {
+                    let name = `${profile.name} 副本`,
+                      index = 2;
+                    while (data.profiles.some((item) => item.name === name))
+                      name = `${profile.name} 副本 ${index++}`;
+                    return name;
+                  })(),
+                })
+              }
+            >
+              <Copy size={14} />
+              复制档案
+            </button>
+            <button
+              className="text-button"
+              disabled={busy || !canEdit || data.profiles.length <= 1}
+              onClick={() =>
+                setConfirmation({
+                  title: `删除配置档案“${profile.name}”？`,
+                  description:
+                    "此档案的变量和环境覆盖会移除，项目定义及其他档案保留。删除前自动备份。",
+                  run: async (base) => {
+                    await persist(
+                      {
+                        ...base,
+                        profiles: base.profiles.filter(
+                          (item) => item.id !== profile.id,
+                        ),
+                      },
+                      base.revision,
+                    );
+                    setActive("");
+                  },
+                })
+              }
+            >
+              <Trash2 size={14} />
+              删除档案
+            </button>
+          </div>
+          <div className="pc-storage">
+            <Archive size={15} />
+            <span>
+              保存与恢复前自动备份
+              <br />
+              保留最近 30 份快照
+            </span>
+          </div>
+        </aside>
+        <div className="pc-content">
+          <div className="pc-environment">
+            <div>
+              <h2>{profile.name}</h2>
+              <p>
+                {profile.description ||
+                  "在档案中填写环境变量，入口模板使用 {{变量名}} 引用。"}
+              </p>
+            </div>
+            <span>
+              {data.projects.length} 个项目 · {profile.variables.length} 个变量
+            </span>
+          </div>
+          <div className="pc-metrics" aria-label="当前档案概况">
+            <span>
+              <CheckCircle2 size={14} />
+              <strong>
+                {resolved.filter((item) => item.enabled && !item.error).length}
+              </strong>
+              可打开
+            </span>
+            <span>
+              <strong>{resolved.filter((item) => !item.enabled).length}</strong>
+              已停用
+            </span>
+            <button
+              className={
+                resolved.some((item) => item.error) ? "pc-invalid" : ""
+              }
+              onClick={() => setFilter("invalid")}
+            >
+              <AlertCircle size={14} />
+              <strong>{resolved.filter((item) => item.error).length}</strong>
+              配置异常
+            </button>
+            {canEdit && (
+              <button onClick={() => setProfileDraft(structuredClone(profile))}>
+                <Settings2 size={14} />
+                管理 {profile.name} 变量
+              </button>
+            )}
+          </div>
+          <div className="pc-toolbar">
+            <label className="pc-search">
+              <Search size={15} />
+              <input
+                aria-label="搜索项目"
+                placeholder="搜索名称、编码、分组或地址…"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <select
+              aria-label="筛选项目分组"
+              value={group}
+              onChange={(event) => setGroup(event.target.value)}
+            >
+              <option value="">全部分组</option>
+              {groups.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </select>
+            <select
+              aria-label="项目排序"
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+            >
+              <option value="manual">创建顺序</option>
+              <option value="name">按名称</option>
+              <option value="group">按分组</option>
+            </select>
+            <div
+              className="pc-view-toggle"
+              role="group"
+              aria-label="项目显示方式"
+            >
+              <button
+                aria-label="卡片视图"
+                aria-pressed={view === "grid"}
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                aria-label="列表视图"
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+              >
+                <List size={16} />
+              </button>
+            </div>
+            <select
+              aria-label="筛选项目状态"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+            >
+              <option value="all">全部状态</option>
+              <option value="enabled">已启用</option>
+              <option value="disabled">已停用</option>
+              <option value="invalid">配置异常</option>
+            </select>
+            <button
+              className="run-button"
+              disabled={busy || !canEdit}
+              onClick={() =>
+                editEntry({
+                  id: newProjectId(),
+                  name: "",
+                  code: `project-${Date.now().toString(36)}`,
+                  group: "",
+                  description: "",
+                  url: "http://{{host}}:8080/",
+                  enabled: true,
+                  query: [],
+                })
+              }
+            >
+              <Plus size={15} />
+              添加项目
+            </button>
+          </div>
+          <div className="pc-bulk">
+            <label className="pc-select-all">
+              <input
+                ref={allSelected}
+                type="checkbox"
+                aria-label="选择当前结果"
+                checked={
+                  !!projects.length &&
+                  projects.every((item) => selected.includes(item.id))
+                }
+                disabled={!projects.length || busy}
+                onChange={(event) =>
+                  setSelected((current) =>
+                    event.target.checked
+                      ? [
+                          ...new Set([
+                            ...current,
+                            ...projects.map((item) => item.id),
+                          ]),
+                        ]
+                      : current.filter(
+                          (id) => !projects.some((item) => item.id === id),
+                        ),
+                  )
+                }
+              />
+              选择当前结果
+            </label>
+            <span>
+              {projects.length} 项结果 · 已选 {selectedProjects.length} 项
+              {selectedProjects.some(
+                (item) => !projects.some((visible) => visible.id === item.id),
+              )
+                ? "（含筛选外项目）"
+                : ""}
+            </span>
+            {selected.length > 0 && (
+              <button onClick={() => setSelected([])}>清除选择</button>
+            )}
+            {canEdit && (
+              <>
+                <button
+                  disabled={busy || !selectedProjects.length}
+                  onClick={() => void action(() => setEnabled(true))}
+                >
+                  启用所选
+                </button>
+                <button
+                  disabled={busy || !selectedProjects.length}
+                  onClick={() => void action(() => setEnabled(false))}
+                >
+                  停用所选
+                </button>
+                <button
+                  disabled={
+                    busy ||
+                    !selectedProjects.some(
+                      (item) =>
+                        resolveProject(item, profile).enabled &&
+                        !resolveProject(item, profile).error,
+                    )
+                  }
+                  onClick={() =>
+                    void action(async () => {
+                      await probe(
+                        selectedProjects
+                          .filter((item) => {
+                            const result = resolveProject(item, profile);
+                            return result.enabled && !result.error;
+                          })
+                          .slice(0, 20)
+                          .map((item) => item.id),
+                      );
+                      setMessage(
+                        "已从主机检测所选入口（最多 20 项）；状态不代表完整业务可用性。",
+                      );
+                    })
+                  }
+                >
+                  检测所选入口
+                </button>
+              </>
+            )}
+            <button
+              disabled={!projects.length && !selectedProjects.length}
+              onClick={() =>
+                void copy(
+                  (selectedProjects.length ? selectedProjects : projects)
+                    .map(
+                      (item) =>
+                        `${item.name}\t${resolveProject(item, profile).url || "配置异常"}`,
+                    )
+                    .join("\n"),
+                )
+              }
+            >
+              {selectedProjects.length ? "复制所选清单" : "复制当前清单"}
+            </button>
+          </div>
+          {!projects.length && (
+            <div className="pc-empty">
+              <FolderKanban size={34} />
+              <h3>
+                {data.projects.length ? "没有匹配的项目" : "添加第一个项目入口"}
+              </h3>
+              <p>
+                {data.projects.length
+                  ? "试试其他关键词或清除分组、状态筛选。"
+                  : "先添加项目定义，再通过配置档案切换环境。地址可以引用 {{host}} 等变量。"}
+              </p>
+              {data.projects.length > 0 && (
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setSearch("");
+                    setGroup("");
+                    setFilter("all");
+                  }}
+                >
+                  清除筛选
+                </button>
+              )}
+            </div>
+          )}
+          <div className={`pc-grid ${view === "list" ? "pc-list" : ""}`}>
+            {projects.map((project) => {
+              const result = resolveProject(project, profile),
+                probeResult = health[`${profile.id}:${project.id}`];
+              return (
+                <article
+                  className={`pc-card ${!result.enabled ? "disabled" : ""} ${selected.includes(project.id) ? "is-selected" : ""}`}
+                  key={project.id}
+                >
+                  <div className="pc-card-top">
+                    <label className="pc-card-select">
+                      <input
+                        type="checkbox"
+                        aria-label={`选择 ${project.name}`}
+                        disabled={busy}
+                        checked={selected.includes(project.id)}
+                        onChange={(event) =>
+                          setSelected((current) =>
+                            event.target.checked
+                              ? [...current, project.id]
+                              : current.filter((id) => id !== project.id),
+                          )
+                        }
+                      />
+                      <span>{project.group || "未分组"}</span>
+                    </label>
+                    <small className="pc-code" title={project.code}>
+                      {project.code}
+                    </small>
+                    <span>{result.overridden ? "档案覆盖" : "基础定义"}</span>
+                  </div>
+                  <div className="pc-card-identity">
+                    <h3 title={project.name}>{project.name}</h3>
+                    <button
+                      className={`pc-status ${result.enabled ? "enabled" : ""}`}
+                      disabled={busy || !canEdit}
+                      aria-label={`${result.enabled ? "停用" : "启用"} ${project.name}（仅当前档案）`}
+                      onClick={() =>
+                        void action(() =>
+                          setEnabled(!result.enabled, [project]),
+                        )
+                      }
+                    >
+                      {result.enabled ? "已启用" : "已停用"}
+                    </button>
+                  </div>
+                  {project.description && (
+                    <p
+                      className="pc-card-description"
+                      title={project.description}
+                    >
+                      {project.description}
+                    </p>
+                  )}
+                  <details className="pc-address">
+                    <summary
+                      aria-label={`展开 ${project.name} 完整地址`}
+                      title={result.error || result.url}
+                    >
+                      <code className={result.error ? "pc-invalid" : ""}>
+                        {result.error || result.url}
+                      </code>
+                      <ChevronDown size={13} />
+                    </summary>
+                    <div>
+                      <code>{result.error || result.url}</code>
+                    </div>
+                  </details>
+                  {portal && result.localOnly && (
+                    <small className="pc-invalid">
+                      此地址指向访问者自己的电脑；共享服务请使用主机局域网 IP。
+                    </small>
+                  )}
+                  {probeResult && (
+                    <small
+                      className={
+                        probeResult.state === "online" ? "pc-ok" : "pc-invalid"
+                      }
+                    >
+                      {probeResult.status
+                        ? `HTTP ${probeResult.status}`
+                        : probeResult.error}{" "}
+                      · {probeResult.elapsed} ms（主机检测）
+                    </small>
+                  )}
+                  <div className="pc-card-actions">
+                    <button
+                      className="secondary-button"
+                      disabled={!result.enabled || !!result.error}
+                      onClick={() =>
+                        void action(async () => {
+                          await openProjectUrl(result.url);
+                        })
+                      }
+                    >
+                      <ExternalLink size={14} />
+                      {result.enabled ? "打开入口" : "已停用"}
+                    </button>
+                    <button
+                      className="icon-button"
+                      aria-label={`复制 ${project.name} 地址`}
+                      title="复制最终地址"
+                      disabled={!!result.error}
+                      onClick={() => void copy(result.url)}
+                    >
+                      <Copy size={14} />
+                    </button>
+                    {canEdit && (
+                      <>
+                        <button
+                          className="icon-button"
+                          aria-label={`编辑 ${project.name}`}
+                          title="编辑基础定义（所有档案）"
+                          disabled={busy}
+                          onClick={() => editEntry(project)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          className="icon-button"
+                          title="仅覆盖当前档案"
+                          aria-label={`配置 ${project.name} 环境覆盖`}
+                          disabled={busy}
+                          onClick={() => editEntry(project, true)}
+                        >
+                          <Settings2 size={14} />
+                        </button>
+                        <details
+                          className="pc-menu"
+                          onClick={(event) => {
+                            if (
+                              event.target instanceof Element &&
+                              event.target.closest("button")
+                            )
+                              event.currentTarget.open = false;
+                          }}
+                        >
+                          <summary
+                            aria-label={`${project.name} 更多操作`}
+                            title="更多操作"
+                          >
+                            <MoreHorizontal size={17} />
+                          </summary>
+                          <div>
+                            <button
+                              className="text-button"
+                              title="复制项目定义"
+                              aria-label={`复制 ${project.name} 定义`}
+                              disabled={busy}
+                              onClick={() =>
+                                editEntry({
+                                  ...structuredClone(project),
+                                  id: newProjectId(),
+                                  name: `${project.name} 副本`,
+                                  code: `${project.code}-${Date.now().toString(36)}`,
+                                })
+                              }
+                            >
+                              <Plus size={14} />
+                              复制定义
+                            </button>
+                            <button
+                              className="text-button pc-invalid"
+                              aria-label={`删除 ${project.name}`}
+                              disabled={busy}
+                              onClick={() =>
+                                setConfirmation({
+                                  title: `删除项目“${project.name}”？`,
+                                  description:
+                                    "项目及其在所有配置档案中的覆盖都会移除。删除前自动备份，可在“备份与恢复”中找回。",
+                                  run: async (base) => {
+                                    await persist(
+                                      {
+                                        ...base,
+                                        projects: base.projects.filter(
+                                          (item) => item.id !== project.id,
+                                        ),
+                                        profiles: base.profiles.map((item) => ({
+                                          ...item,
+                                          overrides: item.overrides.filter(
+                                            (row) =>
+                                              row.projectId !== project.id,
+                                          ),
+                                        })),
+                                      },
+                                      base.revision,
+                                    );
+                                  },
+                                })
+                              }
+                            >
+                              <Trash2 size={14} />
+                              删除项目
+                            </button>
+                          </div>
+                        </details>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <footer className="pc-footer">
+            <button
+              className="text-button"
+              onClick={() =>
+                void action(async () => {
+                  setMessage(
+                    await saveText(
+                      exportState(data),
+                      "devkit-project-center.json",
+                    ),
+                  );
+                })
+              }
+            >
+              <Download size={14} />
+              导出项目与档案
+            </button>
+            {canEdit && (
+              <>
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => file.current?.click()}
+                >
+                  <Upload size={14} />
+                  导入预览
+                </button>
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () =>
+                      setHistory(await projectRequest<Snapshot[]>("snapshots")),
+                    )
+                  }
+                >
+                  <Archive size={14} />
+                  备份与恢复
+                </button>
+              </>
+            )}
+            <span>
+              {owner
+                ? "项目与档案保存到安装目录的 configs；整目录复制可迁移，导出 JSON 可选择合并导入。"
+                : "数据保存在主机；当前环境和视图选择只影响你自己。"}
+            </span>
+          </footer>
+          <input
+            ref={file}
+            type="file"
+            className="sr-only"
+            accept=".json"
+            aria-label="导入项目中心 JSON"
+            onChange={(event) => {
+              const selected = event.target.files?.[0];
+              event.target.value = "";
+              if (selected)
+                void action(async () => {
+                  if (selected.size > 4_100_000)
+                    throw new Error("导入文件过大。");
+                  setImportMode("merge");
+                  setImported(importState(await selected.text()));
+                });
+            }}
+          />
+        </div>
+      </div>
+      {entry && (
+        <Modal
+          feedback={message}
+          title={
+            overrideMode
+              ? `当前档案覆盖 · ${profile.name}`
+              : "项目定义 · 对所有档案生效"
+          }
+          close={() => setEntry(null)}
+          draft={{ entry, overrideUrl, overrideEnabled }}
+          busy={busy}
+          wide
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void action(async () => {
+                if (overrideMode) {
+                  await persist({
+                    ...data,
+                    profiles: data.profiles.map((item) =>
+                      item.id !== profile.id
+                        ? item
+                        : {
+                            ...item,
+                            overrides: [
+                              ...item.overrides.filter(
+                                (row) => row.projectId !== entry.id,
+                              ),
+                              {
+                                projectId: entry.id,
+                                url: overrideUrl,
+                                enabled: overrideEnabled,
+                              },
+                            ],
+                          },
+                    ),
+                  });
+                } else
+                  await persist({
+                    ...data,
+                    projects: upsert(data.projects, entry),
+                  });
+                setEntry(null);
+              });
+            }}
+          >
+            {errorBox}
+            {overrideMode ? (
+              <>
+                <p>
+                  只修改此档案中的“{entry.name}”。留空地址表示继续使用基础模板。
+                </p>
+                <Field label="覆盖地址模板">
+                  <input
+                    maxLength={4000}
+                    value={overrideUrl}
+                    placeholder={entry.url}
+                    onChange={(event) => setOverrideUrl(event.target.value)}
+                  />
+                </Field>
+                <label className="pc-check">
+                  <input
+                    type="checkbox"
+                    checked={overrideEnabled}
+                    onChange={(event) =>
+                      setOverrideEnabled(event.target.checked)
+                    }
+                  />
+                  在当前档案启用
+                </label>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      await persist({
+                        ...data,
+                        profiles: data.profiles.map((item) =>
+                          item.id !== profile.id
+                            ? item
+                            : {
+                                ...item,
+                                overrides: item.overrides.filter(
+                                  (row) => row.projectId !== entry.id,
+                                ),
+                              },
+                        ),
+                      });
+                      setEntry(null);
+                    })
+                  }
+                >
+                  移除覆盖，恢复基础定义
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="pc-scope">
+                  <Settings2 size={15} />
+                  基础定义对所有档案生效。已有环境覆盖的档案仍优先使用覆盖地址。
+                </div>
+                <div className="pc-form-grid">
+                  <Field label="项目名称">
+                    <input
+                      required
+                      maxLength={100}
+                      value={entry.name}
+                      onChange={(event) =>
+                        setEntry({ ...entry, name: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="唯一编码">
+                    <input
+                      required
+                      maxLength={100}
+                      value={entry.code}
+                      onChange={(event) =>
+                        setEntry({ ...entry, code: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="分组">
+                    <input
+                      maxLength={80}
+                      value={entry.group}
+                      onChange={(event) =>
+                        setEntry({ ...entry, group: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="说明">
+                    <input
+                      maxLength={1000}
+                      value={entry.description}
+                      onChange={(event) =>
+                        setEntry({ ...entry, description: event.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+                <h3 className="pc-form-section">入口地址与参数</h3>
+                <Field label="HTTP(S) 地址模板">
+                  <input
+                    required
+                    maxLength={4000}
+                    placeholder="http://{{host}}:8080/"
+                    value={entry.url}
+                    onChange={(event) =>
+                      setEntry({ ...entry, url: event.target.value })
+                    }
+                  />
+                </Field>
+                <p className="pc-hint">
+                  使用 {"{{变量名}}"}{" "}
+                  引用档案变量；参数通过下表添加，会自动编码并保留重复项。
+                </p>
+                <p className="pc-hint">
+                  完整地址可包含路径和已有参数，例如 https://{"{{host}}"}
+                  /console?lang=zh。下表参数会追加到地址中。
+                </p>
+                <label className="pc-check">
+                  <input
+                    type="checkbox"
+                    checked={entry.enabled}
+                    onChange={(event) =>
+                      setEntry({ ...entry, enabled: event.target.checked })
+                    }
+                  />
+                  默认启用
+                </label>
+                <div className="pc-section-title">
+                  <strong>查询参数</strong>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={entry.query.length >= 100}
+                    onClick={() =>
+                      setEntry({
+                        ...entry,
+                        query: [
+                          ...entry.query,
+                          {
+                            id: newProjectId(),
+                            key: "",
+                            value: "",
+                            enabled: true,
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    ＋ 添加参数
+                  </button>
+                </div>
+                {entry.query.length > 0 && (
+                  <div className="pc-row-head" aria-hidden="true">
+                    <span>启用</span>
+                    <span>参数名</span>
+                    <span>参数值</span>
+                    <span />
+                  </div>
+                )}
+                {entry.query.map((row, index) => (
+                  <div
+                    className={`pc-row pc-query-row ${!row.enabled ? "is-inactive" : ""}`}
+                    key={row.id}
+                  >
+                    <input
+                      aria-label={`参数 ${index + 1} 启用`}
+                      type="checkbox"
+                      checked={row.enabled}
+                      onChange={(event) =>
+                        setEntry({
+                          ...entry,
+                          query: entry.query.map((item) =>
+                            item.id === row.id
+                              ? { ...item, enabled: event.target.checked }
+                              : item,
+                          ),
+                        })
+                      }
+                    />
+                    <input
+                      aria-label={`参数 ${index + 1} 名称`}
+                      maxLength={200}
+                      value={row.key}
+                      onChange={(event) =>
+                        setEntry({
+                          ...entry,
+                          query: entry.query.map((item) =>
+                            item.id === row.id
+                              ? { ...item, key: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                      placeholder="名称"
+                    />
+                    <input
+                      aria-label={`参数 ${index + 1} 值`}
+                      maxLength={2000}
+                      value={row.value}
+                      onChange={(event) =>
+                        setEntry({
+                          ...entry,
+                          query: entry.query.map((item) =>
+                            item.id === row.id
+                              ? { ...item, value: event.target.value }
+                              : item,
+                          ),
+                        })
+                      }
+                      placeholder="值或 {{变量名}}"
+                    />
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`删除参数 ${index + 1}`}
+                      onClick={() =>
+                        setEntry({
+                          ...entry,
+                          query: entry.query.filter(
+                            (item) => item.id !== row.id,
+                          ),
+                        })
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {data.projects.some((item) => item.id === entry.id) &&
+                  profile.overrides.some(
+                    (row) => row.projectId === entry.id,
+                  ) && (
+                    <p className="pc-invalid">
+                      当前档案已为该项目设置覆盖。修改基础定义后，覆盖内容仍优先。
+                    </p>
+                  )}
+              </>
+            )}
+            <UrlPreview
+              project={entry}
+              profile={
+                overrideMode
+                  ? {
+                      ...profile,
+                      overrides: [
+                        ...profile.overrides.filter(
+                          (row) => row.projectId !== entry.id,
+                        ),
+                        {
+                          projectId: entry.id,
+                          url: overrideUrl,
+                          enabled: overrideEnabled,
+                        },
+                      ],
+                    }
+                  : profile
+              }
+              copy={copy}
+            />
+            {!overrideMode && (
+              <details className="pc-profile-preview">
+                <summary>
+                  查看所有配置档案的地址（{data.profiles.length}）
+                </summary>
+                {data.profiles.map((item) => {
+                  const result = resolveProject(entry, item);
+                  return (
+                    <div key={item.id}>
+                      <strong>
+                        {item.name}
+                        {result.overridden ? " · 环境覆盖优先" : ""}
+                      </strong>
+                      <code className={result.error ? "pc-invalid" : ""}>
+                        {result.error || result.url}
+                      </code>
+                    </div>
+                  );
+                })}
+              </details>
+            )}
+            {draftError && (
+              <p className="pc-validation" role="status">
+                {draftError}
+              </p>
+            )}
+            <footer>
+              <ModalCancel />
+              <button className="run-button" disabled={busy || !!draftError}>
+                保存{overrideMode ? "当前档案覆盖" : "项目定义"}
+              </button>
+            </footer>
+          </form>
+        </Modal>
+      )}
+      {profileDraft && (
+        <Modal
+          feedback={message}
+          title="编辑配置档案"
+          close={() => setProfileDraft(null)}
+          draft={profileDraft}
+          busy={busy}
+          wide
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void action(async () => {
+                await persist({
+                  ...data,
+                  profiles: upsert(data.profiles, profileDraft),
+                });
+                setActive(profileDraft.id);
+                setProfileDraft(null);
+              });
+            }}
+          >
+            {errorBox}
+            <Field label="档案名称">
+              <input
+                required
+                maxLength={100}
+                value={profileDraft.name}
+                onChange={(event) =>
+                  setProfileDraft({ ...profileDraft, name: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="说明">
+              <input
+                maxLength={1000}
+                value={profileDraft.description}
+                onChange={(event) =>
+                  setProfileDraft({
+                    ...profileDraft,
+                    description: event.target.value,
+                  })
+                }
+              />
+            </Field>
+            <div className="pc-section-title">
+              <strong>环境变量</strong>
+              <button
+                type="button"
+                className="text-button"
+                disabled={profileDraft.variables.length >= 100}
+                onClick={() =>
+                  setProfileDraft({
+                    ...profileDraft,
+                    variables: [
+                      ...profileDraft.variables,
+                      { key: "", value: "" },
+                    ],
+                  })
+                }
+              >
+                ＋ 添加变量
+              </button>
+            </div>
+            <p className="pc-hint">
+              变量会随配置导出和共享。此处不用于保存登录密码或密钥。
+            </p>
+            {profileDraft.variables.map((row, index) => (
+              <div className="pc-row" key={index}>
+                <input
+                  required
+                  aria-label={`变量 ${index + 1} 名称`}
+                  maxLength={80}
+                  value={row.key}
+                  placeholder="host"
+                  onChange={(event) =>
+                    setProfileDraft({
+                      ...profileDraft,
+                      variables: profileDraft.variables.map((item, i) =>
+                        i === index
+                          ? { ...item, key: event.target.value }
+                          : item,
+                      ),
+                    })
+                  }
+                />
+                <input
+                  aria-label={`变量 ${index + 1} 值`}
+                  maxLength={2000}
+                  value={row.value}
+                  placeholder="192.168.1.10"
+                  onChange={(event) =>
+                    setProfileDraft({
+                      ...profileDraft,
+                      variables: profileDraft.variables.map((item, i) =>
+                        i === index
+                          ? { ...item, value: event.target.value }
+                          : item,
+                      ),
+                    })
+                  }
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={`删除变量 ${index + 1}`}
+                  onClick={() =>
+                    setProfileDraft({
+                      ...profileDraft,
+                      variables: profileDraft.variables.filter(
+                        (_, i) => i !== index,
+                      ),
+                    })
+                  }
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            {!profileDraft.variables.length && (
+              <p className="pc-hint">
+                暂无环境变量。不使用模板变量时可以留空。
+              </p>
+            )}
+            <details className="pc-profile-preview">
+              <summary>
+                查看此档案的项目地址预览（{data.projects.length}）
+              </summary>
+              {data.projects.map((item) => {
+                const result = resolveProject(item, profileDraft);
+                return (
+                  <div key={item.id}>
+                    <strong>{item.name}</strong>
+                    <code className={result.error ? "pc-invalid" : ""}>
+                      {result.error || result.url}
+                    </code>
+                  </div>
+                );
+              })}
+            </details>
+            {draftError && (
+              <p className="pc-validation" role="status">
+                {draftError}
+              </p>
+            )}
+            <footer>
+              <ModalCancel />
+              <button className="run-button" disabled={busy || !!draftError}>
+                保存配置档案
+              </button>
+            </footer>
+          </form>
+        </Modal>
+      )}
+      {imported && (
+        <Modal
+          feedback={message}
+          title="导入预览"
+          close={() => setImported(null)}
+          busy={busy}
+        >
+          {errorBox}
+          <p>
+            文件包含 {imported.projects.length} 个项目、
+            {imported.profiles.length}{" "}
+            个配置档案。确认前不会写入数据；导入前自动备份，访问口令和共享设置不变。
+          </p>
+          <fieldset className="pc-import-modes">
+            <legend>导入方式</legend>
+            <label>
+              <input
+                type="radio"
+                name="import-mode"
+                value="merge"
+                checked={importMode === "merge"}
+                onChange={() => setImportMode("merge")}
+              />
+              <span>
+                <strong>合并到当前数据</strong>
+                <small>
+                  同编码项目更新；同名档案合并变量与覆盖；保留文件外的内容。
+                </small>
+              </span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="import-mode"
+                value="replace"
+                checked={importMode === "replace"}
+                onChange={() => setImportMode("replace")}
+              />
+              <span>
+                <strong>全部替换</strong>
+                <small>项目与档案以文件为准，当前文件外的内容会移除。</small>
+              </span>
+            </label>
+          </fieldset>
+          {importTarget && <StateChanges current={data} next={importTarget} />}
+          {importError && (
+            <p className="pc-error" role="alert">
+              {importError}
+            </p>
+          )}
+          <details className="pc-profile-preview">
+            <summary>查看导入内容</summary>
+            <p>
+              配置档案：{imported.profiles.map((item) => item.name).join("、")}
+            </p>
+            <ul>
+              {imported.projects.slice(0, 50).map((item) => (
+                <li key={item.id}>
+                  {item.name} · {item.code} · {item.group || "未分组"}
+                </li>
+              ))}
+            </ul>
+            {imported.projects.length > 50 && (
+              <p>仅展示前 50 项，全部内容均参与导入。</p>
+            )}
+          </details>
+          <footer>
+            <ModalCancel />
+            <button
+              className="run-button"
+              disabled={busy || !importTarget}
+              onClick={() =>
+                void action(async () => {
+                  await persist({ ...importTarget!, revision: data.revision });
+                  setImported(null);
+                  setSelected([]);
+                  setActive(
+                    importTarget!.profiles.find(
+                      (item) => item.id === profile.id,
+                    )?.id ||
+                      importTarget!.profiles.find(
+                        (item) => item.name === profile.name,
+                      )?.id ||
+                      importTarget!.profiles[0].id,
+                  );
+                  setMessage(
+                    importMode === "merge"
+                      ? "已合并导入；可在备份与恢复中撤销本次修改。"
+                      : "已替换导入；可在备份与恢复中找回原数据。",
+                  );
+                })
+              }
+            >
+              备份当前数据并导入
+            </button>
+          </footer>
+        </Modal>
+      )}
+      {history && (
+        <Modal
+          feedback={message}
+          title={restoring ? "恢复预览" : "备份与恢复"}
+          close={() => {
+            setHistory(null);
+            setRestoring(null);
+          }}
+          busy={busy}
+        >
+          {errorBox}
+          {restoring ? (
+            <>
+              <p>
+                准备恢复“{restoring.meta.name}”（
+                {new Date(restoring.meta.createdAt).toLocaleString()}
+                ）。项目和档案将替换为快照内容，当前共享设置和访问口令保持不变。
+              </p>
+              <StateChanges current={data} next={restoring.data} />
+              <details className="pc-profile-preview">
+                <summary>查看快照内容</summary>
+                <p>
+                  档案：
+                  {restoring.data.profiles.map((item) => item.name).join("、")}
+                </p>
+                <ul>
+                  {restoring.data.projects.slice(0, 50).map((item) => (
+                    <li key={item.id}>
+                      {item.name} · {item.code}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+              <footer>
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => setRestoring(null)}
+                >
+                  返回快照列表
+                </button>
+                <button
+                  className="run-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      setData(
+                        await projectRequest<ProjectState>("restore", {
+                          id: restoring.meta.id,
+                          revision: data.revision,
+                        }),
+                      );
+                      setHealth({});
+                      setSelected([]);
+                      setRestoring(null);
+                      await refreshSnapshots();
+                      setMessage("已恢复快照，并保留恢复前备份。");
+                    })
+                  }
+                >
+                  备份当前数据并恢复
+                </button>
+              </footer>
+            </>
+          ) : (
+            <>
+              <p>
+                自动保留最近 30
+                份快照。恢复先预览，再新增版本；恢复前的数据也会备份。
+              </p>
+              <div className="pc-backup-create">
+                <input
+                  aria-label="快照名称"
+                  maxLength={100}
+                  value={snapshotName}
+                  placeholder="快照名称（选填）"
+                  onChange={(event) => setSnapshotName(event.target.value)}
+                />
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      await projectRequest("backup", {
+                        name:
+                          snapshotName.trim() ||
+                          `手动快照 ${new Date().toLocaleString()}`,
+                      });
+                      setSnapshotName("");
+                      await refreshSnapshots();
+                      setMessage("已创建快照。");
+                    })
+                  }
+                >
+                  <Plus size={14} />
+                  创建手动快照
+                </button>
+              </div>
+              <div className="pc-snapshots">
+                {history.map((item) => (
+                  <div key={item.id}>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {new Date(item.createdAt).toLocaleString()} ·{" "}
+                        {item.projects} 项目 / {item.profiles} 档案
+                      </small>
+                    </div>
+                    <button
+                      className="secondary-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void action(async () =>
+                          setRestoring({
+                            meta: item,
+                            data: await projectRequest<ProjectState>(
+                              "snapshot",
+                              { id: item.id },
+                            ),
+                          }),
+                        )
+                      }
+                    >
+                      预览恢复
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {!history.length && (
+                <div className="pc-empty">
+                  <Archive size={28} />
+                  <h3>还没有快照</h3>
+                  <p>保存项目时会自动备份，也可以在上方手动创建。</p>
+                </div>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+      {confirmation && (
+        <Modal
+          feedback={message}
+          title={confirmation.title}
+          close={() => setConfirmation(null)}
+          busy={busy}
+        >
+          {errorBox}
+          <p>{confirmation.description}</p>
+          <footer>
+            <ModalCancel />
+            <button
+              className="pc-danger-button"
+              disabled={busy}
+              onClick={() =>
+                void action(async () => {
+                  await confirmation.run(data);
+                  setConfirmation(null);
+                })
+              }
+            >
+              确认删除
+            </button>
+          </footer>
+        </Modal>
+      )}
+      {storageOpen && owner && (
+        <Modal
+          feedback={message}
+          title="配置文件与迁移"
+          close={() => setStorageOpen(false)}
+          busy={busy}
+        >
+          {errorBox}
+          <p>
+            项目中心使用安装目录下的 <strong>configs</strong>{" "}
+            文件夹。复制整个文件夹可以带走项目、档案、备份和共享设置。
+          </p>
+          <div className="pc-path">
+            <code>{storage?.directory}</code>
+            <div className="pc-actions">
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  void action(async () => {
+                    await projectRequest("open-configs");
+                  })
+                }
+              >
+                <FolderOpen size={15} />
+                打开 configs 目录
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => void copy(storage?.directory || "")}
+              >
+                <Copy size={14} />
+                复制路径
+              </button>
+            </div>
+          </div>
+          <dl className="pc-file-list">
+            <div>
+              <dt>projects.json</dt>
+              <dd>项目、配置档案与最近 30 份快照</dd>
+            </div>
+            <div>
+              <dt>sharing.json</dt>
+              <dd>共享选项与访问口令哈希</dd>
+            </div>
+          </dl>
+          <h3 className="pc-form-section">整目录迁移</h3>
+          <ol className="pc-transfer-steps">
+            <li>关闭两台电脑上的 DevKit 或独立服务。</li>
+            <li>
+              先备份目标电脑的 configs，再将来源 configs
+              整个复制到目标安装目录的相同位置。
+            </li>
+            <li>
+              确认当前用户可写，重新启动 DevKit 即可使用。主机 IP
+              从新电脑重新获取。
+            </li>
+          </ol>
+          <p>
+            复制目录包含访问口令与快照；导出 JSON
+            仅包含项目和档案。需要保留两边内容时，使用 JSON 合并导入。
+          </p>
+          {storage?.migratedFrom && (
+            <p className="pc-hint">
+              本次启动迁入自：{storage.migratedFrom}。旧目录原件未删除。
+            </p>
+          )}
+          <footer>
+            <ModalCancel>知道了</ModalCancel>
+          </footer>
+        </Modal>
+      )}
+      {sharing && (
+        <Modal
+          feedback={message}
+          title="局域网共享 · 仅项目中心"
+          close={() => setSharing(null)}
+          busy={busy}
+          savedKey={shareSaved}
+          draft={{
+            host: sharing.host,
+            port: sharing.port,
+            canEdit: sharing.canEdit,
+            autoStart: sharing.autoStart,
+            password: sharePassword,
+          }}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void action(async () => {
+                const result = await projectRequest<Sharing>("start", {
+                  host: sharing.host,
+                  port: Number(sharing.port),
+                  canEdit: sharing.canEdit,
+                  autoStart: sharing.autoStart,
+                  password: sharePassword,
+                });
+                setSharing((current) => (current === null ? null : result));
+                setSharePassword("");
+                setShareSaved((current) => current + 1);
+                setMessage("项目中心共享已启动。");
+              });
+            }}
+          >
+            {errorBox}
+            <p>
+              主机运行期间，其他电脑可用浏览器访问。关闭 DevKit 会停止共享。现有
+              44 个工具不通过此服务开放。
+            </p>
+            <div className="pc-form-grid">
+              <Field label="监听范围">
+                <select
+                  value={sharing.host}
+                  onChange={(event) =>
+                    setSharing({ ...sharing, host: event.target.value })
+                  }
+                >
+                  <option value="0.0.0.0">局域网（所有 IPv4 网卡）</option>
+                  <option value="127.0.0.1">仅本机（用于测试）</option>
+                </select>
+              </Field>
+              <Field label="端口">
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={65535}
+                  value={sharing.port}
+                  onChange={(event) =>
+                    setSharing({ ...sharing, port: Number(event.target.value) })
+                  }
+                />
+              </Field>
+            </div>
+            <Field
+              label={
+                sharing.hasPassword
+                  ? "更换访问口令（留空保留）"
+                  : "首次访问口令（至少 8 位）"
+              }
+            >
+              <input
+                type="password"
+                autoComplete="new-password"
+                required={!sharing.hasPassword}
+                minLength={8}
+                maxLength={128}
+                value={sharePassword}
+                onChange={(event) => setSharePassword(event.target.value)}
+              />
+            </Field>
+            <label className="pc-check">
+              <input
+                type="checkbox"
+                checked={sharing.canEdit}
+                onChange={(event) =>
+                  setSharing({ ...sharing, canEdit: event.target.checked })
+                }
+              />
+              允许持有口令的访客编辑项目、档案和恢复备份
+            </label>
+            <label className="pc-check">
+              <input
+                type="checkbox"
+                checked={sharing.autoStart}
+                onChange={(event) =>
+                  setSharing({ ...sharing, autoStart: event.target.checked })
+                }
+              />
+              下次启动 DevKit 时自动开启共享
+            </label>
+            <p className="pc-hint">
+              默认只读。仅用于可信局域网，HTTP
+              不加密；访问口令请单独设置。系统防火墙需允许所选端口入站。
+            </p>
+            <div className="pc-sharing-state">
+              <strong>{sharing.running ? "共享正在运行" : "共享已停止"}</strong>
+              {sharing.addresses.map((url) => (
+                <div key={url}>
+                  <code>{url}</code>
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => void copy(url)}
+                  >
+                    复制地址
+                  </button>
+                </div>
+              ))}
+              <small>数据目录：{sharing.directory}</small>
+            </div>
+            <footer>
+              {sharing.running && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void action(async () => {
+                      const stopped = await projectRequest<Sharing>("stop");
+                      setSharing((current) =>
+                        current === null ? null : stopped,
+                      );
+                      setSharePassword("");
+                      setShareSaved((current) => current + 1);
+                    })
+                  }
+                >
+                  停止共享
+                </button>
+              )}
+              <button className="run-button" disabled={busy}>
+                {sharing.running ? "应用设置并重启共享" : "开启共享"}
+              </button>
+            </footer>
+          </form>
+        </Modal>
+      )}
+    </section>
+  );
+}
