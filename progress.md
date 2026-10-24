@@ -320,3 +320,4 @@
 - 四份发行物及 verify:release 全部完成：Windows 113,055,353字节、amd64 93,239,932字节、ARM64 88,146,804字节、独立服务ZIP 190,789字节。共同构建指纹 fd55f9a4c220a76460969214c3ad4eecaf39ad77b03251eeb3bb7860733670d0；实际两份 deb 中 ASAR 均与 Windows 一致（ef6c3c4cf7cc2a6e8648995ba7d189d152c93d3743bc614abb24f5823f785a0e）。
 - 独立服务实际解压启动、资源隔离、复制configs/快照/口令复用通过；README和界面/工作区/项目中心/经纬度说明在各包逐字节一致。最终报告、截图和日志保存在 artifacts/release-1.9.3。未声称实际安装或在 Linux/麒麟执行。
 - 已暂存17个本次授权文件，AGENTS.md 未暂存；准备提交并推送 main。
+- 实现提交 a870b49 已推送 origin/main，ls-remote 确认远端 SHA 与本地一致。全部实施、验证、发行与推送完成；用户 AGENTS.md 原有修改保持未提交。本完成记录正常提交推送，最终来源信息写入发行目录 SOURCE-COMMIT.txt。
