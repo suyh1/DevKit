@@ -307,3 +307,4 @@
 - 独立服务最新 ZIP 再次实际解压启动验证通过，四份本次变更专题文档与 ZIP 内容逐字节一致；报告及最后一次成功预览汇总进 artifacts/release-1.9.2。Windows 和 amd64 已完成，ARM64 最后压缩核验中。
 - 最终三桌面包完成并通过 verify:release，共同构建指纹 95de2f3a6ada77de38013d30181da722e8db3026062b19fa454b883940f20fbb。实际 deb 的 ASAR 均与 Windows 相同（64856529b72135c42a49e44c762a36a06b5df253c35bbf2bdea814e25ca57723），README、经纬度指南/许可、审查清单、工具流程和开发工具文档逐字节一致。附 VERIFICATION.zh-CN.md、报告、预览及摘要清单。
 - Windows 安装器 113,053,287 字节，amd64 deb 93,247,904 字节，ARM64 deb 88,163,512 字节；独立服务 ZIP 189,416 字节。未声称真实安装或在 Linux/麒麟上执行，用户原有 AGENTS.md 修改不提交。准备提交推送。
+- 修复及审查提交 783945b 已成功推送 origin/main。最终交付 v1.9.2 三桌面包、独立服务、12 类问题与45工具审查记录，143 单元及最终实际 Windows ASAR 完整交互回归通过。本条随完成记录正常提交推送，最终远端 SHA 记入发行目录 SOURCE-COMMIT.txt。
