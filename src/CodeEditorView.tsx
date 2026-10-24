@@ -21,8 +21,8 @@ async function languageSupport(language: EditorLanguage) {
   return [];
 }
 const highlighting = HighlightStyle.define([
-  { tag: tags.inserted, color: 'var(--accent)', backgroundColor: '#16a34a18' },
-  { tag: tags.deleted, color: 'var(--diff-deleted)', backgroundColor: '#ef444418' },
+  { tag: tags.inserted, color: 'var(--diff-added)', backgroundColor: 'var(--diff-added-bg)' },
+  { tag: tags.deleted, color: 'var(--diff-deleted)', backgroundColor: 'var(--diff-deleted-bg)' },
   { tag: tags.meta, color: 'var(--syntax-keyword)' },
   { tag: tags.propertyName, color: 'var(--syntax-key)' },
   { tag: [tags.string, tags.special(tags.string)], color: 'var(--syntax-string)' },

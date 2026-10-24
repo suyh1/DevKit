@@ -78,7 +78,7 @@
 .digest-compare { display:flex; flex-direction:column; gap:10px; margin-top:10px; width:100%; font-size:12px; color:var(--muted); }
 .digest-compare input { font-size:12px; }
 .digest-result p { display:flex; align-items:center; gap:7px; font-size:12px; }
-.mismatch-text { color:var(--error,#b94343); }
+.mismatch-text { color:var(--error); }
 .conversion-summary { display:flex; gap:12px; align-items:center; padding:10px 14px; background:var(--soft); border-top:1px solid var(--line); font-size:10px; color:var(--muted); flex-wrap:wrap; }
 .conversion-summary small { margin-left:auto; }
 .metric-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:20px; }

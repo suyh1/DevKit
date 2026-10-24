@@ -328,7 +328,7 @@
   color: var(--diff-deleted);
 }
 .pc-ok {
-  color: var(--accent);
+  color: var(--success);
 }
 .pc-empty {
   display: grid;
@@ -707,8 +707,8 @@ body:has(.pc-login) {
   min-height: 26px;
 }
 .pc-status.enabled {
-  color: var(--accent);
-  background: var(--tint);
+  color: var(--success);
+  background: var(--success-tint);
 }
 .pc-status:disabled {
   opacity: 1;

@@ -1,5 +1,10 @@
 # Findings
 
+## 2026-10-24 深色主题去绿
+- 根因是 styles.css、workbench.css 和 design.css 重复定义全局主题，最后一层将深色背景、面板、文字和边框全部染绿，另有硬编码绿色装饰、焦点和选区。共享 theme.css 保留原导入顺序，新增首位主题变量文件统一管理。
+- 确定配色：背景 #141518、面板 #1C1E22、浮层 #25282E、输入区 #181A1E、正文 #E8E9ED、强调 #A6B8F4。成功 #8AC5A0、警告 #E2BB7F、错误 #EFA0AB；颜色工具的业务颜色不随主题替换。
+- 实际 Electron 主题切换含颜色过渡；视觉断言须等待过渡完成，避免捕获中间帧。已将真实成功状态、按钮及行号配色纳入既有设计回归。
+
 ## Debian first-install failure
 - The reported /opt/devkit/chrome-sandbox.dpkg-new ENOENT matches the original data.tar.xz having no directory entries. The old verifier checked file metadata but did not enforce parent-directory presence/order; it incorrectly let this package pass static checks.
 - Emit every parent directory before children, with root ownership and 0755 permissions; preserve runtime empty directories. A verifier must not use an extractor that silently creates missing parents, since that masks this defect. Strict empty-root extraction reproduces and prevents it.

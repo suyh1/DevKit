@@ -1,0 +1,34 @@
+/* One palette for desktop and project portal; component files consume these tokens. */
+:root {
+  --bg: #f7f9f8; --surface: #fff; --surface-raised: #fff; --soft: #f3f7f5;
+  --text: #243d35; --muted: #5e716a; --subtle: #687b73; --line: #e0e9e4;
+  --accent: #26745c; --accent-hover: #1e614c; --accent-ink: #fff; --tint: #eaf4ee;
+  --success: #26745c; --success-tint: #eaf4ee; --warning: #a36e14;
+  --error: #b42335; --diff-added: var(--success); --diff-deleted: var(--error);
+  --diff-added-bg: #16a34a18; --diff-deleted-bg: #ef444418;
+  --glass: #ffffffdf; --hero-bg: #edf6ef; --hero-ink: #23553f;
+  --app-background: radial-gradient(ellipse at 80% -30%, #b5d7c433, transparent 65%), var(--bg);
+  --color-story-background: linear-gradient(135deg, var(--surface), var(--tint));
+  --shadow: 0 4px 24px #294e3a04; --shadow-hover: 0 12px 32px #294e3a0c;
+  --syntax-key: #4270ac; --syntax-string: #238167; --syntax-number: #a45b28;
+  --syntax-keyword: #8e53b1; --syntax-comment: #7c8d99; --syntax-type: #9a6821; --syntax-function: #3566b2;
+  --editor-gutter: #f9fbfc; --editor-active: #087f7007; --editor-selection: #a3d9cd66;
+  --selection: #87d1bf60; --editor-focus-line: #629f8d; --focus-shadow: #087f7008;
+  --button-shadow: #26745c24;
+  --ease-out: cubic-bezier(.2,.7,.2,1);
+}
+:root[data-theme=dark] {
+  --bg: #141518; --surface: #1c1e22; --surface-raised: #25282e; --soft: #181a1e;
+  --text: #e8e9ed; --muted: #acafb9; --subtle: #9398a5; --line: #34373e;
+  --accent: #a6b8f4; --accent-hover: #bdcaf8; --accent-ink: #171d30; --tint: #292f43;
+  --success: #8ac5a0; --success-tint: #23332a; --warning: #e2bb7f; --error: #efa0ab;
+  --diff-added-bg: #8ac5a018; --diff-deleted-bg: #efa0ab18;
+  --glass: #1c1e22f5; --hero-bg: var(--surface); --hero-ink: var(--text);
+  --app-background: var(--bg); --color-story-background: var(--surface);
+  --shadow: 0 4px 24px #0000000c; --shadow-hover: 0 12px 32px #00000024;
+  --syntax-key: #a9c2f3; --syntax-string: #b5c5a2; --syntax-number: #e8bc8b;
+  --syntax-keyword: #c7ade8; --syntax-comment: #9398a5; --syntax-type: #dec995; --syntax-function: #b4c7f4;
+  --editor-gutter: #181a1e; --editor-active: #ffffff05; --editor-selection: #a6b8f43d;
+  --selection: #a6b8f44d; --editor-focus-line: var(--accent); --focus-shadow: #a6b8f414;
+  --button-shadow: #a6b8f424;
+}
