@@ -339,6 +339,7 @@ module.exports = async function checkProjects(window, output, staging) {
     await remote.webContents.executeJavaScript(
       'document.documentElement.dataset.theme="light"; new Promise(resolve=>setTimeout(resolve,200))',
     );
+    assert.deepEqual(await remote.webContents.executeJavaScript('({background:getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),accent:getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()})'), { background: '#f5f6f8', accent: '#3d5fad' });
     await fs.writeFile(
       path.join(output, "preview-project-portal.png"),
       (await remote.webContents.capturePage()).toPNG(),

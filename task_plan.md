@@ -167,3 +167,10 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 66. 仅提交授权文件并推送，确认远端 SHA — complete
 - 用户已批准实施；圆周仅含椭球 Karney 和球面大圆，不含恒向线/沿经纬线模式。
 - 保留用户 AGENTS.md 未提交修改；延续 planning-with-files 记录。
+
+## 2026-10-24 v1.9.1 修复与浅色主题去绿
+67. 复现提取/圆周点流转的全精度数字解析失败并补齐端到端回归 — complete
+68. 将浅色主配色改为中性灰白/蓝色，清除背景与交互的硬编码绿色并同步文档 — complete
+69. 回归与实际 Electron/主题截图验证，打包 v1.9.1 并核验发行物 — complete
+70. 提交并推送修复，保留用户 AGENTS.md 修改 — in_progress
+- 延续此前用户授权的实现、打包、提交推送流程；使用 ui-ux-pro-max 技能复核配色，保持现有布局与深色主题。

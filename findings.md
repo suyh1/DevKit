@@ -192,3 +192,9 @@
 - 来源：GeographicLib Python 官方 geodesics/intro、Movable Type 作者原文 latlong / latlong-vincenty、Turf destination/rhumbDestination、PROJ AEQD 文档。推荐默认 Karney，按需要增加球面模式；恒向线应作为明确命名的另一种移动方式，不笼统称为更精确/更差算法。
 - 最终交付仅经纬度三页签、椭球/球面两模型与复制能力。实际三架构包共享同一构建；两个 deb 实际 ASAR 与 Windows 预打包 ASAR 相同，许可/使用文档完整。验证边界及校验值保存在 artifacts/release-1.9.0/。
 - 旧通用提案已转存 artifacts/research，不进入本轮代码提交或发行。
+
+## v1.9.1 用户反馈修复
+- 工作区初始只有用户既有 AGENTS.md 未提交修改。使用 planning-with-files 续记，并读取 ui-ux-pro-max，用 bundled Python 生成设计建议；其默认绿色 CTA 与用户意图冲突，不采用，按用户要求选择中性灰白和蓝色。
+- 定位候选根因：提取坐标保留 Number 全精度，跳转时 String(point.lon/lat) 可产生 14–17 位小数或科学计数法；原十进制度正则只接受最多 12 位小数且不接受指数，内部结果因此被当作非法用户输入。需先补失败回归再修复。
+- 浅色 theme-tokens.css 确实仍为暖白/玉石绿，design.css 另有绿色光晕和装饰；深色先前修改未同步浅色。明确改用灰白背景、中性文字与蓝色交互，成功语义与颜色工具业务色独立保留。
+- v1.9.1 实际包内完整流转和浅色主题验证通过。保持全精度内部数据，展示/复制精度独立；未调整地理算法或减小坐标精度。所有新旧回归最终通过，根因与针对性回归均随修复提交。

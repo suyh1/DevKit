@@ -48,6 +48,19 @@ module.exports = async function geographySmoke(window, output) {
   assert.match(await js(`document.querySelector('${pane} .geo-issues').textContent`), /180/);
   await set('重复点', 'on'); await run();
   assert.equal(await js(`document.querySelectorAll('${pane} .geo-table tbody tr').length`), 2);
+  // Use the repeating-fraction coordinate from row two; do not overwrite the transferred center with a sample.
+  await js(`document.querySelectorAll('${pane} .geo-table tbody tr')[1].querySelectorAll('button')[1].click()`);
+  await wait(`!!document.querySelector('${pane} input[aria-label="圆心经度"]')`);
+  const transferred = await js(`document.querySelector('${pane} input[aria-label="圆心经度"]').value`);
+  assert.ok(Math.abs(Number(transferred) - 121.47366666666666) < 1e-12);
+  assert.ok(transferred.split('.')[1].length > 12, 'transfer must retain full precision');
+  for (const algorithm of ['ellipsoid', 'sphere']) {
+    await set('圆周算法', algorithm); await run();
+    assert.equal(await js(`document.querySelectorAll('${pane} .geo-point').length`), 1);
+  }
+  await js(`[...document.querySelectorAll('${pane} .geo-point button')].find(b=>b.textContent==='送到格式转换').click()`);
+  await run();
+  assert.equal(await js(`document.querySelector('${pane} [aria-label="复制全部坐标"]').disabled`), false);
   for (const tab of ['格式转换', '圆周点计算', '文本提取']) {
     await click(tab);
     for (const theme of ['light', 'dark']) {
@@ -68,6 +81,6 @@ module.exports = async function geographySmoke(window, output) {
     }
   }
   window.setSize(1440, 1000);
-  await fs.writeFile(path.join(output, 'geography-report.json'), JSON.stringify({ conversion: true, pastePair: true, ellipsoidAndSphere: true, fourDirections: true, extraction: true, actualClipboard: true, columnAndTsv: true, rejectedCoordinates: true, tabCache: true, dedupe: true, responsiveThemes: true }, null, 2));
+  await fs.writeFile(path.join(output, 'geography-report.json'), JSON.stringify({ conversion: true, pastePair: true, ellipsoidAndSphere: true, fourDirections: true, extraction: true, extractedCenterCalculatedWithoutReplacing: true, calculatedPointConverted: true, actualClipboard: true, columnAndTsv: true, rejectedCoordinates: true, tabCache: true, dedupe: true, responsiveThemes: true }, null, 2));
   async function runError() { await js(`document.querySelector('${pane} .run-button').click()`); await wait(`!!document.querySelector('${pane} .status-error')`); }
 };

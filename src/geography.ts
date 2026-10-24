@@ -7,7 +7,9 @@ export type GeoPoint = { lon: number; lat: number; source?: string; line?: numbe
 export type GeoIssue = { source: string; line: number; reason: string };
 export type GeoResult = { mode: GeoMode; signature: string; points: GeoPoint[]; issues: GeoIssue[]; removed: number };
 type Angle = { value: number; axis?: 'lon' | 'lat' };
-const numeric = '[+-]?\\d{1,9}(?:\\.\\d{1,12})?';
+// Accept the complete finite Number representation used by internal point transfers.
+// The anchored grammar excludes angle expressions; length and geographic ranges are checked separately.
+const numeric = '[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:[eE][+-]?\\d+)?';
 const dmsBody = '[+-]?\\d{1,9}\\s*[°度]\\s*\\d{1,9}\\s*[\'′分]\\s*\\d{1,9}(?:\\.\\d{1,12})?\\s*(?:["″秒]|\'{2}|′{2})';
 const direction = '(?:东经|西经|北纬|南纬|[NSEW](?![A-Za-z]))';
 const labels = '(?:经度|纬度)';
@@ -48,7 +50,7 @@ function decodeAngle(raw: string): Angle {
   if (!decimal && !parts) throw new Error('格式无效，请输入十进制度或完整的度分秒。');
   if (parts && (Number(parts[2]) >= 60 || Number(parts[3]) >= 60)) throw new Error('分和秒必须小于 60。');
   const standard = parts ? `${parts[1]}d${parts[2]}'${parts[3]}"` : text.replace(/[°度]/g, '').trim();
-  const value = DMS.Decode(standard + (h ?? '')).val;
+  const value = decimal ? Number(standard) * (h && /[SW]/.test(h) ? -1 : 1) : DMS.Decode(standard + (h ?? '')).val;
   if (!Number.isFinite(value)) throw new Error('坐标必须是有限数。');
   return { value: Object.is(value, -0) ? 0 : value, axis };
 }

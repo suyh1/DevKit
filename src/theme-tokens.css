@@ -1,20 +1,20 @@
 /* One palette for desktop and project portal; component files consume these tokens. */
 :root {
-  --bg: #f7f9f8; --surface: #fff; --surface-raised: #fff; --soft: #f3f7f5;
-  --text: #243d35; --muted: #5e716a; --subtle: #687b73; --line: #e0e9e4;
-  --accent: #26745c; --accent-hover: #1e614c; --accent-ink: #fff; --tint: #eaf4ee;
-  --success: #26745c; --success-tint: #eaf4ee; --warning: #a36e14;
+  --bg: #f5f6f8; --surface: #fff; --surface-raised: #fff; --soft: #f0f2f5;
+  --text: #252934; --muted: #616877; --subtle: #687080; --line: #dce0e7;
+  --accent: #3d5fad; --accent-hover: #304d91; --accent-ink: #fff; --tint: #ecf0fa;
+  --success: #287746; --success-tint: #edf5ee; --warning: #94620d;
   --error: #b42335; --diff-added: var(--success); --diff-deleted: var(--error);
   --diff-added-bg: #16a34a18; --diff-deleted-bg: #ef444418;
-  --glass: #ffffffdf; --hero-bg: #edf6ef; --hero-ink: #23553f;
-  --app-background: radial-gradient(ellipse at 80% -30%, #b5d7c433, transparent 65%), var(--bg);
+  --glass: #ffffffdf; --hero-bg: #eff2f8; --hero-ink: #273650;
+  --app-background: var(--bg);
   --color-story-background: linear-gradient(135deg, var(--surface), var(--tint));
-  --shadow: 0 4px 24px #294e3a04; --shadow-hover: 0 12px 32px #294e3a0c;
-  --syntax-key: #4270ac; --syntax-string: #238167; --syntax-number: #a45b28;
+  --shadow: 0 4px 24px #17203306; --shadow-hover: 0 12px 32px #17203312;
+  --syntax-key: #4270ac; --syntax-string: #6d5793; --syntax-number: #a45b28;
   --syntax-keyword: #8e53b1; --syntax-comment: #7c8d99; --syntax-type: #9a6821; --syntax-function: #3566b2;
-  --editor-gutter: #f9fbfc; --editor-active: #087f7007; --editor-selection: #a3d9cd66;
-  --selection: #87d1bf60; --editor-focus-line: #629f8d; --focus-shadow: #087f7008;
-  --button-shadow: #26745c24;
+  --editor-gutter: #f8f9fb; --editor-active: #3d5fad07; --editor-selection: #b9ccf766;
+  --selection: #b9ccf780; --editor-focus-line: #3d5fad; --focus-shadow: #3d5fad08;
+  --button-shadow: #3d5fad24;
   --ease-out: cubic-bezier(.2,.7,.2,1);
 }
 :root[data-theme=dark] {

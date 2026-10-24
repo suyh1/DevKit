@@ -41,14 +41,12 @@ module.exports = async function designSmoke(window, output) {
       assert.equal(geometry.workspaceOverflow, false, `${theme} ${width}: workspace overflow`);
       assert.equal(geometry.navbarOutside, false, `${theme} ${width}: navbar outside viewport`);
       assert.equal(geometry.floating, true);
-      assert.equal(geometry.background, theme === 'dark' ? '#141518' : '#f7f9f8');
+      assert.equal(geometry.background, theme === 'dark' ? '#141518' : '#f5f6f8');
       assert.equal(geometry.panel, theme === 'dark' ? 'rgb(28, 30, 34)' : 'rgb(255, 255, 255)');
-      assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(36, 61, 53)');
-      assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#26745c');
-      if (theme === 'dark') {
-        assert.equal(geometry.appGradient, 'none');
-        assert.equal(geometry.aurora, 'none');
-      } else assert.notEqual(geometry.aurora, 'none');
+      assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(37, 41, 52)');
+      assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#3d5fad');
+      assert.equal(geometry.appGradient, 'none');
+      assert.equal(geometry.aurora, 'none');
       report.push({ theme, ...geometry });
       if ([1440, 375].includes(width)) await fs.writeFile(path.join(output, `design-home-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
     }
@@ -96,6 +94,11 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(24, 26, 30)');
   await fs.writeFile(path.join(output, 'design-editor-dark.png'), (await window.webContents.capturePage()).toPNG());
   await js("document.documentElement.dataset.theme = 'light'");
+  await settle();
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .status-success")).color'), 'rgb(40, 119, 70)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(61, 95, 173)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(248, 249, 251)');
+  await fs.writeFile(path.join(output, 'design-editor-light.png'), (await window.webContents.capturePage()).toPNG());
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   await wait('!!document.querySelector(".overview-workspace:not([hidden])")');
   await js('document.querySelector(".color-story-card").click()');

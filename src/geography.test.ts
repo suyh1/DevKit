@@ -5,6 +5,18 @@ import { createTask, editTask, importWorkspace, workspaceSnapshot } from './work
 import { transform } from './tools';
 
 describe('geographic coordinates', () => {
+  it('calculates immediately from extracted full-precision centers and reuses calculated points', async () => {
+    const extracted = extractCoordinates(geoSample, geoDefaults).points[1];
+    expect(String(extracted.lon).split('.')[1].length).toBeGreaterThan(12);
+    for (const algorithm of ['ellipsoid', 'sphere']) {
+      const calculated = JSON.parse(await geographyTransform('', { ...geoDefaults, mode: 'circle', algorithm, centerLon: String(extracted.lon), centerLat: String(extracted.lat) }));
+      expect(calculated.points).toHaveLength(1);
+      const p = calculated.points[0];
+      const converted = JSON.parse(await geographyTransform('', { ...geoDefaults, lon: String(p.lon), lat: String(p.lat) }));
+      expect(converted.points[0]).toEqual({ lon: p.lon, lat: p.lat });
+    }
+    for (const value of [121.47366666666666, -0.000000000123456789, 1e-15]) expect(parseCoordinate(String(value), 'lon')).toBe(value);
+  });
   it('parses decimal, Chinese, Unicode, ASCII and hemisphere prefix/suffix forms', () => {
     for (const text of ['116.3913', '116°23′28.68″E', '东经116度23分28.68秒', 'E116°23\'28.68"', '１１６°２３′２８．６８″E', '116:23:28.68']) expect(parseCoordinate(text, 'lon')).toBeCloseTo(116.3913, 10);
     for (const text of ['-116.3913', '西经116度23分28.68秒', '-116°23′28.68″W']) expect(parseCoordinate(text, 'lon')).toBeCloseTo(-116.3913, 10);
@@ -13,7 +25,9 @@ describe('geographic coordinates', () => {
     expect(parseCoordinate('-0', 'lat')).toBe(0);
   });
   it('rejects range, minutes/seconds, expressions, hemisphere/sign conflicts and wrong axis', () => {
-    for (const text of ['', 'Infinity', 'NaN', '181', '180°00′0.01″', '116°60′0″', '116°0′60″', '-116E', '+116W', 'N116°0′0″', '1d+2d', '12°-2′3″', '1e2', '1/2', 'true']) expect(() => parseCoordinate(text, 'lon'), text).toThrow();
+    for (const text of ['', 'Infinity', 'NaN', '181', '180°00′0.01″', '116°60′0″', '116°0′60″', '-116E', '+116W', 'N116°0′0″', '1d+2d', '12°-2′3″', '1e309', '1e2+1', '1e-', '1/2', 'true']) expect(() => parseCoordinate(text, 'lon'), text).toThrow();
+    expect(parseCoordinate('1e2', 'lon')).toBe(100);
+    expect(parseCoordinate('-.5', 'lon')).toBe(-0.5);
     expect(() => parseCoordinate('90°0′0.01″N', 'lat')).toThrow();
     expect(parseCoordinate('180°0′0″W', 'lon')).toBe(-180);
     expect(parseCoordinate('90°0′0″S', 'lat')).toBe(-90);
