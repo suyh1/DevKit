@@ -3,7 +3,7 @@ import type { Options } from './tools';
 import { geoSignature, validateGeoOptions } from './geo-config';
 import type { GeoMode } from './geo-config';
 
-export type GeoPoint = { lon: number; lat: number; source?: string; line?: number; direction?: string };
+export type GeoPoint = { lon: number; lat: number; rawLon?: string; rawLat?: string; source?: string; line?: number; direction?: string };
 export type GeoIssue = { source: string; line: number; reason: string };
 export type GeoResult = { mode: GeoMode; signature: string; points: GeoPoint[]; issues: GeoIssue[]; removed: number };
 type Angle = { value: number; axis?: 'lon' | 'lat' };
@@ -60,20 +60,39 @@ export function parseCoordinate(raw: string, axis: 'lon' | 'lat'): number {
   if (Math.abs(angle.value) > (axis === 'lon' ? 180 : 90)) throw new Error(`${axis === 'lon' ? '经度须在 -180～180°' : '纬度须在 -90～90°'}。`);
   return angle.value;
 }
-function pair(first: string, second: string, order: string): GeoPoint {
+function pairFields(first: string, second: string, order: string): { lon: string; lat: string } {
   const a = decodeAngle(first), b = decodeAngle(second);
   if (a.axis && b.axis && a.axis === b.axis) throw new Error('同组中缺少另一种经纬坐标。');
   const firstAxis = a.axis ?? (b.axis ? b.axis === 'lon' ? 'lat' : 'lon' : order === 'lat-lon' ? 'lat' : 'lon');
-  return firstAxis === 'lon' ? { lon: parseCoordinate(first, 'lon'), lat: parseCoordinate(second, 'lat') }
-    : { lon: parseCoordinate(second, 'lon'), lat: parseCoordinate(first, 'lat') };
+  const fields = firstAxis === 'lon' ? { lon: first.trim(), lat: second.trim() } : { lon: second.trim(), lat: first.trim() };
+  parseCoordinate(fields.lon, 'lon'); parseCoordinate(fields.lat, 'lat');
+  return fields;
+}
+export function splitCoordinatePair(text: string, order = 'lon-lat'): { lon: string; lat: string } {
+  const raw = text.trim().replace(/^[（(\[]|[）)\]]$/g, '');
+  // Normalization is length-preserving: recognize separators without rewriting the user's angle text.
+  const input = normal(raw);
+  const separated = input.split(/[,，;；\t\r\n]+/).map(s => s.trim()).filter(Boolean);
+  if (separated.length === 2) {
+    const original = raw.split(/[,，;；\t\r\n]+/).map(s => s.trim()).filter(Boolean);
+    return pairFields(original[0], original[1], order);
+  }
+  const matches = [...input.matchAll(new RegExp(angleToken, 'gi'))];
+  if (matches.length === 2 && !input.slice(0, matches[0].index).trim() && !input.slice(matches[0].index! + matches[0][0].length, matches[1].index).trim() && !input.slice(matches[1].index! + matches[1][0].length).trim()) return pairFields(...matches.map(m => raw.slice(m.index!, m.index! + m[0].length)) as [string, string], order);
+  throw new Error('请输入一对坐标，用逗号分隔；度分秒可带方向标识。');
 }
 export function parseCoordinatePair(text: string, order = 'lon-lat'): GeoPoint {
-  const input = normal(text).trim().replace(/^[（(\[]|[）)\]]$/g, '');
-  const separated = input.split(/[,，;；\t\r\n]+/).map(s => s.trim()).filter(Boolean);
-  if (separated.length === 2) return pair(separated[0], separated[1], order);
-  const matches = [...input.matchAll(new RegExp(angleToken, 'gi'))];
-  if (matches.length === 2 && !input.slice(0, matches[0].index).trim() && !input.slice(matches[0].index! + matches[0][0].length, matches[1].index).trim() && !input.slice(matches[1].index! + matches[1][0].length).trim()) return pair(matches[0][0], matches[1][0], order);
-  throw new Error('请输入一对坐标，用逗号分隔；度分秒可带方向标识。');
+  const fields = splitCoordinatePair(text, order);
+  return { lon: parseCoordinate(fields.lon, 'lon'), lat: parseCoordinate(fields.lat, 'lat') };
+}
+// Source-backed points keep their representation; computed points retain the full Number precision.
+export function coordinateInput(point: GeoPoint): { lon: string; lat: string } {
+  const source = (axis: 'lon' | 'lat') => {
+    const raw = point[axis === 'lon' ? 'rawLon' : 'rawLat'];
+    try { if (raw !== undefined && parseCoordinate(raw, axis) === point[axis]) return raw; } catch { /* Fall back for old/imported caches. */ }
+    return String(point[axis]);
+  };
+  return { lon: source('lon'), lat: source('lat') };
 }
 export function decimalText(value: number, places: number): string {
   const text = value.toFixed(places);
@@ -116,7 +135,8 @@ export function extractCoordinates(input: string, options: Options): { points: G
     const gap = text.slice(start + a[0].length, b.index);
     if (!/^[\s,，;；、()（）[\]]*$/.test(gap) || /\n\s*\n/.test(gap)) { addIssue(orphanReason('与下一坐标不属于同一坐标组。')); continue; }
     try {
-      const point = pair(a[0], b[0], options.inputOrder);
+      const fields = pairFields(input.slice(start, start + a[0].length), input.slice(b.index!, b.index! + b[0].length), options.inputOrder);
+      const point: GeoPoint = { lon: parseCoordinate(fields.lon, 'lon'), lat: parseCoordinate(fields.lat, 'lat'), rawLon: fields.lon, rawLat: fields.lat };
       point.source = input.slice(start, b.index! + b[0].length); point.line = lineAt(start);
       const key = `${point.lon},${point.lat}`;
       if (options.dedupe === 'on' && seen.has(key)) removed++;
@@ -150,7 +170,10 @@ export async function circlePoint(center: GeoPoint, distance: number, bearing: n
 }
 export async function geographyTransform(input: string, incoming: Options): Promise<string> {
   const o = validateGeoOptions(incoming), result: GeoResult = { mode: o.mode as GeoMode, signature: geoSignature(input, o), points: [], issues: [], removed: 0 };
-  if (o.mode === 'convert') result.points = [!o.lon && !o.lat && input.trim() ? parseCoordinatePair(input, o.inputOrder) : { lon: parseCoordinate(o.lon, 'lon'), lat: parseCoordinate(o.lat, 'lat') }];
+  if (o.mode === 'convert') {
+    const fields = { lon: o.lon, lat: o.lat };
+    result.points = [{ lon: parseCoordinate(fields.lon, 'lon'), lat: parseCoordinate(fields.lat, 'lat'), rawLon: fields.lon, rawLat: fields.lat }];
+  }
   else if (o.mode === 'extract') Object.assign(result, extractCoordinates(input, o));
   else {
     const center = { lon: parseCoordinate(o.centerLon, 'lon'), lat: parseCoordinate(o.centerLat, 'lat') };
@@ -167,6 +190,7 @@ export function readGeoCache(output: string): Partial<Record<GeoMode, GeoResult>
       const r = value?.[mode];
       if (r?.mode !== mode || typeof r.signature !== 'string' || r.signature.length > 2_000_000 || !Number.isInteger(r.removed) || r.removed < 0 || !Array.isArray(r.points) || r.points.length > 5000 || !Array.isArray(r.issues) || r.issues.length > 10000) continue;
       if (!r.points.every((p: GeoPoint) => p && Number.isFinite(p.lon) && Math.abs(p.lon) <= 180 && Number.isFinite(p.lat) && Math.abs(p.lat) <= 90 && (p.source === undefined || typeof p.source === 'string') && (p.line === undefined || Number.isInteger(p.line)) && (p.direction === undefined || typeof p.direction === 'string'))) continue;
+      if (!r.points.every((p: GeoPoint) => [p.rawLon, p.rawLat].every(raw => raw === undefined || typeof raw === 'string' && raw.length <= 200))) continue;
       if (!r.issues.every((p: GeoIssue) => p && typeof p.source === 'string' && typeof p.reason === 'string' && Number.isInteger(p.line))) continue;
       cache[mode] = r;
     }

@@ -3,6 +3,7 @@ import type { Options, ToolId } from './tools';
 import ResultView from './ResultView';
 import { parseCsv } from './practical';
 import { digestMatches } from './tool-experience';
+import { jsonObjectFields } from './result-model';
 
 type Props = { id: ToolId; text: string; source: string; options: Options; expected: string; onExpected: (value: string) => void; onCopy: (value: string) => void };
 const display = (value: unknown): string => value === null ? '无' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '');
@@ -37,7 +38,10 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   if (id === 'ipv4') return <div className="subnet-result"><div className="subnet-summary"><span className="result-kicker">NETWORK / PREFIX</span><strong>{display(data.cidr)}</strong><div className="subnet-bits" aria-label={`网络位 ${data.prefix}，主机位 ${32 - Number(data.prefix)}`}>{Array.from({ length: 32 }, (_, index) => <span className={index < Number(data.prefix) ? 'network-bit' : ''} key={index} />)}</div><small>网络位 {display(data.prefix)} · 主机位 {32 - Number(data.prefix)}</small></div><Fields data={{ '子网掩码': data.netmask, '反掩码': data.wildcard, '网络地址': data.network, '广播地址': data.broadcast, '首个主机': data.firstHost, '末个主机': data.lastHost, '地址总数': data.totalAddresses, '可用主机': data.usableHosts }} onCopy={onCopy} /><p className="preview-note">{display(data.note)}</p></div>;
   if (id === 'chmod') return <div className="permission-result"><div className="permission-value"><strong>{display(data.octal)}</strong><code>{display(data.symbolic)}</code></div><Fields data={{ '所有者': (data.groups as { symbolic: string }[])[0].symbolic, '所属组': (data.groups as { symbolic: string }[])[1].symbolic, '其他人': (data.groups as { symbolic: string }[])[2].symbolic, '特殊权限': data.special, '命令参考（不执行）': data.command }} onCopy={onCopy} /><p className="preview-note">{display(data.note)}</p></div>;
   if (id === 'url-inspect') return <div className="url-result"><Fields data={{ '协议': data.protocol, '主机': data.hostname, '端口': data.port || '默认', '路径': data.pathname, '片段': data.hash, 'Origin': data.origin, '用户名': data.username, '密码': data.password }} onCopy={onCopy} /><h3 className="result-section-title">查询参数 · {(data.query as unknown[]).length} 项</h3><Table rows={[[ '参数名', '值' ], ...(data.query as { name: string; value: string }[]).map(item => [item.name, item.value])]} /><p className="preview-note">重复参数按原始顺序保留。</p></div>;
-  if (id === 'jwt') return <div className="jwt-result"><p className="preview-note">{display(data.notice)}</p>{[['header', 'Header · 算法与类型'], ['payload', 'Payload · 载荷'], ['dates', '时间声明 · UTC'], ['signature', 'Signature · 未验证']].map(([key, title]) => <section key={key}><h3>{title}</h3>{key === 'signature' ? <code>{display(data[key])}</code> : <ResultView toolId="json" text={JSON.stringify(data[key], null, 2)} source="" onCopy={onCopy} />}</section>)}</div>;
+  if (id === 'jwt') {
+    const fields = jsonObjectFields(text);
+    return <div className="jwt-result"><p className="preview-note">{display(data.notice)}</p>{[['header', 'Header · 算法与类型'], ['payload', 'Payload · 载荷'], ['dates', '时间声明 · UTC'], ['signature', 'Signature · 未验证']].map(([key, title]) => <section key={key}><h3>{title}</h3>{key === 'signature' ? <code>{display(data[key])}</code> : <ResultView toolId="json" text={fields.get(key)?.raw ?? '{}'} source="" onCopy={onCopy} />}</section>)}</div>;
+  }
   if (id === 'ulid') return <div className="ulid-results">{(data as unknown as Record<string, unknown>[]).slice(0, 100).map((item, index) => <section key={index}><h3>#{index + 1} · ULID</h3><Fields data={{ '标识': item.ulid, 'UTC 时间': item.utc, '毫秒时间戳': item.timestamp, '随机段': item.randomness }} onCopy={onCopy} /></section>)}<p className="preview-note">预览前 100 项；源码和导出保留全部结果。</p></div>;
   return fallback;
 }

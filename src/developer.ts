@@ -1,5 +1,5 @@
 import type { Options } from './tools';
-import { jsonTree } from './result-model';
+import { jsonObjectFields, jsonTree } from './result-model';
 import type { JsonNode } from './result-model';
 
 export type DeveloperToolId = 'code-format' | 'json-path' | 'json-schema' | 'query-string' | 'http-code' | 'cron' | 'env' | 'properties' | 'hmac' | 'unicode' | 'css-unit' | 'http-status';
@@ -28,6 +28,7 @@ export const developerTools: { id: DeveloperToolId; name: string; english: strin
 export function isDeveloperTool(id: string): id is DeveloperToolId { return Object.hasOwn(developerDefaults, id); }
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 function stringObject(input: string): Record<string, string> {
+  jsonObjectFields(input);
   const value = JSON.parse(input);
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.values(value).some(item => typeof item !== 'string')) throw new Error('请输入平面 JSON 对象，所有值必须是字符串。');
   return value;
@@ -82,6 +83,7 @@ function inferSchema(nodes: JsonNode[], depth = 0): Schema {
 }
 function queryString(input: string, options: Options) {
   if (options.mode === 'encode') {
+    jsonObjectFields(input);
     const value = JSON.parse(input);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('请输入 JSON 对象，值为字符串或字符串数组。');
     const query = new URLSearchParams();
@@ -99,6 +101,7 @@ function queryString(input: string, options: Options) {
   return pretty(value);
 }
 function httpCode(input: string, options: Options) {
+  const fields = jsonObjectFields(input);
   const config = JSON.parse(input);
   if (!config || typeof config !== 'object' || Array.isArray(config) || typeof config.url !== 'string') throw new Error('配置必须包含 url 字符串。');
   const url = new URL(config.url);
@@ -106,13 +109,19 @@ function httpCode(input: string, options: Options) {
   const method = String(config.method ?? 'GET').toUpperCase();
   if (!/^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(method)) throw new Error('不支持此 HTTP method。');
   const headers = config.headers ?? {};
+  const headerRaw = fields.get('headers')?.raw;
+  if (headerRaw && headerRaw !== 'null') jsonObjectFields(headerRaw);
   if (!headers || typeof headers !== 'object' || Array.isArray(headers) || Object.entries(headers).some(([key, value]) => !/^[!#$%&'*+.^_`|~\w-]+$/.test(key) || typeof value !== 'string' || /[\r\n]/.test(value))) throw new Error('headers 必须为合法名称与单行字符串值的对象。');
-  const body = config.body === undefined ? undefined : typeof config.body === 'string' ? config.body : JSON.stringify(config.body);
+  const bodyRaw = fields.get('body')?.raw;
+  const body = bodyRaw === undefined ? undefined : typeof config.body === 'string' ? config.body : bodyRaw;
+  if (bodyRaw !== undefined && typeof config.body !== 'string' && !Object.keys(headers).some(key => key.toLowerCase() === 'content-type')) headers['Content-Type'] = 'application/json';
   if (body !== undefined && ['GET', 'HEAD'].includes(method)) throw new Error('GET / HEAD 不支持请求体，请移除 body 或更换 method。');
   const shell = (text: string) => "'" + text.replace(/'/g, "'\\''") + "'";
   if (options.style === 'curl') return ['curl', '--request', shell(method), '--url', shell(config.url), ...Object.entries(headers).flatMap(([key, value]) => ['--header', shell(`${key}: ${value}`)]), ...(body === undefined ? [] : ['--data-raw', shell(body)])].join(' ');
-  if (options.style === 'axios') return `import axios from 'axios';\n\nconst response = await axios.request(${pretty({ url: config.url, method, headers, ...(body === undefined ? {} : { data: config.body }) })});\nconsole.log(response.data);\n`;
-  return `const response = await fetch(${JSON.stringify(config.url)}, ${pretty({ method, headers, ...(body === undefined ? {} : { body }) })});\nif (!response.ok) throw new Error(\`HTTP \${response.status}\`);\nconst text = await response.text();\nconsole.log(text);\n`;
+  // Serialize JSON bodies as text for every client, retaining large integer and exponent tokens.
+  const entries = [`"method": ${JSON.stringify(method)}`, `"headers": ${pretty(headers)}`];
+  if (options.style === 'axios') return `import axios from 'axios';\n\nconst response = await axios.request({\n  "url": ${JSON.stringify(config.url)},\n  ${entries.join(',\n  ')}${body === undefined ? '' : ',\n  "data": ' + JSON.stringify(body)}\n});\nconsole.log(response.data);\n`;
+  return `const response = await fetch(${JSON.stringify(config.url)}, {\n  ${entries.join(',\n  ')}${body === undefined ? '' : ',\n  "body": ' + JSON.stringify(body)}\n});\nif (!response.ok) throw new Error(\`HTTP \${response.status}\`);\nconst text = await response.text();\nconsole.log(text);\n`;
 }
 function cronPreview(input: string, options: Options) {
   const fields = input.trim().split(/\s+/);

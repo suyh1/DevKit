@@ -1,19 +1,22 @@
-function decodeSegment(segment: string): unknown {
+import { jsonObjectFields } from './result-model';
+
+function decodeSegment(segment: string): string {
   if (!/^[A-Za-z0-9_-]+$/.test(segment) || segment.length % 4 === 1) throw new Error('JWT 包含无效的 Base64URL 数据。');
   const padded = segment.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - segment.length % 4) % 4);
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(padded), char => char.charCodeAt(0))));
+  const text = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(padded), char => char.charCodeAt(0)));
+  jsonObjectFields(text);
+  return text;
 }
 export function decodeJwt(input: string): string {
   const parts = input.trim().split('.');
   if (parts.length !== 3) throw new Error('请输入由三段组成的 JWT（header.payload.signature），不支持加密 JWE。');
-  const header = decodeSegment(parts[0]), payload = decodeSegment(parts[1]);
-  if (!header || typeof header !== 'object' || Array.isArray(header) || !payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('JWT header 和 payload 必须是 JSON 对象。');
+  const header = decodeSegment(parts[0]), payload = decodeSegment(parts[1]), claims = jsonObjectFields(payload);
   const dates: Record<string, string> = {};
   for (const key of ['iat', 'exp', 'nbf']) {
-    const value = (payload as Record<string, unknown>)[key];
+    const value = claims.has(key) ? JSON.parse(claims.get(key)!.raw) : undefined;
     if (typeof value === 'number' && Number.isFinite(value) && Math.abs(value * 1000) <= 8.64e15) dates[key] = new Date(value * 1000).toISOString();
   }
-  return JSON.stringify({ notice: '仅解码，未验证签名、有效期或可信性。', header, payload, dates, signature: parts[2] }, null, 2);
+  return `{\n  "notice": "仅解码，未验证签名、有效期或可信性。",\n  "header": ${header},\n  "payload": ${payload},\n  "dates": ${JSON.stringify(dates)},\n  "signature": ${JSON.stringify(parts[2])}\n}`;
 }
 
 export function convertRadix(input: string, options: Record<string, string>): string {

@@ -27,6 +27,17 @@ export function createTask(toolId: ToolId, indent = '2', input?: string): Task {
 export function editTask(task: Task, patch: Partial<Task>): Task {
   return { ...task, ...patch, error: '', status: task.elapsed !== null || task.output !== '' ? 'stale' : 'idle' };
 }
+export function changeToolOption(task: Task, key: string, value: string): Partial<Task> {
+  const options = { ...task.options, [key]: value };
+  if (task.toolId !== 'ulid' || key !== 'mode' || value === task.options.mode) return { options };
+  const from = task.options.mode === 'parse' ? 'parseInput' : 'generateInput';
+  const to = value === 'parse' ? 'parseInput' : 'generateInput';
+  options[from] = task.input;
+  if (from === 'parseInput') options.parseVisited = 'on';
+  // A first switch after generation uses the actual generated IDs, never an unrelated example.
+  const input = to === 'generateInput' ? options[to] ?? '5' : options.parseVisited === 'on' ? options[to] ?? '' : task.status === 'success' ? task.output : options[to] ?? '';
+  return { input, options, fileName: undefined, encoding: undefined };
+}
 export function validatePreferences(value: unknown): Preferences {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const choose = <Key extends keyof Preferences>(key: Key, values: readonly Preferences[Key][]): Preferences[Key] => values.includes(source[key] as Preferences[Key]) ? source[key] as Preferences[Key] : defaultPreferences[key];

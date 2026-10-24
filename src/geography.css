@@ -23,8 +23,10 @@
 .geo-value>span { color:var(--muted); }
 .geo-value>div { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
 .geo-value code { overflow-wrap:anywhere; }
-.geo-value code:first-child { font-size:18px; }
-.geo-value code:last-child { font-size:12px; color:var(--muted); }
+.geo-value-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.geo-value-row code { min-width:0; }
+.geo-decimal code { font-size:18px; }
+.geo-dms code { font-size:12px; color:var(--muted); }
 .geo-table-scroll { overflow:auto; max-width:100%; border:1px solid var(--line); border-radius:8px; }
 .geo-table { border-collapse:collapse; width:100%; font-size:12px; text-align:left; min-width:650px; }
 .geo-table th,.geo-table td { padding:12px; border-bottom:1px solid var(--line); vertical-align:top; }

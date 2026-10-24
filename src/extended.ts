@@ -3,7 +3,7 @@ import type { Options } from './tools';
 export type ExtendedToolId = 'xml' | 'gzip' | 'ipv4' | 'chmod' | 'ulid' | 'text-stats';
 export const extendedDefaults: Record<ExtendedToolId, Options> = {
   xml: { mode: 'format', indent: '2' }, gzip: { mode: 'compress' }, ipv4: {}, chmod: {},
-  ulid: { mode: 'generate', timestamp: '' }, 'text-stats': {},
+  ulid: { mode: 'generate', timestamp: '', generateInput: '5', parseInput: '', parseVisited: 'off' }, 'text-stats': {},
 };
 export const extendedTools = [
   { id: 'xml' as const, name: 'XML 格式化', english: 'XML Formatter', category: '结构化数据', description: '格式化或压缩 XML，保留注释、CDATA 与 xml:space。拒绝 DTD / ENTITY；不执行内容，不校验 XSD。', sample: '<?xml version="1.0"?><users><!-- 本地配置 --><user id="1"><name>张三</name><role>developer</role></user></users>' },

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { diffRows, jsonTree, nodePath } from './result-model';
 import type { JsonNode } from './result-model';
@@ -14,11 +14,12 @@ function TreeNode({ node, label, path, depth, query, onCopy }: { node: JsonNode;
 
 function DiffView({ text }: { text: string }) {
   const rows = useMemo(() => diffRows(text), [text]);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(-1);
+  useEffect(() => setIndex(-1), [text]);
   const container = useRef<HTMLDivElement>(null);
   const changes = rows.filter(row => row.kind === 'hunk').length;
   function jump(direction: number) {
-    const next = (index + direction + changes) % changes;
+    const next = index < 0 ? direction > 0 ? 0 : changes - 1 : (index + direction + changes) % changes;
     setIndex(next);
     container.current?.querySelectorAll('.diff-hunk')[next]?.scrollIntoView({ block: 'nearest' });
   }

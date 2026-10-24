@@ -24,7 +24,7 @@ export function validateGeoOptions(options: Options): Options {
 // Only computational inputs participate; display changes can reformat the same precise result.
 export function geoSignature(input: string, options: Options): string {
   const o = { ...geoDefaults, ...options };
-  return JSON.stringify(o.mode === 'convert' ? [o.mode, o.lon, o.lat, !o.lon && !o.lat ? [input, o.inputOrder] : ''] : o.mode === 'circle'
+  return JSON.stringify(o.mode === 'convert' ? [o.mode, o.lon, o.lat] : o.mode === 'circle'
     ? [o.mode, o.centerLon, o.centerLat, o.radius, o.unit, o.algorithm, o.direction]
     : [o.mode, input, o.inputOrder, o.dedupe]);
 }

@@ -25,6 +25,7 @@ module.exports = async function workflowsSmoke(window, output) {
   window.setMinimumSize(360, 600);
   window.setSize(1440, 1000);
   const report = [];
+  const audit = require('./interaction-audit-smoke.cjs')(window, output);
   for (const name of names) {
     console.log(`Checking workflow UI: ${name}`);
     await js(`[...document.querySelectorAll('nav .nav-item')].find(button => button.title === ${JSON.stringify(name)}).click()`);
@@ -65,15 +66,30 @@ module.exports = async function workflowsSmoke(window, output) {
         await wait(`!!document.querySelector('${pane} .ulid-results')`);
       }
       if (id === 'http-code') {
+        // Real editor input followed by a form edit must not round or rewrite an untouched body.
+        const config = '{"method":"POST","url":"https://example.com","body":{"id":9007199254740993,"value":1.2300e+2}}';
+        window.show(); window.focus(); window.webContents.focus();
+        await js(`document.querySelectorAll('${pane} .request-input-tabs button')[1].click()`);
+        await wait(`!!document.querySelector('${pane} .input-card .cm-content')`);
+        await js(`document.querySelector('${pane} .input-card .cm-content').focus()`);
+        window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
+        window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+        await window.webContents.insertText(config);
+        await wait(`document.querySelector('${pane} .input-card .cm-content')?.textContent===${JSON.stringify(config)}`);
+        await js(`document.querySelector('${pane} .request-input-tabs button').click()`);
+        await wait(`!!document.querySelector('${pane} input[aria-label="请求 URL"]')`);
         await fill(`${pane} input[aria-label="请求 URL"]`, 'https://example.com/edited');
         await js(`document.querySelector('${pane} .run-button').click()`);
         await wait(`!!document.querySelector('${pane} .status-success')`);
         await wait(`document.querySelector('${pane} .output-card .cm-content')?.textContent.includes('/edited')`);
         await js(`document.querySelectorAll('${pane} .request-input-tabs button')[1].click()`);
         await wait(`document.querySelector('${pane} .input-card .cm-content')?.textContent.includes('/edited')`);
+        assert.ok(await js(`document.querySelector('${pane} .input-card .cm-content').textContent.includes('9007199254740993')`));
+        assert.ok(await js(`document.querySelector('${pane} .input-card .cm-content').textContent.includes('1.2300e+2')`));
         await js(`document.querySelector('${pane} .request-input-tabs button').click()`);
       }
-      report.push({ name, id, workflow: await js(`document.querySelector('${pane} .text-workbench').className`), status: 'success' });
+      const interaction = id === 'geo-coordinates' ? { dedicatedGeographyFlow: true } : await audit(id);
+      report.push({ name, id, workflow: await js(`document.querySelector('${pane} .text-workbench').className`), status: 'success', interaction });
       await js(`document.querySelector('button[aria-label="关闭通知"]')?.click()`);
       for (const theme of ['light', 'dark']) {
         await js(`document.documentElement.dataset.theme = '${theme}'`);
@@ -91,7 +107,44 @@ module.exports = async function workflowsSmoke(window, output) {
       }
     } else {
       assert.equal(await js(`!!document.querySelector('${pane} .color-workbench')`), true, name);
-      report.push({ name, workflow: 'color', status: 'existing visual workspace' });
+      const original = 'rgba(10, 20, 30, 0.5)';
+      const primary = `${pane} .color-control-panel .color-value-input`;
+      await fill(primary, original);
+      assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), original);
+      if (await js(`!!document.querySelector('${pane} .color-secondary-button') && [...document.querySelectorAll('${pane} .color-secondary-button')].some(b=>b.textContent==='交换颜色')`)) {
+        const secondary = await js(`document.querySelectorAll('${pane} .color-control-panel .color-value-input')[1].value`);
+        for (let n=0;n<2;n++) await js(`[...document.querySelectorAll('${pane} .color-secondary-button')].find(b=>b.textContent==='交换颜色').click()`);
+        assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), original);
+        assert.equal(await js(`document.querySelectorAll('${pane} .color-control-panel .color-value-input')[1].value`), secondary);
+      }
+      if (name === '取色器') {
+        await js(`[...document.querySelectorAll('${pane} button')].find(b=>b.textContent==='示例图片').click()`);
+        await js(`[...document.querySelectorAll('${pane} button')].find(b=>b.textContent==='取此像素').click()`);
+        assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), '#EF4444');
+        await fill(primary, original);
+      }
+      const { clipboard } = require('electron');
+      window.show(); window.focus(); window.webContents.focus();
+      await clipboard.clear();
+      if (await js(`!!document.querySelector('${pane} .color-formats button')`)) {
+        const visible = await js(`document.querySelector('${pane} .color-formats button code').textContent`);
+        await js(`document.querySelector('${pane} .color-formats button').click()`);
+        await wait(`document.querySelector('${pane} .color-status').textContent.includes('已复制')`);
+        assert.equal(await clipboard.readText(), visible);
+      } else if (await js(`!!document.querySelector('${pane} .color-export button')`)) {
+        await js(`document.querySelector('${pane} .color-export button').click()`);
+        await wait(`document.querySelector('${pane} .color-status').textContent.includes('已复制')`);
+        assert.ok((await clipboard.readText()).length > 10);
+      } else {
+        assert.ok(await js(`Number.parseFloat(document.querySelector('${pane} .color-ratio strong').textContent)>1`));
+      }
+      assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), original, `${name}: output actions preserve input`);
+      await fill(primary, 'invalid-color');
+      assert.equal(await js(`!!document.querySelector('${pane} .color-error')`), true);
+      assert.equal(await js(`!!document.querySelector('${pane} .color-formats button')`), false);
+      assert.equal(await js(`!!document.querySelector('${pane} .color-export button')`), false);
+      await fill(primary, original);
+      report.push({ name, workflow: 'color', status: 'verified', interaction: { inputPreserved: true, actualCopyOrContrast: true, invalidatedResults: true, imagePixel: name === '取色器' } });
     }
     await js('document.querySelector(".task-tab.selected .tab-close").click()');
     await wait('document.querySelectorAll(".task-tab").length === 0');

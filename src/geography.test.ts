@@ -13,7 +13,7 @@ describe('geographic coordinates', () => {
       expect(calculated.points).toHaveLength(1);
       const p = calculated.points[0];
       const converted = JSON.parse(await geographyTransform('', { ...geoDefaults, lon: String(p.lon), lat: String(p.lat) }));
-      expect(converted.points[0]).toEqual({ lon: p.lon, lat: p.lat });
+      expect(converted.points[0]).toMatchObject({ lon: p.lon, lat: p.lat, rawLon: String(p.lon), rawLat: String(p.lat) });
     }
     for (const value of [121.47366666666666, -0.000000000123456789, 1e-15]) expect(parseCoordinate(String(value), 'lon')).toBe(value);
   });

@@ -8,7 +8,7 @@
 | JSON 路径提取 | `$.users[*].name`、`$["a.b"][0]` | 始终返回匹配数组，无匹配为 `[]`；保留大整数、数字原文；支持字段、索引、通配符，不支持递归/过滤表达式 |
 | JSON Schema 生成 | 任意 JSON 样本 | Draft 2020-12；合并全部数组样本，缺失字段不列入 required，混合类型 anyOf；不推断格式、枚举、业务上下限 |
 | Query 参数转换 | 参数串（可带 `?`）或 JSON 字符串对象 | 重复参数为数组；`+` 解码为空格；保留空字符串；不接受完整 URL，不进行类型推断 |
-| HTTP 请求代码生成 | JSON：`url`、可选 `method` / `headers` / `body` | Fetch、Axios、POSIX shell cURL；仅 HTTP(S)，拒绝 GET/HEAD 请求体；JSON body 自动序列化，Content-Type 由用户配置；Axios 需在目标项目安装 |
+| HTTP 请求代码生成 | JSON：`url`、可选 `method` / `headers` / `body` | Fetch、Axios、POSIX shell cURL；仅 HTTP(S)，拒绝 GET/HEAD 请求体；结构化 body 保留 JSON 数字原文并作为字符串发送，缺少 Content-Type 时补 application/json，用户已有值优先；Axios 需在目标项目安装 |
 | Cron 表达式预览 | `*/15 9-18 * * 1-5`；可设带时区 ISO 起始时间与 1–50 次 | UTC 时间列表，严格晚于起始时间；最多搜索 4 年，数量不足时 complete=false；五字段数字 Unix Cron，支持列表/范围/步长，日期与星期规则见工具提示 |
 | .env ↔ JSON | 平面字符串对象；支持 export、单/双引号、注释 | 不展开 `${VAR}` 或 `$(command)`；不支持多行引号，拒绝重复变量；双引号采用 JSON 转义规则，单引号为字面量 |
 | Properties ↔ JSON | 平面字符串对象，Java Properties 字符文本 | 支持 `=`、`:`、空白分隔与续行；`\uXXXX`、常用控制字符及键转义；拒绝重复键；输出非 ASCII 字符为 Unicode 转义 |
@@ -33,6 +33,8 @@ JSON 提取和 Schema 使用保留原文的结构模型，输入最多 300,000 �
 ```
 
 cURL 输出采用 POSIX shell 引号规则。在 Windows 请使用相应 shell，或生成 Fetch/Axios 代码。工具本身不调用这些命令。
+
+method/URL 表单编辑只替换对应的 JSON 值，body 中的大整数、指数、小数尾零和重复字段不变，预览也保留原文。请求配置和 headers 的顶层重复字段、Query / .env / Properties 编码输入中的重复 JSON 键会报错，避免最后一个值静默覆盖前面的值。以上结构化编辑/编码最多 2,000,000 字符、100,000 节点、100 层，超过时保留可编辑原文并给出错误。
 
 ## 依据
 
