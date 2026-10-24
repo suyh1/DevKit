@@ -172,5 +172,5 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 67. 复现提取/圆周点流转的全精度数字解析失败并补齐端到端回归 — complete
 68. 将浅色主配色改为中性灰白/蓝色，清除背景与交互的硬编码绿色并同步文档 — complete
 69. 回归与实际 Electron/主题截图验证，打包 v1.9.1 并核验发行物 — complete
-70. 提交并推送修复，保留用户 AGENTS.md 修改 — in_progress
+70. 提交并推送修复，保留用户 AGENTS.md 修改 — complete
 - 延续此前用户授权的实现、打包、提交推送流程；使用 ui-ux-pro-max 技能复核配色，保持现有布局与深色主题。
