@@ -280,3 +280,5 @@
 - v1.9.0 三平台安装包、独立服务 ZIP 全部完成；verify:release、两个实际 deb 严格解包、独立 ZIP 实际解压启动与配置/口令/快照迁移通过。Windows 安装程序未执行安装，Linux/麒麟及跨物理电脑运行仍需目标环境验收。
 - 直接读取两个实际 deb 的 ASAR，SHA256 均为 74e31682b5cb54e8cdd32f1942ef1395c755336f7c1650ce04085e54ca9945b9，与 Windows ASAR 相同；包内当前 README、使用说明和两份 MIT 许可逐字节一致。三桌面共同构建指纹 7c58d628ee7c94d7cb4ec804340022ff82aa01e2cc4cd26d280e014114a6a3f7。
 - 产物及校验、验证报告和预览在 artifacts/release-1.9.0；旧产物与真实 configs 保留。代码和相关文档已逐项暂存，排除用户 AGENTS.md 修改，准备提交推送。
+- 功能与发行提交 41bc3c4（feat: 新增经纬度工具并发布 v1.9.0）已推送 origin/main，ls-remote 确认远端与本地 SHA 一致。全部授权实现、验证和打包完成；AGENTS.md 仅保留用户原有 4 行修改且未暂存。
+- 此最终完成记录随正常文档提交推送；发行目录 SOURCE-COMMIT.txt 记录最终源码提交，安装包二进制保持已核验版本。

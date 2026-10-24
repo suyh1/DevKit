@@ -164,6 +164,6 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 63. 实现单工具三页签、严格坐标解析/文本提取、两种圆周算法和复制 — complete
 64. 算法边界、工作区和真实 Electron 流程验证并同步文档 — complete
 65. 打包三平台和独立服务、核验发行物 — complete
-66. 仅提交授权文件并推送，确认远端 SHA — in_progress
+66. 仅提交授权文件并推送，确认远端 SHA — complete
 - 用户已批准实施；圆周仅含椭球 Karney 和球面大圆，不含恒向线/沿经纬线模式。
 - 保留用户 AGENTS.md 未提交修改；延续 planning-with-files 记录。
