@@ -199,3 +199,12 @@
 - Repeated the portable host check with a clean second installation, copying only configs, omitting password env on the second startup: stored password hash reused successfully, projects and snapshots retained. Both test servers stopped, loopback only.
 - Delivery directory artifacts/release-1.6.0 contains three installers, Node ZIP, checksums, complete configs/LAN and Kylin guides, verification records and stable screenshots. All requested refinement, portable storage, tests and multi-architecture packaging completed. Actual system installation, target Linux/Kylin startup and second physical computer networking remain as documented target-machine checks.
 
+
+## README 功能说明与打包自动同步
+- 开始核对源码中的工具注册表、项目中心、构建命令和 CI；恢复已有计划记录。
+
+- 完成功能导向模板、生成器、四项动态文档验证，接入桌面/合集/独立服务直调入口及 CI。生产构建、文档校验、3 桌面策略、12 项目、2 发行一致性检查通过；核心测试首轮 116 通过、Java 解析一项超时，待独立复核。
+
+- 完成全部 6 项文档验证（含真实打包脚本入口、错误阻断、临时 ZIP 内容与相对文档链接），0 跳过。使用 bundled Python 显式指定 DEVKIT_PYTHON，保留系统环境。
+- 最终 docs:update / docs:check、生产构建、117 核心、3 桌面、12 项目、2 发行校验通过；git diff --check 通过（仅现有 Windows LF/CRLF 提示）。
+- 新增 AGENTS.md 固化功能变更与模板维护约定。完成 README 按功能重写、所有当前发行入口自动同步和文档随包分发；没有重新制作现有安装包或变更用户 configs。

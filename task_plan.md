@@ -109,3 +109,11 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 39. Verify real UI, migration/transfer/permissions and regressions, update deployment docs — complete
 40. Build and verify Windows x64, Linux amd64/ARM64 and portable server release — complete
 
+
+## README 功能文档与打包同步
+41. 核对当前工具、项目中心和打包入口 — complete
+42. 重写功能导向 README，加入可重复的自动生成与打包接入 — complete
+43. 验证文档更新、打包入口及现有回归 — complete
+- 本次 session-catchup 因 Python Store 别名不可用未运行；已读取现有计划、进度、发现恢复上下文。
+
+- 首轮核心回归与生产构建并行时，Java 解析测试超过默认 5 秒（其余 116 核心项通过）；构建完成后将独立重跑，暂不调整测试阈值。

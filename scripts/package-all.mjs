@@ -4,10 +4,12 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { root } from './desktop-files.mjs';
 import { releaseTargets, validateIdentity, verifyRuntime } from './release-integrity.mjs';
+import { copyReadme, updateReadme } from './update-readme.mjs';
 
 const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const collectOnly = process.argv.includes('--collect-only');
 if (process.argv.slice(2).some(argument => argument !== '--collect-only')) throw new Error('Supported option: --collect-only (collect already-built current-version packages)');
+await updateReadme();
 const targets = releaseTargets(manifest.version);
 // Build sequentially: electron-builder and runtime staging use shared build caches.
 for (const target of collectOnly ? [] : targets) {
@@ -34,4 +36,5 @@ for (const target of targets) {
 }
 await writeFile(path.join(output, 'SHA256SUMS'), checksums.join('\n') + '\n');
 await writeFile(path.join(output, 'release.json'), JSON.stringify({ version: manifest.version, electron: manifest.devDependencies.electron, buildSha256: commonBuild, files }, null, 2) + '\n');
+await copyReadme(output);
 console.log(`All packages and SHA256SUMS: ${output}`);

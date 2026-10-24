@@ -1,10 +1,14 @@
 """Package only the browser project center and its built-in Node server."""
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import zipfile
 
 root = Path(__file__).resolve().parent.parent
+subprocess.run([os.environ.get('DEVKIT_NODE', 'node'), str(root / 'scripts/update-readme.mjs')], cwd=root, check=True)
 version = json.loads((root / 'package.json').read_text(encoding='utf-8'))['version']
 manifest = json.loads((root / 'dist/.vite/manifest.json').read_text(encoding='utf-8'))
 entries, assets = {}, {'portal.html'}
@@ -40,6 +44,10 @@ with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslev
                 bundle.write(source, f'{folder}/{source.name}')
     bundle.writestr('package.json', json.dumps(package, indent=2))
     bundle.write(root / 'docs/project-center.md', 'GUIDE.zh-CN.md')
+    bundle.write(root / 'README.md', 'README.md')
+    for guide in sorted((root / 'docs').rglob('*.md')):
+        if guide.name != 'README.template.md':
+            bundle.write(guide, guide.relative_to(root).as_posix())
     bundle.writestr('README.txt', 'DevKit Project Center\nRequires Node.js 24+ on the HOST only. Clients need only a modern browser.\nNo npm install, build, Python or Electron needed for this ZIP.\n\nWindows PowerShell:\n$env:DEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password"\nnode server/start.mjs\n\nLinux:\nDEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password" node server/start.mjs\n\nDefault: 0.0.0.0:8765, read-only.\nHOST, PORT, DEVKIT_PROJECT_DATA and DEVKIT_PROJECT_EDIT=true are optional.\nData defaults to ./configs beside server/. Close both hosts before copying configs between installations. No user data is included in this archive.\nOnly for trusted LANs; HTTP is not encrypted. See GUIDE.zh-CN.md.\n')
 with zipfile.ZipFile(archive) as bundle:
     assert bundle.testzip() is None
@@ -48,4 +56,6 @@ with zipfile.ZipFile(archive) as bundle:
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 (output / 'PROJECT-SERVER-SHA256SUMS').write_text(f'{digest}  {archive.name}\n', encoding='ascii')
 (output / 'project-server.json').write_text(json.dumps({'version': version, 'name': archive.name, 'bytes': archive.stat().st_size, 'sha256': digest, 'nodeRuntimeIncluded': False, 'requiredHostNode': '24+', 'architecture': 'portable JavaScript'}, indent=2), encoding='utf-8')
+shutil.copyfile(root / 'README.md', output / 'README.md')
+shutil.copytree(root / 'docs', output / 'docs', dirs_exist_ok=True, ignore=shutil.ignore_patterns('README.template.md'))
 print(f'Built {archive.name}: {archive.stat().st_size} bytes, SHA256 {digest}')

@@ -1,204 +1,267 @@
+<!-- README.md 自动生成；维护源为 docs/README.template.md。工具清单来自源码注册表，版本和产物名称来自 package.json / releaseTargets。
+     变更工作台、项目中心、部署或数据行为时，同步修改本模板及对应专题文档，然后运行 npm run docs:update。
+     不要直接编辑根目录 README.md；每次打包都会重新生成。 -->
 # DevKit · 开发者工具箱
 
-基于 **Electron + React + TypeScript** 的本地开发工作台。Windows 与 Linux 统一使用内置 Chromium，无需系统 WebKitGTK 或 WebView2。当前版本 v1.6.0，中文界面，44 个工具均离线运行，另含支持局域网共享的项目中心。
+DevKit 是中文界面的本地开发工作台，提供 **7 类、44 个离线工具**，以及可通过局域网共享的项目中心。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。
 
-## v1.6 项目中心打磨与便携配置
+当前版本：**v1.6.0**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
 
-项目中心配置改存为 **安装目录/configs**。首次启动自动迁入旧版数据并保留原件；关闭应用后，可将 configs 整个复制到另一台电脑安装目录的相同位置。界面提供实际路径、打开目录与迁移指引，升级和卸载保留该目录。Linux 安装时准备普通用户可写的 configs，目录不可写时明确报错，具体权限处理见部署说明。
+## 开始使用
 
-卡片压缩为紧凑布局，名称、编码、分组、状态和操作集中显示，长地址按需展开；增加列表视图、排序和明确勾选的批量操作。编辑区提供作用范围、URL 组成和各档案预览，取消/Esc/退出保护草稿。导入支持合并/替换及影响预览，恢复先预览快照，支持命名备份。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.6.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.6.0/`。
+2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
+3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 
-当前发行目录 `artifacts/release-1.6.0/` 提供 Windows x64、Linux amd64、Linux ARM64 及独立 Node24 服务 ZIP。[配置位置、迁移与局域网部署说明](docs/project-center.md)。
+Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windows 安装包当前未配置代码签名。Linux / 麒麟离线安装、基础库检查和启动排查见 [麒麟 V10 部署说明](docs/kylin-offline-install.md)。
 
-## v1.5 项目中心与局域网共享
+## 工具功能
 
-新增统一的 **项目中心**，将项目入口、环境配置档案、导入导出与快照恢复放在同一工作流中。项目定义维护一次，配置档案维护变量及个别项目的覆盖；切换档案只影响当前使用者。支持分组搜索、批量启停、入口清单、主机手动检测、版本冲突检查和最近 30 份快照。
+以下清单直接读取应用的工具定义与分类；名称、说明、数量和排序随当前功能同步。
 
-桌面端通过“局域网共享”开启独立 HTTP 服务，其他电脑用浏览器访问主机 IP/端口。设置访问口令，默认只读，可明确允许协作编辑及下次启动自动共享。只开放项目中心，原有工具箱资源与输入不开放；不需要 Nginx，桌面主机不需要另装 Node。另有 Node.js 24+ 独立服务 ZIP，用于常驻主机部署。
+### 结构化数据（9）
 
-[项目中心逻辑、局域网操作步骤与部署说明](docs/project-center.md)。v1.5 历史桌面交付在 `artifacts/release-1.5.0/`，包括 Windows x64、Linux amd64、Linux ARM64 包及校验值。独立服务 ZIP 不包含 Node 运行时；仅运行主机需要 Node，浏览器客户端不需要。
-
-## v1.4 GitHub 调研与实用工具补齐
-
-参考 DevToys、IT-Tools 和 CyberChef，新增 **XML、GZip、IPv4 子网、chmod、ULID、文本统计** 六个工具，接入现有搜索、独立任务、示例与文件导出。首页新增显式内容识别，推荐工具并携带原文和转换模式；仅在主动操作时读取剪贴板。搜索优先用途别名，处理结果可继续送往 GZip / XML / 文本统计。
-
-[调研报告、对比与后续优先级](docs/github-research-2026-10-24.md)。v1.4 历史交付目录为 `artifacts/release-1.4.0/`，包含 Windows x64、Linux amd64、Linux ARM64 包、构建指纹及 SHA-256。打包过程检查实际 ASAR 的全部前端资源和桌面代码，防止汇总旧包；交付后可运行 `npm run verify:release`。
-
-## v1.3 类型转换整合
-
-将 JSON 转 Java / TypeScript 合并为 **JSON 转类型**，通过目标语言切换，并保留 POJO/Record、Jackson、interface/type 和 TS 对象输出选项。新增 **类型转 JSON**，从 Java 实体类/Record 或 TS interface/type 生成 JSON 示例，支持本地嵌套类型、集合、泛型与继承；循环对象引用以 null 截断。v1.3 时总计仍为 38 个工具，v1.4 已扩展为 44 个。
-
-反向转换按声明类型生成示例，不执行源码、构造器或初始化表达式，不会还原实际数据。输入语言、根类型与数组示例数量可设置，TS 可选择包含/忽略可选字段。旧工作区、收藏和启动入口自动迁移。[用法、支持范围与示例](docs/type-conversion.md)。v1.3 历史安装包位于 `artifacts/release-1.3.0/`。
-
-## v1.2 前后端工具升级
-
-新增 **12 个工具**：JS/JSX、TS/TSX、HTML、CSS/SCSS 格式化，JSON 路径提取、JSON Schema 生成、Query 参数转换、Fetch/Axios/cURL 请求代码生成、Cron 预览、.env 与 Properties 转换、HMAC、Unicode 转义、CSS 单位换算、HTTP 状态码速查。全部接入分类搜索、独立任务、示例、复制和导出，JSON 输出支持结构预览。
-
-[工具用法与边界](docs/developer-tools.md)。代码格式化通过随应用分发的 Prettier 按需加载，HTTP 工具只生成代码，Cron 只预览 UTC 触发时间。HMAC 密钥与结果默认排除在工作区保存之外。
-
-新增 `npm run bundle:all`，一次生成 Windows x64、Linux amd64 与 Linux ARM64 三份安装包，统一放入对应版本的发行目录（当前为 `artifacts/release-1.6.0/`），附带 `SHA256SUMS` 和 `release.json`。构建 Windows 安装包的合集命令在 Windows 构建机使用，各平台仍保留独立打包命令和 CI。
-
-## v1.0 产品体验升级
-
-- 七个任务分类统一总览、侧栏和搜索：结构化数据、代码与查询、编码与解析、文本与匹配、时间与数值、安全与标识、颜色与设计。搜索支持用途别名、多个关键词、英文子序列匹配，收藏和最近使用优先。
-- 紧凑工作台首页提供继续工作、卡片/列表切换、分类过滤；移除宣传式大图。浅色、深色、跟随系统主题，以及舒适/紧凑密度。
-- 最多 12 个独立任务，同一工具可打开多份输入。切换保留编辑器、光标和滚动；任务可后台执行或主动取消。编辑后保留旧结果并标记待更新；失败重试保留上次输出。清空、文件导入和关闭文本任务可撤销。
-- 文本文件可拖入或选择导入，最多 8 MB 且不超过 2,000,000 字符；支持 UTF-8、带 BOM 的 UTF-16 LE/BE。桌面导出使用原生另存对话框，仅授予用户选择文件的写权限；浏览器预览使用下载。
-- 编辑区支持拖动分栏（宽窗口）、上下布局、输入/结果最大化、字号与缩进设置。窄窗口导航支持 Esc 关闭、焦点约束与焦点恢复。
-- JSON、CSV 导入结果可切换结构/表格预览，保留大整数、数字原文及重复键；支持节点搜索、路径和值复制。URL/JWT 展示结构化字段，正则提供匹配高亮与分组，diff 提供左右对照和差异块跳转，密码/UUID 提供逐条复制。
-- 处理结果可作为新任务输入，串联 JSON 格式化、代码生成、编码等操作。工作区通过文件主动保存、恢复；默认排除密码/JWT/HMAC，颜色任务和图片不导出。工作区文件为明文，导入有大小、数量和字段验证，恢复的结果需重新处理。
-- 设置页管理主题、密度、启动工具、字号、缩进、换行与布局，并支持设置/收藏导入导出和可撤销重置。
-
-离线工具的任务输入输出默认仅存在内存；偏好、工具收藏和收藏色自动保存。项目中心的数据经主动保存后持久化在主机，可按设置供局域网访问；入口检测仅在主动操作时进行。无遥测或远程字体。
-
-## 已实现
+整理数据与配置文件
 
 | 工具 | 功能 |
 | --- | --- |
-| XML 格式化 | 格式化 / 压缩、注释 / CDATA / xml:space，拒绝 DTD / ENTITY；不是 XSD 校验器 |
-| GZip 文本编解码 | UTF-8 文本 ↔ GZip Base64，流式解压最多 4,000,000 字节 |
-| IPv4 子网 | CIDR / 点分掩码、网络 / 广播 / 主机范围、/31 与 /32 |
-| chmod 权限 | 八进制 ↔ rwx，setuid / setgid / sticky，只计算不执行 |
-| ULID | 批量生成、同批次单调递增、时间字段解析；不用于秘密令牌 |
-| 文本统计 | UTF-8 字节、UTF-16 单元、码点、字符簇、分词、行数与换行类型 |
-| JSON ↔ YAML | 双向转换，保留大整数，拒绝重复键、非有限数、复杂键与循环别名 |
-| CSV → JSON | CSV / TSV、首行表头或数组模式，支持引号、换行、可选类型推断 |
-| SQL 格式化 | 标准 SQL / MySQL / PostgreSQL / SQLite / SQL Server / Oracle，缩进与关键字大小写 |
-| 文本差异对比 | 双文本输入、交换内容、行首尾空白选项、增删高亮与 .patch 导出 |
-| URL 解析 | 拆解 URL、查询参数、重复参数与片段，全程不访问地址 |
-| 随机密码生成 | 安全随机数、4–256 位、1–100 条、四种字符集、排除易混淆字符 |
-| JSON | 格式化、压缩、语法校验，保留大整数、数字原始写法及重复键 |
-| JSON 转类型 | 同一入口切换 Java POJO / Record 与 TS interface / type，保留两种语言的独立配置 |
-| 类型转 JSON | Java 类 / Record 或 TS interface / type 生成示例 JSON，支持嵌套、集合、本地继承和泛型 |
-| JSON → CSV / TSV | 合并所有行的列、引用转义、缺失值与表格公式转义 |
-| Base64 | UTF-8 编码、解码，支持中文与 emoji |
-| URL | URL 参数编码、解码（encodeURIComponent 语义） |
-| HTML 实体 | 特殊字符转义、常见命名实体和数字实体解码 |
-| 时间戳 | 秒/毫秒、带时区 ISO 日期、UTC 与本地时区显示 |
-| 哈希 | SHA-256 / SHA-384 / SHA-512 / SHA-1 |
-| UUID | 使用安全随机数生成 UUID v4，单次 1–1000 个 |
-| 正则 | JavaScript 正则、标志、匹配位置、捕获分组和命名分组 |
-| JWT | Header / Payload 解码及 iat / exp / nbf 的 UTC 日期，仅解码、不验证签名 |
-| 进制转换 | BigInt 精确转换 2 / 8 / 10 / 16 进制，支持负数和对应进制前缀 |
-| 文本与命名 | 小驼峰、大驼峰、下划线、连字符、大小写、逐行去重、自然排序和空白清理 |
-| 取色器 | 色板、可用环境下的屏幕吸管、本地图片像素取色、坐标与放大镜 |
-| 颜色格式转换 | HEX / HEXA / RGB / HSL、透明度、HSV 与 CMYK 分量显示 |
-| 调色板与色阶 | 类似色、互补色、三角色、分裂互补色、四角色、单色系及 50–950 色阶 |
-| 渐变生成器 | 2–5 个等距色标、线性 / 径向渐变、角度和 CSS 导出 |
-| 颜色对比度 | WCAG 2.2 AA / AAA 普通字、大字与 UI 图形阈值检查 |
-| 混色与插值 | sRGB 或线性光空间、预乘透明度混合、11 级插值色阶 |
+| JSON 格式化 | 让结构清晰，让调试轻松。格式化、压缩与校验 JSON。 |
+| JSON ↔ YAML | 转换配置文件，保留大整数，检测重复键与不兼容的 YAML 值。 |
+| XML 格式化 | 格式化或压缩 XML，保留注释、CDATA 与 xml:space。拒绝 DTD / ENTITY；不执行内容，不校验 XSD。 |
+| CSV 转 JSON | 导入 CSV / TSV，支持表头、引号内换行与可选类型推断。 |
+| JSON 转 CSV | 合并对象数组的所有列，支持 CSV / TSV 和表格公式转义。 |
+| JSON 路径提取 | 支持 $.field、[0]、["字段"] 与 [*]，始终输出匹配值数组，保留数字原文。不是完整 JSONPath；最多 300,000 字符、8,000 节点。 |
+| JSON Schema 生成 | 根据样本生成 Draft 2020-12 Schema，合并数组对象与可选字段。样本推断不代表完整业务约束；最多 300,000 字符、8,000 节点。 |
+| .env ↔ JSON | 转换平面字符串配置，支持 export、引号和注释；双引号支持 \n、\r、\t、\"、\\，不展开变量、不执行命令。拒绝重复键及多行引号。 |
+| Properties ↔ JSON | Java Properties 文本与 JSON 字符串对象互转，支持转义、Unicode、续行、空格或 =/: 分隔。拒绝重复键；输出使用 ASCII Unicode 转义。 |
 
-支持 `Ctrl/Cmd + K` 搜索、`Shift + Enter` 从搜索新建独立任务、文字工具的 `Ctrl/Cmd + Enter` 处理；总览中按 `/` 聚焦工具库搜索。
+### 代码与查询（6）
 
-### 工作台与代码编辑器
+转换类型、生成请求代码与整理查询
 
-默认启动进入工具总览，也可在设置中指定启动工具。侧边栏提供七个工具分组、收藏与最近使用；桌面可收起为图标栏，窄窗口改为抽屉导航。最近使用只记录本次会话的工具，不保存输入内容。点击工具复用已打开任务，工具卡片的 ＋ 或工具标题旁的“新任务”创建独立实例。
+| 工具 | 功能 |
+| --- | --- |
+| JSON 转类型 | 在同一工具切换 Java POJO / Record 与 TypeScript interface / type，保留各语言选项，从全部 JSON 样本推断嵌套类型。 |
+| 类型转 JSON | 从 Java 类 / Record 或 TS interface / type 生成 JSON 示例。支持嵌套、集合、本地继承与泛型；循环引用和未知值类型输出 null。不会执行源码或还原真实数据；外部类型需同时提供定义。最多 200,000 字符、500 类型、10,000 示例节点、60 层。 |
+| SQL 格式化 | 整理 SQL 缩进与关键字大小写，支持常用数据库方言，仅格式化、不执行。 |
+| 前端代码格式化 | 使用本地 Prettier 整理 JS / JSX、TS / TSX、CSS / SCSS、HTML；仅格式化，不执行代码。每次最多 200,000 字符。 |
+| HTTP 请求代码生成 | 从 JSON 请求配置生成 Fetch、Axios 或 POSIX shell cURL 代码。支持 method、url、headers、body，全程不发送请求；cURL 不适用于 PowerShell 引号规则。 |
+| HTTP 状态码速查 | 离线查询常用 HTTP 状态码、英文名称与中文说明；输入状态码、名称或关键词。不覆盖全部扩展状态码。 |
 
-`Ctrl/Cmd+K` 打开全局搜索面板，输入名称或用途，上下键选择，Enter 打开，Esc 关闭。面板使用原生模态对话框管理焦点。工具库的关键词筛选与分类过滤独立于全局搜索。
+### 编码与解析（7）
 
-文字工具和颜色代码导出区使用 CodeMirror 6，提供行号、折叠、JSON / Java / TypeScript / CSS 语法高亮、Ctrl/Cmd+F 查找与撤销重做。编辑器与各语言包按需从本地资源加载，不使用在线 CDN。Tab 用于缩进；按 Esc 后再按 Tab 可离开编辑器，避免键盘焦点被困。输入区支持粘贴、示例与清空，结果支持复制与文件导出，自动换行可切换。
+编码转换与地址解析
 
-### 颜色管理
+| 工具 | 功能 |
+| --- | --- |
+| Base64 编解码 | 在文本与 Base64 之间转换，完整支持 UTF-8 中文。 |
+| GZip 压缩与解压 | UTF-8 文本与 GZip Base64 双向转换，流式解压最多 4,000,000 字节；不处理 ZIP 或任意二进制文件。 |
+| URL 编解码 | 编码或解码 URL 参数中的特殊字符。 |
+| HTML 实体转换 | 转义 HTML 特殊字符；解码常见命名实体与数字实体。输出作为文本展示。 |
+| URL 解析 | 拆解地址、路径与查询参数，保留同名参数；全程不发起网络请求。 |
+| Query 参数转换 | Query 与 JSON 字符串对象互转，同名参数保留为数组，+ 按空格解码。输入为参数串（可带 ?），不接受完整 URL。 |
+| Unicode 转义 | 文本与 JavaScript Unicode 转义互转，支持 \uXXXX、\u{1F600} 和代理对；输出为文本，不执行。 |
 
-六个颜色工具共用当前主颜色与收藏色，可在色板、格式、配色、渐变、对比度和混色之间切换。支持最多 40 个本地收藏色，点击复用，可删除、清空或导出为 JSON；配色方案还可复制 / 导出 CSS 变量或 JSON，渐变可导出 CSS 文件。窄窗口下通过左上角按钮打开工具抽屉，Ctrl/Cmd+K 可直接搜索并打开工具。
+### 文本与匹配（4）
 
-颜色输入支持 `#RGB`、`#RGBA`、`#RRGGBB`、`#RRGGBBAA`，逗号或空格形式的 `rgb()/rgba()`、`hsl()/hsla()`，百分比透明度和常见命名色。转换基于 sRGB；HSV 与 CMYK 为分量换算，CMYK 不包含印刷 ICC 配置。明度阶梯基于 HSL，不是感知均匀色阶。调色板与插值色块中的透明颜色以白色为底预览。
+比较、匹配与清理文本
 
-屏幕吸管使用运行环境提供的 [EyeDropper API](https://developer.mozilla.org/en-US/docs/Web/API/EyeDropper_API)，仅在支持时启用；Linux WebKit 等环境可能不支持。跨平台仍可通过色板或图片取色。图片支持 PNG / JPEG / WebP / BMP，最大 20 MB、2000 万像素，按系统 WebView 解码后从原分辨率 Canvas 读取像素；可移动鼠标预览、点击取色，或输入零起始 X/Y 坐标取色。图片不会上传，不导入 SVG 或远程图片。
+| 工具 | 功能 |
+| --- | --- |
+| 文本差异对比 | 逐行比较两份文本，突出新增与删除，导出 unified diff 补丁。 |
+| 正则测试 | 测试 JavaScript 正则表达式，查看匹配位置和捕获分组。 |
+| 文本与命名转换 | 驼峰、下划线、大小写转换，以及逐行去重、排序与清理。 |
+| 文本统计 | 统计 UTF-8 字节、UTF-16 单元、Unicode 码点、可见字符簇、单词与行数，正确处理中文、emoji 和 CRLF。 |
 
-对比度依据 [WCAG 2.2 的 sRGB 相对亮度与对比度公式](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum)，使用未四舍五入比值判定；普通字 AA ≥4.5、AAA ≥7，大字 AA ≥3、AAA ≥4.5，UI 图形阈值 ≥3。透明背景先叠加白色，文字再叠加背景。它是颜色对的检查，不能单独证明页面整体无障碍合规。
+### 时间与数值（4）
 
-### JSON 转 Java / TypeScript
+时间、数字与子网的精确计算
 
-转换器根据整个 JSON 样本推断结构，合并数组中所有对象的字段。字段在部分样本中缺失时，TS 会生成 `?`；显式 `null` 会保留在 TS 联合类型中。仅由 null 推断的 Java 字段、空数组元素和不兼容混合类型使用 `Object`；TS 空数组使用 `unknown`。样本推断无法替代完整 JSON Schema。
+| 工具 | 功能 |
+| --- | --- |
+| 时间戳转换 | 在 Unix 时间戳与日期之间转换，明确区分秒和毫秒。 |
+| 进制转换 | 使用 BigInt 精确转换二、八、十、十六进制整数。 |
+| Cron 表达式预览 | 五字段 Unix Cron（分 时 日 月 周），支持数字、*、范围、逗号与步长，0/7 为周日；日期与星期均受限时取或。按 UTC 预览未来最多 4 年，不创建定时任务；不支持 Quartz 秒字段、名称或 L/W/#。 |
+| IPv4 子网计算 | 由 IPv4 / CIDR 或连续子网掩码计算网络、广播、主机范围。/31 使用点对点规则，/32 为单个地址；不访问网络。 |
 
-Java 支持对象或非空对象数组根节点，输出可保存为单个 `Root.java` 文件，嵌套对象生成为内部类型。整数根据原始数字文本推断为 `Integer` / `Long` / `BigInteger`，小数或指数形式使用 `BigDecimal`；不会先把大整数转换为 JS Number。POJO 使用包装类型和 getter/setter，Record 需要 Java 16+。默认无外部依赖；字段重命名后如需保留 JSON 绑定，请选择 Jackson 注解，并在目标 Java 项目引入 `jackson-annotations`，反序列化时使用支持相应类型的 Jackson 配置。
+### 安全与标识（7）
 
-TS 支持任意合法 JSON 根节点，提供 interface / type 风格，可输出 `export const data: Root = ...`。`number` 采用 JavaScript 数值精度；生成代码保留原数字写法，但大整数业务 ID 建议在 JSON 中使用字符串。
+摘要、权限、令牌与安全随机数
 
-### 配置、表格与调试工具
+| 工具 | 功能 |
+| --- | --- |
+| 哈希计算 | 为 UTF-8 文本计算 SHA 摘要，快速核对数据。 |
+| 随机密码生成 | 使用系统安全随机数批量生成密码，支持字符集、长度与排除易混淆字符。 |
+| JWT 解码 | 查看 Header、Payload 和时间字段。仅解码，不验证签名或令牌可信性。 |
+| UUID 生成 | 使用安全随机数批量生成 UUID v4。 |
+| ULID 生成与解析 | 生成 1–1,000 个 ULID，同批次单调递增；或逐行解析标识的毫秒时间与随机段。时间可见，不用于密码或令牌。 |
+| HMAC 签名 | 使用 UTF-8 密钥计算 HMAC SHA-256 / SHA-384 / SHA-512，输出 HEX 或 Base64。密钥与结果仅在内存；工作区默认排除此任务。 |
+| chmod 权限换算 | 八进制与 rwx 权限互转，解释 owner / group / other 与 setuid、setgid、sticky。只计算，不执行命令或修改文件。 |
 
-JSON / YAML 转换采用 YAML 1.2 core 规则，只处理单文档。大整数保留原始整数精度；浮点数仍使用双精度。转换会丢弃注释与原始排版，拒绝重复键、非字符串键、非有限数、未知标签、循环别名及超过 100 层的结构。别名展开有数量限制。
+### 颜色与设计（7）
 
-CSV 导入默认将字段保留为字符串，避免 `001` 变成 `1`。可选择数字 / 布尔 / null 推断；带前导零或超出安全整数范围的数字保留字符串，空字段保留空字符串。支持 BOM、CRLF、引号转义与字段内换行；空白记录行忽略，列数不一致、重复或空表头会报错。最多支持 100,000 条记录。
+取色、搭配与视觉探索
 
-SQL 只做排版，不连接数据库、不执行语句，也不保证语义或语法正确。最多支持 200,000 字符；复杂存储过程可能不受解析器支持。YAML、SQL、diff 及其语法高亮模块从本地按需加载。
+| 工具 | 功能 |
+| --- | --- |
+| 取色器 | 从色板、屏幕或本地图片中取色，收藏你的常用颜色。 |
+| 颜色格式转换 | HEX、RGB、HSL 相互转换，同时查看 HSV、CMYK 与透明度。 |
+| 调色板与色阶 | 生成配色方案与 50–950 色阶，导出 CSS 变量和 JSON。 |
+| 渐变生成器 | 搭配 2–5 个色标，实时预览线性、径向渐变并导出 CSS。 |
+| 颜色对比度 | 检查文字与背景的 WCAG 2.2 对比度，以及 AA / AAA 等级。 |
+| 混色与插值 | 在 sRGB 或线性光空间混合颜色，支持透明度与渐变色阶。 |
+| CSS 单位换算 | 逐行转换 px / rem / em / vw，em 使用设定的字体基准，vw 使用设定的视口宽度。输入数字或带对应单位的值，不解析 CSS 表达式。 |
 
-文本差异每侧最多 500,000 字符，计算设有时间及编辑距离限制。绿色 `+` 为新增，红色 `-` 为删除；没有 `@@` 差异块表示按当前空白规则未发现差异。默认精确对比，导出的 unified diff 可用于补丁工具；开启忽略空白时仅用于查看差异。
+## 工作台与文件处理
 
-URL 解析使用标准 URL / URLSearchParams 规则，查询参数以数组表示以保留重复项。查询中的 `+` 按空格解析，端口等字段可能标准化。结果包含输入中的用户名、密码等字段，仅在本地显示。
+- **独立任务**：最多 12 个任务，同一工具可打开多份输入；切换保留编辑内容、光标和滚动位置。任务可后台处理或取消，修改输入后保留旧结果并标记待更新，失败后可重试。
+- **查找与导航**：7 类工具分组、用途别名搜索、收藏、会话内最近使用，支持卡片 / 列表。首页可主动识别文本内容并推荐工具；剪贴板仅在主动操作时读取。
+- **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；支持分栏拖动、上下布局、区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
+- **结果查看**：JSON 结构树、CSV 表格、URL / JWT 字段、正则匹配与分组、左右差异对照、密码 / UUID 逐项复制。处理结果可作为新任务的输入继续转换。
+- **文件输入输出**：支持拖入或选择文本文件，最多 8 MB 且不超过 2,000,000 字符，可读取 UTF-8 与带 BOM 的 UTF-16 LE/BE。桌面导出使用原生另存对话框，浏览器预览使用下载。
+- **工作区与偏好**：可主动保存、恢复文本任务；默认排除密码、JWT、HMAC，颜色任务和图片不写入工作区。主题支持浅色、深色、跟随系统，另有密度、启动工具及设置 / 收藏导入导出。
 
-密码使用 Web Crypto `getRandomValues`，通过拒绝采样避免模偏差；混合字符集每条保证包含所选的各类字符。默认 24 位、5 条，排除 `Il1O0o`。支持字母数字符号、字母数字、十六进制和纯数字；十六进制或数字模式若需要完整字符集，可将易混淆字符设为保留。生成结果不自动保存，复制或导出需主动操作。
+| 快捷键 | 操作 |
+| --- | --- |
+| `Ctrl/Cmd + K` | 打开全局工具搜索 |
+| `Shift + Enter` | 从搜索创建独立任务 |
+| `Ctrl/Cmd + Enter` | 处理当前文本任务 |
+| `/` | 在总览中聚焦工具库搜索 |
+| `Ctrl/Cmd + F` | 编辑器内查找 |
+| `Esc` 后按 `Tab` | 从编辑器缩进模式移出焦点 |
+
+## 颜色管理
+
+取色、格式转换、调色板、渐变、对比度和混色共用当前主颜色及最多 40 个本地收藏色。支持 HEX / HEXA、RGB、HSL 输入，显示 HSV / CMYK 分量，配色可导出 CSS 变量或 JSON，渐变可导出 CSS。
+
+屏幕吸管在运行环境支持时启用；也可使用色板或本地图片取色。图片支持 PNG / JPEG / WebP / BMP，最大 20 MB、2000 万像素，可按坐标取色，不上传图片。颜色换算基于 sRGB，CMYK 不含印刷 ICC 配置；HSL 色阶不保证感知均匀。对比度检查提供 WCAG 2.2 的 AA / AAA 阈值判断。
+
+## 项目中心
+
+项目中心集中维护项目入口及环境差异，桌面与局域网网页共用同一份主机数据。
+
+- **项目与档案**：项目维护名称、唯一编码、分组、说明、HTTP(S) 地址模板、查询参数和默认状态；配置档案维护变量与个别项目的地址 / 启用覆盖。切换档案只影响当前使用者。
+- **管理与预览**：支持搜索、分组、排序、紧凑卡片 / 列表、复制项目 / 档案，以及明确勾选后的批量启停。编辑时展示 URL 组成及各档案的解析结果，有修改时提供草稿退出保护。
+- **导入导出与恢复**：支持 JSON 导出、导入影响预览、合并或替换；保存时检查版本冲突。自动保留最近 30 份快照，支持命名备份、恢复预览，导入和恢复前自动备份。
+- **手动检测**：主机按用户操作检测入口可达性。启停只控制入口状态，不启动或停止系统服务。
+- **局域网访问**：桌面端开启共享后，其他电脑通过主机 IP / 端口进入项目中心，使用口令登录。默认只读，可明确允许协作编辑，并设置下次启动自动共享。共享范围仅包含项目中心。
+
+### 配置保存与迁移
+
+| 运行方式 | 默认配置位置 |
+| --- | --- |
+| Windows 安装版 / 解压版 | `devkit.exe` 同级的 `configs/` |
+| Linux 安装版 | `/opt/devkit/configs/` |
+| 独立 Node 服务 | 解压根目录的 `configs/`，与 `server/` 同级 |
+| 源码桌面运行 | 仓库根目录的 `configs/` |
+
+`configs` 保存项目、档案、快照、共享设置及加盐口令哈希。首次启动会在新位置无数据时迁入旧版配置并保留原件；已有新配置优先，升级和卸载保留配置目录。
+
+迁移时关闭来源与目标应用 / 服务，备份目标配置后，复制整个 `configs` 到新安装目录并确保普通用户有写入权限。只导出项目 JSON 不会包含共享口令和历史快照。两边数据需要合并时使用界面的导入预览。
+
+### 独立服务部署
+
+适合常驻主机：解压 `DevKit_ProjectCenter_1.6.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+
+Windows PowerShell：
+
+```powershell
+$env:DEVKIT_PROJECT_PASSWORD='替换为独立访问口令'
+node server/start.mjs
+```
+
+Linux：
+
+```sh
+DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' node server/start.mjs
+```
+
+默认监听 `0.0.0.0:8765`，只读访问。可通过 `HOST`、`PORT`、`DEVKIT_PROJECT_EDIT=true` 配置监听与协作编辑；`DEVKIT_PROJECT_DATA` 可显式指定数据目录。后续启动可复用已保存的口令哈希。HTTP 共享用于可信局域网；同一配置目录只能由一个主机进程使用。完整步骤与权限处理见 [项目中心使用和部署说明](docs/project-center.md)。
 
 ## 开发与打包
 
-从 v1.1.0 起统一采用 Electron + React + TypeScript。Windows、Linux amd64 和 Linux ARM64 使用同一个桌面主进程和原生文件保存接口。Chromium 随安装包分发，不要求目标系统安装 WebKitGTK、WebView2、Node.js 或 Rust。
-
-构建机准备 Node.js 24、Python 3.10+（仅制作 deb 使用）：
+构建机使用 Node.js 24；制作 `.deb` 或独立服务 ZIP 还需 Python 3.10+。首次下载构建依赖和 Electron 运行时需要网络，已安装的离线工具使用本地资源。
 
 ```sh
 npm ci
-npm run desktop
+npm run dev       # 浏览器开发
+npm run desktop   # 构建后启动 Electron
 ```
 
-`npm run desktop` 先构建再打开 Electron；浏览器界面开发可运行 `npm run dev`。修改桌面主进程或需要验证原生文件保存、Worker/CSP 时，重新运行桌面命令。
+桌面运行时当前使用 Electron 45.0.0。安装包包含 Chromium，Linux 包不添加系统软件源、不替换系统库；依赖以 `.deb` 控制文件为准。麒麟实际安装和启动需要在目标系统验收。
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
 | Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.6.0_x64-setup.exe` |
-| Linux amd64 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.6.0-1_amd64.deb` |
-| Linux ARM64 / 麒麟 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.6.0-1_arm64.deb` |
-| 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.6.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.6.0-1_arm64.deb` |
+| 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
+| 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.6.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.6.0/DevKit_ProjectCenter_1.6.0_node24.zip` |
 
-Windows 解压版必须保留 `artifacts/desktop-runtime/DevKit-win32-x64/` 整个目录，再运行其中的 `devkit.exe`。不能只复制一个 exe。NSIS 安装包包含运行时，可整包传输，采用当前用户安装；目前没有配置代码签名。
-
-ARM64 deb 可以在 Windows 或 Linux 构建机上生成。打包脚本下载官方 Electron 预编译运行时，检查 ELF 架构及 glibc 符号要求，然后使用 Python 标准库生成 Debian ar/control/data 归档。安装脚本不联网、不添加源、不安装或替换系统库。基础库依赖以 deb 控制文件为准，不依赖 WebKitGTK。真实麒麟机器上的安装/启动仍需验证。
-
-[麒麟 V10 离线安装与排查](docs/kylin-offline-install.md)。离线终端只需应用包；若它本身缺少包中声明的基础库，安装会报错，此时应反馈做进一步应用适配，不要强制忽略依赖或升级目标系统。
-
-构建依赖下载需要联网；现有 44 个工具离线运行，项目中心共享与手动检测按用户设置使用网络。桌面使用不需要额外安装 Node、Python 或 Java；独立服务 ZIP 的主机需要 Node.js 24+。Linux 安装包包含 Chromium 的沙箱帮助程序，运行时不要添加 `--no-sandbox` 或用 sudo 启动。
-
-### 自动构建
-
-`.github/workflows/build.yml` 使用同一套 Electron 打包脚本，生成 Windows x64、Linux amd64、Linux ARM64 产物并上传到 Actions。Windows 执行真实 Electron 集成检查；Linux 检查 deb 元数据、父目录完整性、空目录严格解包，并执行实际 `dpkg --unpack`。工作流不发布 Release，不代表已在麒麟机器上验收。旧版本构建产物可能仍在 artifacts 中，Electron 统一版从 1.1.0 开始；本次交付使用 `1.6.0-1` Debian 包，保留自 `1.1.0-1` 起修复父目录缺失问题的打包逻辑。
-
-## 验证与边界
+`bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 
 ```sh
+node scripts/package-all.mjs --collect-only
+npm run verify:release
+```
+
+汇总前会校验各包的版本、架构、校验值、构建凭据及实际 ASAR 内容，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。CI 工作流 `.github/workflows/build.yml` 使用同一组打包入口，构建三平台产物与独立服务 ZIP。
+
+### README 自动维护
+
+**每次打包都会先根据当前功能生成根目录 README.md，失败时停止打包。** Windows、Linux、麒麟别名、解压版、合集（含 `--collect-only`）及独立服务 ZIP 均覆盖；直接运行打包脚本同样生效。安装包、输出目录、解压版、发行合集和独立服务 ZIP 会附带当前 README 及其链接的专题文档。
+
+```sh
+npm run docs:update   # 手动同步 README
+npm run docs:check    # 只检查一致性，过期时返回失败
+npm run test:docs     # 验证自动更新逻辑
+```
+
+维护来源：
+
+- `src/tools.ts` 及其引用的工具模块：自动读取实际工具名称和功能说明，新增、删除、重命名或修改说明均同步到清单。
+- `src/catalog.ts`：自动读取分类和工具顺序；工具遗漏、重复或引用失效会阻止生成。
+- `package.json`、`scripts/release-integrity.mjs`、`src/workbench.ts`：自动读取版本、Electron 版本、发行文件名、打包命令和任务数量限制。
+- `docs/README.template.md`：维护工作台、项目中心、部署和使用边界等说明。相关功能改变时同步修改模板及专题文档，再生成 README。
+
+生成不依赖在线 AI 或网络；内容相同不会重复写入，也不写入构建时间。请修改上述来源，避免直接编辑会被重新生成的根目录 README。
+
+## 验证与使用边界
+
+```sh
+npm run docs:check
+npm run test:docs
 npm test
 npm run test:desktop
+npm run test:projects
 npm run test:release
 npm run test:electron
 npm run build
 python scripts/test-deb-packaging.py
 ```
 
-117 项核心测试覆盖现有 44 个工具。桌面策略测试覆盖本地来源限制、目录穿越和原生保存参数；Electron 集成检查验证隔离沙箱、安全本地协议、页面、JSON/YAML/SQL、新增工具与 Prettier Worker、Web Crypto、原生保存桥接和取消。测试用的保存对话框选择由测试桩提供，不属于操作系统弹窗点击测试。
+生成的 Java 代码可额外用 JDK 17+ 验证：`npm run test:java`，也可传入 `javac` 路径。桌面集成测试覆盖本地协议、Worker、沙箱及原生保存桥接；保存对话框的选择使用测试桩。真实安装、目标 Linux / 麒麟启动及跨电脑网络访问需在对应环境确认。
 
-安装 JDK 17+ 后，可运行 `npm run test:java` 编译生成代码，也可执行 `npm run test:java -- /path/to/javac` 指定编译器。使用工具箱本身不需要 Java。
-
-文字工具在独立 Web Worker 中执行，正则超过 3 秒、其他任务超过 10 秒会终止，也可主动取消；输入上限为 2,000,000 个 UTF-16 代码单元，输出上限为 4,000,000 个。正则最多返回 1000 条匹配，高亮预览支持最多 100,000 输入字符并展示前 200 项。JSON 最多 100 层嵌套，结构预览最多 300,000 字符、8,000 节点，表格预览最多 100 行、30 列，diff 预览最多 5,000 行。工作区最多 12,000,000 字符和 12 个文本任务。
-
-JWT 仅解码，不验证签名或可信性。SHA-1 仅供兼容性校验。CSV 默认转义看起来像表格公式的字符串，可手动关闭。安装成功、程序启动、功能验收是三项独立检查，当前开发机不能替代真实麒麟 ARM64 验收。
+- 文本工具在独立 Worker 中执行；正则超过 3 秒、其他任务超过 10 秒会终止。通用输入上限为 2,000,000 个 UTF-16 单元，输出为 4,000,000 个；部分工具有更小限制，具体见界面说明。
+- JSON 格式化保留数字原文与重复键；JSON / YAML 转换拒绝重复键等不兼容结构，转换不保留注释和排版。CSV 默认保留字符串，并对导出中的表格公式字符串转义。
+- JSON 转类型按样本推断；类型转 JSON 按声明生成示例，不执行源码，也不还原真实数据。详见 [类型转换说明](docs/type-conversion.md)。
+- SQL / 代码工具仅格式化或生成代码，HTTP 工具不发送请求，Cron 只预览 UTC 时间，JWT 仅解码、不验证签名。前后端工具的具体支持范围见 [开发工具说明](docs/developer-tools.md)。
+- 工作区、项目导出和配置文件包含明文业务数据，应按实际内容保管；任务内容不会自动持久化，主动复制、导出或共享由用户决定。
 
 ## 工程结构
 
-- `src/tools.ts`、`src/catalog.ts`、`src/discovery.ts`：工具定义、七个任务分类与统一搜索。
-- `src/App.tsx`、`src/workbench.ts`：独立任务、运行状态、偏好和工作区文件。
-- `src/ToolWorkspace.tsx`、`src/ToolOptions.tsx`、`src/ResultView.tsx`：编辑区、参数与结构化结果。
-- `src/generators.ts`、`src/utilities.ts`、`src/practical.ts`、`src/developer.ts`、`src/colors.ts`：转换和生成算法。
-- `src/ColorWorkbench.tsx`：颜色工具、图片取色与收藏。
-- `src/extended.ts`：XML、GZip、IPv4、chmod、ULID 和文本统计；`src/detection.ts`、`src/SmartOpen.tsx`：显式内容推荐。
-- `src/CodeEditor*.tsx`、`src/styles.css`、`src/workbench.css`：编辑器与视觉系统。
-- `src/files.ts`：调用统一 Electron 文件保存桥接；浏览器预览使用下载。
-- `electron/main.cjs`、`electron/preload.cjs`、`electron/policy.cjs`：共享桌面入口、最小 IPC 接口、本地资源与来源校验。
-- `scripts/package-desktop.mjs`、`scripts/make-deb.py`：统一运行时打包与 deb 归档。
-- `scripts/release-integrity.mjs`、`scripts/verify-release.mjs`：实际 ASAR 内容校验、构建凭据与三架构发行包校验。
-- `build/icons/`：共享应用图标。
-
-
-
-
-发行包一致性复核：`npm run verify:release`。只汇总已构建产物可使用 `node scripts/package-all.mjs --collect-only`，要求每份包具备匹配的 `.build.json`，并与当前全部 dist / 桌面源码一致；缺失或过期会明确失败。
-
-项目中心代码：`shared/projects.mjs` 为共用模型，`server/` 为存储/共享/检测，`src/ProjectCenter.tsx` 为桌面与网页共用界面，`portal.html` 为唯一对外网页入口。`npm run test:projects` 验证项目与共享边界；`npm run serve:projects` 启动独立 Node 服务；`npm run bundle:project-server` 制作仅项目中心的独立 ZIP（构建机需 Python，可通过 DEVKIT_PYTHON 指定）。
+| 路径 | 职责 |
+| --- | --- |
+| `src/tools.ts`、`src/catalog.ts`、`src/discovery.ts` | 工具注册、分类与搜索 |
+| `src/App.tsx`、`src/workbench.ts`、`src/ToolWorkspace.tsx` | 工作台、独立任务与偏好 |
+| `src/ToolOptions.tsx`、`src/ResultView.tsx`、`src/CodeEditor*.tsx` | 参数、结果预览与编辑器 |
+| `src/generators.ts`、`src/type-samples.ts`、`src/utilities.ts`、`src/practical.ts`、`src/developer.ts`、`src/extended.ts` | 转换、解析与生成算法 |
+| `src/colors.ts`、`src/ColorWorkbench.tsx` | 颜色算法与交互 |
+| `src/ProjectCenter.tsx`、`shared/projects.mjs`、`server/`、`portal.html` | 项目中心界面、共享模型、存储及局域网服务 |
+| `electron/`、`src/files.ts` | 桌面入口、来源策略及文件保存桥接 |
+| `scripts/package-*.mjs`、`scripts/make-deb.py` | 桌面、合集与服务打包 |
+| `scripts/release-integrity.mjs`、`scripts/verify-release.mjs` | 构建内容和发行包一致性校验 |
+| `scripts/update-readme.mjs`、`docs/README.template.md` | 功能文档生成与维护源 |
+| `docs/` | 类型转换、开发工具、项目中心和麒麟部署专题说明 |

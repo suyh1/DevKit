@@ -6,6 +6,9 @@
   "version": "1.6.0",
   "type": "module",
   "scripts": {
+    "docs:update": "node scripts/update-readme.mjs",
+    "docs:check": "node scripts/update-readme.mjs --check",
+    "test:docs": "node --test scripts/update-readme.check.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",

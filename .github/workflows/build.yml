@@ -40,6 +40,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: npm ci
+      - run: npm run test:docs
       - run: npm test
       - run: npm run test:desktop
       - run: npm run test:release
@@ -75,6 +76,8 @@ jobs:
             artifacts/${{ matrix.artifact }}/*.deb
             artifacts/${{ matrix.artifact }}/*.txt
             artifacts/${{ matrix.artifact }}/*.json
+            artifacts/${{ matrix.artifact }}/README.md
+            artifacts/${{ matrix.artifact }}/docs/
             artifacts/${{ matrix.artifact }}/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -91,6 +94,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
+      - run: npm run test:docs
       - run: npm run test:projects
       - run: npm run bundle:project-server
       - run: node scripts/check-project-server.mjs
@@ -102,5 +106,7 @@ jobs:
             artifacts/release-*/PROJECT-SERVER-SHA256SUMS
             artifacts/release-*/project-server.json
             artifacts/release-*/project-server-verification.json
+            artifacts/release-*/README.md
+            artifacts/release-*/docs/
           if-no-files-found: error
           retention-days: 14

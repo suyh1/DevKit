@@ -119,3 +119,15 @@
 - v1.6 final desktop packages share source/runtime fingerprint 1e7038a67729215c5f46f35a5e38fbb9f283d2aa6a05dc69119891df650eba1e. Windows 112966906 bytes, amd64 93179028 bytes, ARM64 88079948 bytes, portable ZIP 116279 bytes. All final checksums verified.
 - Configs-only transfer into a clean standalone installation works even when launched from a different CWD. Password env was omitted on restart to prove copied sharing settings are used. Same-host stale lock recovered after test process shutdown; projects and snapshots retained. Final compact cards measured 150 CSS px including description.
 
+
+## README 自动维护审计
+- 当前版本 1.6.0，工具定义分布于 tools/practical/developer/extended，catalog 是七分类顺序的来源。原 README 以版本历史为主，工具清单不完整且版本、路径多处硬编码。
+- 打包入口包含 package-desktop.mjs、package-all.mjs（含 collect-only）、package-project-server.mjs / .py；需要覆盖直接运行脚本，而不仅 npm 前置钩子。
+- 当前 git 工作区干净；现有发行产物保持不变。
+
+- 自动生成使用 Vite 无监听 SSR 加载实际注册表（包含跨模块展开），关闭依赖扫描，避免另维护功能清单；模板承载非工具使用说明，AGENTS.md 记录后续功能变更的维护要求。
+- 文档随安装包、输出目录、合集和服务 ZIP 分发，并附专题文档保证相对链接可用。
+
+- 使用内置 Python 实际验证独立服务 Node 包装入口和 Python 直接入口：临时 ZIP 含最新 README 和 docs，根目录 README 与发行副本一致；未覆盖现有发行目录。
+- 显式关闭 Vite HTTP 监听、WebSocket、HMR、文件观察和依赖扫描；生成只加载注册表，不运行转换、不启动局域网服务。
+- 核心回归独立重跑 117/117 通过，确认首轮单项超时源于并行构建时的资源竞争；未修改超时阈值。
