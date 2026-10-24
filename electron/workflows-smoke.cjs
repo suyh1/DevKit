@@ -18,17 +18,17 @@ module.exports = async function workflowsSmoke(window, output) {
   };
   await js('[...document.querySelectorAll(".tab-close")].forEach(button => button.click())');
   await wait('document.querySelectorAll(".task-tab").length === 0');
-  await js('[...document.querySelectorAll("nav button[aria-expanded=false]")].forEach(button => button.click())');
-  const names = await js('[...document.querySelectorAll("nav .nav-item")].map(button => button.title)');
-  assert.equal(names.length, 45);
   const size = window.getSize(), minimum = window.getMinimumSize();
   window.setMinimumSize(360, 600);
   window.setSize(1440, 1000);
+  const { catalog, openTool } = require('./navigation-helpers.cjs')(window);
+  const names = (await catalog()).map(tool => tool.name);
+  assert.equal(names.length, 45);
   const report = [];
   const audit = require('./interaction-audit-smoke.cjs')(window, output);
   for (const name of names) {
     console.log(`Checking workflow UI: ${name}`);
-    await js(`[...document.querySelectorAll('nav .nav-item')].find(button => button.title === ${JSON.stringify(name)}).click()`);
+    await openTool(name);
     await wait(`document.querySelector('${pane} h1')?.textContent === ${JSON.stringify(name)}`);
     const id = await js(`document.querySelector('${pane} [data-tool]')?.dataset.tool`);
     if (id) {

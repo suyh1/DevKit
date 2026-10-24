@@ -127,19 +127,14 @@ app.on('browser-window-created', (_event, window) => {
         assert.match(result.output, expected);
       }
       // Exercise the visible tool workspace, not only the worker transform API.
-      await window.webContents.executeJavaScript('[...document.querySelectorAll("nav button[aria-expanded=false]")].forEach(button => button.click())');
-      await waitFor('[...document.querySelectorAll("nav button")].some(button => button.title === "前端代码格式化")');
-      await window.webContents.executeJavaScript('[...document.querySelectorAll("nav button")].find(button => button.title === "前端代码格式化").click()');
+      const { openTool } = require('./navigation-helpers.cjs')(window);
+      await openTool('前端代码格式化');
       await waitFor('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "前端代码格式化"');
       await window.webContents.executeJavaScript('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例")).click()');
       await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .run-button").click()');
       await waitFor('document.querySelector(".task-pane:not([hidden]) .status-success") !== null');
       await waitFor('document.querySelector(".task-pane:not([hidden]) .output-card .cm-content")?.textContent.includes("const users")');
       await fs.writeFile(path.join(output, 'preview-developer-tools.png'), (await window.webContents.capturePage()).toPNG());
-      const openTool = async name => {
-        await window.webContents.executeJavaScript(`[...document.querySelectorAll('nav button')].find(button => button.title === ${JSON.stringify(name)}).click()`);
-        await waitFor(`document.querySelector('.task-pane:not([hidden]) h1')?.textContent === ${JSON.stringify(name)}`);
-      };
       const option = async (key, value) => {
         await window.webContents.executeJavaScript(`{ const select = document.querySelector('.task-pane:not([hidden]) .field-${key} select'); select.value = ${JSON.stringify(value)}; select.dispatchEvent(new Event('change', {bubbles:true})); }`);
         await waitFor(`document.querySelector('.task-pane:not([hidden]) .field-${key} select')?.value === ${JSON.stringify(value)}`);

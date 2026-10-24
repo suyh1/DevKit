@@ -203,3 +203,11 @@
 - 初步共享流程问题：ULID 模式切换无条件覆盖输入；工作台在失效/失败后仍允许复制/导出旧结果；坐标结果同时显示两种格式但单个复制按钮随隐藏在下方的复制格式选择，含义不够明确。继续逐工具验证。
 - 完成 45 工具源码与实际 UI 首轮审查，确认并修复坐标原文、单值复制、ULID 草稿、失效/空结果、HTTP body 数字、JWT 数字、后续工具设置、差异交换/跳转和重复键等问题。完整逐项清单见 docs/tool-interaction-audit-2026-10-24.md。
 - 追加边界：异步粘贴/导入完成时停止先前 Worker，避免旧输入的结果覆盖新输入；目标菜单随结果变化时，实际发送目标与当前选中项保持一致。
+# 2026-10-25 固定分类导航
+- 现有 7 类折叠标题 10px，展开改变后续分类位置；收起侧栏会显示全部 45 工具图标。用户批准固定分类 + 点击工具浮层。
+- GitHub API 快照：radix-ui/primitives 19,420 stars / MIT / pushed 2026-10-14；microsoft/fluentui 20,353 stars / pushed 2026-10-23，API 许可 NOASSERTION，官方仓库 README 明确 MIT，使用其文档指导而不复制代码。
+- 参考 Radix Popover 的受控状态、Escape / 外部关闭和焦点返回；Fluent 的 inline / overlay 响应式导航。Radix #4128 报告非模态浮层 Tab 被循环锁定，需验证可离开面板。
+- 现有 React/CSS/Lucide 足以实现限定的导航，不引入完整组件库；桌面浮层保留主内容交互，窄屏在现有模态侧栏内替换分类列表并提供返回。
+- 来源：https://github.com/radix-ui/primitives；https://www.radix-ui.com/primitives/docs/components/popover；https://github.com/radix-ui/primitives/issues/4128；https://github.com/microsoft/fluentui；https://fluent2.microsoft.design/components/web/react/core/drawer/usage。
+- 当前仅 AGENTS.md 为用户原有改动。现有 Electron 用例依赖展开所有分类，需改为先打开相应分类，再点击真实工具入口。
+- 最终交付 v1.9.3：导航不再展开45工具挤动分类；窄屏选择页隐藏其他导航以获得足够列表高度。最终ASAR通过全部交互验证；实际Linux包的ASAR、README及界面文档与Windows和源码一致，详见 artifacts/release-1.9.3。

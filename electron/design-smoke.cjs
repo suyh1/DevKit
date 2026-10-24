@@ -13,6 +13,7 @@ module.exports = async function designSmoke(window, output) {
     throw new Error(`Design condition not met: ${expression}`);
   }
   const size = window.getSize(), minimum = window.getMinimumSize();
+  await require('./navigation-smoke.cjs')(window, output);
   window.setMinimumSize(360, 600);
   const report = [];
   for (const theme of ['light', 'dark']) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, ChevronDown, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle } from 'lucide-react';
+import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle } from 'lucide-react';
 import { tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { isColorTool } from './colors';
@@ -12,7 +12,8 @@ import Overview from './Overview';
 import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
 import CommandPalette from './CommandPalette';
-import { toolIcons, categoryMeta, categoryOrder } from './ui';
+import CategoryNavigation from './CategoryNavigation';
+import { toolIcons, categoryMeta } from './ui';
 import { createTask, defaultPreferences, editTask, importWorkspace, normalizeFavorites, MAX_TASKS, validatePreferences, workspaceSnapshot } from './workbench';
 import type { Preferences, Task } from './workbench';
 import { saveText } from './files';
@@ -32,7 +33,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);
   const [page, setPage] = useState<Page>(tasks.length ? 'task' : 'home');
   const [favorites, setFavorites] = useState<ToolId[]>(() => { const saved = readPreference('devkit:favorites'); return Array.isArray(saved) ? normalizeFavorites(saved) : ['json', 'timestamp']; });
-  const [recent, setRecent] = useState<ToolId[]>([]), [folded, setFolded] = useState<string[]>(() => categoryOrder.filter(name => name !== (tools.find(tool => tool.id === preferences.startup)?.category ?? categoryOrder[0])));
+  const [recent, setRecent] = useState<ToolId[]>([]);
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [searchOpen, setSearchOpen] = useState(false), [saveOpen, setSaveOpen] = useState(false), [includeSensitive, setIncludeSensitive] = useState(false);
@@ -53,7 +54,6 @@ export default function App() {
   }
   function focusTask(id: string) { setActiveId(id); setPage('task'); if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }
   function openTool(toolId: ToolId, fresh = false, input?: string, options?: Options) {
-    setFolded(current => current.filter(category => category !== tools.find(tool => tool.id === toolId)?.category));
     const existing = !fresh && tasksRef.current.find(task => task.toolId === toolId);
     if (existing) focusTask(existing.id);
     else {
@@ -151,6 +151,7 @@ export default function App() {
     const controls = () => [...(sidebar?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])].filter(element => element.getClientRects().length > 0);
     controls()[0]?.focus();
     const trap = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape') { event.preventDefault(); setCollapsed(true); }
       if (event.key !== 'Tab') return;
       const items = controls(), first = items[0], last = items[items.length - 1];
@@ -170,7 +171,7 @@ export default function App() {
       <button className="sidebar-search" aria-label="打开工具搜索" onClick={() => setSearchOpen(true)}><Search size={15} /><span>搜索工具或用途</span><kbd>Ctrl K</kbd></button>
       <div className="sidebar-workspace">{([{ id: 'home', label: '工作台', Icon: LayoutGrid, count: tools.length }, { id: 'favorites', label: '我的收藏', Icon: Star, count: favorites.length }, { id: 'recent', label: '最近使用', Icon: Clock3, count: recent.length }] as const).map(item => <button className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.label} key={item.id} onClick={() => navigate(item.id)}><item.Icon size={17} /><span>{item.label}</span><small>{item.count}</small></button>)}</div>
       <button className={`nav-item ${page === 'projects' ? 'active' : ''}`} aria-current={page === 'projects' ? 'page' : undefined} title="项目中心" onClick={() => navigate('projects')}><FolderOpen size={17} /><span>项目中心</span><small>共享</small></button>
-      <div className="nav-caption"><span>按任务分类</span><small>{categoryOrder.length} 个分组</small></div><nav aria-label="工具导航">{categoryOrder.map(category => <div className="nav-group" key={category}><button className="nav-group-heading" aria-expanded={!folded.includes(category)} onClick={() => setFolded(current => current.includes(category) ? current.filter(item => item !== category) : [...current, category])}><span>{category}</span><ChevronDown size={12} className={folded.includes(category) ? 'folded' : ''} /></button>{(!folded.includes(category) || collapsed) && tools.filter(tool => tool.category === category).map(tool => { const Icon = toolIcons[tool.id], selected = page === 'task' && activeTask?.toolId === tool.id, count = tasks.filter(task => task.toolId === tool.id).length; return <button className={`nav-item ${selected ? 'active' : ''}`} aria-current={selected ? 'page' : undefined} title={tool.name} key={tool.id} onClick={() => openTool(tool.id)}><Icon size={16} /><span>{tool.name}</span>{count > 0 && <small>{count}</small>}</button>; })}</div>)}</nav>
+      <CategoryNavigation key={`${collapsed}-${narrow}-${searchOpen}`} activeToolId={page === 'task' ? activeTask?.toolId : undefined} tasks={tasks} narrow={narrow} onChoose={openTool} />
       <div className="sidebar-bottom"><button className={`nav-item ${page === 'settings' ? 'active' : ''}`} title="设置" onClick={() => navigate('settings')}><Settings2 size={17} /><span>偏好设置</span><small>v{packageInfo.version}</small></button><div className="local-badge"><ShieldCheck size={15} /><div><strong>离线运行 · 数据留在本机</strong><small>无需登录，无遥测</small></div></div></div>
     </aside>
     <main inert={narrow && !collapsed}><header className="topbar floating-navbar">

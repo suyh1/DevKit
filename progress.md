@@ -308,3 +308,15 @@
 - 最终三桌面包完成并通过 verify:release，共同构建指纹 95de2f3a6ada77de38013d30181da722e8db3026062b19fa454b883940f20fbb。实际 deb 的 ASAR 均与 Windows 相同（64856529b72135c42a49e44c762a36a06b5df253c35bbf2bdea814e25ca57723），README、经纬度指南/许可、审查清单、工具流程和开发工具文档逐字节一致。附 VERIFICATION.zh-CN.md、报告、预览及摘要清单。
 - Windows 安装器 113,053,287 字节，amd64 deb 93,247,904 字节，ARM64 deb 88,163,512 字节；独立服务 ZIP 189,416 字节。未声称真实安装或在 Linux/麒麟上执行，用户原有 AGENTS.md 修改不提交。准备提交推送。
 - 修复及审查提交 783945b 已成功推送 origin/main。最终交付 v1.9.2 三桌面包、独立服务、12 类问题与45工具审查记录，143 单元及最终实际 Windows ASAR 完整交互回归通过。本条随完成记录正常提交推送，最终远端 SHA 记入发行目录 SOURCE-COMMIT.txt。
+# 2026-10-25 分类导航方案①
+- 用户批准执行、打包、提交推送；已读仓库约定与现有计划，保留 AGENTS.md 原有修改。
+- 完成源码、打包入口和 Electron 回归依赖检查，使用 ui-ux-pro-max 与 planning-with-files 技能。设计技能首轮 Python Store 别名失败，已改用 bundled Python 成功查询。
+- 对比 Radix / Fluent 开源实践，准备实现固定分类、桌面非模态浮层、窄屏分类返回及键盘焦点。
+- 首轮真实导航回归捕获分类整体移动 11px。初步怀疑工具 scrollIntoView；几何报告确认短列表的焦点返回改变了分类列表 scrollTop。工具仅滚动本列表，分类焦点返回使用 preventScroll；测试在每次滚动目标分类后记录基准，继续严格验证打开前后位置一致。143 单元、6 文档（显式配置 Python 后无跳过）、3 桌面策略、12 项目和2发行检查通过。
+- 新导航完整交互通过，包含 42 组桌面分类/主题/宽度几何检查、原生方向键/Tab/Enter/Esc、外部点击、任务高亮、搜索切换、收起和窄屏返回。Enter 初次测试缺少 Chromium char 事件，已修正原生键盘测试序列，未增加产品自定义 Enter 行为。
+- 完整 Electron 回归通过：45 工具界面、39 文本及坐标工具执行、系统剪贴板/导出/流转/撤销、项目中心/portal、深浅主题和响应式。截图复核后进一步扩大窄屏工具列表高度、保留首项焦点边框，将在最终 ASAR 再次运行完整回归。
+- v1.9.3 文档与构建完成，fetch 确认 HEAD 与 origin/main 原先一致。开始三平台与独立服务发行打包。
+- 最终 Windows ASAR 完整 Electron 回归通过（退出码0），包括扩大高度后的窄屏工具选择、42 组导航几何检查和全部45工具；已查看最终桌面、收起和375px窄屏截图。Windows NSIS 与 amd64 deb 已完成，后者 Debian 空根解包、架构、sandbox权限和运行库依赖验证通过；ARM64 打包中。
+- 四份发行物及 verify:release 全部完成：Windows 113,055,353字节、amd64 93,239,932字节、ARM64 88,146,804字节、独立服务ZIP 190,789字节。共同构建指纹 fd55f9a4c220a76460969214c3ad4eecaf39ad77b03251eeb3bb7860733670d0；实际两份 deb 中 ASAR 均与 Windows 一致（ef6c3c4cf7cc2a6e8648995ba7d189d152c93d3743bc614abb24f5823f785a0e）。
+- 独立服务实际解压启动、资源隔离、复制configs/快照/口令复用通过；README和界面/工作区/项目中心/经纬度说明在各包逐字节一致。最终报告、截图和日志保存在 artifacts/release-1.9.3。未声称实际安装或在 Linux/麒麟执行。
+- 已暂存17个本次授权文件，AGENTS.md 未暂存；准备提交并推送 main。
