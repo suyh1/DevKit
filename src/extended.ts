@@ -9,7 +9,7 @@ export const extendedTools = [
   { id: 'xml' as const, name: 'XML 格式化', english: 'XML Formatter', category: '结构化数据', description: '格式化或压缩 XML，保留注释、CDATA 与 xml:space。拒绝 DTD / ENTITY；不执行内容，不校验 XSD。', sample: '<?xml version="1.0"?><users><!-- 本地配置 --><user id="1"><name>张三</name><role>developer</role></user></users>' },
   { id: 'gzip' as const, name: 'GZip 压缩与解压', english: 'GZip Text Codec', category: '编码与解析', description: 'UTF-8 文本与 GZip Base64 双向转换，流式解压最多 4,000,000 字节；不处理 ZIP 或任意二进制文件。', sample: '你好，DevKit！\n离线压缩，离线解压。\n你好，DevKit！' },
   { id: 'ipv4' as const, name: 'IPv4 子网计算', english: 'IPv4 Subnet Calculator', category: '时间与数值', description: '由 IPv4 / CIDR 或连续子网掩码计算网络、广播、主机范围。/31 使用点对点规则，/32 为单个地址；不访问网络。', sample: '192.168.10.42/24' },
-  { id: 'chmod' as const, name: 'chmod 权限换算', english: 'Unix Permissions', category: '安全与标识', description: '八进制与 rwx 权限互转，解释 owner / group / other 与 setuid、setgid、sticky。只计算，不执行命令或修改文件。', sample: '4755' },
+  { id: 'chmod' as const, name: 'chmod 权限换算', english: 'Unix Permissions', category: '安全与标识', description: '通过权限矩阵、八进制或 rwx 输入换算权限，解释 owner / group / other 与 setuid、setgid、sticky。只计算，不执行命令或修改文件。', sample: '4755' },
   { id: 'ulid' as const, name: 'ULID 生成与解析', english: 'ULID Generator / Decoder', category: '安全与标识', description: '生成 1–1,000 个 ULID，同批次单调递增；或逐行解析标识的毫秒时间与随机段。时间可见，不用于密码或令牌。', sample: '5' },
   { id: 'text-stats' as const, name: '文本统计', english: 'Text Analyzer', category: '文本与匹配', description: '统计 UTF-8 字节、UTF-16 单元、Unicode 码点、可见字符簇、单词与行数，正确处理中文、emoji 和 CRLF。', sample: 'Hello, DevKit!\r\n你好，开发者 👨‍👩‍👧‍👦\r\n\r\n离线处理，不上传文本。' },
 ];

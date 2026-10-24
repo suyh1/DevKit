@@ -52,7 +52,7 @@ async function convertYaml(input: string, options: Options): Promise<string> {
   return options.mode === 'json-yaml' ? stringify(value, { lineWidth: 0, aliasDuplicateObjects: false }) : json;
 }
 
-function parseCsv(input: string, delimiter: string): string[][] {
+export function parseCsv(input: string, delimiter: string): string[][] {
   const text = input.replace(/^\uFEFF/, '');
   if (!text) throw new Error('请输入 CSV 或 TSV 内容。');
   const rows: string[][] = []; let row: string[] = [], field = '', state: 'plain' | 'quoted' | 'closed' = 'plain', started = false;

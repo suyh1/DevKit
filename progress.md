@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-10-24 按工具功能重设计
+- v1.7.0 交付完成：三个安装包汇总至 artifacts/release-1.7.0，版本 / 架构 / SHA256 / 共享构建指纹全部通过。Windows 113010688 字节，Linux amd64 93210288 字节，ARM64 88121932 字节；独立服务 ZIP 156075 字节。
+- Windows 实际打包 ASAR 再次通过全部 44 工具与项目中心集成。两个最终 .deb 严格提取与架构检查通过（85 文件 / 15 目录、GLIBC 2.25、4755 sandbox）；直接读取包内 ASAR 和 README / 设计文档，确认与当前构建一致。实际 Linux / 麒麟启动及安装器安装未在本机执行。
+- 发行目录包含当前文档、代表截图、逐工具运行记录、包内对比 JSON 和中文验证记录；独立 ZIP CRC、版本、校验值及源码 / 资源内容核对通过。
+- 最终界面调整后再次通过全 44 工具 Electron 检查；38 文本工具运行、双主题、四宽度、项目中心真实 CRUD/登录/隔离均通过。已人工查看权限矩阵、Cron、统计、差异与 HTTP 代码截图。
+- 122 核心测试、6 文档测试、3 桌面策略、12 项目中心、2 发行一致性均通过。Debian 包测试 10 项中 9 通过，1 POSIX 符号链接用例在 Windows 按预期跳过。
+- README 通过生成器更新到 v1.7.0，44 项交互设计写入 docs/tool-workflows.md。开始使用校验过的本地 Electron ZIP 与附带 Python 制作三个桌面目标。
+- 完成 44 工具的显式流程映射与逐项设计文档。新增专属输入、权限矩阵、摘要比对、结果卡片与时间线；格式化单文档、转换上下流程、生成侧栏、差异双输入下方结果。
+- 122 项核心测试通过，生产构建通过。Electron 集成增加全部工具与四种宽度、双主题的实际 UI 检查。
+- 首轮截图测试在连续缩放后 requestAnimationFrame 被后台节流挂起；终止测试专用进程，改为关闭测试窗口后台节流并使用有界延迟，正在重跑。截图主题切换增加绘制等待，避免记录上一主题的帧。
+- 已读取项目约定、历史计划和当前工作区；开始逐项检查工具输入、配置与实际输出结构。
+- 使用 UI/UX 与 planning-with-files 技能。系统 Python 为 Store 别名；改用应用附带 Python 完成设计系统与 React 指引检索。
+- 现有颜色工具已有专属交互；文本工具集中在 ToolWorkspace，当前生成、查询与计算共享双框，需要按流程拆分。
+
 ## Kylin first-install packaging repair
 - User screenshot shows dpkg cannot create /opt/devkit/chrome-sandbox.dpkg-new because its parent is absent; subsequent lzma broken-pipe errors are cascading. The original hand-built data archive included files only, with no directory entries. This is a packaging defect, not a missing WebKit requirement.
 - Fixed directory emission in parent-first order, including runtime subdirectories and application desktop/icon/doc paths. Preserved root ownership, 0755 directories and the 4755 Chromium sandbox helper. Application version remains 1.1.0; Debian revision becomes 1.1.0-1.

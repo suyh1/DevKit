@@ -25,8 +25,10 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 - **独立任务**：最多 {{MAX_TASKS}} 个任务，同一工具可打开多份输入；切换保留编辑内容、光标和滚动位置。任务可后台处理或取消，修改输入后保留旧结果并标记待更新，失败后可重试。
 - **查找与导航**：{{CATEGORY_COUNT}} 类工具分组、用途别名搜索、收藏、会话内最近使用，支持卡片 / 列表。首页可主动识别文本内容并推荐工具；剪贴板仅在主动操作时读取。
-- **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；支持分栏拖动、上下布局、区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
-- **结果查看**：JSON 结构树、CSV 表格、URL / JWT 字段、正则匹配与分组、左右差异对照、密码 / UUID 逐项复制。处理结果可作为新任务的输入继续转换。
+- **按功能设计的工作区**：格式化使用单文档「编辑原文 / 查看结果」切换；编解码使用上下流程；代码与配置转换保留可调整分栏；差异对比使用并排双输入和下方差异。全部 {{TOOL_COUNT}} 个工具的逐项设计见 [工具交互设计说明](docs/tool-workflows.md)。
+- **查询、计算与解析**：状态码搜索与快捷码、时间字段卡片、子网位图、chmod 权限矩阵、Cron 五字段拆解与 UTC 时间线、JWT 分区、URL 参数表、文本统计指标。HTTP 请求代码提供方法 / URL 表单与配置 JSON 切换；Headers / body 在 JSON 中编辑。
+- **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；对照工作区支持分栏拖动与上下布局，另有区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
+- **结果查看**：JSON 结构树、CSV 表格、正则匹配与分组、左右差异对照，以及密码 / UUID / ULID 逐项复制。SHA / HMAC 可粘贴已有值核对（HEX 忽略大小写，Base64 区分大小写）；输入或选项变更后保留旧源码并标记待更新。处理结果可作为新任务的输入继续转换。
 - **文件输入输出**：支持拖入或选择文本文件，最多 8 MB 且不超过 2,000,000 字符，可读取 UTF-8 与带 BOM 的 UTF-16 LE/BE。桌面导出使用原生另存对话框，浏览器预览使用下载。
 - **工作区与偏好**：可主动保存、恢复文本任务；默认排除密码、JWT、HMAC，颜色任务和图片不写入工作区。主题支持浅色、深色、跟随系统，另有密度、启动工具及设置 / 收藏导入导出。
 
@@ -158,6 +160,7 @@ python scripts/test-deb-packaging.py
 | `src/tools.ts`、`src/catalog.ts`、`src/discovery.ts` | 工具注册、分类与搜索 |
 | `src/App.tsx`、`src/workbench.ts`、`src/ToolWorkspace.tsx` | 工作台、独立任务与偏好 |
 | `src/ToolOptions.tsx`、`src/ResultView.tsx`、`src/CodeEditor*.tsx` | 参数、结果预览与编辑器 |
+| `src/tool-experience.ts`、`src/ToolInput.tsx`、`src/ToolResult.tsx` | 各工具流程、专属输入与结果展示 |
 | `src/generators.ts`、`src/type-samples.ts`、`src/utilities.ts`、`src/practical.ts`、`src/developer.ts`、`src/extended.ts` | 转换、解析与生成算法 |
 | `src/colors.ts`、`src/ColorWorkbench.tsx` | 颜色算法与交互 |
 | `src/ProjectCenter.tsx`、`shared/projects.mjs`、`server/`、`portal.html` | 项目中心界面、共享模型、存储及局域网服务 |

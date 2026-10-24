@@ -13,7 +13,7 @@ require('node:fs').mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
 let tested = false;
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: path.join(output, 'saved.txt') });
-const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 90_000);
+const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 180_000);
 app.on('browser-window-created', (_event, window) => {
   window.webContents.on('console-message', event => { if (event.level === 'error') console.error(`Renderer: ${event.message}`); });
   window.webContents.once('did-finish-load', async () => {
@@ -133,7 +133,7 @@ app.on('browser-window-created', (_event, window) => {
         await waitFor(`document.querySelector('.task-pane:not([hidden]) .field-${key} select')?.value === ${JSON.stringify(value)}`);
       };
       const sampleAndRun = async () => {
-        await window.webContents.executeJavaScript('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例")).click()');
+        await window.webContents.executeJavaScript('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例"))?.click()');
         await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .run-button").click()');
         await waitFor('document.querySelector(".task-pane:not([hidden]) .status-success") !== null');
       };
@@ -161,6 +161,7 @@ app.on('browser-window-created', (_event, window) => {
       }
       await window.webContents.executeJavaScript('new Promise(resolve => setTimeout(resolve, 200))');
       await fs.writeFile(path.join(output, 'preview-text-stats.png'), (await window.webContents.capturePage()).toPNG());
+      await require('./workflows-smoke.cjs')(window, output);
       const saved = await window.webContents.executeJavaScript('window.devkitDesktop.saveText("本地离线保存", "saved.txt")');
       assert.match(saved, /已保存/); assert.equal(await fs.readFile(path.join(output, 'saved.txt'), 'utf8'), '本地离线保存');
       dialog.showSaveDialog = async () => ({ canceled: true });

@@ -46,8 +46,8 @@ function TableView({ node }: { node: JsonNode }) {
   return <div className="table-preview"><p className="preview-note">共 {node.children.length} 行 · 预览前 100 行、30 列 · 数字保持原始精度</p><table><thead><tr><th>#</th>{keys.map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}><td>{index + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}</tr>)}</tbody></table></div>;
 }
 
-export default function ResultView({ toolId, text, source, onCopy }: { toolId: ToolId; text: string; source: string; onCopy: (text: string) => void }) {
-  const [query, setQuery] = useState(''), [view, setView] = useState('tree');
+export default function ResultView({ toolId, text, source, onCopy, initialView = 'tree' }: { toolId: ToolId; text: string; source: string; onCopy: (text: string) => void; initialView?: string }) {
+  const [query, setQuery] = useState(''), [view, setView] = useState(initialView);
   const parsed = useMemo(() => {
     if (['diff', 'password', 'uuid', 'regex'].includes(toolId)) return {};
     try { return { node: jsonTree(text) }; } catch (error) { return { error: error instanceof Error ? error.message : '无法生成预览' }; }

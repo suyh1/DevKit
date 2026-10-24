@@ -1,5 +1,12 @@
 # Toolkit implementation plan
 
+## 2026-10-24 按工具功能重设计
+44. 逐项审查全部工具并记录操作流程与专属设计 — complete
+45. 实现查询、计算、生成、解析、统计、对比与编辑工作区 — complete
+46. 回归与真实 Electron 界面验证，更新功能文档 — complete
+47. Windows x64 / Linux amd64 / Linux ARM64 打包及一致性校验 — complete
+
+
 ## Goal
 Build an offline cross-platform developer desktop toolkit, with Windows exe and Linux arm64/amd64 deb packaging.
 
