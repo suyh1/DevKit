@@ -1,11 +1,12 @@
 import type { Options, ToolId } from './tools';
 
-export type Workflow = 'format' | 'convert' | 'codec' | 'table' | 'lookup' | 'calculate' | 'permissions' | 'inspect' | 'schedule' | 'digest' | 'match' | 'compare' | 'stats' | 'generate' | 'color';
+export type Workflow = 'geography' | 'format' | 'convert' | 'codec' | 'table' | 'lookup' | 'calculate' | 'permissions' | 'inspect' | 'schedule' | 'digest' | 'match' | 'compare' | 'stats' | 'generate' | 'color';
 type Experience = { workflow: Workflow; input: string; output: string; action: string; hint: string; placeholder?: string };
 const entry = (workflow: Workflow, input: string, output: string, action: string, hint: string, placeholder?: string): Experience => ({ workflow, input, output, action, hint, placeholder });
 
 // Explicit coverage: each tool chooses its interaction according to its data flow.
 export const toolExperiences: Record<ToolId, Experience> = {
+  'geo-coordinates': entry('geography', '经纬度与文本', '坐标结果', '处理坐标', '格式互转、椭球/球面圆周点和度分秒文本提取，共享精度与复制格式。'),
   json: entry('format', 'JSON 文档', '格式化与结构', '整理 JSON', '整理缩进后浏览结构；数字原文与重复字段保持不变。'),
   xml: entry('format', 'XML 文档', '整理后的 XML', '整理 XML', '按文档结构整理缩进，保留注释、CDATA 与空白约定。'),
   sql: entry('format', 'SQL 查询', '整理后的查询', '整理 SQL', '选择数据库方言后整理查询；此处不会执行 SQL。'),

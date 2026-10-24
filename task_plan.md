@@ -143,3 +143,27 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - 本次 session-catchup 因 Python Store 别名不可用未运行；已读取现有计划、进度、发现恢复上下文。
 
 - 首轮核心回归与生产构建并行时，Java 解析测试超过默认 5 秒（其余 116 核心项通过）；构建完成后将独立重跑，暂不调整测试阈值。
+
+## 2026-10-24 新一轮工具与功能调研（待用户审阅）
+58. 核对 v1.8.1 现有能力、扩展点和重复项 — complete
+59. 检索 GitHub 同类项目及候选依赖，比较许可证、活跃度、设计与问题 — complete
+60. 形成分批工具清单、具体实现方案和验收/发行计划供审阅 — complete
+- 审阅文档：docs/feature-expansion-proposal-2026-10-24.md；推荐 T1–T6 + F1–F2（6 工具 + 参数预设/文本配方），尚未得到实施授权。
+- 当前仅分析和文档记录；用户审阅前不实现、不打包、不提交、不推送。
+- 保留用户已有 AGENTS.md 修改。
+- 调研错误：首次误读 src/tool-experience.tsx；实际文件为 src/tool-experience.ts，后续按真实路径查看。
+
+## 2026-10-24 经纬度工具定向方案
+61. 按用户三项需求核对地图算法、DMS 解析与文本提取边界 — complete
+62. 比较开源实现并形成单工具三页签方案供用户审阅 — complete
+- 当前审阅文件：docs/geographic-coordinates-proposal-2026-10-24.md；建议一个工具三页签，工具总数 44 → 45。
+- 上轮通用工具方案已被用户否定，不纳入后续实施。
+- 审阅前继续不实施、不打包、不提交、不推送。
+
+## 2026-10-24 经纬度工具 v1.9.0 实施
+63. 实现单工具三页签、严格坐标解析/文本提取、两种圆周算法和复制 — complete
+64. 算法边界、工作区和真实 Electron 流程验证并同步文档 — complete
+65. 打包三平台和独立服务、核验发行物 — complete
+66. 仅提交授权文件并推送，确认远端 SHA — in_progress
+- 用户已批准实施；圆周仅含椭球 Karney 和球面大圆，不含恒向线/沿经纬线模式。
+- 保留用户 AGENTS.md 未提交修改；延续 planning-with-files 记录。

@@ -64,7 +64,7 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js('document.querySelectorAll(".library-scope button")[2].getAttribute("aria-pressed")'), 'true');
   await js('document.querySelectorAll(".library-scope button")[2].dispatchEvent(new KeyboardEvent("keydown", {key:"Home", bubbles:true}))');
   await settle();
-  assert.equal(await js('document.querySelectorAll(".tool-card").length'), 44);
+  assert.equal(await js('document.querySelectorAll(".tool-card").length'), 45);
   await js('document.querySelector(".category-marquee button").click()');
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".marquee-track")).animationPlayState'), 'paused');

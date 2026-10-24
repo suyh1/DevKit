@@ -148,3 +148,47 @@
 - Skeleton 仅用于真实的编辑器 / 项目数据加载；减少动态效果时关闭循环与过渡。
 - Vite 多入口会将共享设计 CSS 提前分块，可能被工作台原样式覆盖；以 theme.css 统一所有样式导入，确保桌面与 portal 层叠顺序一致。
 - 实际截图确认首页、工具工作区和项目中心采用相同明亮视觉，项目卡仍保持 150 CSS px 紧凑高度。
+
+## 2026-10-24 新一轮功能调研
+- 用户要求先遵守 AGENTS.md 检索活跃、许可明确、高 Star 的 GitHub 项目，输出工具清单与实施方案，经审阅后再实现、打包、提交和推送。
+- 当前 v1.8.1；44 个工具、7 类，React 19 / TypeScript / Electron 45，默认离线，桌面含 Windows x64、Linux amd64、Linux ARM64；另有项目中心独立服务。
+- 既有工具包括 JSON Schema 样本生成（尚非校验器）、受限 JSON 路径提取、JSON/YAML/XML/CSV、类型双向转换、代码格式化、HTTP 代码、Cron UTC、文本 diff、网络和颜色套件。
+- 工作区手动导出恢复、结果继续处理已存在；不作为新增功能重复计数。任务默认内存，敏感工具默认排除工作区导出。
+- 现有 AGENTS.md 是用户未提交改动，保持原样。
+- 已确认 electron/security.json 的 script-src 为 self，未允许 unsafe-eval；Ajv 官方安全文档说明运行时动态编译与严格 CSP 不兼容，预编译只适合已知 Schema，不能直接解决用户任意输入 Schema。
+- 已核对 docs/home-feature-inventory.md 的早期候选；其中项目入口、环境档案、备份、批量探活后来已经实现，本轮不能照旧重复推荐。
+- 第一轮 GitHub API：DevToys 32,105 stars / MIT / pushed 2026-09-29；IT-Tools 40,953 / GPL-3.0 / 2026-10-22；CyberChef 36,193 / Apache-2.0 / 2026-10-23；Ajv 14,864 / MIT / 2026-09-06；jsondiffpatch 5,349 / MIT / 2026-05-14。pushed_at 仅为仓库推送信号，不等于版本发布日期或修复保证。
+- 浏览器访问带查询参数的两个 issues 页失败；改用 GitHub API 按仓库获取 issue 与包元数据。
+{"repo":"cfworker/cfworker","stars":704,"license":"MIT","pushed_at":"2026-04-10T02:58:34Z","archived":false,"branch":"main"}
+{"repo":"kozakdenys/qr-code-styling","stars":2970,"license":"MIT","pushed_at":"2026-02-14T03:52:51Z","archived":false,"branch":"master"}
+{"repo":"kazuhikoarase/qrcode-generator","stars":2382,"license":"MIT","pushed_at":"2026-02-14T10:06:24Z","archived":false,"branch":"master"}
+{"repo":"nayuki/QR-Code-generator","stars":6802,"license":null,"pushed_at":"2026-08-31T19:37:04Z","archived":false,"branch":"master"}
+{"repo":"iarna/iarna-toml","stars":341,"license":"ISC","pushed_at":"2024-05-30T09:46:17Z","archived":false,"branch":"latest"}
+- 第二轮选型：smol-toml 318 stars / BSD-3-Clause / 2026-10-10；cfworker/cfworker 704 / MIT / 2026-04-10；qrcode-generator 2,382 / MIT / 2026-02-14；Nayuki QR 6,802 / API 许可证为空但 README 与 TS 文件均明确 MIT / 2026-08-31；node-qrcode 8,180 / MIT / 2024-08-23，因此不能称其维护活跃。
+- npm 最新元数据（调研快照）：@cfworker/json-schema 4.1.1、smol-toml 1.9.1、qrcode-generator 2.0.4、semver 7.8.5 均无运行时依赖；jsondiffpatch 0.7.6 依赖 @dmsnell/diff-match-patch；markdown-it 15.0.3 有六个直接依赖；DOMPurify 3.4.17 为 MPL-2.0 OR Apache-2.0，计划选 Apache-2.0。
+- @cfworker/json-schema 官方 README 明确不使用 eval/new Function，支持 Draft 4/7/2019-09/2020-12，并列出少量不支持用例，适合作为 CSP 兼容候选；其 stars 少于 Ajv，应明确记录取舍并在实施第一步做实际 Electron 验证。
+- smol-toml 默认 Number 会损失超大整数，提供 integersAsBigInt；默认 TomlDate 可能规范化无效日历日期，严格 Temporal 路径需验证；TOML 无 null、日期语义、注释无法双向保真均需明确。
+- jsondiffpatch 默认对象数组按位置匹配，只有明确 objectHash 才按业务标识匹配；默认保留数组顺序，不自动猜 id。不得以 Number 解析大整数后比较。
+- 调研访问错误：额外候选 isomorphic-gitignore 地址 404（不纳入方案）；markdown-it security.md / security.mts 路径 404，改用仓库目录确认实际文件；均未下载运行或安装第三方代码。
+- 完成推荐方案 docs/feature-expansion-proposal-2026-10-24.md：6 个新工具（Schema 校验、JSON 结构比较、TOML、二维码、Markdown、SemVer）和 2 项工作台功能（命名参数预设、文本处理配方），另列后续候选。
+- @cfworker/json-schema unsupported.ts 实际包含 2020-12 动态引用和 format/Unicode 等失败用例；方案因此限定支持集、未知/不支持约束必须报错，不能宣传完整 2020-12 兼容。
+- 二维码拟选 Nayuki 官方 TS 固定提交、保留 MIT 与适配记录；JSON Diff 仅比较、按索引数组、不生成/应用 Patch，复用原文树避免大整数舍入。
+
+## 2026-10-24 用户明确地图经纬度需求
+- 用户否定上轮通用工具建议，当前唯一目标是：十进制度/度分秒互转；圆心+半径+北东南西计算圆周点；从混合文本提取度分秒坐标对；所有结果可复制。
+- 延续用户最初的审阅要求，当前只出定向方案，不实现、不打包、不提交、不推送。建议一个经纬度工具内三个子页，共享解析、格式、精度与复制设置。
+- GitHub API 快照：Turfjs/turf 10,524 stars / MIT / pushed 2026-10-21；chrisveness/geodesy 1,227 / MIT / 2024-07-10；geographiclib/geographiclib 486 / MIT / 2026-08-24；geographiclib/geographiclib-js 52 / MIT / 2026-07-14。推送日按 UTC，仅为维护信号。
+- Turf 覆盖广且维护活跃，但 destination 是球面模型；GeographicLib 专长椭球正解，更符合圆心/半径计算，需要明确说明少 Star 的专业库选型取舍。
+- geographiclib-geodesic latest 2.2.0，MIT、无运行时依赖、自带 TS 类型；尚未安装。
+- 外部文档访问错误：SourceForge JavaScript API 页面无法读取，改看 GitHub 官方源码、类型和 README。
+- geographiclib-dms latest 2.2.0 同为 MIT、无运行时依赖、自带 TS 类型；官方 Decode / DecodeLatLon / Encode 可供格式解析和格式化。旧 geographiclib 合并包已拆分，不使用已弃用包名。
+- 已读取官方 Direct/Inverse/WGS84 类型与示例。Direction 需明确为真北起顺时针的起始方位角；地球曲面正东/正西测地线并不严格保持纬度，不能把它暗中当作平面坐标加减或等纬线。
+- Turf destination 官方说明使用 Haversine 球面模型；本需求拟用 GeographicLib WGS84 椭球地表距离，不加载完整 Turf、地图瓦片或在线 SDK。
+- 文本提取须先定位完整 DMS token，再成对匹配、按半球/标签识别经纬；无标签才用用户指定顺序。需保留原文位置和拒绝原因，不能跨不相关文本将孤立数字硬配对。
+- 本轮错误：尝试 dms/src/DMS.js 返回 404，改为 GitHub contents API 确认路径；未安装或执行第三方代码。公开仓库当前没有返回开放 issue，不据此认定无问题。
+- 已读取真实路径 dms/DMS.js：官方解析允许内部加减角度表达式，且显式负号与 W/S 符号相乘。方案明确必须先做单角度语法与符号一致性校验，不能直接放开底层 Decode 的全部能力。
+- 用户认可三个页签等其他方案，仅继续询问圆周点是否还有常用算法；此问题不等于授权开始实施。补充调研：椭球 Karney、椭球 Vincenty、球面大圆正解、恒向线、投影平面方法。
+- 需区分算法与需求语义：Karney/Vincenty 是同一椭球测地线问题的求解方法；球面改了地球模型；恒向线以路线长度为距离且固定航向，正东/西维持纬度，不等同于等最短地表距离圆；投影平面距离不一定等于地面距离，AEQD 中心等距是特定例外。
+- 来源：GeographicLib Python 官方 geodesics/intro、Movable Type 作者原文 latlong / latlong-vincenty、Turf destination/rhumbDestination、PROJ AEQD 文档。推荐默认 Karney，按需要增加球面模式；恒向线应作为明确命名的另一种移动方式，不笼统称为更精确/更差算法。
+- 最终交付仅经纬度三页签、椭球/球面两模型与复制能力。实际三架构包共享同一构建；两个 deb 实际 ASAR 与 Windows 预打包 ASAR 相同，许可/使用文档完整。验证边界及校验值保存在 artifacts/release-1.9.0/。
+- 旧通用提案已转存 artifacts/research，不进入本轮代码提交或发行。

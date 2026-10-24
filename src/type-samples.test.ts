@@ -8,7 +8,7 @@ import { developerPresentation } from './tool-presentation';
 const reverse = async (input: string, options: Options = {}) => JSON.parse(await transform('type-json', input, { ...defaultOptions['type-json'], ...options }));
 describe('unified JSON / type tools', () => {
   it('has one forward entry and one reverse entry, alongside the extended tool catalog', () => {
-    expect(tools).toHaveLength(44);
+    expect(tools).toHaveLength(45);
     expect(tools.filter(tool => ['json-java', 'json-ts'].includes(tool.id))).toEqual([]);
     expect(tools.some(tool => tool.id === 'json-code')).toBe(true);
     expect(tools.some(tool => tool.id === 'type-json')).toBe(true);

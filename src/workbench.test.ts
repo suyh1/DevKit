@@ -9,7 +9,7 @@ import { readText } from './files';
 describe('workbench workflows', () => {
   it('assigns every existing tool to exactly one task category', () => {
     const ids = categories.flatMap(category => category.ids);
-    expect(new Set(ids).size).toBe(44);
+    expect(new Set(ids).size).toBe(45);
     expect(ids.sort()).toEqual(tools.map(tool => tool.id).sort());
     for (const tool of tools) expect(categories.find(category => category.ids.includes(tool.id))?.name).toBe(tool.category);
   });

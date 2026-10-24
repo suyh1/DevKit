@@ -5,12 +5,13 @@ export const categories = [
   { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: ['json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status'] },
   { name: '编码与解析', key: 'encode', description: '编码转换与地址解析', ids: ['base64', 'gzip', 'url', 'html', 'url-inspect', 'query-string', 'unicode'] },
   { name: '文本与匹配', key: 'text', description: '比较、匹配与清理文本', ids: ['diff', 'regex', 'text', 'text-stats'] },
-  { name: '时间与数值', key: 'utility', description: '时间、数字与子网的精确计算', ids: ['timestamp', 'radix', 'cron', 'ipv4'] },
+  { name: '时间与数值', key: 'utility', description: '时间、数字、子网与地理坐标的计算', ids: ['timestamp', 'radix', 'cron', 'ipv4', 'geo-coordinates'] },
   { name: '安全与标识', key: 'security', description: '摘要、权限、令牌与安全随机数', ids: ['hash', 'password', 'jwt', 'uuid', 'ulid', 'hmac', 'chmod'] },
   { name: '颜色与设计', key: 'color', description: '取色、搭配与视觉探索', ids: ['color-picker', 'color-convert', 'color-palette', 'color-gradient', 'color-contrast', 'color-mix', 'css-unit'] },
 ];
 
 export const aliases: Partial<Record<ToolId, string>> = {
+  'geo-coordinates': '地图 经纬度 坐标 度分秒 DMS GPS 圆心 半径 圆周 四方向 geographic latitude longitude WGS84 提取 清洗',
   xml: 'xml 格式化 压缩 配置 svg pom', gzip: 'gzip gunzip 压缩 解压 base64',
   ipv4: 'ipv4 cidr subnet 子网 掩码 网络 广播 主机 ip', chmod: 'chmod unix linux 权限 八进制 rwx setuid sticky',
   ulid: 'ulid 唯一 标识 可排序 时间 生成 解析', 'text-stats': '文本 统计 分析 字数 字节 行数 emoji unicode analyzer',

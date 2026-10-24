@@ -1,5 +1,6 @@
 import { defaultOptions, tools } from './tools';
 import type { Options, ToolId } from './tools';
+import { validateGeoOptions } from './geo-config';
 
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'cancelled';
 export type Task = {
@@ -64,6 +65,10 @@ export function importWorkspace(text: string): { tasks: Task[]; active: number }
       if (!Object.hasOwn(task.options, key)) continue;
       if (typeof value !== 'string' || value.length > 2_000_000) throw new Error('工作区参数超出限制。');
       options[key] = value;
+    }
+    if (toolId === 'geo-coordinates') {
+      validateGeoOptions(options);
+      if (entry.input.length > 300_000) throw new Error('经纬度文本超过 300,000 字符。');
     }
     return { ...task, input: entry.input, output: entry.output, options, elapsed: null, status: 'stale' as const, fileName: typeof entry.fileName === 'string' ? entry.fileName.slice(0, 200) : undefined };
   });

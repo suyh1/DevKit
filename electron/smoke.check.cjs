@@ -35,6 +35,16 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      if (process.env.DEVKIT_TEST_GEOGRAPHY_ONLY === '1') {
+        window.setMinimumSize(360, 600); window.setSize(1440, 1000);
+        await window.webContents.executeJavaScript('document.querySelector(\'button[aria-label="新建经纬度工具任务"]\').click()');
+        await waitFor('!!document.querySelector(".geo-workbench")');
+        await window.webContents.executeJavaScript('[...document.querySelectorAll(".geo-workbench .editor-footer button")].find(b=>b.textContent.includes("示例")).click()');
+        await window.webContents.executeJavaScript('document.querySelector(".geo-workbench .run-button").click()');
+        await waitFor('!!document.querySelector(".geo-workbench .status-success")');
+        await require('./geography-smoke.cjs')(window, output);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       await require('./design-smoke.cjs')(window, output);
       if (process.env.DEVKIT_TEST_DESIGN_ONLY === '1') { clearTimeout(timeout); app.exit(0); return; }
       await window.webContents.executeJavaScript(`{

@@ -20,7 +20,7 @@ module.exports = async function workflowsSmoke(window, output) {
   await wait('document.querySelectorAll(".task-tab").length === 0');
   await js('[...document.querySelectorAll("nav button[aria-expanded=false]")].forEach(button => button.click())');
   const names = await js('[...document.querySelectorAll("nav .nav-item")].map(button => button.title)');
-  assert.equal(names.length, 44);
+  assert.equal(names.length, 45);
   const size = window.getSize(), minimum = window.getMinimumSize();
   window.setMinimumSize(360, 600);
   window.setSize(1440, 1000);
@@ -35,6 +35,7 @@ module.exports = async function workflowsSmoke(window, output) {
       if (id === 'hmac') await fill(`${pane} .field-key input`, 'key');
       await js(`document.querySelector('${pane} .run-button').click()`);
       await wait(`!!document.querySelector('${pane} .status-success')`);
+      if (id === 'geo-coordinates') await require('./geography-smoke.cjs')(window, output);
       if (id === 'json') {
         assert.equal(await js(`getComputedStyle(document.querySelector('${pane} .input-card')).display`), 'none');
         await js(`document.querySelector('${pane} .document-tabs button').click()`);
@@ -98,5 +99,5 @@ module.exports = async function workflowsSmoke(window, output) {
   await js("document.documentElement.dataset.theme = 'light'");
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'workflow-report.json'), JSON.stringify(report, null, 2));
-  console.log('All 44 tool UIs checked; 38 text tools executed, both themes and four viewport widths passed.');
+  console.log('All 45 tool UIs checked; 39 text/coordinate tools executed, both themes and four viewport widths passed.');
 };

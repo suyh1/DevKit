@@ -3,13 +3,13 @@
      不要直接编辑根目录 README.md；每次打包都会重新生成。 -->
 # DevKit · 开发者工具箱
 
-DevKit 是中文界面的本地开发工作台，提供 **7 类、44 个离线工具**，以及可通过局域网共享的项目中心。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。
+DevKit 是中文界面的本地开发工作台，提供 **7 类、45 个离线工具**，以及可通过局域网共享的项目中心。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。
 
-当前版本：**v1.8.1**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.9.0**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.8.1_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.8.1/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.9.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.9.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 
@@ -73,9 +73,9 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 文本与命名转换 | 驼峰、下划线、大小写转换，以及逐行去重、排序与清理。 |
 | 文本统计 | 统计 UTF-8 字节、UTF-16 单元、Unicode 码点、可见字符簇、单词与行数，正确处理中文、emoji 和 CRLF。 |
 
-### 时间与数值（4）
+### 时间与数值（5）
 
-时间、数字与子网的精确计算
+时间、数字、子网与地理坐标的计算
 
 | 工具 | 功能 |
 | --- | --- |
@@ -83,6 +83,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 进制转换 | 使用 BigInt 精确转换二、八、十、十六进制整数。 |
 | Cron 表达式预览 | 五字段 Unix Cron（分 时 日 月 周），支持数字、*、范围、逗号与步长，0/7 为周日；日期与星期均受限时取或。按 UTC 预览未来最多 4 年，不创建定时任务；不支持 Quartz 秒字段、名称或 L/W/#。 |
 | IPv4 子网计算 | 由 IPv4 / CIDR 或连续子网掩码计算网络、广播、主机范围。/31 使用点对点规则，/32 为单个地址；不访问网络。 |
+| 经纬度工具 | 十进制度与度分秒互转；按圆心、半径及四方向计算椭球/球面圆周点；从文本提取度分秒坐标对。结果可逐项、整列或 CSV/TSV 复制，全部离线处理。 |
 
 ### 安全与标识（7）
 
@@ -112,12 +113,18 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 混色与插值 | 在 sRGB 或线性光空间混合颜色，支持透明度与渐变色阶。 |
 | CSS 单位换算 | 逐行转换 px / rem / em / vw，em 使用设定的字体基准，vw 使用设定的视口宽度。输入数字或带对应单位的值，不解析 CSS 表达式。 |
 
+### 经纬度处理
+
+“时间与数值 → 经纬度工具”在同一工具内提供十进制度/度分秒互转、圆心与半径的四方向圆周点计算、混合文本中的度分秒坐标提取。圆周算法可选 WGS84 椭球测地线（默认）或球面大圆；支持单值、坐标对、整列和 CSV/TSV 复制/导出，各页签分别保留参数与结果。
+
+格式转换不改变坐标基准；圆周方向为起始方位角，正东/正西终点纬度可能变化。文本提取不跨无关段落拼凑坐标，无法确认的片段另列供核对。输入格式、精度、半径及复制边界见 [经纬度工具说明](docs/geographic-coordinates.md)。
+
 ## 工作台与文件处理
 
 - **独立任务**：最多 12 个任务，同一工具可打开多份输入；切换保留编辑内容、光标和滚动位置。任务可后台处理或取消，修改输入后保留旧结果并标记待更新，失败后可重试。
 - **查找与导航**：7 类工具分组、用途别名搜索、收藏、会话内最近使用，支持卡片 / 列表。首页可主动识别文本内容并推荐工具；剪贴板仅在主动操作时读取。
 - **工作空间外观**：悬浮导航连接工作台、项目中心与收藏，首页以 Bento 区块展示快捷工具、内容识别和配色入口；分段切换全部 / 收藏 / 最近使用。浅色采用暖白与玉石绿，深色采用石墨灰背景、柔白文字与雾蓝强调色，并关闭首页 Aurora 光晕；成功、警告、错误分别使用绿色、琥珀色和柔红色。可暂停的类别滚动带、真实加载骨架和柔和过渡兼容减少动态效果设置，详见 [界面设计说明](docs/interface-design.md)。
-- **按功能设计的工作区**：格式化使用单文档「编辑原文 / 查看结果」切换；编解码使用上下流程；代码与配置转换保留可调整分栏；差异对比使用并排双输入和下方差异。全部 44 个工具的逐项设计见 [工具交互设计说明](docs/tool-workflows.md)。
+- **按功能设计的工作区**：格式化使用单文档「编辑原文 / 查看结果」切换；编解码使用上下流程；代码与配置转换保留可调整分栏；差异对比使用并排双输入和下方差异。全部 45 个工具的逐项设计见 [工具交互设计说明](docs/tool-workflows.md)。
 - **查询、计算与解析**：状态码搜索与快捷码、时间字段卡片、子网位图、chmod 权限矩阵、Cron 五字段拆解与 UTC 时间线、JWT 分区、URL 参数表、文本统计指标。HTTP 请求代码提供方法 / URL 表单与配置 JSON 切换；Headers / body 在 JSON 中编辑。
 - **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；对照工作区支持分栏拖动与上下布局，另有区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
 - **结果查看**：JSON 结构树、CSV 表格、正则匹配与分组、左右差异对照，以及密码 / UUID / ULID 逐项复制。SHA / HMAC 可粘贴已有值核对（HEX 忽略大小写，Base64 区分大小写）；输入或选项变更后保留旧源码并标记待更新。处理结果可作为新任务的输入继续转换。
@@ -164,7 +171,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.8.1_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.9.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -195,13 +202,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.8.1_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.8.1-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.8.1-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.9.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.9.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.9.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.8.1/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.8.1/DevKit_ProjectCenter_1.8.1_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.9.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.9.0/DevKit_ProjectCenter_1.9.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 
