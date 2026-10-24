@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
+import Skeleton from './Skeleton';
 
 export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'sql' | 'diff' | 'text';
 export type CodeEditorProps = { value: string; onChange?: (value: string) => void; label: string; language?: EditorLanguage; readOnly?: boolean; wrap?: boolean; placeholder?: string; tabSize?: number };
@@ -14,5 +15,5 @@ class EditorRecovery extends Component<{ children: ReactNode; editor: CodeEditor
   }
 }
 export default function CodeEditor(props: CodeEditorProps) {
-  return <EditorRecovery editor={props}><Suspense fallback={<div className="editor-loading">正在准备编辑器…</div>}><Editor {...props} /></Suspense></EditorRecovery>;
+  return <EditorRecovery editor={props}><Suspense fallback={<Skeleton />}><Editor {...props} /></Suspense></EditorRecovery>;
 }

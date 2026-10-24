@@ -5,11 +5,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、44 个离线工具**，以及可通过局域网共享的项目中心。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。
 
-当前版本：**v1.7.0**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.8.0**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.7.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.7.0/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.8.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.8.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 
@@ -116,6 +116,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 - **独立任务**：最多 12 个任务，同一工具可打开多份输入；切换保留编辑内容、光标和滚动位置。任务可后台处理或取消，修改输入后保留旧结果并标记待更新，失败后可重试。
 - **查找与导航**：7 类工具分组、用途别名搜索、收藏、会话内最近使用，支持卡片 / 列表。首页可主动识别文本内容并推荐工具；剪贴板仅在主动操作时读取。
+- **明亮工作空间**：悬浮导航连接工作台、项目中心与收藏，首页以 Bento 区块展示快捷工具、内容识别和配色入口；分段切换全部 / 收藏 / 最近使用。Aurora 光晕、可暂停的类别滚动带、真实加载骨架和柔和过渡兼容深色主题及减少动态效果设置，详见 [界面设计说明](docs/interface-design.md)。
 - **按功能设计的工作区**：格式化使用单文档「编辑原文 / 查看结果」切换；编解码使用上下流程；代码与配置转换保留可调整分栏；差异对比使用并排双输入和下方差异。全部 44 个工具的逐项设计见 [工具交互设计说明](docs/tool-workflows.md)。
 - **查询、计算与解析**：状态码搜索与快捷码、时间字段卡片、子网位图、chmod 权限矩阵、Cron 五字段拆解与 UTC 时间线、JWT 分区、URL 参数表、文本统计指标。HTTP 请求代码提供方法 / URL 表单与配置 JSON 切换；Headers / body 在 JSON 中编辑。
 - **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；对照工作区支持分栏拖动与上下布局，另有区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
@@ -163,7 +164,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.7.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.8.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -194,13 +195,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.7.0_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.7.0-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.7.0-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.8.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.8.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.8.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.7.0/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.7.0/DevKit_ProjectCenter_1.7.0_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.8.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.8.0/DevKit_ProjectCenter_1.8.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

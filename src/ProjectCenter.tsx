@@ -52,7 +52,8 @@ import {
   StateChanges,
 } from "./project-components";
 import { saveText } from "./files";
-import "./projects.css";
+import Skeleton from "./Skeleton";
+import SegmentedControl from "./SegmentedControl";
 
 function upsert<T extends { id: string }>(items: T[], value: T): T[] {
   return items.some((item) => item.id === value.id)
@@ -91,7 +92,7 @@ export default function ProjectCenter({
     [storageOpen, setStorageOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]),
     [sort, setSort] = useState("manual");
-  const [view, setView] = useState(() =>
+  const [view, setView] = useState<'grid' | 'list'>(() =>
     localStorage.getItem("devkit:project-view") === "list" ? "list" : "grid",
   );
   const [importMode, setImportMode] = useState("merge");
@@ -317,6 +318,7 @@ export default function ProjectCenter({
       </button>
     </div>
   );
+  if (!session && !error) return <section className="project-center"><Skeleton kind="projects" /></section>;
   if (!session?.authenticated)
     return (
       <section className="project-center pc-login">
@@ -356,11 +358,7 @@ export default function ProjectCenter({
     return (
       <section className="project-center">
         {errorBox}
-        <p>
-          {error
-            ? "项目中心暂不可用，请处理上面的配置目录问题后重新启动。其他工具仍可使用。"
-            : "正在加载项目数据…"}
-        </p>
+        {error ? <p>项目中心暂不可用，请处理上面的配置目录问题后重新启动。其他工具仍可使用。</p> : <Skeleton kind="projects" />}
         {storage && (
           <div className="pc-path">
             <code>{storage.directory}</code>
@@ -684,26 +682,7 @@ export default function ProjectCenter({
               <option value="name">按名称</option>
               <option value="group">按分组</option>
             </select>
-            <div
-              className="pc-view-toggle"
-              role="group"
-              aria-label="项目显示方式"
-            >
-              <button
-                aria-label="卡片视图"
-                aria-pressed={view === "grid"}
-                onClick={() => setView("grid")}
-              >
-                <LayoutGrid size={16} />
-              </button>
-              <button
-                aria-label="列表视图"
-                aria-pressed={view === "list"}
-                onClick={() => setView("list")}
-              >
-                <List size={16} />
-              </button>
-            </div>
+            <SegmentedControl label="项目显示方式" className="pc-view-toggle" value={view} onChange={setView} options={[{ value: 'grid', label: '卡片视图', content: <LayoutGrid size={16} /> }, { value: 'list', label: '列表视图', content: <List size={16} /> }]} />
             <select
               aria-label="筛选项目状态"
               value={filter}

@@ -35,6 +35,8 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      await require('./design-smoke.cjs')(window, output);
+      if (process.env.DEVKIT_TEST_DESIGN_ONLY === '1') { clearTimeout(timeout); app.exit(0); return; }
       await window.webContents.executeJavaScript(`{
         const input = document.querySelector('textarea[aria-label="待识别内容"]');
         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '{"name":"推荐测试","id":9007199254740993}');

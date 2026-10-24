@@ -222,3 +222,21 @@
 - 完成全部 6 项文档验证（含真实打包脚本入口、错误阻断、临时 ZIP 内容与相对文档链接），0 跳过。使用 bundled Python 显式指定 DEVKIT_PYTHON，保留系统环境。
 - 最终 docs:update / docs:check、生产构建、117 核心、3 桌面、12 项目、2 发行校验通过；git diff --check 通过（仅现有 Windows LF/CRLF 提示）。
 - 新增 AGENTS.md 固化功能变更与模板维护约定。完成 README 按功能重写、所有当前发行入口自动同步和文档随包分发；没有重新制作现有安装包或变更用户 configs。
+## 2026-10-24 明亮优雅界面改造
+- 已审查 App、Overview、SmartOpen、CodeEditor 与项目中心现有布局，使用 UI/UX 与 planning-with-files 技能记录设计和验证过程。
+- 已通过 bundled Python 获取设计建议；系统 Python 为不可执行的 Store 别名。
+- 已实现 Floating Navbar、Bento 首页、共享 Segmented Control、可暂停 Marquee、Aurora、真实加载 Skeleton 和减少动态效果支持，保留小屏保存 / 恢复入口。
+- 生产构建、122 单元测试、6 项文档测试（含 Python 直接打包，0 跳过）、docs:check 全部通过。完整 Electron 验证 44 工具、38 文本执行、深浅主题、项目 CRUD / 导入恢复 / portal 与安全隔离通过。
+- 新增独立 --design-only 入口，验证五档宽度、两种主题、快捷工具 / 配色 / 主导航、分段筛选和键盘、暂停和减少动态效果；已检查实际截图。截图和 design-report.json 位于 artifacts/electron-smoke。
+- README 由模板重新生成，新增 docs/interface-design.md 并同步工具和项目设计文档。当前安装包未重新制作，本次交付为源码与生产构建。
+- 最终 --design-only 在 375 / 620 / 768 / 1024 / 1440 目标内容宽度复核通过（Windows DPI 可能产生 1px 舍入），退出码 0；已修正独立入口的退出收尾。完整功能回归此前已通过。git diff --check 无错误。
+
+## v1.8.0 打包、提交与推送
+- 用户授权打包后提交并推送。当前 main，远端 origin=https://github.com/suyh1/DevKit.git；本次改造从 1.7.0 升级至 1.8.0，保留旧版发行产物。
+- 采用标准三平台 bundle:all 与独立服务入口；使用已有官方 Electron ZIP，并由打包器逐一校验 SHASUMS256，Python 使用 bundled runtime。
+- v1.8.0 发行前检查：122 单元、6 文档（0 跳过）、3 桌面策略、12 项目、2 发行一致性检查均通过。README 已从模板和注册表生成；fetch 确认 main 与 origin/main 原先一致。
+- Windows x64 NSIS 制作完成，Linux amd64 打包中；开始对实际 Windows ASAR 运行完整 Electron 测试。
+- 实际 Windows v1.8.0 ASAR 完整 Electron 回归通过：44 工具、38 文本执行、双主题与响应式、项目 CRUD / 覆盖 / 导入恢复 / portal 及保存桥接均通过。Linux amd64 严格 Debian 校验通过；ARM64 制作中。
+- 独立服务 ZIP 已生成并实际解压启动验证：静态资源、登录、桌面资源隔离、复制 configs 后保留项目 / 快照 / 口令通过；测试主机仅监听 127.0.0.1 并已停止。
+- 三平台安装包已汇总到 artifacts/release-1.8.0，共同构建指纹 169d7587d4efe3883aebdc7168af5f0bd9318c6cb0965e89a4d35923120c8366。SHA-256、两份 Debian 实际 ASAR、README / 设计文档与独立服务资源核验均通过；附带校验清单、验证说明及预览。
+- Windows 安装程序未执行安装，实际 Linux / 麒麟运行和跨物理电脑访问仍属于目标环境验收。发行产物保持在本地忽略目录，接下来提交并推送源码。
