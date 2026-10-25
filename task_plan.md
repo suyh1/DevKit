@@ -222,4 +222,4 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 95. 核对默认/显式目录、include路径和失败语义，设计自动准备 — complete
 96. 接入检查/启动/重载目录补齐及可见结果，验证无覆盖和跨平台路径 — complete
 96a. 将实例信息、操作与执行反馈吸顶，加入克制动画并验证窄屏/键盘 — complete
-97. 同步提示和文档，验证打包并提交推送 — in_progress
+97. 同步提示和文档，验证打包并提交推送 — complete
