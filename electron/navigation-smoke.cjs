@@ -126,16 +126,16 @@ module.exports = async function navigationSmoke(window, output) {
     await open('color');
     await key('Escape');
     await wait('!document.querySelector(".category-panel")');
-    assert.equal(await js('document.querySelector(".app").classList.contains("sidebar-collapsed")'), false);
+    assert.equal(await js('document.querySelector(".sidebar").inert'), false);
     assert.equal(await js('document.activeElement.dataset.category'), 'color');
     await key('Escape');
-    await wait('document.querySelector(".app").classList.contains("sidebar-collapsed")');
+    await wait('document.querySelector(".sidebar").inert');
     await js('document.querySelector(\'.topbar button[aria-label="展开导航"]\').click()');
     await settle();
     await open('utility');
     await js('document.querySelector(\'.category-tool[data-tool-id="timestamp"]\').click()');
     await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "时间戳转换"');
-    await wait('document.querySelector(".app").classList.contains("sidebar-collapsed")');
+    await wait('document.querySelector(".sidebar").inert');
     await js('document.querySelectorAll(".tab-close").forEach(button=>button.click())');
     await wait('document.querySelectorAll(".task-tab").length === 0');
   }

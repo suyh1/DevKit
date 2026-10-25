@@ -12,7 +12,7 @@ module.exports = function navigationHelpers(window) {
   }
   async function expand() {
     await js('document.querySelector(\'.topbar button[aria-label="展开导航"]\')?.click()');
-    await wait('!document.querySelector(".app").classList.contains("sidebar-collapsed")');
+    await wait('!!document.querySelector(\'.topbar button[aria-label="收起导航"]\') && !document.querySelector(".sidebar").inert');
   }
   async function catalog() {
     if (catalogs.has(window)) return catalogs.get(window);
