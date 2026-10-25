@@ -5,11 +5,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、本机 Nginx 配置与实例管理、HTTP 调试工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.10.6**。工具输入和结果默认只保存在内存中；偏好、收藏、手动保存的 HTTP 请求集合和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.10.7**。工具输入和结果默认只保存在内存中；偏好、收藏、手动保存的 HTTP 请求集合和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.6_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.6/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.7_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.7/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 4. 需要维护本机 Nginx 时，打开与项目中心平级的“Nginx 配置”，登记主文件、附属文件、运行目录与 nginx 程序。默认按字段编辑，也可切换全文；保存后检查配置，再启动或重载。
@@ -140,6 +140,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 - **按功能设计的工作区**：格式化使用单文档「编辑原文 / 查看结果」切换；编解码使用上下流程；代码与配置转换保留可调整分栏；差异对比使用并排双输入和下方差异。全部 46 个工具的逐项设计见 [工具交互设计说明](docs/tool-workflows.md)。
 - **查询、计算与解析**：状态码搜索与快捷码、时间字段卡片、子网位图、chmod 权限矩阵、Cron 五字段拆解与 UTC 时间线、JWT 分区、URL 参数表、文本统计指标。HTTP 请求代码提供方法 / URL 表单与配置 JSON 切换；Headers / body 在 JSON 中编辑。
 - **编辑体验**：CodeMirror 6 提供语法高亮、行号、折叠、查找、撤销重做；对照工作区支持分栏拖动与上下布局，另有区域最大化、字体、缩进与换行设置。清空、导入和关闭文本任务支持撤销。
+- **过渡与反馈**：弹窗、分类浮层、导航页签、折叠区、列表、HTTP 状态、颜色与真实加载骨架使用统一过渡；复制完成由剪贴板实际结果驱动。模式切换保留编辑器，系统“减少动态效果”时直接显示最终状态。覆盖清单与边界见 [界面动效说明](docs/ui-motion.md)。
 - **结果查看**：JSON 结构树、CSV 表格、正则匹配与分组、左右差异对照，以及密码 / UUID / ULID 逐项复制。SHA / HMAC 可粘贴已有值核对（HEX 忽略大小写，Base64 区分大小写）；输入或选项变更后保留旧源码并标记待更新，复制/导出/继续处理需重新运行成功。成功的空结果也可复制和导出。处理结果可原样送到新任务，并衔接已知的语言、分隔符与编解码方向；ULID 两种模式分别保留草稿。逐项核对见 [工具交互审查清单](docs/tool-interaction-audit-2026-10-24.md)。
 - **JSON 结构差异**：“文本与 JSON 差异”支持文本补丁与结构模式；结构模式按字段路径列出新增、删除、修改和对象数组移动，忽略对象键顺序，保留数字原文；可按业务标识字段匹配数组，重复键和重复标识报错。
 - **批量 Mock**：从 JSON 示例或常用 Schema 子集生成 1–1,000 份中文数据，支持固定种子、字段规则与 JSON/CSV 导出。规则、支持的 Schema 范围与资源限制见 [数据对比与 Mock](docs/data-workbench.md)。
@@ -200,7 +201,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.10.6_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.10.7_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -231,13 +232,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.6_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.6-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.6-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.7_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.7-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.7-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.6/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.6/DevKit_ProjectCenter_1.10.6_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.7/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.7/DevKit_ProjectCenter_1.10.7_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

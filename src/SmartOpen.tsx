@@ -1,3 +1,4 @@
+import { MotionButton } from './Motion';
 import { useState } from 'react';
 import { ClipboardPaste, ScanLine, ArrowRight } from 'lucide-react';
 import { tools } from './tools';
@@ -19,7 +20,7 @@ export default function SmartOpen({ onOpen }: { onOpen: (id: ToolId, text: strin
         if (text.length > DETECTION_LIMIT) { setError('剪贴板超过 200,000 字符，请直接在目标工具中导入。'); return; }
         setInput(text); inspect(text);
       } catch { setError('无法读取剪贴板，请在文本框内按 Ctrl / Cmd + V。'); }
-    }}><ClipboardPaste size={14} />粘贴并识别</button><button className="run-button" disabled={!input.trim()} onClick={() => inspect(input)}><ScanLine size={14} />识别内容</button>{input && <button className="text-button" onClick={() => { setInput(''); setSuggestions(null); setError(''); }}>清空</button>}</div></div>
+    }}><ClipboardPaste size={14} />粘贴并识别</button><MotionButton className="run-button" disabled={!input.trim()} onClick={() => inspect(input)}><ScanLine size={14} />识别内容</MotionButton>{input && <button className="text-button" onClick={() => { setInput(''); setSuggestions(null); setError(''); }}>清空</button>}</div></div>
     {error && <p role="alert" className="smart-open-error">{error}</p>}
     {suggestions && <div className="smart-suggestions" role="status">{suggestions.map(suggestion => <button className="smart-suggestion" key={suggestion.id} onClick={() => { onOpen(suggestion.id, input, suggestion.options); }}><span><strong>{tools.find(tool => tool.id === suggestion.id)!.name}</strong><small>{suggestion.reason}</small></span><ArrowRight size={15} /></button>)}</div>}
   </section>;

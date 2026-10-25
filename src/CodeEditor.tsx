@@ -1,6 +1,7 @@
-import { Component, lazy, Suspense } from 'react';
+import { Component, lazy, Suspense, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Skeleton from './Skeleton';
+import { useSkeletonMorph } from './Motion';
 
 export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'sql' | 'nginx' | 'diff' | 'text';
 export type CodeEditorProps = { value: string; onChange?: (value: string) => void; label: string; language?: EditorLanguage; readOnly?: boolean; wrap?: boolean; placeholder?: string; tabSize?: number };
@@ -15,5 +16,7 @@ class EditorRecovery extends Component<{ children: ReactNode; editor: CodeEditor
   }
 }
 export default function CodeEditor(props: CodeEditorProps) {
-  return <EditorRecovery editor={props}><Suspense fallback={<Skeleton />}><Editor {...props} /></Suspense></EditorRecovery>;
+  const stage = useRef<HTMLDivElement>(null), [ready, setReady] = useState(false);
+  useSkeletonMorph(stage, ready);
+  return <div className="motion-editor-stage" ref={stage}><EditorRecovery editor={props}><Suspense fallback={<Skeleton />}><Editor {...props} onReady={() => setReady(true)} /></Suspense></EditorRecovery></div>;
 }

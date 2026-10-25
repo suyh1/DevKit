@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -36,5 +37,5 @@ export function NginxCommandOutput({ output, compact }: { output: NginxOutput; c
   const [expanded, setExpanded] = useState(true);
   useEffect(() => { setExpanded(!compact); }, [compact]);
   useEffect(() => { setExpanded(true); }, [output]);
-  return <details open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className={`ng-output ${output.ok ? 'success' : 'failure'}`}><summary>{output.ok ? '命令执行成功' : '命令未完成'}<small>{expanded ? '收起执行详情' : '展开执行详情'}</small></summary><div className="ng-output-body"><code>{output.command}</code><pre>{output.output || '无输出'}</pre></div></details>;
+  return <MotionDetails open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className={`ng-output ${output.ok ? 'success' : 'failure'}`}><summary>{output.ok ? '命令执行成功' : '命令未完成'}<small>{expanded ? '收起执行详情' : '展开执行详情'}</small></summary><div className="ng-output-body"><code>{output.command}</code><pre>{output.output || '无输出'}</pre></div></MotionDetails>;
 }

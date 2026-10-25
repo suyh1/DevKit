@@ -1,3 +1,4 @@
+import { MotionPresence } from './Motion';
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileWarning, X } from 'lucide-react';
@@ -52,5 +53,5 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
     const reload = intent === 'reload';
     void request({ context: '未保存的更改', title: reload ? '重新加载工作台？' : '关闭 DevKit？', detail: reload ? '当前还有未保存的更改。重新加载会放弃这些更改，已保存的文件不会受到影响。' : '当前还有未保存的更改。关闭后这些更改将被放弃，已保存的文件不会受到影响。', confirm: reload ? '放弃并重新加载' : '放弃并关闭' }).then(allow => window.devkitDesktop?.answerClose(allow));
   }), [request]);
-  return <ConfirmationContext.Provider value={request}>{children}{options && <ConfirmationDialog options={options} settle={settle} />}</ConfirmationContext.Provider>;
+  return <ConfirmationContext.Provider value={request}>{children}<MotionPresence kind="dialog" present={!!(options)}>{options && <ConfirmationDialog options={options} settle={settle} />}</MotionPresence></ConfirmationContext.Provider>;
 }

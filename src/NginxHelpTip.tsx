@@ -14,9 +14,11 @@ export default function NginxHelpTip({ label, id, children }: { label: string; i
   function place() {
     const button = trigger.current?.getBoundingClientRect(), panel = popup.current;
     if (!button || !panel) return;
-    const rect = panel.getBoundingClientRect();
-    panel.style.left = `${Math.max(12, Math.min(button.left, innerWidth - rect.width - 12))}px`;
-    panel.style.top = `${Math.max(12, Math.min(button.bottom + 8 + rect.height <= innerHeight - 12 ? button.bottom + 8 : button.top - rect.height - 8, innerHeight - rect.height - 12))}px`;
+    const width = panel.offsetWidth, height = panel.offsetHeight;
+    const left = Math.max(12, Math.min(button.left, innerWidth - width - 12)), below = button.bottom + 8 + height <= innerHeight - 12;
+    panel.style.left = `${left}px`;
+    panel.style.top = `${Math.max(12, Math.min(below ? button.bottom + 8 : button.top - height - 8, innerHeight - height - 12))}px`;
+    panel.style.setProperty('--popover-origin', `${Math.max(0, Math.min(width, button.left + button.width / 2 - left))}px ${below ? 'top' : 'bottom'}`);
   }
   function show() {
     clear();

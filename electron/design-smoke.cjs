@@ -84,7 +84,7 @@ module.exports = async function designSmoke(window, output) {
   try {
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     assert.equal(await js('getComputedStyle(document.querySelector(".marquee-track")).animationName'), 'none');
-    assert.equal(await js('getComputedStyle(document.querySelector(".segment-indicator")).transitionDuration'), '0s');
+    assert.equal(await js('getComputedStyle(document.querySelector(".segmented-control .motion-pill")).transitionDuration'), '0s');
   } finally {
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     window.webContents.debugger.detach();

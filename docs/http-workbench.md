@@ -4,6 +4,8 @@
 
 ## 编辑与发送
 
+表单与配置 JSON 切换保留编辑器实例；发送按钮原地切换为取消。等待、错误与响应区域使用高度过渡，响应到达立即展示；减少动态效果时直接切换。复制反馈取决于实际剪贴板写入结果。
+
 请求表单编辑方法/URL，“配置 JSON”编辑 Headers 和 body。支持 GET、HEAD、POST、PUT、PATCH、DELETE、OPTIONS；仅 HTTP(S)，URL 不支持内嵌用户名/密码。示例：
 
 ```json

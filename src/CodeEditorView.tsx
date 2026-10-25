@@ -34,7 +34,7 @@ const highlighting = HighlightStyle.define([
   { tag: tags.function(tags.variableName), color: 'var(--syntax-function)' },
 ]);
 
-export default function CodeEditorView(props: CodeEditorProps) {
+export default function CodeEditorView(props: CodeEditorProps & { onReady?: () => void }) {
   const host = useRef<HTMLDivElement>(null), view = useRef<EditorView | null>(null);
   const initial = useRef(props), change = useRef(props.onChange), syncing = useRef(false);
   const compartments = useRef({ editable: new Compartment(), wrapping: new Compartment(), language: new Compartment(), indent: new Compartment() });
@@ -58,6 +58,7 @@ export default function CodeEditorView(props: CodeEditorProps) {
       }),
     });
     view.current = editor;
+    values.onReady?.();
     return () => { view.current = null; editor.destroy(); };
   }, []);
   useEffect(() => {
@@ -78,5 +79,5 @@ export default function CodeEditorView(props: CodeEditorProps) {
   }, [props.language]);
   useEffect(() => { view.current?.dispatch({ effects: compartments.current.wrapping.reconfigure(props.wrap !== false ? EditorView.lineWrapping : []) }); }, [props.wrap]);
   useEffect(() => { view.current?.dispatch({ effects: compartments.current.indent.reconfigure([EditorState.tabSize.of(props.tabSize || 2), indentUnit.of(' '.repeat(props.tabSize || 2))]) }); }, [props.tabSize]);
-  return <div className={`code-editor ${props.readOnly ? 'is-readonly' : ''}`} ref={host} />;
+  return <div className={`code-editor motion-skeleton-content ${props.readOnly ? 'is-readonly' : ''}`} ref={host} />;
 }

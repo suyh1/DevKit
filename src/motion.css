@@ -1,0 +1,780 @@
+/* UI Motion mechanisms; colours and static geometry inherit DevKit tokens. */
+.motion-presence-panel[data-state="open"] > .task-strip {
+  animation: motion-panel-in 200ms var(--ease-snappy) both;
+}
+.motion-pending-glyph {
+  opacity: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 30 20;
+  transition: opacity 160ms var(--ease-snappy);
+}
+.motion-button[data-motion-feedback="pending"] .motion-pending-glyph {
+  opacity: 1;
+  animation: spin 0.8s linear infinite;
+}
+.motion-button[data-motion-feedback="pending"] .motion-original-glyph {
+  opacity: 0;
+}
+.motion-toast[data-dragging="true"] {
+  transition: none;
+}
+.motion-rich-check svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.motion-rich-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  transition: stroke-dashoffset 340ms var(--ease-snappy) 50ms;
+}
+.motion-button[data-motion-feedback="success"] > .motion-rich-check path {
+  stroke-dashoffset: 0;
+}
+.motion-drop-edge rect {
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+}
+.tree-branch.motion-details > summary {
+  list-style: none;
+}
+.tree-branch.motion-details > summary::-webkit-details-marker {
+  display: none;
+}
+.tree-branch.motion-details > summary::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--subtle);
+  border-top: 1.5px solid var(--subtle);
+  rotate: 45deg;
+  margin: 0 9px 1px 2px;
+  transition: rotate 260ms var(--ease-spring);
+}
+.tree-branch.motion-details[open] > summary::before {
+  rotate: 135deg;
+}
+.tree-branch.motion-details[data-motion-expanding="false"] > summary::before {
+  rotate: 45deg;
+}
+.color-code-editor > .motion-reveal-inner {
+  height: 100%;
+}
+@media (max-width: 980px) {
+  .color-control-panel > .color-stop-list {
+    grid-column: 1/-1;
+  }
+}
+.motion-reveal-inner {
+  display: flow-root;
+  min-width: 0;
+}
+.motion-group.segmented-control {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.motion-group.segmented-control > button {
+  flex: 1 0 auto;
+}
+.task-tabs.motion-group > .motion-pill {
+  box-shadow: inset 0 2px var(--accent);
+}
+.motion-text-current {
+  position: relative;
+  white-space: pre;
+}
+.motion-text-current > span {
+  display: inline-block;
+}
+.motion-text-ghosts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  white-space: pre;
+}
+.motion-toast .motion-text,
+.motion-toast .motion-text-current {
+  display: inline;
+  white-space: pre-wrap;
+}
+.motion-rich-check {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  opacity: 0;
+  scale: 0.6;
+  pointer-events: none;
+  color: currentColor;
+  transition:
+    opacity 160ms var(--ease-snappy),
+    scale 240ms var(--ease-spring);
+}
+.motion-button[data-motion-feedback="success"] > .motion-rich-check {
+  opacity: 1;
+  scale: 1;
+}
+.motion-button[data-motion-feedback="success"] > svg {
+  opacity: 0;
+}
+.motion-button[data-motion-feedback="error"] {
+  outline: 1px solid var(--error);
+  outline-offset: 2px;
+}
+.motion-editor-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+.motion-editor-stage > .code-editor,
+.motion-editor-stage > .loading-skeleton {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+.code-editor.motion-skeleton-content {
+  translate: none !important;
+}
+.color-image-panel {
+  position: relative;
+}
+.color-stop-list:empty {
+  display: none;
+}
+.color-range input[type="range"]::-webkit-slider-thumb {
+  transition: scale 120ms var(--ease-spring);
+}
+.color-range input[type="range"]::-webkit-slider-thumb:active {
+  scale: 0.92;
+}
+.workspace-stage {
+  position: relative;
+}
+.workspace[data-motion-page]:not([hidden]) {
+  position: relative;
+  z-index: 1;
+}
+.workspace[data-motion-page][hidden] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.experience-layout {
+  position: relative;
+}
+.editor-card[data-mode-hidden="true"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.editor-card[data-mode-hidden="false"] {
+  opacity: 1;
+}
+.motion-mode {
+  opacity: 1;
+  transition:
+    opacity 160ms var(--ease-standard),
+    display 160ms allow-discrete;
+}
+.motion-mode[hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+.request-json {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.request-json > .editor-body {
+  min-height: 0;
+  flex: 1;
+}
+.http-response-tabs {
+  display: flex;
+  gap: 6px;
+}
+.http-response-tabs > .motion-pill {
+  background: var(--tint);
+}
+@starting-style {
+  .motion-mode:not([hidden]),
+  .editor-card[data-mode-hidden="false"] {
+    opacity: 0;
+  }
+}
+@media (min-width: 761px) {
+  .sidebar .brand-word,
+  .sidebar .brand-version,
+  .sidebar .sidebar-search > span,
+  .sidebar .sidebar-search kbd,
+  .sidebar .nav-item > span,
+  .sidebar .nav-item > small,
+  .sidebar .nav-caption,
+  .sidebar .local-badge > div {
+    transition:
+      opacity 160ms var(--ease-standard),
+      display 160ms allow-discrete;
+    opacity: 1;
+  }
+  .sidebar-collapsed .brand-word,
+  .sidebar-collapsed .brand-version,
+  .sidebar-collapsed .sidebar-search > span,
+  .sidebar-collapsed .sidebar-search kbd,
+  .sidebar-collapsed .nav-item > span,
+  .sidebar-collapsed .nav-item > small,
+  .sidebar-collapsed .nav-caption,
+  .sidebar-collapsed .local-badge > div {
+    opacity: 0;
+  }
+}
+:root {
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+.motion-presence {
+  display: contents;
+}
+.motion-presence[data-state="closing"] {
+  pointer-events: none;
+}
+.motion-presence[data-state="open"] > .ng-modal,
+.motion-presence[data-state="open"] > .confirm-dialog {
+  animation: motion-dialog-in 400ms var(--ease-snappy) both;
+}
+.motion-presence[data-state="closing"] > dialog::backdrop {
+  opacity: 0;
+  transition: opacity 160ms var(--ease-exit);
+}
+dialog::backdrop {
+  transition:
+    opacity 240ms var(--ease-standard),
+    backdrop-filter 240ms var(--ease-standard),
+    display 240ms allow-discrete,
+    overlay 240ms allow-discrete;
+}
+dialog.motion-native {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition:
+    opacity 160ms var(--ease-exit),
+    transform 160ms var(--ease-exit),
+    display 160ms allow-discrete,
+    overlay 160ms allow-discrete;
+  animation: none !important;
+}
+dialog.motion-native[open] {
+  opacity: 1;
+  transform: none;
+  transition-duration: 240ms;
+}
+@starting-style {
+  dialog.motion-native[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+@keyframes motion-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.motion-presence-popover[data-state="open"] > .category-panel {
+  animation: motion-popover-in 300ms var(--ease-snappy) both;
+  transform-origin: left top;
+}
+.motion-presence-popover[data-state="open"] > .category-panel-inline {
+  transform-origin: left top;
+}
+.ng-help-popover {
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  transition:
+    opacity 120ms var(--ease-exit),
+    transform 160ms var(--ease-exit),
+    display 160ms allow-discrete,
+    overlay 160ms allow-discrete;
+  transform-origin: var(--popover-origin, left top);
+}
+.ng-help-popover:popover-open {
+  opacity: 1;
+  transform: none;
+  transition-duration: 240ms;
+}
+@starting-style {
+  .ng-help-popover:popover-open {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+}
+@keyframes motion-popover-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.motion-group {
+  position: relative;
+  isolation: isolate;
+}
+.motion-group > .motion-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--tint);
+  opacity: 0;
+  transition: opacity 140ms var(--ease-standard);
+}
+.motion-group > button,
+.motion-group > .task-tab {
+  position: relative;
+  z-index: 1;
+}
+.motion-group > button[aria-pressed="true"],
+.motion-group > button[aria-current="page"],
+.motion-group > button[aria-selected="true"],
+.motion-group > .task-tab.selected,
+.motion-group > button.selected {
+  background: transparent !important;
+  box-shadow: none;
+}
+.motion-group > button[aria-pressed="true"]:hover,
+.motion-group > button[aria-current="page"]:hover {
+  background: transparent;
+}
+.motion-group.segmented-control > .segment-indicator {
+  display: none;
+}
+.motion-group.segmented-control > .motion-pill {
+  background: var(--surface);
+  box-shadow: 0 2px 5px #17203310;
+  border-radius: 7px;
+}
+.motion-group > .motion-pill {
+  border-radius: 8px;
+}
+.command-results.motion-group > .motion-pill {
+  border-radius: 9px;
+}
+.command-results.motion-group > .command-result.selected {
+  background: transparent;
+}
+.task-tabs.motion-group > .motion-pill {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
+}
+.motion-group[data-fade-start="true"] {
+  mask-image: linear-gradient(to right, transparent, #000 12px, #000);
+}
+.motion-group[data-fade-end="true"] {
+  mask-image: linear-gradient(to left, transparent, #000 12px, #000);
+}
+.motion-group[data-fade-start="true"][data-fade-end="true"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent
+  );
+}
+.motion-button {
+  position: relative;
+  transition:
+    transform 120ms var(--ease-spring),
+    background-color 160ms var(--ease-standard),
+    color 160ms var(--ease-standard),
+    border-color 160ms var(--ease-standard),
+    box-shadow 160ms var(--ease-standard);
+}
+.motion-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.motion-button[data-copy="true"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.motion-label-slot {
+  display: inline-grid;
+  position: relative;
+  vertical-align: middle;
+  min-width: 0;
+}
+.motion-label-slot > * {
+  grid-area: 1/1;
+}
+.motion-label-measure {
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre;
+  line-height: inherit;
+}
+.motion-text {
+  display: inline-flex;
+  white-space: pre;
+  align-items: center;
+  position: relative;
+}
+.motion-text > span {
+  display: inline-block;
+}
+.motion-glyph-slot {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.motion-glyph-slot > * {
+  grid-area: 1/1;
+}
+.motion-original-glyph {
+  display: inline-flex;
+  align-items: center;
+  transition:
+    opacity 160ms var(--ease-snappy),
+    transform 240ms var(--ease-snappy),
+    filter 160ms var(--ease-snappy);
+}
+.motion-check,
+.motion-error-glyph {
+  opacity: 0;
+  transform: scale(0.6);
+  filter: blur(2px);
+  transition:
+    opacity 160ms var(--ease-snappy),
+    transform 240ms var(--ease-snappy),
+    filter 160ms var(--ease-snappy);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.motion-check {
+  color: var(--success);
+}
+.motion-error-glyph {
+  color: var(--error);
+}
+.motion-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  transition: stroke-dashoffset 340ms var(--ease-snappy) 50ms;
+}
+.motion-button[data-motion-feedback="success"] .motion-original-glyph,
+.motion-button[data-motion-feedback="error"] .motion-original-glyph {
+  opacity: 0;
+  transform: translateX(6px) scale(0.6);
+  filter: blur(2px);
+}
+.motion-button[data-motion-feedback="success"] .motion-check,
+.motion-button[data-motion-feedback="error"] .motion-error-glyph {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+.motion-button[data-motion-feedback="success"] .motion-check path {
+  stroke-dashoffset: 0;
+}
+.motion-button[data-motion-feedback="pending"] {
+  cursor: wait;
+}
+.motion-button[data-motion-feedback="pending"] .motion-original-glyph {
+  opacity: 0;
+  transform: translateX(6px) scale(0.6);
+}
+.motion-toast {
+  animation: motion-toast-in 320ms var(--ease-snappy);
+  transform: translateX(calc(-50% + var(--toast-drag, 0px)));
+  touch-action: pan-y;
+  transition: transform 240ms var(--ease-spring);
+}
+@keyframes motion-toast-in {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+.motion-presence-panel[data-state="open"] > .task-error,
+.motion-presence-panel[data-state="open"] > .pc-error,
+.motion-presence-panel[data-state="open"] > .stale-banner,
+.motion-presence-panel[data-state="open"] > .ng-log-view,
+.motion-presence-panel[data-state="open"] > .http-response {
+  animation: motion-panel-in 240ms var(--ease-snappy) both;
+}
+@keyframes motion-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.motion-reveal {
+  min-width: 0;
+  overflow: clip;
+}
+.motion-reveal:has(> .http-response) {
+  margin-top: 0;
+}
+details.motion-details {
+  overflow: clip;
+}
+details.motion-details > summary > svg {
+  transition: transform 260ms cubic-bezier(0.18, 0.89, 0.32, 1.15);
+}
+details.motion-details[data-motion-expanding="true"] > summary > svg,
+details.motion-details[open] > summary > svg {
+  transform: rotate(90deg);
+}
+details.motion-details[data-motion-expanding="false"] > summary > svg {
+  transform: none;
+}
+details.motion-details[data-motion-expanding="true"] > :not(summary) {
+  animation: motion-detail-in 240ms var(--ease-snappy) both;
+}
+details.motion-details[data-motion-expanding="false"] > :not(summary) {
+  opacity: 0;
+  translate: 0 -4px;
+  transition:
+    opacity 160ms var(--ease-exit),
+    translate 160ms var(--ease-exit);
+}
+@keyframes motion-detail-in {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+/* Discrete display transitions preserve mounted editors; inert blocks outgoing focus. */
+.workspace[data-motion-page] {
+  opacity: 1;
+  transition:
+    opacity 160ms var(--ease-standard),
+    display 160ms allow-discrete;
+}
+.workspace[data-motion-page][hidden] {
+  opacity: 0;
+}
+.workspace[data-motion-page] > .page-heading,
+.workspace[data-motion-page] > .overview,
+.workspace[data-motion-page] > .settings-page {
+  animation: none;
+}
+.raw-result,
+.result-preview,
+.input-card,
+.output-card,
+.request-form {
+  transition:
+    opacity 160ms var(--ease-standard),
+    display 160ms allow-discrete;
+}
+@starting-style {
+  .workspace[data-motion-page]:not([hidden]) {
+    opacity: 0;
+  }
+  .result-preview {
+    opacity: 0;
+  }
+}
+.motion-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms var(--ease-standard);
+}
+.input-card {
+  position: relative;
+}
+.motion-drop[data-active="true"] {
+  opacity: 1;
+}
+.motion-drop-edge {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.motion-drop-edge rect {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+}
+.motion-drop[data-active="true"] .motion-drop-edge rect {
+  animation: motion-drop-edge 1s linear infinite;
+}
+.motion-drop-sheets {
+  position: absolute;
+  right: 20px;
+  top: 64px;
+  width: 28px;
+  height: 32px;
+  perspective: 400px;
+}
+.motion-drop-sheets i {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  border-radius: 3px;
+  transition: transform 240ms cubic-bezier(0.18, 0.89, 0.32, 1.15);
+}
+.motion-drop[data-active="true"] i:first-child {
+  transform: translate(-8px, -3px) rotate(-8deg);
+}
+.motion-drop[data-active="true"] i:nth-child(2) {
+  transform: translate(8px, -2px) rotate(6deg);
+}
+@keyframes motion-drop-edge {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.color-saved-list .color-saved {
+  transform-origin: center;
+}
+.color-field-row strong,
+.color-grade {
+  transition:
+    color 160ms var(--ease-standard),
+    background-color 160ms var(--ease-standard);
+}
+.color-sliders input[type="range"]::-webkit-slider-thumb:active {
+  scale: 0.92;
+}
+.file-meta {
+  animation: motion-panel-in 200ms var(--ease-snappy);
+}
+.split-handle {
+  transition: background-color 160ms var(--ease-standard);
+}
+.editors[data-resizing="true"] > * {
+  transition: none !important;
+}
+.editors:not([data-resizing="true"]) {
+  transition: grid-template-columns 300ms var(--ease-spring);
+}
+.motion-skeleton-stage {
+  display: contents;
+}
+.motion-skeleton-content {
+  animation: motion-skeleton-arrive 340ms var(--ease-spring) both;
+}
+.code-editor.motion-skeleton-content {
+  filter: none !important;
+  transform: none !important;
+}
+@keyframes motion-skeleton-arrive {
+  from {
+    opacity: 0.25;
+    translate: 0 3px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 760px) {
+  .app .sidebar {
+    display: flex !important;
+    transform: translateX(0);
+    transition:
+      transform 400ms var(--ease-snappy),
+      opacity 240ms var(--ease-standard),
+      visibility 240ms allow-discrete;
+  }
+  .app.drawer-closed .sidebar {
+    display: flex !important;
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition-duration: 240ms;
+  }
+  .sidebar-backdrop {
+    animation: motion-panel-in 200ms var(--ease-standard);
+  }
+  .motion-presence-drawer[data-state="closing"] > .sidebar-backdrop {
+    opacity: 0;
+  }
+  .sidebar .brand-word,
+  .sidebar .nav-item > span {
+    transition: opacity 160ms var(--ease-standard);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motion-group > .motion-pill,
+  .motion-button,
+  .motion-text,
+  .motion-glyph-slot *,
+  .motion-presence > *,
+  .motion-toast,
+  .motion-drop,
+  .motion-drop *,
+  details.motion-details,
+  .workspace[data-motion-page],
+  .ng-help-popover,
+  dialog.motion-native,
+  .app .sidebar {
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
+  }
+  .motion-button:active:not(:disabled) {
+    transform: none;
+  }
+  .motion-toast {
+    transform: translateX(-50%);
+  }
+  .motion-presence[data-state="closing"] {
+    display: none;
+  }
+  .code-editor.motion-skeleton-content {
+    opacity: 1;
+  }
+}

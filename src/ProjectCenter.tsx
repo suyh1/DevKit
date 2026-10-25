@@ -1,3 +1,5 @@
+import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence, MotionDetails } from './Motion';
+import { buttonFeedback, copyText } from './motion-primitives';
 import ProjectComparison from './ProjectComparison';
 import './features.css';
 import { useEffect, useRef, useState } from "react";
@@ -140,15 +142,18 @@ export default function ProjectCenter({
     data?.profiles.find((item) => item.id === active) || data?.profiles[0];
   async function action(work: () => Promise<void>) {
     if (busyRef.current) return false;
+    const feedback = buttonFeedback();
     busyRef.current = true;
     setBusy(true);
     setError("");
     setMessage("");
     try {
       await work();
+      feedback(true);
       return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "操作失败。");
+      feedback(false);
       return false;
     } finally {
       busyRef.current = false;
@@ -266,7 +271,7 @@ export default function ProjectCenter({
   }
   async function copy(text: string) {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setMessage("已复制。");
     } catch {
       const previous = document.activeElement,
@@ -308,20 +313,24 @@ export default function ProjectCenter({
       ),
     }));
   }
+  const grid = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLElement>(null);
+  useSkeletonMorph(stage, !!data && !!profile);
+  useMotionList(grid, projects.map(project => project.id).join('|') + view, !!search);
   const errorBox = error && (
     <div className="pc-error" role="alert">
       <span>{error}</span>
-      <button
+      <MotionButton outcome={error ? "error" : ""} busy={busy}
         type="button"
         className="text-button"
         disabled={busy}
         onClick={() => void action(load)}
       >
         刷新共享数据
-      </button>
+      </MotionButton>
     </div>
   );
-  if (!session && !error) return <section className="project-center"><Skeleton kind="projects" /></section>;
+  if (!session && !error) return <section ref={stage} className="project-center"><Skeleton kind="projects" /></section>;
   if (!session?.authenticated)
     return (
       <section className="project-center pc-login">
@@ -350,16 +359,16 @@ export default function ProjectCenter({
               onChange={(event) => setPassword(event.target.value)}
             />
           </Field>
-          <button className="run-button" disabled={busy}>
+          <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy}>
             {busy ? "正在连接…" : "进入项目中心"}
-          </button>
+          </MotionButton>
         </form>
         <small>仅用于可信局域网。HTTP 连接不加密，请勿复用重要账号密码。</small>
       </section>
     );
   if (!data || !profile)
     return (
-      <section className="project-center">
+      <section ref={stage} className="project-center">
         {errorBox}
         {error ? <p>项目中心暂不可用，请处理上面的配置目录问题后重新启动。其他工具仍可使用。</p> : <Skeleton kind="projects" />}
         {storage && (
@@ -412,9 +421,10 @@ export default function ProjectCenter({
   }
   return (
     <section
-      className={`project-center ${portal ? "pc-portal" : ""} ${canEdit ? "" : "pc-viewer"}`}
+      ref={stage}
+      className={`project-center motion-skeleton-content ${portal ? "pc-portal" : ""} ${canEdit ? "" : "pc-viewer"}`}
     >
-      {comparisonOpen && <ProjectComparison data={data} active={active} close={() => setComparisonOpen(false)} />}
+      <MotionPresence kind="dialog" present={!!(comparisonOpen)}>{comparisonOpen && <ProjectComparison data={data} active={active} close={() => setComparisonOpen(false)} />}</MotionPresence>
       <header className="pc-heading">
         <div className="pc-brand">
           <FolderKanban size={27} />
@@ -423,32 +433,32 @@ export default function ProjectCenter({
             <p>项目定义一次维护，环境差异由配置档案管理。</p>
           </div>
         </div>
-        <div className="pc-actions"><button className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比环境</button>
+        <div className="pc-actions"><MotionButton outcome={error ? "error" : ""} busy={busy} className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比环境</MotionButton>
           <span className="pc-role">
             <ShieldCheck size={13} />
             {owner ? "主机管理" : canEdit ? "协作编辑" : "只读访问"} · 数据版本
             {data.revision}
           </span>
-          <button
+          <MotionButton outcome={error ? "error" : ""} busy={busy}
             className="secondary-button"
             disabled={busy}
             onClick={() => void action(load)}
           >
             <RefreshCw size={14} />
             刷新
-          </button>
+          </MotionButton>
           {owner && (
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="secondary-button"
               disabled={busy}
               onClick={() => setStorageOpen(true)}
             >
               <FolderOpen size={14} />
               配置文件
-            </button>
+            </MotionButton>
           )}
           {owner && (
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="secondary-button"
               disabled={busy}
               onClick={() =>
@@ -460,7 +470,7 @@ export default function ProjectCenter({
             >
               <Globe size={14} />
               局域网共享
-            </button>
+            </MotionButton>
           )}
           {portal && (
             <>
@@ -474,7 +484,7 @@ export default function ProjectCenter({
               >
                 切换主题
               </button>
-              <button
+              <MotionButton outcome={error ? "error" : ""} busy={busy}
                 className="text-button"
                 disabled={busy}
                 onClick={() =>
@@ -487,7 +497,7 @@ export default function ProjectCenter({
                 }
               >
                 退出
-              </button>
+              </MotionButton>
             </>
           )}
         </div>
@@ -513,7 +523,7 @@ export default function ProjectCenter({
         <aside className="pc-profiles">
           <div className="pc-section-title">
             <strong>配置档案</strong>
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="icon-button"
               title="新建配置档案"
               aria-label="新建配置档案"
@@ -529,11 +539,11 @@ export default function ProjectCenter({
               }
             >
               <Plus size={16} />
-            </button>
+            </MotionButton>
           </div>
           <p>选择仅影响当前使用者</p>
           {data.profiles.map((item) => (
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               key={item.id}
               className={`pc-profile ${profile.id === item.id ? "selected" : ""}`}
               aria-pressed={profile.id === item.id}
@@ -548,18 +558,18 @@ export default function ProjectCenter({
                 {item.description ||
                   `${item.variables.length} 个变量 · ${item.overrides.length} 个覆盖`}
               </small>
-            </button>
+            </MotionButton>
           ))}
           <div className="pc-profile-tools">
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="text-button"
               disabled={busy || !canEdit}
               onClick={() => setProfileDraft(structuredClone(profile))}
             >
               <Settings2 size={14} />
               编辑当前档案
-            </button>
-            <button
+            </MotionButton>
+            <MotionButton variant="copy"
               className="text-button"
               disabled={busy || !canEdit}
               onClick={() =>
@@ -578,8 +588,8 @@ export default function ProjectCenter({
             >
               <Copy size={14} />
               复制档案
-            </button>
-            <button
+            </MotionButton>
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="text-button"
               disabled={busy || !canEdit || data.profiles.length <= 1}
               onClick={() =>
@@ -604,7 +614,7 @@ export default function ProjectCenter({
             >
               <Trash2 size={14} />
               删除档案
-            </button>
+            </MotionButton>
           </div>
           <div className="pc-storage">
             <Archive size={15} />
@@ -697,7 +707,7 @@ export default function ProjectCenter({
               <option value="disabled">已停用</option>
               <option value="invalid">配置异常</option>
             </select>
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="run-button"
               disabled={busy || !canEdit}
               onClick={() =>
@@ -715,7 +725,7 @@ export default function ProjectCenter({
             >
               <Plus size={15} />
               添加项目
-            </button>
+            </MotionButton>
           </div>
           <div className="pc-bulk">
             <label className="pc-select-all">
@@ -758,19 +768,19 @@ export default function ProjectCenter({
             )}
             {canEdit && (
               <>
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={busy || !selectedProjects.length}
                   onClick={() => void action(() => setEnabled(true))}
                 >
                   启用所选
-                </button>
-                <button
+                </MotionButton>
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={busy || !selectedProjects.length}
                   onClick={() => void action(() => setEnabled(false))}
                 >
                   停用所选
-                </button>
-                <button
+                </MotionButton>
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={
                     busy ||
                     !selectedProjects.some(
@@ -797,7 +807,7 @@ export default function ProjectCenter({
                   }
                 >
                   检测所选入口
-                </button>
+                </MotionButton>
               </>
             )}
             <button
@@ -841,7 +851,7 @@ export default function ProjectCenter({
               )}
             </div>
           )}
-          <div className={`pc-grid ${view === "list" ? "pc-list" : ""}`}>
+          <div ref={grid} className={`pc-grid ${view === "list" ? "pc-list" : ""}`}>
             {projects.map((project) => {
               const result = resolveProject(project, profile),
                 probeResult = health[`${profile.id}:${project.id}`];
@@ -849,6 +859,7 @@ export default function ProjectCenter({
                 <article
                   className={`pc-card ${!result.enabled ? "disabled" : ""} ${selected.includes(project.id) ? "is-selected" : ""}`}
                   key={project.id}
+                  data-motion-key={project.id}
                 >
                   <div className="pc-card-top">
                     <label className="pc-card-select">
@@ -874,7 +885,7 @@ export default function ProjectCenter({
                   </div>
                   <div className="pc-card-identity">
                     <h3 title={project.name}>{project.name}</h3>
-                    <button
+                    <MotionButton outcome={error ? "error" : ""} busy={busy}
                       className={`pc-status ${result.enabled ? "enabled" : ""}`}
                       disabled={busy || !canEdit}
                       aria-label={`${result.enabled ? "停用" : "启用"} ${project.name}（仅当前档案）`}
@@ -885,7 +896,7 @@ export default function ProjectCenter({
                       }
                     >
                       {result.enabled ? "已启用" : "已停用"}
-                    </button>
+                    </MotionButton>
                   </div>
                   {project.description && (
                     <p
@@ -895,7 +906,7 @@ export default function ProjectCenter({
                       {project.description}
                     </p>
                   )}
-                  <details className="pc-address">
+                  <MotionDetails className="pc-address">
                     <summary
                       aria-label={`展开 ${project.name} 完整地址`}
                       title={result.error || result.url}
@@ -908,7 +919,7 @@ export default function ProjectCenter({
                     <div>
                       <code>{result.error || result.url}</code>
                     </div>
-                  </details>
+                  </MotionDetails>
                   {portal && result.localOnly && (
                     <small className="pc-invalid">
                       此地址指向访问者自己的电脑；共享服务请使用主机局域网 IP。
@@ -939,7 +950,7 @@ export default function ProjectCenter({
                       <ExternalLink size={14} />
                       {result.enabled ? "打开入口" : "已停用"}
                     </button>
-                    <button
+                    <MotionButton variant="copy"
                       className="icon-button"
                       aria-label={`复制 ${project.name} 地址`}
                       title="复制最终地址"
@@ -947,10 +958,10 @@ export default function ProjectCenter({
                       onClick={() => void copy(result.url)}
                     >
                       <Copy size={14} />
-                    </button>
+                    </MotionButton>
                     {canEdit && (
                       <>
-                        <button
+                        <MotionButton outcome={error ? "error" : ""} busy={busy}
                           className="icon-button"
                           aria-label={`编辑 ${project.name}`}
                           title="编辑基础定义（所有档案）"
@@ -958,8 +969,8 @@ export default function ProjectCenter({
                           onClick={() => editEntry(project)}
                         >
                           <Pencil size={14} />
-                        </button>
-                        <button
+                        </MotionButton>
+                        <MotionButton outcome={error ? "error" : ""} busy={busy}
                           className="icon-button"
                           title="仅覆盖当前档案"
                           aria-label={`配置 ${project.name} 环境覆盖`}
@@ -967,8 +978,8 @@ export default function ProjectCenter({
                           onClick={() => editEntry(project, true)}
                         >
                           <Settings2 size={14} />
-                        </button>
-                        <details
+                        </MotionButton>
+                        <MotionDetails
                           className="pc-menu"
                           onClick={(event) => {
                             if (
@@ -985,7 +996,7 @@ export default function ProjectCenter({
                             <MoreHorizontal size={17} />
                           </summary>
                           <div>
-                            <button
+                            <MotionButton variant="copy"
                               className="text-button"
                               title="复制项目定义"
                               aria-label={`复制 ${project.name} 定义`}
@@ -1001,8 +1012,8 @@ export default function ProjectCenter({
                             >
                               <Plus size={14} />
                               复制定义
-                            </button>
-                            <button
+                            </MotionButton>
+                            <MotionButton outcome={error ? "error" : ""} busy={busy}
                               className="text-button pc-invalid"
                               aria-label={`删除 ${project.name}`}
                               disabled={busy}
@@ -1034,9 +1045,9 @@ export default function ProjectCenter({
                             >
                               <Trash2 size={14} />
                               删除项目
-                            </button>
+                            </MotionButton>
                           </div>
-                        </details>
+                        </MotionDetails>
                       </>
                     )}
                   </div>
@@ -1063,15 +1074,15 @@ export default function ProjectCenter({
             </button>
             {canEdit && (
               <>
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="text-button"
                   disabled={busy}
                   onClick={() => file.current?.click()}
                 >
                   <Upload size={14} />
                   导入预览
-                </button>
-                <button
+                </MotionButton>
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="text-button"
                   disabled={busy}
                   onClick={() =>
@@ -1082,7 +1093,7 @@ export default function ProjectCenter({
                 >
                   <Archive size={14} />
                   备份与恢复
-                </button>
+                </MotionButton>
               </>
             )}
             <span>
@@ -1111,7 +1122,7 @@ export default function ProjectCenter({
           />
         </div>
       </div>
-      {entry && (
+      <MotionPresence kind="dialog" present={!!(entry)}>{entry && (
         <Modal
           feedback={message}
           title={
@@ -1182,7 +1193,7 @@ export default function ProjectCenter({
                   />
                   在当前档案启用
                 </label>
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   type="button"
                   className="text-button"
                   disabled={busy}
@@ -1206,7 +1217,7 @@ export default function ProjectCenter({
                   }
                 >
                   移除覆盖，恢复基础定义
-                </button>
+                </MotionButton>
               </>
             ) : (
               <>
@@ -1417,7 +1428,7 @@ export default function ProjectCenter({
               copy={copy}
             />
             {!overrideMode && (
-              <details className="pc-profile-preview">
+              <MotionDetails className="pc-profile-preview">
                 <summary>
                   查看所有配置档案的地址（{data.profiles.length}）
                 </summary>
@@ -1435,7 +1446,7 @@ export default function ProjectCenter({
                     </div>
                   );
                 })}
-              </details>
+              </MotionDetails>
             )}
             {draftError && (
               <p className="pc-validation" role="status">
@@ -1444,14 +1455,14 @@ export default function ProjectCenter({
             )}
             <footer>
               <ModalCancel />
-              <button className="run-button" disabled={busy || !!draftError}>
+              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
                 保存{overrideMode ? "当前档案覆盖" : "项目定义"}
-              </button>
+              </MotionButton>
             </footer>
           </form>
         </Modal>
-      )}
-      {profileDraft && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(profileDraft)}>{profileDraft && (
         <Modal
           feedback={message}
           title="编辑配置档案"
@@ -1575,7 +1586,7 @@ export default function ProjectCenter({
                 暂无环境变量。不使用模板变量时可以留空。
               </p>
             )}
-            <details className="pc-profile-preview">
+            <MotionDetails className="pc-profile-preview">
               <summary>
                 查看此档案的项目地址预览（{data.projects.length}）
               </summary>
@@ -1590,7 +1601,7 @@ export default function ProjectCenter({
                   </div>
                 );
               })}
-            </details>
+            </MotionDetails>
             {draftError && (
               <p className="pc-validation" role="status">
                 {draftError}
@@ -1598,14 +1609,14 @@ export default function ProjectCenter({
             )}
             <footer>
               <ModalCancel />
-              <button className="run-button" disabled={busy || !!draftError}>
+              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
                 保存配置档案
-              </button>
+              </MotionButton>
             </footer>
           </form>
         </Modal>
-      )}
-      {imported && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(imported)}>{imported && (
         <Modal
           feedback={message}
           title="导入预览"
@@ -1655,7 +1666,7 @@ export default function ProjectCenter({
               {importError}
             </p>
           )}
-          <details className="pc-profile-preview">
+          <MotionDetails className="pc-profile-preview">
             <summary>查看导入内容</summary>
             <p>
               配置档案：{imported.profiles.map((item) => item.name).join("、")}
@@ -1670,10 +1681,10 @@ export default function ProjectCenter({
             {imported.projects.length > 50 && (
               <p>仅展示前 50 项，全部内容均参与导入。</p>
             )}
-          </details>
+          </MotionDetails>
           <footer>
             <ModalCancel />
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="run-button"
               disabled={busy || !importTarget}
               onClick={() =>
@@ -1699,11 +1710,11 @@ export default function ProjectCenter({
               }
             >
               备份当前数据并导入
-            </button>
+            </MotionButton>
           </footer>
         </Modal>
-      )}
-      {history && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(history)}>{history && (
         <Modal
           feedback={message}
           title={restoring ? "恢复预览" : "备份与恢复"}
@@ -1722,7 +1733,7 @@ export default function ProjectCenter({
                 ）。项目和档案将替换为快照内容，当前共享设置和访问口令保持不变。
               </p>
               <StateChanges current={data} next={restoring.data} />
-              <details className="pc-profile-preview">
+              <MotionDetails className="pc-profile-preview">
                 <summary>查看快照内容</summary>
                 <p>
                   档案：
@@ -1735,16 +1746,16 @@ export default function ProjectCenter({
                     </li>
                   ))}
                 </ul>
-              </details>
+              </MotionDetails>
               <footer>
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="secondary-button"
                   disabled={busy}
                   onClick={() => setRestoring(null)}
                 >
                   返回快照列表
-                </button>
-                <button
+                </MotionButton>
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="run-button"
                   disabled={busy}
                   onClick={() =>
@@ -1764,7 +1775,7 @@ export default function ProjectCenter({
                   }
                 >
                   备份当前数据并恢复
-                </button>
+                </MotionButton>
               </footer>
             </>
           ) : (
@@ -1781,7 +1792,7 @@ export default function ProjectCenter({
                   placeholder="快照名称（选填）"
                   onChange={(event) => setSnapshotName(event.target.value)}
                 />
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="secondary-button"
                   disabled={busy}
                   onClick={() =>
@@ -1799,7 +1810,7 @@ export default function ProjectCenter({
                 >
                   <Plus size={14} />
                   创建手动快照
-                </button>
+                </MotionButton>
               </div>
               <div className="pc-snapshots">
                 {history.map((item) => (
@@ -1811,7 +1822,7 @@ export default function ProjectCenter({
                         {item.projects} 项目 / {item.profiles} 档案
                       </small>
                     </div>
-                    <button
+                    <MotionButton outcome={error ? "error" : ""} busy={busy}
                       className="secondary-button"
                       disabled={busy}
                       onClick={() =>
@@ -1827,7 +1838,7 @@ export default function ProjectCenter({
                       }
                     >
                       预览恢复
-                    </button>
+                    </MotionButton>
                   </div>
                 ))}
               </div>
@@ -1841,8 +1852,8 @@ export default function ProjectCenter({
             </>
           )}
         </Modal>
-      )}
-      {confirmation && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(confirmation)}>{confirmation && (
         <Modal
           feedback={message}
           title={confirmation.title}
@@ -1853,7 +1864,7 @@ export default function ProjectCenter({
           <p>{confirmation.description}</p>
           <footer>
             <ModalCancel />
-            <button
+            <MotionButton outcome={error ? "error" : ""} busy={busy}
               className="pc-danger-button"
               disabled={busy}
               onClick={() =>
@@ -1864,11 +1875,11 @@ export default function ProjectCenter({
               }
             >
               确认删除
-            </button>
+            </MotionButton>
           </footer>
         </Modal>
-      )}
-      {storageOpen && owner && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(storageOpen && owner)}>{storageOpen && owner && (
         <Modal
           feedback={message}
           title="配置文件与迁移"
@@ -1894,13 +1905,13 @@ export default function ProjectCenter({
                 <FolderOpen size={15} />
                 打开 configs 目录
               </button>
-              <button
+              <MotionButton variant="copy"
                 className="secondary-button"
                 onClick={() => void copy(storage?.directory || "")}
               >
                 <Copy size={14} />
                 复制路径
-              </button>
+              </MotionButton>
             </div>
           </div>
           <dl className="pc-file-list">
@@ -1938,8 +1949,8 @@ export default function ProjectCenter({
             <ModalCancel>知道了</ModalCancel>
           </footer>
         </Modal>
-      )}
-      {sharing && (
+      )}</MotionPresence>
+      <MotionPresence kind="dialog" present={!!(sharing)}>{sharing && (
         <Modal
           feedback={message}
           title="局域网共享 · 仅项目中心"
@@ -2061,7 +2072,7 @@ export default function ProjectCenter({
             </div>
             <footer>
               {sharing.running && (
-                <button
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
                   type="button"
                   className="secondary-button"
                   disabled={busy}
@@ -2077,15 +2088,15 @@ export default function ProjectCenter({
                   }
                 >
                   停止共享
-                </button>
+                </MotionButton>
               )}
-              <button className="run-button" disabled={busy}>
+              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy}>
                 {sharing.running ? "应用设置并重启共享" : "开启共享"}
-              </button>
+              </MotionButton>
             </footer>
           </form>
         </Modal>
-      )}
+      )}</MotionPresence>
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { MotionButton, MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { diffRows, jsonTree, nodePath } from './result-model';
@@ -7,9 +8,9 @@ import type { ToolId } from './tools';
 function TreeNode({ node, label, path, depth, query, onCopy }: { node: JsonNode; label: string; path: string; depth: number; query: string; onCopy: (text: string) => void }) {
   const visible = !query || label.toLowerCase().includes(query) || node.raw.toLowerCase().includes(query);
   if (!visible) return null;
-  const actions = <span className="node-actions"><button title="复制字段路径" aria-label={`复制路径 ${path}`} onClick={event => { event.preventDefault(); onCopy(path); }}>$</button><button title="复制原始值" aria-label={`复制值 ${path}`} onClick={event => { event.preventDefault(); onCopy(node.raw); }}><Copy size={12} /></button></span>;
+  const actions = <span className="node-actions"><MotionButton variant="copy" title="复制字段路径" aria-label={`复制路径 ${path}`} onClick={event => { event.preventDefault(); onCopy(path); }}>$</MotionButton><MotionButton variant="copy" title="复制原始值" aria-label={`复制值 ${path}`} onClick={event => { event.preventDefault(); onCopy(node.raw); }}><Copy size={12} /></MotionButton></span>;
   if (node.kind === 'value') return <div className="tree-leaf"><span className="tree-key">{label}</span><code className={`json-value ${node.raw.startsWith('"') ? 'string' : 'literal'}`}>{node.raw}</code>{actions}</div>;
-  return <details className="tree-branch" open={query || depth === 0 ? true : undefined} key={`${path}-${query ? 'search' : 'browse'}`}><summary><span className="tree-key">{label}</span><small>{node.kind === 'array' ? '[' : '{'} {node.children.length} 项 {node.kind === 'array' ? ']' : '}'}</small>{actions}</summary><div className="tree-children">{depth < 40 ? node.children.map(({ key, node: child }, index) => <TreeNode key={`${key}-${index}`} node={child} label={key} path={nodePath(path, key, node.kind === 'array')} depth={depth + 1} query={query} onCopy={onCopy} />) : <p className="preview-note">层级较深，请复制此节点或查看源码。</p>}</div></details>;
+  return <MotionDetails className="tree-branch" open={query || depth === 0 ? true : undefined} key={`${path}-${query ? 'search' : 'browse'}`}><summary><span className="tree-key">{label}</span><small>{node.kind === 'array' ? '[' : '{'} {node.children.length} 项 {node.kind === 'array' ? ']' : '}'}</small>{actions}</summary><div className="tree-children">{depth < 40 ? node.children.map(({ key, node: child }, index) => <TreeNode key={`${key}-${index}`} node={child} label={key} path={nodePath(path, key, node.kind === 'array')} depth={depth + 1} query={query} onCopy={onCopy} />) : <p className="preview-note">层级较深，请复制此节点或查看源码。</p>}</div></MotionDetails>;
 }
 
 function DiffView({ text }: { text: string }) {
@@ -37,7 +38,7 @@ function MatchView({ text, source }: { text: string; source: string }) {
     position = match.index + match.match.length;
   }
   fragments.push(source.slice(position));
-  return <div className="match-preview"><p className="preview-note">{data.count} 个匹配{data.limitReached ? '（达到结果上限）' : ''} · 预览前 200 项</p><pre className="match-source">{fragments}</pre>{data.matches.slice(0, 200).map((match, index) => <details className="match-item" key={index}><summary><span>#{index + 1} · 位置 {match.index}</span><code>{match.match || '空匹配'}</code></summary><pre>{JSON.stringify({ groups: match.groups, namedGroups: match.namedGroups }, null, 2)}</pre></details>)}</div>;
+  return <div className="match-preview"><p className="preview-note">{data.count} 个匹配{data.limitReached ? '（达到结果上限）' : ''} · 预览前 200 项</p><pre className="match-source">{fragments}</pre>{data.matches.slice(0, 200).map((match, index) => <MotionDetails className="match-item" key={index}><summary><span>#{index + 1} · 位置 {match.index}</span><code>{match.match || '空匹配'}</code></summary><pre>{JSON.stringify({ groups: match.groups, namedGroups: match.namedGroups }, null, 2)}</pre></MotionDetails>)}</div>;
 }
 
 function TableView({ node }: { node: JsonNode }) {
@@ -54,7 +55,7 @@ export default function ResultView({ toolId, text, source, onCopy, initialView =
     try { return { node: jsonTree(text) }; } catch (error) { return { error: error instanceof Error ? error.message : '无法生成预览' }; }
   }, [text, toolId]);
   if (toolId === 'diff') return <DiffView text={text} />;
-  if (toolId === 'password' || toolId === 'uuid' || toolId === 'ulid' && !text.startsWith('[')) return <div className="generated-list">{text.split('\n').map((line, index) => <div key={index}><span>{String(index + 1).padStart(2, '0')}</span><code>{line}</code><button className="icon-button" aria-label={`复制第 ${index + 1} 条`} onClick={() => onCopy(line)}><Copy size={14} /></button></div>)}</div>;
+  if (toolId === 'password' || toolId === 'uuid' || toolId === 'ulid' && !text.startsWith('[')) return <div className="generated-list">{text.split('\n').map((line, index) => <div key={index}><span>{String(index + 1).padStart(2, '0')}</span><code>{line}</code><MotionButton variant="copy" className="icon-button" aria-label={`复制第 ${index + 1} 条`} onClick={() => onCopy(line)}><Copy size={14} /></MotionButton></div>)}</div>;
   if (toolId === 'regex') {
     if (source.length > 100_000) return <p className="preview-note">匹配高亮支持 100,000 字符以内的输入，请使用源码视图。</p>;
     return <MatchView text={text} source={source} />;

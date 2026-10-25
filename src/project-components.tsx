@@ -1,3 +1,4 @@
+import { MotionButton } from './Motion';
 import {
   createContext,
   useContext,
@@ -54,7 +55,7 @@ export function Modal({
       ?.querySelector<HTMLInputElement>("input:not([type=checkbox]), select")
       ?.focus();
     return () => {
-      if (before instanceof HTMLElement && before.isConnected) before.focus();
+      if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus();
     };
   }, []);
   useEffect(() => {
@@ -177,7 +178,7 @@ export function UrlPreview({
     <section className="pc-preview" aria-label="最终地址预览">
       <div className="pc-section-title">
         <strong>当前档案的地址预览 · {profile.name}</strong>
-        <button
+        <MotionButton variant="copy"
           type="button"
           className="text-button"
           disabled={!result.url}
@@ -185,7 +186,7 @@ export function UrlPreview({
         >
           <Copy size={13} />
           复制
-        </button>
+        </MotionButton>
       </div>
       <code className={result.error ? "pc-invalid" : ""}>
         {result.error || result.url}

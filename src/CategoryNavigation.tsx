@@ -1,5 +1,6 @@
+import { MotionPresence, useMotionHeight } from './Motion';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import { ArrowLeft, Binary, Braces, CaseSensitive, ChevronRight, Clock3, Code2, Palette, ShieldCheck, X } from 'lucide-react';
 import { categories } from './catalog';
 import { tools } from './tools';
@@ -9,20 +10,22 @@ import type { Task } from './workbench';
 
 const categoryIcons = { data: Braces, code: Code2, encode: Binary, text: CaseSensitive, utility: Clock3, security: ShieldCheck, color: Palette };
 
-export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoose }: {
+export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoose, dismissKey }: {
   activeToolId?: ToolId;
   tasks: Task[];
   narrow: boolean;
   onChoose: (id: ToolId) => void;
+  dismissKey?: string;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [position, setPosition] = useState<CSSProperties>({});
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLElement>(null);
   const triggers = useRef(new Map<string, HTMLButtonElement>());
   const restoreFocusTo = useRef<string | null>(null);
   const category = categories.find(item => item.key === openKey);
   const selectedCategory = tools.find(tool => tool.id === activeToolId)?.category;
   const groupedTools = category ? category.ids.map(id => tools.find(tool => tool.id === id)!) : [];
+  useMotionHeight(panel, openKey);
+  useEffect(() => { setOpenKey(null); }, [dismissKey, narrow]);
 
   function close(restoreFocus = false) {
     if (restoreFocus) restoreFocusTo.current = openKey;
@@ -45,7 +48,7 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
       const left = Math.max(12, Math.min((sidebar?.right ?? rect.right) + 10, window.innerWidth - width - 12));
       const height = surface.getBoundingClientRect().height;
       const top = Math.max(12, Math.min(rect.top, window.innerHeight - height - 12));
-      setPosition({ left, top, width });
+      Object.assign(surface.style, { left: `${left}px`, top: `${top}px`, width: `${width}px` });
     }
     place();
     const observer = new ResizeObserver(place);
@@ -125,7 +128,7 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
         </button>;
       })}
     </nav>
-    {category && <section id="category-tool-panel" className={`category-panel ${narrow ? 'category-panel-inline' : ''}`} style={narrow ? undefined : position} ref={panel} aria-labelledby="category-panel-title">
+    <MotionPresence kind="popover" present={!!(category)}>{category && <section id="category-tool-panel" className={`category-panel ${narrow ? 'category-panel-inline' : ''}`} ref={panel} aria-labelledby="category-panel-title">
       <header className="category-panel-heading">
         {narrow && <button className="icon-button category-back" aria-label="返回工具分类" onClick={() => close(true)}><ArrowLeft size={18} /></button>}
         <div><h2 id="category-panel-title">{category.name}<small>{groupedTools.length} 个工具</small></h2><p>{category.description}</p></div>
@@ -146,6 +149,6 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
         })}
       </nav>
       <footer className="category-panel-footer">{narrow ? '选择工具后返回工作区' : '↑ ↓ 选择 · Enter 打开 · Esc 关闭'}</footer>
-    </section>}
+    </section>}</MotionPresence>
   </div>;
 }
