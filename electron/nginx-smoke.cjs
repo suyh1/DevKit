@@ -140,9 +140,7 @@ module.exports = async function checkNginx(window, output) {
     await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
     await wait('!document.querySelector(".ng-help-popover:popover-open")');
     await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
-    await js(`[...document.querySelectorAll('.ng-toolbar .ng-action-with-help')].find(group=>group.textContent.includes('保存文件')).querySelector('.ng-help-trigger').click()`);
-    await wait('document.querySelector(".ng-help-popover:popover-open")?.textContent.includes("保存不会自动重载")');
-    assert.equal(await fs.readFile(main,'utf8'),original,'Clicking help does not perform the action'); await dismissHelp();
+    assert.equal(await js('document.querySelectorAll(".ng-toolbar .ng-help-trigger,.ng-instance-heading .ng-help-trigger,.ng-operation-help,.ng-block>summary .ng-help-trigger").length'), 0, 'Actions and block headings have no question-mark hints');
     await field('server_name', 'ui.local');
     await wait('document.querySelector(".ng-center .ng-warning")?.textContent.includes("未保存")');
     await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
@@ -246,19 +244,20 @@ module.exports = async function checkNginx(window, output) {
       assert.equal(body, 'included:/ping'); await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
     }
     console.log('Nginx directory preparation passed: missing log and temp directories are created before the real config test and start; created paths are visible in execution details.');
-    console.log('Nginx help passed: question marks with hover/click/focus, accessible field descriptions, modal Escape isolation, outside dismissal, operation help without execution, route cleanup, light/dark themes and narrow viewport bounds.');
+    await require('./nginx-delete-smoke.cjs')(window, output, { instanceId, createdId, createdDirectory, main, common, executable, port });
+    console.log('Nginx help passed: field-only question marks with hover/click/focus, no action hints, accessible descriptions, modal Escape isolation, outside dismissal, route cleanup, themes and narrow viewport bounds.');
     console.log(`Nginx UI passed: import and create sets, directory picker, filename validation, linked main/include editing, lossless save, backup recovery, draft preservation, source repair, external conflicts, themes, narrow layout${executable ? ', real nginx start/reload/quit, homepage and included proxy HTTP routing' : ''}.`);
   } catch (error) {
     console.error(await js('JSON.stringify({error:document.querySelector(".ng-center [role=alert]")?.textContent,notice:document.querySelector(".ng-notice")?.textContent,source:document.querySelector(".ng-source .cm-content")?.textContent,warning:document.querySelector(".ng-warning")?.textContent})'));
     await fs.writeFile(path.join(output, 'nginx-failure.png'), (await window.webContents.capturePage()).toPNG());
     throw error;
   } finally {
-    if (createdId) {
+    if (createdId && (await ipc('get')).instances.some(instance=>instance.id===createdId)) {
       const statuses = await ipc('statuses'); if (statuses.find(item => item.id === createdId)?.state === 'running') await ipc('command', { id: createdId, command: 'stop' });
       const state = await ipc('get'); await ipc('remove', { id: createdId, revision: state.revision, forgetOnly: true });
     }
     if (upstream) await new Promise(resolve => upstream.close(resolve));
-    if (instanceId) {
+    if (instanceId && (await ipc('get')).instances.some(instance=>instance.id===instanceId)) {
       const statuses = await ipc('statuses');
       if (statuses.find(item => item.id === instanceId)?.state === 'running') await ipc('command', { id: instanceId, command: 'stop' });
       const state = await ipc('get'); await ipc('remove', { id: instanceId, revision: state.revision, forgetOnly: true });

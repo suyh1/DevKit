@@ -42,7 +42,3 @@ export default function NginxHelpTip({ label, id, children }: { label: string; i
     onClick={event => { event.preventDefault(); event.stopPropagation(); if (pinned.current) hide(); else { show(); pinned.current = true; } }}><span aria-hidden="true">?</span></button>
     {host && createPortal(<div ref={popup} id={contentId} popover="auto" className="ng-help-popover" role="tooltip" onPointerEnter={clear} onPointerLeave={leave} onToggle={() => { const visible = !!popup.current?.matches(':popover-open'); setOpen(visible); if (!visible) pinned.current = false; }}><strong>{label}</strong><div>{children}</div><small>点击外部或按 Esc 关闭</small></div>, host)}</>;
 }
-
-export function NginxActionHelp({ label, detail, children }: { label: string; detail: string; children: ReactNode }) {
-  return <div className="ng-action-with-help">{children}<NginxHelpTip label={label}>{detail}</NginxHelpTip></div>;
-}

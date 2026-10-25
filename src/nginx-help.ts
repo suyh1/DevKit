@@ -5,40 +5,12 @@ export const instanceHints = {
   platform: '选择配置实际运行的系统。Windows 和 Linux 都支持主文件加多个附属文件；可跨系统编辑，运行命令只能在匹配的系统执行。',
   directory: '选择已有目录，用于生成主配置、附属配置和运行子目录；不会覆盖同名配置，也不会自动启动 nginx。',
   mainName: '只填主文件名，例如 nginx.conf，不填目录。它是启动时读取的入口，内部可以配置多个服务。',
-  commonName: '只填不同的附属文件名，例如 common_proxy.conf。新模板会在示例服务中 include 此文件，之后可让多个服务共用。',
+  commonName: '只填不同的附属文件名，例如 common_proxy.conf。新模板在示例服务中 include 此文件，之后可让多个服务共用；初始 /api/ 代理到 http://127.0.0.1:9000，需按实际后端调整。',
   port: '仅用于生成第一个示例服务，例如 8080，访问地址为 http://127.0.0.1:8080。范围 1–65535；创建后可增加多个 server 和 listen。导入已有配置无需填写。',
   main: '选择已有主配置的绝对路径，例如 D:/nginx/nginx.conf 或 /etc/nginx/nginx.conf。已有端口、站点和代理规则会按原结构读取，无需重新填写。',
   prefix: '填写原来启动 nginx 时使用的运行目录，也可使用自定义配置目录。pid、error_log、root 等相对路径基于此目录，include 基于主配置所在目录。检查/启动/重载会自动补齐日志、PID、临时及缓存等运行目录；自动检测后请核对自定义目录。',
   executable: '可留空，自动检测 PATH 和常见安装位置；找不到时选择 nginx.exe（Windows）或 nginx（Linux）可执行文件。此处填写程序文件路径。',
   files: '每行一个附属文件的绝对路径，可解析 include 或手动选择。登记只让文件可编辑；实际生效仍需 include。多个服务共用时，修改会影响所有引用它的服务。',
-} as const;
-
-export const operationHints = {
-  refresh: '重新读取实例、磁盘配置和运行状态；有草稿时先确认是否放弃。',
-  add: '登记一套已有配置或在目录中新建主文件与附属文件；一个实例可以包含多个服务。',
-  existing: '导入现有文件并保留原内容，不要求重新填写端口或代理目标。',
-  create: '在所选目录生成一个示例服务及公共代理文件，不自动启动；之后可添加多个服务。',
-  pick: '打开本机文件或目录选择器；取消选择保留原输入。',
-  discover: '读取主配置中的 include，递归查找附属文件并加入列表；不改写文件。',
-  detect: '查找 nginx 程序并读取安装信息，不启动进程。导入模式会填入程序和运行目录，新建模式保留所选配置目录。',
-  settings: '修改名称、文件列表、运行目录或程序路径；运行期间不可改变主文件、程序、运行目录和目标系统。',
-  unregister: '只移除工作区中的登记记录，不删除文件、备份，也不停止 nginx。',
-  test: '先自动补齐日志、PID、临时及缓存等运行目录，再使用已保存配置执行 nginx -t。执行详情列出新建目录；目录无权限、缺少配置或证书时明确报错。不启动服务，也不验证后端接口是否可用。',
-  start: '先自动补齐运行目录并检查配置，通过后按主文件启动；一个实例的多个 server 会一起启动。新建目录显示在执行详情，端口占用等问题可查看 error_log。',
-  reload: '先补齐新配置需要的运行目录并检查，再通知运行中的 nginx 重新加载；影响此实例中全部服务。成功后仍需实际访问并检查错误日志。',
-  stop: '向此主配置对应的 nginx 发送 quit，等待已有连接处理完毕；此实例中的所有监听端口都会停止。',
-  backups: '查看每次保存前自动保留的原文件；载入备份只替换草稿，核对并保存后才写入磁盘。',
-  reread: '放弃此实例的草稿并重新读取磁盘文件；有修改时会先确认。',
-  saveFiles: '保存所有修改文件，写入前备份并检查外部改动；保存不会自动重载。推荐顺序：保存 → 检查配置 → 启动或重载。',
-  fields: '按原层级修改参数；只填参数，不填指令名、分号或注释。Enter 或离开输入框提交到草稿，Esc恢复当前字段。',
-  source: '编辑当前文件的完整源码，需要保留指令名、分号与花括号；结构错误时可在这里修复。',
-  addDirective: '在当前层级新增完整指令或配置块，只修改草稿；普通指令以分号结束，配置块使用花括号。',
-  deleteDirective: '从当前草稿删除此指令；确认并保存文件后才写入磁盘。',
-  deleteBlock: '删除当前配置块及其全部子项，只修改草稿；删除 server 会在保存并重载后移除此服务。',
-  saveInstance: '保存实例的登记信息，不修改已有配置文件，也不启动或重载 nginx。',
-  createInstance: '生成配置和运行子目录并登记实例；已有同名配置会阻止创建，不自动启动 nginx。',
-  cancel: '关闭当前表单；有实际改动时先确认，继续编辑可保留输入。',
-  loadBackup: '将这份备份载入当前草稿，核对后保存才会覆盖磁盘文件；不会自动重载。',
 } as const;
 
 type Help = { detail: string; example?: string; base?: 'prefix' | 'config' };
@@ -104,10 +76,3 @@ export function directiveHint(node: Pick<NginxNode, 'name' | 'block'>, parent = 
   }
   return (node.block ? blocks : fields)[node.name] || { detail: node.block ? '此配置块的参数取决于对应模块；保留现有语法，并在其内部添加适用于该层级的指令。' : '此指令可能来自自定义模块或 MIME 映射。仅填写原指令参数，支持引号和变量；具体含义请核对对应模块文档。' };
 }
-
-export const operationGuide = [
-  ['保存文件', operationHints.saveFiles], ['检查配置', operationHints.test], ['启动', operationHints.start], ['重载', operationHints.reload], ['停止', operationHints.stop],
-  ['刷新 / 重新读取', '刷新读取实例、状态和磁盘配置；重新读取只读取当前实例的文件。两者有草稿时都会先确认放弃。'],
-  ['备份 / 载入草稿', operationHints.backups], ['实例设置 / 取消登记', `${operationHints.settings} ${operationHints.unregister}`],
-  ['字段 / 全文 / 新增 / 删除', `${operationHints.fields} 全文及新增框需填写完整语法；删除只改草稿，保存并重载后才影响运行。`],
-] as const;
