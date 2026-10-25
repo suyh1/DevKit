@@ -227,4 +227,4 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 ## 2026-10-25 Nginx 实例删除与提示精简
 98. 提供明确的实例删除入口，覆盖草稿、选中切换和文件保留 — complete
 99. 移除全部操作提示及问号，仅保留输入字段提示 — complete
-100. 验证桌面流程、同步文档，打包并提交推送 — in_progress
+100. 验证桌面流程、同步文档，打包并提交推送 — complete
