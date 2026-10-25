@@ -194,4 +194,11 @@ describe("motion lifecycle and real outcomes", () => {
       ),
     ).toBe("");
   });
+  it("measures labels without duplicating their DOM text", () => {
+    const html = renderToStaticMarkup(
+      createElement(MotionButton, null, "刷新"),
+    );
+    expect(html).toContain('data-label="刷新"');
+    expect(html.replace(/<[^>]*>/g, "")).toBe("刷新");
+  });
 });

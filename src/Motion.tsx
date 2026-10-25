@@ -385,11 +385,17 @@ export const MotionButton = forwardRef<HTMLButtonElement, ButtonProps>(
             )}
             {text && !symbolCopy ? (
               <span className="motion-label-slot" ref={labelSlot}>
-                <span className="motion-label-measure" aria-hidden="true">
-                  {isCopy && text.length > 1
-                    ? [text, "复制失败"].sort((a, b) => b.length - a.length)[0]
-                    : text}
-                </span>
+                <span
+                  className="motion-label-measure"
+                  aria-hidden="true"
+                  data-label={
+                    isCopy && text.length > 1
+                      ? [text, "复制失败"].sort(
+                          (a, b) => b.length - a.length,
+                        )[0]
+                      : text
+                  }
+                />
                 <MotionText text={label} />
               </span>
             ) : null}

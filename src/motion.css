@@ -438,6 +438,9 @@ dialog.motion-native[open] {
   white-space: pre;
   line-height: inherit;
 }
+.motion-label-measure::before {
+  content: attr(data-label);
+}
 .motion-text {
   display: inline-flex;
   white-space: pre;
