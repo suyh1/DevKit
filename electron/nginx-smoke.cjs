@@ -4,6 +4,8 @@ const path = require('node:path');
 const net = require('node:net');
 
 module.exports = async function checkNginx(window, output) {
+  window.webContents.setBackgroundThrottling(false);
+  window.show(); window.focus(); window.webContents.focus();
   const js = source => window.webContents.executeJavaScript(source);
   async function wait(expression) {
     for (let index = 0; index < 180; index++) {
@@ -48,7 +50,9 @@ module.exports = async function checkNginx(window, output) {
   }
   const field = async (name, value) => {
     await js(`{ const element=[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})); let parent=element.closest('details');while(parent){parent.open=true;parent=parent.parentElement.closest('details');} element.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)}); element.dispatchEvent(new Event('input',{bubbles:true})); }`);
-    await js(`document.activeElement.blur()`);
+    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
+    await js(`[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})).blur()`);
+    await wait('!document.querySelector(".ng-warning")?.textContent.includes("请移出字段")');
   };
   async function source(text) {
     await click('全文编辑'); await wait('!!document.querySelector(".ng-source .cm-content")');

@@ -3,6 +3,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 module.exports = async function designSmoke(window, output) {
+  window.webContents.setBackgroundThrottling(false);
+  window.show(); window.focus(); window.webContents.focus();
   const js = code => window.webContents.executeJavaScript(code);
   const settle = () => js('new Promise(resolve => setTimeout(resolve, 350))');
   async function wait(expression) {
@@ -65,8 +67,8 @@ module.exports = async function designSmoke(window, output) {
   await settle();
   assert.equal(await js('document.querySelectorAll(".tool-card").length'), 45);
   await js('document.querySelector(".category-marquee button").click()');
-  await settle();
-  assert.equal(await js('getComputedStyle(document.querySelector(".marquee-track")).animationPlayState'), 'paused');
+  await wait('document.querySelector(".category-marquee").dataset.paused === "true"');
+  await wait('getComputedStyle(document.querySelector(".marquee-track")).animationPlayState === "paused"');
   await js('document.querySelector(".welcome-actions button").click()');
   assert.equal(await js('document.activeElement.getAttribute("aria-label")'), '筛选工具库');
   await js('document.querySelector(".overview-workspace").scrollTop = 0; document.activeElement.blur()');
