@@ -210,5 +210,5 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 ## 2026-10-25 Nginx 弹窗与退出确认修正
 89. 统一主题确认弹窗、处理窗口退出保护与实际草稿状态 — complete
 90. 优化实例表单与无实例状态，验证键盘/主题/关闭取消与放弃 — complete
-91. 同步文档，打包核验并提交推送v1.10.2 — in_progress
+91. 同步文档，打包核验并提交推送v1.10.2 — complete
 - 继续已授权的实现、打包与推送流程，保持整体主题配色。
