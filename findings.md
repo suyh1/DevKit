@@ -211,3 +211,13 @@
 - 来源：https://github.com/radix-ui/primitives；https://www.radix-ui.com/primitives/docs/components/popover；https://github.com/radix-ui/primitives/issues/4128；https://github.com/microsoft/fluentui；https://fluent2.microsoft.design/components/web/react/core/drawer/usage。
 - 当前仅 AGENTS.md 为用户原有改动。现有 Electron 用例依赖展开所有分类，需改为先打开相应分类，再点击真实工具入口。
 - 最终交付 v1.9.3：导航不再展开45工具挤动分类；窄屏选择页隐藏其他导航以获得足够列表高度。最终ASAR通过全部交互验证；实际Linux包的ASAR、README及界面文档与Windows和源码一致，详见 artifacts/release-1.9.3。
+
+## 2026-10-25 Nginx 调研与设计
+- 读取用户命令.txt：start nginx -c 主文件；nginx -c 主文件 -s reload/quit；nginx -t -c 主文件。
+- Windows 示例有8个 server 与 common_proxy.conf 共享 location，Linux 为单文件内联；保留注释、重复指令、嵌套块与变量是编辑器基础要求。
+- 调研：0xJacky/nginx-ui（Go+Vue，结构块/源码双编辑），cym1102/nginxWebUI（Java，参数模板/代理/stream），digitalocean/nginxconfig.io（Vue，生成导出，不能直接管理已有实例）。仅借鉴设计，不复制项目代码或引入服务端栈。
+- 官方命令说明：https://nginx.org/en/docs/switches.html；Windows说明：https://nginx.org/en/docs/windows.html。-c 指定配置，-p 指定 prefix；include 相对主文件所在目录（Nginx conf_prefix），日志/根目录/pid 相对 prefix。不可用 taskkill 全杀区分实例。
+- 项目为 React/Electron，桌面通过受限 IPC 调用 Node 模块；LAN portal 只暴露项目中心，新 Nginx 功能限定桌面本机。持久化复用 configs 目录，原 conf 原地保存并做备份和外部修改检查。
+- 开源调研补充：nginx-ui 11665 stars / AGPL-3.0 / 2026-10-24 push；nginxWebUI 2617 stars / LICENSE 明确为 MulanPSL-1.0（API 为 NOASSERTION）/ 2026-07-05 push；nginxconfig.io 28258 stars / MIT / 2024-12-14 push。nginx-ui #2038 描述共享 upstream 受站点操作影响，故本实现以原文件跨度修改、保留公共配置，不重新生成整份配置。
+- 官方 nginx 1.28.0 Windows 测试运行时只下载到 artifacts/nginx-test-runtime，不打包 nginx，不改用户安装。真实检查/start/HTTP/reload/quit 通过。
+- 实测 nginx 不接受 BOM；文件无损保存保留 BOM，界面提供显式移除 BOM 的草稿动作。-t 创建空 PID 的行为已纳入回归。

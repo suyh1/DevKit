@@ -35,6 +35,10 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      if (process.env.DEVKIT_TEST_NGINX_ONLY === '1') {
+        await require('./nginx-smoke.cjs')(window, output);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_GEOGRAPHY_ONLY === '1') {
         window.setMinimumSize(360, 600); window.setSize(1440, 1000);
         await window.webContents.executeJavaScript('document.querySelector(\'button[aria-label="新建经纬度工具任务"]\').click()');
@@ -175,6 +179,7 @@ app.on('browser-window-created', (_event, window) => {
       assert.equal(await window.webContents.executeJavaScript('window.devkitDesktop.saveText("cancel", "cancel.txt")'), '已取消保存');
       await fs.writeFile(path.join(output, 'preview-electron.png'), (await window.webContents.capturePage()).toPNG());
       await require('./projects-smoke.cjs')(window, output, staging);
+      await require('./nginx-smoke.cjs')(window, output);
       console.log('Electron smoke passed: sandbox, secure origin, explicit recommendations with direction/data transfer, responsive home, all extended tool UIs/workers, local parsers, Web Crypto, native-save IPC and cancel.');
       clearTimeout(timeout); app.exit(0);
     } catch (error) { console.error(error); clearTimeout(timeout); app.exit(1); }

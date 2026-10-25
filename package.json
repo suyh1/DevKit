@@ -3,7 +3,7 @@
   "private": true,
   "description": "Offline developer workbench with bundled Chromium",
   "author": "DevKit maintainers",
-  "version": "1.9.3",
+  "version": "1.10.0",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",
@@ -26,6 +26,7 @@
     "test:release": "node --test scripts/release-integrity.check.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "test:projects": "node --test server/projects.check.mjs",
+    "test:nginx": "node --test server/nginx.check.mjs",
     "serve:projects": "node server/start.mjs",
     "bundle:project-server": "npm run build && node scripts/package-project-server.mjs"
   },

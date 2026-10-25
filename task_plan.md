@@ -187,3 +187,16 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 72. 修复确认问题，建立逐工具审查清单与实际交互回归 — complete
 73. 同步文档、执行完整验证并制作核验 v1.9.2 发行物 — complete
 74. 提交并推送授权修改，保留用户 AGENTS.md 修改 — complete
+
+## 2026-10-25 Nginx 配置与实例管理
+79. 调研成熟方案、核对示例与桌面架构 — complete
+80. 实现无损配置解析、主/附属文件和跨平台实例管理 — complete
+81. 接入平级导航、字段/全文编辑与操作反馈 — complete
+82. 验证解析、文件冲突、命令隔离和真实桌面流程，同步文档 — complete
+- 本轮需求为实施功能；不自动修改用户的示例配置、不自动操作已有 Nginx 进程。
+
+## 2026-10-25 Nginx v1.10.0 发行与推送
+83. 更新版本、生成文档并完成发行前检查 — complete
+84. 制作并核验三平台安装包与独立项目中心服务 — complete
+85. 核验打包后的真实桌面流程，提交并推送 origin/main — in_progress
+- 用户已明确授权打包、提交和推送。当前分支 main，与 origin/main 同步，AGENTS.md 无未提交修改。

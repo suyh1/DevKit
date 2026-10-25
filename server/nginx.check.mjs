@@ -1,0 +1,181 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createServer } from 'node:net';
+import { setTimeout as delay } from 'node:timers/promises';
+import { parseNginx, flattenNginx, editNginxArgs, insertNginx } from '../shared/nginx.mjs';
+import { createNginxManager, discoverIncludes } from './nginx-manager.mjs';
+import { detectNginx, nginxArgs, processMatches } from './nginx-process.mjs';
+
+async function fixture(run, dependencies = {}) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-'));
+  await mkdir(path.join(dir, 'logs')); await mkdir(path.join(dir, 'conf.d'));
+  const main = path.join(dir, 'main.conf'), common = path.join(dir, 'common.conf');
+  await writeFile(main, '\uFEFF# 原样保留\r\npid logs/one.pid;\r\nevents { worker_connections 64; }\r\nhttp { server { listen 19081; include common.conf; } }\r\n');
+  await writeFile(common, 'location /api/ { proxy_pass http://127.0.0.1:9000; proxy_set_header Host $host; }\n');
+  const executable = path.join(dir, process.platform === 'win32' ? 'nginx.exe' : 'nginx');
+  await writeFile(executable, 'test fixture');
+  const manager = await createNginxManager(path.join(dir, 'configs'), { detect: async () => ({ found: true, executable, pid: 'logs/nginx.pid', output: 'nginx version: nginx/test' }), inspect: async () => null, ...dependencies });
+  const add = async (values = {}) => {
+    const state = await manager.request('get');
+    return manager.request('upsert', { revision: state.revision, instance: { name: '测试实例', main, prefix: dir, files: [common], executable, platform: process.platform, ...values } });
+  };
+  try { await run({ dir, main, common, executable, manager, add }); }
+  finally { await manager.close(); assert.equal(path.dirname(dir), tmpdir()); assert.ok(path.basename(dir).startsWith('devkit-nginx-')); await rm(dir, { recursive: true, force: true }); }
+}
+
+test('span editing preserves BOM, CRLF, comments, repeated directives, quoted delimiters and variables', () => {
+  const original = '\uFEFF# header\r\nhttp { # keep\r\n server { listen 80; location ~ "^/a{2}#b;" {\r\n proxy_pass http://${backend}/; # comment\r\n proxy_set_header Host $host; proxy_set_header X-Test "a;#{}";\r\n } }\r\n}\r\n';
+  const nodes = flattenNginx(parseNginx(original));
+  const target = nodes.find(node => node.name === 'proxy_pass');
+  const changed = editNginxArgs(original, target, 'http://127.0.0.1:9001/');
+  assert.equal(changed, original.replace('http://${backend}/', 'http://127.0.0.1:9001/'));
+  assert.equal(nodes.filter(node => node.name === 'proxy_set_header').length, 2);
+  assert.equal(nodes.find(node => node.name === 'location').values[1], '^/a{2}#b;');
+  assert.throws(() => editNginxArgs(original, target, 'http://safe; include /tmp/other'), /字段只填写参数/);
+  assert.throws(() => editNginxArgs(original, target, 'http://safe # discarded'), /字段只填写参数|分号/);
+});
+test('nested insertion and deletion retain unrelated syntax; malformed syntax never enters field mode', () => {
+  const source = 'http {\n    server { listen 80; }\n}\n';
+  const inserted = insertNginx(source, parseNginx(source)[0], 'server { listen 81; }');
+  assert.equal(parseNginx(inserted)[0].children.length, 2);
+  for (const invalid of ['http {', 'listen 80', 'http {} }', 'root "unclosed;', ';', 'a ${broken;']) assert.throws(() => parseNginx(invalid));
+});
+test('include discovery handles main-relative nested includes, globs, cycles and missing paths', async () => fixture(async ({ dir, main, common }) => {
+  await writeFile(main, 'include conf.d/*.conf; include common.conf; include missing.conf;');
+  await writeFile(path.join(dir, 'conf.d', 'a.conf'), 'include common.conf;');
+  await writeFile(common, 'include main.conf;');
+  const result = await discoverIncludes(main);
+  assert.deepEqual(new Set(result.files), new Set([path.join(dir, 'conf.d', 'a.conf'), common]));
+  assert.equal(result.warnings.length, 1); assert.match(result.warnings[0], /missing.conf/);
+}));
+test('registration, shared attachments, revision conflicts and restart persistence', async () => fixture(async ({ dir, main, manager, add }) => {
+  const state = await add(), id = state.instances[0].id;
+  await assert.rejects(add(), /已登记/);
+  await assert.rejects(manager.request('remove', { id, revision: -1 }), /已改变/);
+  await writeFile(path.join(dir, 'linux.conf'), 'events {}');
+  const next = await add({ main: path.join(dir, 'linux.conf'), platform: process.platform === 'win32' ? 'linux' : 'win32' });
+  const statuses = await manager.request('statuses');
+  assert.equal(statuses.find(item => item.id !== id).state, 'platform');
+  assert.equal(next.instances.length, 2);
+  const persisted = JSON.parse(await readFile(path.join(dir, 'configs/nginx/instances.json'), 'utf8'));
+  assert.equal(persisted.instances[0].main, main);
+  await assert.rejects(createNginxManager(path.join(dir, 'configs')), /另一实例/);
+}));
+test('saving is restricted to registered files and rejects stale hashes before changing any file', async () => fixture(async ({ main, common, manager, add }) => {
+  const state = await add(), id = state.instances[0].id;
+  const { files } = await manager.request('documents', { id });
+  await writeFile(common, '# external\n');
+  await assert.rejects(manager.request('save-files', { id, files: files.map(doc => ({ ...doc, content: doc.content + '# changed\n' })) }), /外部修改/);
+  assert.equal(await readFile(main, 'utf8'), files[0].content);
+  await assert.rejects(manager.request('save-files', { id, files: [{ path: path.join(path.dirname(main), 'unregistered.conf'), content: 'events {}', hash: '' }] }), /已登记/);
+  await assert.rejects(manager.request('save-files', { id, files: [{ ...files[0], content: 'http {' }] }), /缺少/);
+  assert.equal(await readFile(main, 'utf8'), files[0].content);
+}));
+test('save backs up exact original bytes, supports preview recovery, and keeps unrelated files untouched', async () => fixture(async ({ main, common, manager, add }) => {
+  const state = await add(), id = state.instances[0].id;
+  const { files } = await manager.request('documents', { id });
+  const changed = files[0].content.replace('19081', '19082');
+  const result = await manager.request('save-files', { id, files: [{ ...files[0], content: changed }] });
+  assert.equal(await readFile(main, 'utf8'), changed);
+  assert.equal(await readFile(common, 'utf8'), files[1].content);
+  assert.deepEqual(await readFile(path.join(result.backup, '0.conf')), Buffer.from(files[0].content));
+  const backups = await manager.request('backups', { id }); assert.equal(backups.length, 1);
+  const restored = await manager.request('backup-files', { id, backupId: backups[0].id });
+  assert.equal(restored.files[0].content, files[0].content);
+  await assert.rejects(manager.request('backup-files', { id, backupId: '../../outside' }), /编号无效/);
+  assert.equal(result.files[0].hash.length, 64);
+  assert.equal((await readdir(path.dirname(main))).some(file => file.endsWith('.tmp')), false);
+}));
+test('a failed config test prevents starting and reloading; shell fragments remain plain argv', async () => {
+  let calls = [], launched = false;
+  await fixture(async ({ manager, add }) => {
+    const id = (await add()).instances[0].id;
+    const result = await manager.request('command', { id, command: 'start' });
+    assert.equal(result.ok, false); assert.equal(launched, false); assert.equal(calls.length, 1); assert.ok(calls[0].includes('-t'));
+    await assert.rejects(manager.request('command', { id, command: 'evil' }), /未知/);
+  }, { run: async (_exe, args) => { calls.push(args); return { ok: false, output: 'invalid nginx directive' }; }, launch: async () => { launched = true; } });
+  const argv = nginxArgs({ main: 'D:/path with spaces/a & b.conf', prefix: 'D:/nginx prefix' }, 'stop');
+  assert.deepEqual(argv, ['-p', 'D:/nginx prefix/', '-c', 'D:/path with spaces/a & b.conf', '-s', 'quit']);
+});
+test('PID reuse or shared PID files never authorize signaling another config; changing identity while running is blocked', async () => {
+  let info, calls = 0;
+  await fixture(async ({ dir, main, executable, manager, add }) => {
+    const state = await add(), instance = state.instances[0], id = instance.id;
+    await writeFile(path.join(dir, 'logs/one.pid'), '4242');
+    info = { pid: 4242, executable, commandLine: `"${executable}" -p "${dir}" -c "${path.join(dir, 'other.conf')}"` };
+    assert.equal((await manager.request('statuses'))[0].state, 'unknown');
+    await assert.rejects(manager.request('command', { id, command: 'stop' }), /无法确认/); assert.equal(calls, 0);
+    info.commandLine = `"${executable}" -p "${dir}" -c "${main}"`;
+    assert.equal((await manager.request('statuses'))[0].state, 'running');
+    const files = (await manager.request('documents', { id })).files;
+    await assert.rejects(manager.request('save-files', { id, files: [{ ...files[0], content: files[0].content.replace('one.pid', 'two.pid') }] }), /先停止/);
+    await assert.rejects(manager.request('upsert', { revision: state.revision, instance: { ...instance, prefix: path.join(dir, 'logs') } }), /先确认实例停止/);
+    const reload = await manager.request('command', { id, command: 'reload' });
+    assert.equal(reload.ok, false); assert.equal(calls, 1);
+    assert.equal(processMatches(instance, { ...info, commandLine: info.commandLine.replace(main, main + '.other') }), false);
+  }, { inspect: async () => info, run: async () => { calls++; return { ok: false, output: 'test failed' }; } });
+});
+test('an unavailable executable can be corrected in instance settings', async () => fixture(async ({ executable, manager, add }) => {
+  const state = await add({ executable: '' });
+  const result = await manager.request('upsert', { revision: state.revision, instance: { ...state.instances[0], executable } });
+  assert.equal(result.instances[0].executable, executable);
+}, { detect: async () => ({ found: false, output: '未检测到 nginx' }) }));
+test('identity edits to a shared attachment respect every registered instance using that file', async () => {
+  let info;
+  await fixture(async ({ dir, common, executable, manager, add }) => {
+    const id = (await add()).instances[0].id;
+    const secondMain = path.join(dir, 'second.conf'); await writeFile(secondMain, 'pid logs/two.pid; events {}');
+    await add({ name: '共享文件的运行实例', main: secondMain });
+    await writeFile(path.join(dir, 'logs/two.pid'), '4243');
+    info = { pid: 4243, executable, commandLine: `"${executable}" -c "${secondMain}"` };
+    const doc = (await manager.request('documents', { id })).files.find(doc => doc.path === common);
+    await assert.rejects(manager.request('save-files', { id, files: [{ ...doc, content: doc.content + 'include more.conf;\n' }] }), /共享文件的运行实例/);
+    assert.equal(await readFile(common, 'utf8'), doc.content);
+  }, { inspect: async () => info });
+});
+test('UTF-16 and binary inputs are not silently rewritten as UTF-8', async () => fixture(async ({ main, manager, add }) => {
+  const id = (await add()).instances[0].id;
+  await writeFile(main, Buffer.from([0xff, 0xfe, 0x61, 0, 0x3b, 0]));
+  const result = await manager.request('documents', { id });
+  assert.ok(result.warnings.some(warning => warning.includes('UTF-8')));
+}));
+test('an empty PID file created by nginx -t is stopped; corrupt nonempty PID files remain blocked', async () => fixture(async ({ dir, manager, add }) => {
+  await add(); const file = path.join(dir, 'logs/one.pid');
+  await writeFile(file, ''); assert.equal((await manager.request('statuses'))[0].state, 'stopped');
+  await writeFile(file, 'invalid'); assert.equal((await manager.request('statuses'))[0].state, 'unknown');
+}));
+
+async function unusedPort() {
+  const server = createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port;
+}
+test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and graceful stop', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-real-'));
+  await mkdir(path.join(dir, 'logs')); await mkdir(path.join(dir, 'temp'));
+  const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE, main = path.join(dir, 'nginx.conf'), port = await unusedPort();
+  const original = `worker_processes 1;\npid logs/real.pid;\nerror_log logs/error.log;\nevents { worker_connections 32; }\nhttp { access_log off; server { listen 127.0.0.1:${port}; location / { return 200 "before"; } } }\n`;
+  await writeFile(main, original);
+  const manager = await createNginxManager(path.join(dir, 'configs'));
+  let id;
+  try {
+    assert.equal((await detectNginx({ executable })).found, true);
+    const state = await manager.request('upsert', { revision: 0, instance: { name: 'real', main, prefix: dir, files: [], executable, platform: process.platform } }); id = state.instances[0].id;
+    const checked = await manager.request('command', { id, command: 'test' }); assert.equal(checked.ok, true, JSON.stringify(checked));
+    const start = await manager.request('command', { id, command: 'start' }); assert.equal(start.ok, true, JSON.stringify(start));
+    assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), 'before');
+    const doc = (await manager.request('documents', { id })).files[0];
+    await manager.request('save-files', { id, files: [{ ...doc, content: original.replace('before', 'after') }] });
+    const reload = await manager.request('command', { id, command: 'reload' }); assert.equal(reload.ok, true, JSON.stringify(reload));
+    let text;
+    for (let index = 0; index < 40; index++) { text = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(); if (text === 'after') break; await delay(100); }
+    assert.equal(text, 'after');
+    const stop = await manager.request('command', { id, command: 'stop' }); assert.equal(stop.ok, true, JSON.stringify(stop));
+    assert.equal((await manager.request('statuses'))[0].state, 'stopped');
+  } finally {
+    if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
+    await manager.close(); assert.equal(path.dirname(dir), tmpdir()); await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -14,6 +14,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 let window;
 let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
+let nginxManager, nginxError = '';
 let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
@@ -27,7 +28,7 @@ async function createWindow() {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-prevent-unload', event => {
-    const choice = dialog.showMessageBoxSync(window, { type: 'question', title: '尚有未保存的项目配置', message: '关闭 DevKit 并放弃当前草稿？', buttons: ['继续编辑', '放弃更改并关闭'], defaultId: 0, cancelId: 0, noLink: true });
+    const choice = dialog.showMessageBoxSync(window, { type: 'question', title: '尚有未保存的配置', message: '关闭 DevKit 并放弃当前草稿？', buttons: ['继续编辑', '放弃更改并关闭'], defaultId: 0, cancelId: 0, noLink: true });
     if (choice === 1) event.preventDefault();
   });
   window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
@@ -51,6 +52,10 @@ app.whenReady().then(async () => {
       catch (error) { dialog.showErrorBox('项目中心共享未启动', `${error.message}\n项目数据与其他工具仍可使用，请在共享设置中检查端口。`); }
     }
   } catch (error) { projectError = error.message; }
+  try {
+    const { createNginxManager } = await import('./server/nginx-manager.mjs');
+    nginxManager = await createNginxManager(projectStorage.directory);
+  } catch (error) { nginxError = error.message; }
   const root = path.join(__dirname, 'dist');
   protocol.handle('devkit', async request => {
     if (request.method !== 'GET') return new Response(null, { status: 405 });
@@ -111,11 +116,26 @@ app.whenReady().then(async () => {
       return { data };
     } catch (error) { return { error: error.message || '项目中心操作失败。' }; }
   });
+  ipcMain.handle('devkit:nginx', async (event, action, value) => {
+    if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的 Nginx 管理请求。');
+    try {
+      if (action === 'pick') {
+        if (!['main', 'files', 'executable', 'prefix'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
+        const result = await dialog.showOpenDialog(window, {
+          title: value.kind === 'prefix' ? '选择 Nginx 运行目录' : value.kind === 'executable' ? '选择 nginx 程序' : '选择 Nginx 配置文件',
+          properties: value.kind === 'prefix' ? ['openDirectory'] : value.kind === 'files' ? ['openFile', 'multiSelections'] : ['openFile'],
+        });
+        return { data: result.canceled ? [] : result.filePaths };
+      }
+      if (!nginxManager) throw new Error(nginxError || 'Nginx 管理器尚未准备好。');
+      return { data: await nginxManager.request(action, value) };
+    } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
+  });
   await createWindow();
 }).catch(error => { dialog.showErrorBox('DevKit 启动失败', String(error)); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
-  if (!projectStore || closing) return;
+  if ((!projectStore && !nginxManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await projectStore.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });

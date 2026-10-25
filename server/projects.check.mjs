@@ -427,6 +427,10 @@ test("LAN gateway authenticates, enforces viewer/editor and blocks toolkit, trav
         "/assets/tool.worker.js",
         "/.vite/manifest.json",
         "/server/start.mjs",
+        "/server/nginx-manager.mjs",
+        "/shared/nginx.mjs",
+        "/api/nginx/command",
+        "/api/nginx/documents",
         "/%2e%2e/package.json",
         "/api/projects/sharing",
       ])

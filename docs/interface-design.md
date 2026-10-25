@@ -26,6 +26,8 @@
 - **加载与动画**：编辑器模块和项目数据等待期间显示 Skeleton，不增加人为延迟。页面、弹窗、卡片与分段指示器使用短过渡；Aurora 入场后停稳。系统启用 `prefers-reduced-motion` 时关闭动画、循环和自动平滑滚动。
 - **响应式**：小屏幕下侧栏变为抽屉，Bento 单列排列；快捷工具保留一排，搜索和分段控件适应可用宽度。项目卡片继续采用紧凑布局。
 
-样式入口为 `src/theme.css`，统一桌面和网页的层叠顺序；主题变量集中在最先导入的 `src/theme-tokens.css`，组件文件不重复声明全局配色。视觉规则与深色装饰适配位于 `src/design.css`，固定分类及浮层位于 `CategoryNavigation.tsx` / `category-navigation.css`。工作台、首页和共享组件分别位于 `App.tsx`、`Overview.tsx`、`SegmentedControl.tsx`、`Skeleton.tsx`。界面使用本地资源，不请求远程字体。
+Nginx 配置与项目中心同级，名称、分类、说明来自 `src/catalog.ts` 的工作台模块注册表。实例列表展示主文件与运行状态，右侧提供文件页签、默认字段配置、完整源码、备份及命令反馈。字段分组沿用原文 http/server/location 层级，保留自定义指令；宽屏左右分栏，窄屏实例列表置顶。运行操作仅在桌面本机提供，规则见 [Nginx 配置说明](nginx.md)。
+
+样式入口为 `src/theme.css`，统一桌面和网页的层叠顺序；主题变量集中在最先导入的 `src/theme-tokens.css`，组件文件不重复声明全局配色。视觉规则与深色装饰适配位于 `src/design.css`，固定分类及浮层位于 `CategoryNavigation.tsx` / `category-navigation.css`。工作台、首页和共享组件分别位于 `App.tsx`、`Overview.tsx`、`SegmentedControl.tsx`、`Skeleton.tsx`；Nginx 工作区位于 `NginxCenter.tsx` / `nginx.css`。界面使用本地资源，不请求远程字体。
 
 构建后可用 `node scripts/smoke-desktop.mjs --design-only` 单独验证深浅主题、五档宽度、导航与快捷入口、分段筛选、键盘和减少动态效果设置，截图与几何检查记录保存在 `artifacts/electron-smoke/design-*`。`npm run test:electron` 会同时运行这些检查和完整功能回归。

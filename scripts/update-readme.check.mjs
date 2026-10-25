@@ -77,6 +77,19 @@ test('incomplete or ambiguous registries fail without replacing the previous REA
   }
 }));
 
+test('full-page module names, descriptions and categories follow the same registry as navigation', async () => fixture(async directory => {
+  const source = modules => `export const categories = ${JSON.stringify(category(['one', 'two']))}; export const workspaceModules = ${JSON.stringify(modules)};`;
+  await writeFile(path.join(directory, 'src/catalog.ts'), source([{ id: 'nginx', name: 'Nginx 配置', description: '主文件和附属文件', category: '工作台' }]));
+  await updateReadme({ directory });
+  assert.match(await readFile(path.join(directory, 'README.md'), 'utf8'), /\| Nginx 配置 \| 工作台 \| 主文件和附属文件 \|/);
+  await writeFile(path.join(directory, 'src/catalog.ts'), source([{ id: 'nginx', name: '配置管理', description: '实例与进程', category: '本机服务' }]));
+  await assert.rejects(updateReadme({ directory, check: true }), /docs:update/);
+  await updateReadme({ directory });
+  assert.match(await readFile(path.join(directory, 'README.md'), 'utf8'), /\| 配置管理 \| 本机服务 \| 实例与进程 \|/);
+  await writeFile(path.join(directory, 'src/catalog.ts'), source([{ id: 'nginx', name: '配置管理' }]));
+  await assert.rejects(updateReadme({ directory }), /工作台模块定义不完整/);
+}));
+
 test('unknown template tokens and missing packaging commands stop generation', async () => fixture(async directory => {
   await writeFile(path.join(directory, 'docs/README.template.md'), '{{MISSPELLED_TOKEN}}');
   await assert.rejects(updateReadme({ directory }), /MISSPELLED_TOKEN/);

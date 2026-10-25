@@ -16,9 +16,9 @@ export async function readReadmeInputs(directory = root) {
   });
   try {
     const { tools } = await server.ssrLoadModule('/src/tools.ts');
-    const { categories } = await server.ssrLoadModule('/src/catalog.ts');
+    const { categories, workspaceModules = [] } = await server.ssrLoadModule('/src/catalog.ts');
     const { MAX_TASKS: maxTasks } = await server.ssrLoadModule('/src/workbench.ts');
-    return { manifest, tools, categories, maxTasks };
+    return { manifest, tools, categories, workspaceModules, maxTasks };
   } finally {
     await server.close();
   }
@@ -26,7 +26,7 @@ export async function readReadmeInputs(directory = root) {
 
 const cell = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;').replace(/\r?\n/g, '<br>');
 
-export function renderReadme(template, { manifest, tools, categories, maxTasks }) {
+export function renderReadme(template, { manifest, tools, categories, workspaceModules = [], maxTasks }) {
   if (!manifest.version || !manifest.devDependencies?.electron || !Number.isInteger(maxTasks) || maxTasks < 1) throw new Error('README 元数据不完整');
   if (!tools.length || !categories.length) throw new Error('README 工具注册表为空');
   const byId = new Map();
@@ -62,6 +62,10 @@ export function renderReadme(template, { manifest, tools, categories, maxTasks }
     VERSION: manifest.version, ELECTRON_VERSION: manifest.devDependencies.electron,
     TOOL_COUNT: tools.length, CATEGORY_COUNT: categories.length, MAX_TASKS: maxTasks,
     TOOL_CATALOG: catalog,
+    WORKSPACE_MODULES: ['| 模块 | 分类 | 功能 |', '| --- | --- | --- |', ...workspaceModules.map(item => {
+      if (!item.id || !item.name || !item.description || !item.category) throw new Error('README 工作台模块定义不完整');
+      return `| ${cell(item.name)} | ${cell(item.category)} | ${cell(item.description)} |`;
+    })].join('\n'),
     PACKAGE_TABLE: ['| 目标 | 命令 | 输出 |', '| --- | --- | --- |', ...packageRows.map(([label, command, output]) => `| ${label} | \`npm run ${command}\` | \`${output}\` |`)].join('\n'),
   };
   // Replace only template tokens; descriptions may legitimately contain {{variables}}.
