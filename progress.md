@@ -454,3 +454,10 @@
 - Chromium强制prefers-reduced-motion的设计回归已通过，明确输出“reduced (animation disabled)”，本地默认动画模式也已验证暂停语义。已确认并修正两种系统偏好下的断言；不是产品动画故障。
 - 第三轮CI已通过全部测试，Windows安装包亦成功生成，随后electron-builder26按CI环境隐式选onTagOrDraft，自动上传缺GH_TOKEN而失败（run40181068236）。当前工作流仅contents:read并使用upload-artifact，本不应自动发布。已核对本地PublishManager实现与官方v26发布文档，显式传buildOptions.publish=never；同步README模板与打包专题。将以CI=true且无发布令牌真实重制三平台包验证，不给普通构建添加发布权限。
 - 来源：https://www.electron.build/v26/docs/publish/；已安装node_modules/app-builder-lib/out/publish/PublishManager.js第46-64行。
+- GitHub run40181578081（ce1b694）四项全部成功：Windows x64、Linux amd64、Linux ARM64及独立服务。Windows已完成完整源码/包内桌面回归、安装包制作和NSIS配置保留检查，无需新增发布Token。
+- 本地CI=true且移除GH_TOKEN/GITHUB_TOKEN后Windows安装包成功完成，证明普通打包不再触发自动发布；同步文档导致发行载荷更新，最终重制/校验与替换本轮自建Release草稿附件正在进行。
+- 最终CI=true、无GH_TOKEN/GITHUB_TOKEN重制完成，最新发行文件为Windows113099081字节、amd64 93270686字节、arm64 88181786字节、项目服务220557字节。SHA256SUMS及release.json一致；实际两份Deb的ASAR、README及13份专题文档和Windows/源码一致，独立ZIP实际解包运行检查再次通过。
+- 发布前Git schannel短暂TLS握手失败，改用GitHub API核对远端HEAD；辅助脚本一次PowerShell模板字面量转义错误，改为字符串拼接后正常执行。产品代码和发行文件未受影响。
+- GitHub Release v1.10.6已公开：https://github.com/suyh1/DevKit/releases/tag/1.10.6。10个附件均核验上传后的SHA256，包括三平台安装包、独立服务ZIP、校验值、构建凭据、验收报告、CI结果及来源提交。
+- 发布标签1.10.6指向已完整验证的ce1b6943d2c2ce15084760f411aaff8b11080534；四项CI全绿：https://github.com/suyh1/DevKit/actions/runs/40181578081。无需用户申请新的Token。
+- 后续仅提交本完成记录与计划状态，使用[skip ci]避免为无产品变更的记录重复打包；发布标签及已通过的实现提交保持不变。
