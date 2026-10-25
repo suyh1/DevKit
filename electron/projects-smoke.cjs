@@ -183,7 +183,7 @@ module.exports = async function checkProjects(window, output, staging) {
     '!document.querySelector("dialog[open]") && document.querySelector(".project-workspace .pc-card h3")?.textContent === "团队管理台"',
   );
   const storage = await ipc('storage');
-  assert.equal(path.resolve(storage.directory), path.resolve(output, 'installation/configs'));
+  assert.equal(path.resolve(storage.directory), path.resolve(process.env.DEVKIT_DEV_ROOT, 'configs'));
   assert.equal(JSON.parse(await fs.readFile(path.join(storage.directory,'projects.json'),'utf8')).current.projects[0].name, '团队管理台');
   await click('配置文件');
   await wait(window.webContents, 'document.querySelector("dialog[open] .pc-path code")?.textContent.endsWith("configs")');

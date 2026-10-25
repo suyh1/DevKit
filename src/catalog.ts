@@ -4,7 +4,7 @@ import type { ToolId } from './tools';
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
-  { id: 'nginx', name: 'Nginx 配置', description: '可视化编辑主配置与附属文件，检测并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。', category: '工作台', badge: '本机' },
+  { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。', category: '工作台', badge: '本机' },
 ] as const;
 
 export const categories = [

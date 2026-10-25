@@ -5,11 +5,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、45 个离线工具**，以及可通过局域网共享的项目中心、本机 Nginx 配置与实例管理。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.10.0**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.10.1**。工具输入和结果默认只保存在内存中；偏好、收藏和项目中心配置按各自规则保存。项目中心共享和手动入口检测会按用户操作使用网络，无遥测和远程字体。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.0/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.1_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.1/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 4. 需要维护本机 Nginx 时，打开与项目中心平级的“Nginx 配置”，登记主文件、附属文件、运行目录与 nginx 程序。默认按字段编辑，也可切换全文；保存后检查配置，再启动或重载。
@@ -121,7 +121,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 模块 | 分类 | 功能 |
 | --- | --- | --- |
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
-| Nginx 配置 | 工作台 | 可视化编辑主配置与附属文件，检测并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。 |
+| Nginx 配置 | 工作台 | 从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。 |
 
 ### 经纬度处理
 
@@ -158,7 +158,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ## Nginx 配置
 
-- **多实例与多文件**：每个实例登记一个主配置及多个附属文件，可按 include 递归发现（包括通配符），也可手动添加。一份单文件 Linux 配置同样可以独立管理；仅登记文件不会自动改写 include。
+- **多实例与多文件**：Windows / Linux 每个实例均可登记一个主配置及多个附属文件，按 include 递归发现（包括通配符）或手动添加。没有文件时选择“新建配置”，指定目录、主/附属文件名和端口，生成已互相引用的双文件配置及运行目录，创建后直接进入编辑；已有同名配置不会覆盖。导入已有文件时仅登记，不自动改写 include。
 - **字段与全文编辑**：默认按 `http` / `server` / `location` 等层级显示字段，提供端口、域名、静态目录、代理目标、请求头、日志、PID 等说明，保留未知指令、重复指令、注释和原有布局。可新增/删除指令或配置块；全文模式支持完整文档编辑。
 - **文件保存与恢复**：配置原地保存，保存前检查内容哈希并备份原文件；外部修改时要求重新读取合并。备份可载入草稿核对后保存；保存不会自动重载。配置须为 UTF-8，保留 BOM 和现有换行。
 - **本机运行控制**：自动检测 PATH / 常见路径，也可指定 nginx 程序与运行目录。使用主文件的 `-c` 参数检查、启动、`-s quit` 优雅停止及 `-s reload` 重载；启动/重载前自动执行 `-t`。状态依赖 PID 文件与进程身份，无法确认时拒绝停止或重载。
@@ -191,7 +191,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.10.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.10.1_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -222,13 +222,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.0_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.0-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.0-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.1_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.1-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.1-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.0/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.0/DevKit_ProjectCenter_1.10.0_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.1/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.1/DevKit_ProjectCenter_1.10.1_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

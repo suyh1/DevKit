@@ -6,9 +6,11 @@ const path = require('node:path');
 const staging = process.env.DEVKIT_TEST_APP;
 const output = process.env.DEVKIT_TEST_OUTPUT;
 if (!staging || !output) throw new Error('Run with npm run test:electron');
-const profile = path.join(output, 'profile');
+require('node:fs').mkdirSync(output, { recursive: true });
+const installation = require('node:fs').mkdtempSync(path.join(output, 'installation-'));
+const profile = path.join(installation, 'profile');
 // Keep installation-local configs isolated from both the real installation and source tree.
-process.env.DEVKIT_DEV_ROOT = path.join(output, 'installation');
+process.env.DEVKIT_DEV_ROOT = installation;
 require('node:fs').mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
 let tested = false;

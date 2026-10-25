@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, readdir, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, editNginxArgs, insertNginx } from '../shared/nginx.mjs';
 import { createNginxManager, discoverIncludes } from './nginx-manager.mjs';
 import { detectNginx, nginxArgs, processMatches } from './nginx-process.mjs';
+import { createNginxConfigSet, nginxStarter } from './nginx-create.mjs';
 
 async function fixture(run, dependencies = {}) {
   const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-'));
@@ -148,6 +149,49 @@ test('an empty PID file created by nginx -t is stopped; corrupt nonempty PID fil
   await writeFile(file, 'invalid'); assert.equal((await manager.request('statuses'))[0].state, 'unknown');
 }));
 
+test('new sets create both editable configs, a valid include, page and local runtime directories on either target OS', async () => fixture(async ({ dir, manager }) => {
+  for (const platform of ['win32', 'linux']) {
+    const directory = path.join(dir, platform); await mkdir(directory);
+    const state = await manager.request('create', { revision: (await manager.request('get')).revision, name: platform, platform, directory, mainName: 'main config.conf', commonName: 'common proxy.conf', port: 18080 });
+    const instance = state.instances.at(-1);
+    assert.equal(instance.prefix, directory); assert.equal(instance.platform, platform);
+    assert.deepEqual(instance.files, [path.join(directory, 'common proxy.conf')]);
+    const docs = await manager.request('documents', { id: instance.id }); assert.equal(docs.files.length, 2);
+    assert.match(docs.files[0].content, /listen 127\.0\.0\.1:18080/); assert.doesNotThrow(() => docs.files.forEach(doc => parseNginx(doc.content)));
+    assert.deepEqual((await discoverIncludes(instance.main)).files, instance.files);
+    assert.match(await readFile(path.join(directory, 'html/index.html'), 'utf8'), /Nginx ready/);
+    assert.ok((await readdir(directory)).includes('logs')); assert.ok((await readdir(directory)).includes('temp'));
+  }
+}));
+test('creation refuses collisions, invalid names, directory traversal and stale revisions without touching existing content', async () => fixture(async ({ dir, manager }) => {
+  const directory = path.join(dir, 'new'); await mkdir(directory);
+  const base = { revision: 0, name: 'new', platform: process.platform, directory };
+  await writeFile(path.join(directory, 'common_proxy.conf'), 'preserve');
+  await assert.rejects(manager.request('create', base), /已存在/);
+  assert.deepEqual(await readdir(directory), ['common_proxy.conf']);
+  assert.equal(await readFile(path.join(directory, 'common_proxy.conf'), 'utf8'), 'preserve');
+  for (const mainName of ['../outside.conf', 'x/y.conf', 'CON.conf', 'nginx.txt']) await assert.rejects(manager.request('create', { ...base, mainName }), /文件名/);
+  assert.throws(() => nginxStarter({ mainName: 'SAME.conf', commonName: 'same.conf' }), /不能同名/);
+  await assert.rejects(manager.request('create', { ...base, port: 65536 }), /监听端口/);
+  await assert.rejects(manager.request('create', { ...base, revision: -1 }), /已改变/);
+  assert.equal((await manager.request('get')).instances.length, 0);
+}));
+test('creation rollback removes only its own new files and preserves an existing homepage and unrelated content', async () => fixture(async ({ dir }) => {
+  const directory = path.join(dir, 'rollback'); await mkdir(directory); await mkdir(path.join(directory, 'html'));
+  await writeFile(path.join(directory, 'html/index.html'), 'existing page'); await writeFile(path.join(directory, 'keep.txt'), 'keep');
+  await assert.rejects(createNginxConfigSet(directory, {}, async () => { throw new Error('registration failed'); }), /registration failed/);
+  assert.deepEqual((await readdir(directory)).sort(), ['html', 'keep.txt']);
+  assert.equal(await readFile(path.join(directory, 'html/index.html'), 'utf8'), 'existing page');
+  await assert.rejects(createNginxConfigSet(directory, {}, async ({ main }) => { await writeFile(main, 'external change'); throw new Error('registration failed'); }), /已保留/);
+  assert.equal(await readFile(path.join(directory, 'nginx.conf'), 'utf8'), 'external change');
+}));
+test('creation never writes through existing runtime directory links', async () => fixture(async ({ dir }) => {
+  const directory = path.join(dir, 'link-root'), outside = path.join(dir, 'outside'); await mkdir(directory); await mkdir(outside);
+  await symlink(outside, path.join(directory, 'html'), process.platform === 'win32' ? 'junction' : 'dir');
+  await assert.rejects(createNginxConfigSet(directory, {}, async () => {}), /链接占用/);
+  assert.deepEqual(await readdir(outside), []); assert.deepEqual(await readdir(directory), ['html']);
+}));
+
 async function unusedPort() {
   const server = createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port;
@@ -177,5 +221,23 @@ test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
     await manager.close(); assert.equal(path.dirname(dir), tmpdir()); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('real nginx: a generated two-file set in a directory with spaces starts and serves its homepage', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-new space-'));
+  const manager = await createNginxManager(path.join(directory, 'configs'));
+  let id;
+  try {
+    const port = await unusedPort();
+    const result = await manager.request('create', { revision: 0, name: 'generated', platform: process.platform, executable: process.env.DEVKIT_NGINX_TEST_EXECUTABLE, directory, mainName: 'nginx main.conf', commonName: 'common proxy.conf', port });
+    id = result.instances[0].id;
+    const checked = await manager.request('command', { id, command: 'test' }); assert.equal(checked.ok, true, checked.output);
+    const started = await manager.request('command', { id, command: 'start' }); assert.equal(started.ok, true, started.output);
+    assert.match(await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(), /Nginx ready/);
+    assert.equal((await manager.request('command', { id, command: 'stop' })).ok, true);
+  } finally {
+    if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
+    await manager.close(); assert.equal(path.dirname(directory), tmpdir()); await rm(directory, { recursive: true, force: true });
   }
 });

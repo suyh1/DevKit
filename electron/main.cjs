@@ -120,10 +120,10 @@ app.whenReady().then(async () => {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的 Nginx 管理请求。');
     try {
       if (action === 'pick') {
-        if (!['main', 'files', 'executable', 'prefix'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
+        if (!['main', 'files', 'executable', 'prefix', 'directory'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
         const result = await dialog.showOpenDialog(window, {
-          title: value.kind === 'prefix' ? '选择 Nginx 运行目录' : value.kind === 'executable' ? '选择 nginx 程序' : '选择 Nginx 配置文件',
-          properties: value.kind === 'prefix' ? ['openDirectory'] : value.kind === 'files' ? ['openFile', 'multiSelections'] : ['openFile'],
+          title: value.kind === 'directory' ? '选择新建配置的目录' : value.kind === 'prefix' ? '选择 Nginx 运行目录' : value.kind === 'executable' ? '选择 nginx 程序' : '选择 Nginx 配置文件',
+          properties: ['prefix', 'directory'].includes(value.kind) ? ['openDirectory'] : value.kind === 'files' ? ['openFile', 'multiSelections'] : ['openFile'],
         });
         return { data: result.canceled ? [] : result.filePaths };
       }

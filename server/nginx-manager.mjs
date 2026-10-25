@@ -4,6 +4,7 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, MAX_CONFIG_SIZE } from '../shared/nginx.mjs';
 import { acquireProjectLock } from './project-lock.mjs';
+import { createNginxConfigSet } from './nginx-create.mjs';
 import { detectNginx, nginxArgs, runNginx, launchNginx, inspectNginxProcess, processMatches, pathKey } from './nginx-process.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -190,6 +191,27 @@ export async function createNginxManager(directory, dependencies = {}) {
     return { ...await documents(instance), backup: backupDir };
   }
   let queue = Promise.resolve(), closed = false;
+  async function upsertInstance(input, revision) {
+    checkRevision(revision);
+    if (!input || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || !['win32', 'linux', 'any'].includes(input.platform)) throw new Error('实例名称或目标系统无效。');
+    const old = input.id ? find(input.id) : null;
+    if (!old && state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
+    const main = await configFile(input.main);
+    const prefix = await realpath(absolute(input.prefix, '运行目录'));
+    if (!(await stat(prefix)).isDirectory()) throw new Error('运行目录不是文件夹。');
+    if (!Array.isArray(input.files) || input.files.length > 99) throw new Error('附属文件最多 99 个。');
+    const files = [...new Set(await Promise.all(input.files.map(configFile)))].filter(file => pathKey(file) !== pathKey(main));
+    let executable = '';
+    if (input.executable) executable = await realpath(absolute(input.executable, 'nginx 路径'));
+    const instance = { id: old?.id || randomUUID(), name: input.name.trim(), main, prefix, executable, files, platform: input.platform };
+    if (state.instances.some(item => item.id !== instance.id && pathKey(item.main) === pathKey(main))) throw new Error('此主配置已登记为另一个实例。');
+    if (old && ['main', 'prefix', 'executable', 'platform'].some(key => old[key] !== instance[key])) {
+      const oldStatus = await status(old);
+      if (oldStatus.state === 'running' || oldStatus.state === 'unknown' && oldStatus.pid) throw new Error('请先确认实例停止，再修改主文件、运行目录、程序或系统。');
+    }
+    versions.clear();
+    return commit(old ? state.instances.map(item => item.id === old.id ? instance : item) : [...state.instances, instance]);
+  }
   async function request(action, payload = {}) {
     if (closed) throw new Error('Nginx 管理器已关闭。');
     const promise = queue.then(async () => {
@@ -205,28 +227,15 @@ export async function createNginxManager(directory, dependencies = {}) {
         }
         case 'documents': return documents(find(payload.id));
         case 'save-files': return saveFiles(find(payload.id), payload.files);
-        case 'upsert': {
+        case 'create': {
           checkRevision(payload.revision);
-          const input = payload.instance;
-          if (!input || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || !['win32', 'linux', 'any'].includes(input.platform)) throw new Error('实例名称或目标系统无效。');
-          const old = input.id ? find(input.id) : null;
-          if (!old && state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
-          const main = await configFile(input.main);
-          const prefix = await realpath(absolute(input.prefix, '运行目录'));
-          if (!(await stat(prefix)).isDirectory()) throw new Error('运行目录不是文件夹。');
-          if (!Array.isArray(input.files) || input.files.length > 99) throw new Error('附属文件最多 99 个。');
-          const files = [...new Set(await Promise.all(input.files.map(configFile)))].filter(file => pathKey(file) !== pathKey(main));
+          if (typeof payload.name !== 'string' || !payload.name.trim() || payload.name.length > 100 || !['win32', 'linux', 'any'].includes(payload.platform)) throw new Error('实例名称或目标系统无效。');
+          if (state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
           let executable = '';
-          if (input.executable) executable = await realpath(absolute(input.executable, 'nginx 路径'));
-          const instance = { id: old?.id || randomUUID(), name: input.name.trim(), main, prefix, executable, files, platform: input.platform };
-          if (state.instances.some(item => item.id !== instance.id && pathKey(item.main) === pathKey(main))) throw new Error('此主配置已登记为另一个实例。');
-          if (old && ['main', 'prefix', 'executable', 'platform'].some(key => old[key] !== instance[key])) {
-            const oldStatus = await status(old);
-            if (oldStatus.state === 'running' || oldStatus.state === 'unknown' && oldStatus.pid) throw new Error('请先确认实例停止，再修改主文件、运行目录、程序或系统。');
-          }
-          versions.clear();
-          return commit(old ? state.instances.map(item => item.id === old.id ? instance : item) : [...state.instances, instance]);
+          if (payload.executable) executable = await realpath(absolute(payload.executable, 'nginx 路径'));
+          return createNginxConfigSet(payload.directory, payload, paths => upsertInstance({ name: payload.name, platform: payload.platform, executable, ...paths }, payload.revision));
         }
+        case 'upsert': return upsertInstance(payload.instance, payload.revision);
         case 'remove': {
           checkRevision(payload.revision); const instance = find(payload.id);
           const current = await status(instance);

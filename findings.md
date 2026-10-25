@@ -221,3 +221,4 @@
 - 开源调研补充：nginx-ui 11665 stars / AGPL-3.0 / 2026-10-24 push；nginxWebUI 2617 stars / LICENSE 明确为 MulanPSL-1.0（API 为 NOASSERTION）/ 2026-07-05 push；nginxconfig.io 28258 stars / MIT / 2024-12-14 push。nginx-ui #2038 描述共享 upstream 受站点操作影响，故本实现以原文件跨度修改、保留公共配置，不重新生成整份配置。
 - 官方 nginx 1.28.0 Windows 测试运行时只下载到 artifacts/nginx-test-runtime，不打包 nginx，不改用户安装。真实检查/start/HTTP/reload/quit 通过。
 - 实测 nginx 不接受 BOM；文件无损保存保留 BOM，界面提供显式移除 BOM 的草稿动作。-t 创建空 PID 的行为已纳入回归。
+- 新建服务使用此前已调研的结构编辑/源码并存设计，模板按官方初学指南验证：http://nginx.org/en/docs/beginners_guide.html。主/附属文件独占写入、失败回滚、已有首页保留；18项定向回归含真实Nginx生成配置已通过。
