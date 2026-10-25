@@ -366,3 +366,4 @@
 - Linux amd64包通过实际空根解包与架构/权限核验，ARM64正在制作。独立服务ZIP实解包启动及迁移、NSIS配置保留已通过。
 - v1.10.1三平台和独立服务全部完成，SHA/载荷/文档核验通过：Windows113083680字节、amd64 93261934字节、ARM64 88190370字节、服务212492字节。
 - 三平台实际ASAR逐字节一致（76d7b14393543b14dd4f2bc9d929c501fe696a771db94745412ce192232ef3ab），共同构建指纹956cdcc04d1ca045944fdbcf00e0e610fc8e8dab7d7fb84974fa317a4f10d6c1。验收记录、截图和日志保存在artifacts/release-1.10.1。提交前fetch确认与origin/main一致。
+- 新建配置实现718bcb49378aa574cc6abb9080035d8c0843e107已推送origin/main，远端SHA核对一致。v1.10.1发行、185项检查和最终包内完整回归完成；后续仅记录完成状态，SOURCE-COMMIT.txt记录最终提交。
