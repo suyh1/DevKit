@@ -37,6 +37,10 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      if (process.env.DEVKIT_TEST_FEATURES_ONLY === '1') {
+        await require('./features-smoke.cjs')(window, output);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_NGINX_ONLY === '1') {
         await require('./nginx-smoke.cjs')(window, output);
         await require('./close-smoke.cjs')(window, output);
@@ -183,6 +187,7 @@ app.on('browser-window-created', (_event, window) => {
       await fs.writeFile(path.join(output, 'preview-electron.png'), (await window.webContents.capturePage()).toPNG());
       await require('./projects-smoke.cjs')(window, output, staging);
       await require('./nginx-smoke.cjs')(window, output);
+      await require('./features-smoke.cjs')(window, output);
       console.log('Electron smoke passed: sandbox, secure origin, explicit recommendations with direction/data transfer, responsive home, all extended tool UIs/workers, local parsers, Web Crypto, native-save IPC and cancel.');
       await require('./close-smoke.cjs')(window, output);
       clearTimeout(timeout);

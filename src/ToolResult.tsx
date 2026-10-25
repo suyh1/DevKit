@@ -1,3 +1,4 @@
+import type { JsonChange } from './structured-diff';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import type { Options, ToolId } from './tools';
 import ResultView from './ResultView';
@@ -17,6 +18,12 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   const fallback = <ResultView toolId={id} text={text} source={source} onCopy={onCopy} initialView={id === 'csv-json' ? 'table' : 'tree'} />;
   // Large results retain the bounded structured preview or raw editor.
   if (text.length > 300_000) return <p className="preview-note">结果较大，请使用源码视图或导出文件查看完整内容。</p>;
+  if (id === 'mock-data' && options.format === 'csv') { try { return <Table rows={parseCsv(text, ',')} />; } catch { return fallback; } }
+  if (id === 'diff' && options.mode === 'json') {
+    const rows = JSON.parse(text) as JsonChange[];
+    const names = { added: '新增', removed: '删除', changed: '修改', moved: '移动' };
+    return <div className="json-diff-result"><p className="preview-note">{rows.length ? rows.length + ' 项结构差异（预览前 500 项）' : '结构一致'}</p><div className="data-table"><table><thead><tr><th>类型</th><th>字段路径</th><th>原始值</th><th>修改后</th></tr></thead><tbody>{rows.slice(0, 500).map((row, index) => <tr key={index}><td>{names[row.kind]}</td><td><button className="text-button" onClick={() => onCopy(row.path)}>{row.path}</button>{row.from && <small>来自 {row.from}</small>}</td><td><pre>{row.before ?? '—'}</pre></td><td><pre>{row.after ?? '—'}</pre></td></tr>)}</tbody></table></div></div>;
+  }
   if (id === 'hash' || id === 'hmac') {
     const equal = digestMatches(text, expected, id === 'hmac' ? options.format : 'hex');
     return <div className="digest-result"><span className="result-kicker">{options.algorithm} · {id === 'hmac' ? options.format?.toUpperCase() : 'HEX'}</span><code className="digest-value">{text}</code><button className="secondary-button" onClick={() => onCopy(text)}><Copy size={14} />复制{ id === 'hash' ? '摘要' : '签名'}</button><label className="digest-compare">核对已有值<input aria-label="待核对摘要或签名" value={expected} onChange={event => onExpected(event.target.value)} placeholder="粘贴已有值进行核对" spellCheck={false} /></label>{equal !== null && <p role="status" className={equal ? 'success-text' : 'mismatch-text'}>{equal ? <Check size={16} /> : <AlertCircle size={16} />}{equal ? '完全一致' : '值不一致'}</p>}</div>;

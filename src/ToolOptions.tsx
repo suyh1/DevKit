@@ -3,6 +3,7 @@ import type { Options, ToolId } from './tools';
 
 type Field = { key: string; label: string; entries?: [string, string][]; min?: number; max?: number; placeholder?: string; secret?: boolean };
 const fields: Partial<Record<ToolId, Field[]>> = {
+  'mock-data': [{ key: 'source', label: '输入来源', entries: [['example', 'JSON 示例'], ['schema', 'Schema 子集']] }, { key: 'count', label: '记录数量', min: 1, max: 1000 }, { key: 'seed', label: '随机种子', placeholder: 'devkit' }, { key: 'format', label: '输出格式', entries: [['json', 'JSON'], ['csv', 'CSV']] }, { key: 'rules', label: '字段规则 JSON', placeholder: '{"id":"sequence","name":"name"}' }],
   xml: [{ key: 'mode', label: '处理方式', entries: [['format', '格式化'], ['compact', '压缩']] }, { key: 'indent', label: '缩进', entries: [['2', '2 空格'], ['4', '4 空格']] }],
   gzip: [{ key: 'mode', label: '转换方向', entries: [['compress', '文本 → GZip Base64'], ['decompress', 'GZip Base64 → 文本']] }],
   ulid: [{ key: 'mode', label: '处理方式', entries: [['generate', '生成（输入数量）'], ['parse', '解析（每行一个）']] }],
@@ -35,7 +36,7 @@ const fields: Partial<Record<ToolId, Field[]>> = {
     { key: 'keywordCase', label: '关键字', entries: [['upper', '大写'], ['lower', '小写'], ['preserve', '保留原样']] },
     { key: 'indent', label: '缩进', entries: [['2', '2 空格'], ['4', '4 空格']] },
   ],
-  diff: [{ key: 'ignoreWhitespace', label: '行首尾空白', entries: [['off', '参与对比'], ['on', '忽略差异']] }],
+  diff: [{ key: 'mode', label: '对比方式', entries: [['text', '文本逐行'], ['json', 'JSON 结构']] }, { key: 'arrayKey', label: '对象数组标识字段', placeholder: '留空按位置，如 id' }, { key: 'ignoreWhitespace', label: '行首尾空白', entries: [['off', '参与对比'], ['on', '忽略差异']] }],
   password: [
     { key: 'length', label: '长度', min: 4, max: 256 }, { key: 'count', label: '数量', min: 1, max: 100 },
     { key: 'charset', label: '字符集', entries: [['all', '字母 + 数字 + 符号'], ['alnum', '字母 + 数字'], ['hex', '十六进制'], ['digits', '纯数字']] },
@@ -64,7 +65,7 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
     { key: 'value', label: '输出内容', entries: [['include', '类型 + TS 对象'], ['none', '仅类型定义']] } as Field,
   ] : toolId === 'type-json' && options.language !== 'java' ? [{ key: 'optional', label: '可选字段', entries: [['include', '包含示例'], ['exclude', '忽略']] } as Field] : [])];
   const notice = toolId === 'type-json' ? '生成示例值 · 不执行源码或还原真实数据' : toolId === 'hmac' ? '密钥仅在内存，默认不保存工作区' : toolId === 'http-code' ? '只生成代码，不发送请求' : toolId === 'cron' ? 'UTC · 五字段 Unix Cron' : toolId === 'jwt' ? '仅解码，不验证签名或可信性' : toolId === 'url-inspect' ? '保留重复参数，不访问地址' : toolId === 'uuid' ? '安全随机 UUID v4 · 最多 1,000 个' : '';
-  return <div className="options">{visibleFields.map(field => <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : field.min !== undefined ? 'number' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} min={field.min} max={field.max} step={field.min !== undefined ? 1 : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>)}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
+  return <div className="options">{visibleFields.filter(field => toolId !== 'diff' || (field.key !== 'arrayKey' || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : field.min !== undefined ? 'number' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} min={field.min} max={field.max} step={field.min !== undefined ? 1 : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>)}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
 }
 
 

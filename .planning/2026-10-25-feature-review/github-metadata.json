@@ -1,0 +1,82 @@
+[
+  {
+    "repo": "DevToys-app/DevToys",
+    "stars": 32105,
+    "license": "MIT",
+    "pushed_at": "2026-09-29T00:45:51Z",
+    "archived": false,
+    "url": "https://github.com/DevToys-app/DevToys"
+  },
+  {
+    "repo": "gchq/CyberChef",
+    "stars": 36202,
+    "license": "Apache-2.0",
+    "pushed_at": "2026-10-23T11:01:21Z",
+    "archived": false,
+    "url": "https://github.com/gchq/CyberChef"
+  },
+  {
+    "repo": "CorentinTh/it-tools",
+    "stars": 40961,
+    "license": "GPL-3.0",
+    "pushed_at": "2026-10-24T20:34:06Z",
+    "archived": false,
+    "url": "https://github.com/CorentinTh/it-tools"
+  },
+  {
+    "repo": "ajv-validator/ajv",
+    "stars": 14865,
+    "license": "MIT",
+    "pushed_at": "2026-09-06T19:59:32Z",
+    "archived": false,
+    "url": "https://github.com/ajv-validator/ajv"
+  },
+  {
+    "repo": "benjamine/jsondiffpatch",
+    "stars": 5351,
+    "license": "MIT",
+    "pushed_at": "2026-05-14T22:54:47Z",
+    "archived": false,
+    "url": "https://github.com/benjamine/jsondiffpatch"
+  },
+  {
+    "repo": "hoppscotch/hoppscotch",
+    "stars": 80681,
+    "license": "MIT",
+    "pushed_at": "2026-10-23T08:14:56Z",
+    "archived": false,
+    "url": "https://github.com/hoppscotch/hoppscotch"
+  },
+  {
+    "repo": "0xJacky/nginx-ui",
+    "stars": 11666,
+    "license": "AGPL-3.0",
+    "pushed_at": "2026-10-25T08:25:06Z",
+    "archived": false,
+    "url": "https://github.com/0xJacky/nginx-ui"
+  },
+  {
+    "repo": "faker-js/faker",
+    "stars": 15529,
+    "license": "NOASSERTION",
+    "pushed_at": "2026-10-24T20:21:20Z",
+    "archived": false,
+    "url": "https://github.com/faker-js/faker"
+  },
+  {
+    "repo": "APIDevTools/swagger-parser",
+    "stars": 1207,
+    "license": "MIT",
+    "pushed_at": "2026-10-22T23:21:34Z",
+    "archived": false,
+    "url": "https://github.com/APIDevTools/swagger-parser"
+  },
+  {
+    "repo": "harrisiirak/cron-parser",
+    "stars": 1501,
+    "license": "MIT",
+    "pushed_at": "2026-10-22T01:27:19Z",
+    "archived": false,
+    "url": "https://github.com/harrisiirak/cron-parser"
+  }
+]

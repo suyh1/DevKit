@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, MAX_CONFIG_SIZE } from '../shared/nginx.mjs';
 import { acquireProjectLock } from './project-lock.mjs';
 import { createNginxConfigSet } from './nginx-create.mjs';
+import { inspectNginx, tailNginxLog } from './nginx-inspection.mjs';
 import { prepareNginxDirectories, withDirectoryReport } from './nginx-directories.mjs';
 import { detectNginx, nginxArgs, runNginx, launchNginx, inspectNginxProcess, processMatches, pathKey } from './nginx-process.mjs';
 
@@ -26,7 +27,7 @@ async function readDocument(filename) {
   try { content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
   catch { throw new Error(`仅支持 UTF-8 配置文件，请先转换编码：${filename}`); }
   if (content.includes('\0') || content.length > MAX_CONFIG_SIZE) throw new Error(`文件不是有效的文本配置：${filename}`);
-  return { path: filename, content, hash: digest(bytes) };
+  return { path: await realpath(filename), content, hash: digest(bytes) };
 }
 async function atomic(filename, bytes, mode = 0o600) {
   const temporary = `${filename}.${randomUUID()}.tmp`;
@@ -248,6 +249,29 @@ export async function createNginxManager(directory, dependencies = {}) {
           return results;
         }
         case 'documents': return documents(find(payload.id));
+        case 'inspect': {
+          const instance = find(payload.id), scan = await inspectNginx(instance, readDocument);
+          return { logs: scan.logs, references: scan.references, warnings: scan.warnings };
+        }
+        case 'log-tail': {
+          const scan = await inspectNginx(find(payload.id), readDocument);
+          const log = scan.logs.find(log => log.path === payload.path);
+          if (!log) throw new Error('只能读取当前实例生效配置中显式指定的文件日志。');
+          return tailNginxLog(log.path, payload);
+        }
+        case 'review': {
+          const instance = find(payload.id), current = await documents(instance);
+          const impacts = [], warnings = [...current.warnings];
+          const keys = new Set(current.files.map(doc => pathKey(doc.path)));
+          for (const item of state.instances) {
+            const scan = await inspectNginx(item, readDocument);
+            if (scan.documents.some(doc => keys.has(pathKey(doc.path)))) {
+              impacts.push({ id: item.id, name: item.name, files: scan.documents.filter(doc => keys.has(pathKey(doc.path))).map(doc => doc.path), references: scan.references.filter(ref => keys.has(pathKey(ref.to))) });
+            }
+            warnings.push(...scan.warnings.map(warning => `${item.name}：${warning}`));
+          }
+          return { files: current.files, impacts, warnings: [...new Set(warnings)].slice(0, 100) };
+        }
         case 'save-files': return saveFiles(find(payload.id), payload.files);
         case 'create': {
           checkRevision(payload.revision);

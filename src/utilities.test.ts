@@ -4,7 +4,7 @@ import { splitCoordinatePair } from './geography';
 
 describe('additional offline utilities', () => {
   it('runs every tool sample with defaults, geographic fields and an explicit test-only HMAC key', async () => {
-    expect(tools).toHaveLength(45);
+    expect(tools).toHaveLength(46);
     for (const tool of tools) expect(await transform(tool.id, tool.sample, { ...defaultOptions[tool.id], ...(tool.id === 'hmac' ? { key: 'test-only-key' } : tool.id === 'geo-coordinates' ? splitCoordinatePair(tool.sample) : {}) }), tool.id).toBeTruthy();
   });
   it('decodes JWT fields and NumericDate claims without claiming verification', async () => {

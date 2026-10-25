@@ -15,6 +15,7 @@ let window;
 let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
+let httpClient;
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
 let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
@@ -22,12 +23,15 @@ if (!primary) app.quit();
 app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 
 async function createWindow() {
+  httpClient = (await import('./server/http-client.mjs')).createHttpClient();
   window = new BrowserWindow({
     width: 1360, height: 880, minWidth: 800, minHeight: 600, title: 'DevKit · 本地开发工作台',
     backgroundColor: '#11171f', show: false, autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) httpClient?.cancelAll(); });
+  window.on('closed', () => httpClient?.close());
   window.on('close', () => { closeIntent = true; });
   window.webContents.on('will-prevent-unload', event => {
     if (closeAllowed || reloadAllowed) { reloadAllowed = false; event.preventDefault(); return; }
@@ -120,6 +124,15 @@ app.whenReady().then(async () => {
       }
       return { data };
     } catch (error) { return { error: error.message || '项目中心操作失败。' }; }
+  });
+  ipcMain.handle('devkit:http', async (event, action, value) => {
+    if (!window || window.isDestroyed() || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的 HTTP 请求。');
+    try {
+      if (!httpClient) throw new Error('HTTP 客户端尚未准备好。');
+      if (action === 'send') return { data: await httpClient.send(value?.id, value?.request) };
+      if (action === 'cancel') return { data: httpClient.cancel(value?.id) };
+      throw new Error('未知 HTTP 操作。');
+    } catch (error) { return { error: error.message || 'HTTP 请求失败。' }; }
   });
   ipcMain.handle('devkit:nginx', async (event, action, value) => {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的 Nginx 管理请求。');

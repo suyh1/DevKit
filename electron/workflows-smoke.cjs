@@ -23,7 +23,7 @@ module.exports = async function workflowsSmoke(window, output) {
   window.setSize(1440, 1000);
   const { catalog, openTool } = require('./navigation-helpers.cjs')(window);
   const names = (await catalog()).map(tool => tool.name);
-  assert.equal(names.length, 45);
+  assert.equal(names.length, 46);
   const report = [];
   const audit = require('./interaction-audit-smoke.cjs')(window, output);
   for (const name of names) {
@@ -152,5 +152,5 @@ module.exports = async function workflowsSmoke(window, output) {
   await js("document.documentElement.dataset.theme = 'light'");
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'workflow-report.json'), JSON.stringify(report, null, 2));
-  console.log('All 45 tool UIs checked; 39 text/coordinate tools executed, both themes and four viewport widths passed.');
+  console.log('All 46 tool UIs checked; 40 text/coordinate tools executed, both themes and four viewport widths passed.');
 };

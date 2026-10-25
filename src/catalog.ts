@@ -3,12 +3,13 @@ import type { ToolId } from './tools';
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
+  { id: 'http', name: 'HTTP 调试', description: '在桌面本机显式发送 HTTP(S) 请求、查看响应与耗时，支持超时、取消和本地请求集合。', category: '工作台', badge: '本机' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。', category: '工作台', badge: '本机' },
 ] as const;
 
 export const categories = [
-  { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: ['json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'env', 'properties'] },
+  { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: ['json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'mock-data', 'env', 'properties'] },
   { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: ['json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status'] },
   { name: '编码与解析', key: 'encode', description: '编码转换与地址解析', ids: ['base64', 'gzip', 'url', 'html', 'url-inspect', 'query-string', 'unicode'] },
   { name: '文本与匹配', key: 'text', description: '比较、匹配与清理文本', ids: ['diff', 'regex', 'text', 'text-stats'] },
@@ -18,6 +19,7 @@ export const categories = [
 ];
 
 export const aliases: Partial<Record<ToolId, string>> = {
+  'mock-data': 'mock 测试 数据 随机 中文 批量 faker seed schema',
   'geo-coordinates': '地图 经纬度 坐标 度分秒 DMS GPS 圆心 半径 圆周 四方向 geographic latitude longitude WGS84 提取 清洗',
   xml: 'xml 格式化 压缩 配置 svg pom', gzip: 'gzip gunzip 压缩 解压 base64',
   ipv4: 'ipv4 cidr subnet 子网 掩码 网络 广播 主机 ip', chmod: 'chmod unix linux 权限 八进制 rwx setuid sticky',

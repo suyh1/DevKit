@@ -10,6 +10,11 @@ import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { directiveHint, instanceHints } from './nginx-help';
 import NginxHelpTip from './NginxHelpTip';
 import { NginxControlDock, NginxCommandOutput } from './NginxControls';
+import NginxLogs from './NginxLogs';
+import ChangePreview from './ChangePreview';
+import { saveText } from './files';
+import type { NginxReview } from './nginx-api';
+import './features.css';
 
 const basename = (file: string) => file.split(/[\\/]/).at(-1) || file;
 const dirname = (file: string) => file.replace(/[\\/][^\\/]*$/, '');
@@ -130,12 +135,14 @@ export default function NginxCenter({ active }: { active: boolean }) {
   const [snippet, setSnippet] = useState<{ parent: NginxNode | null; value: string } | null>(null), [backups, setBackups] = useState<NginxBackup[] | null>(null);
   const [fieldPending, setFieldPending] = useState<Record<number, boolean>>({}), [epoch, setEpoch] = useState(0);
   const [output, setOutput] = useState<{ ok: boolean; command: string; output: string } | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [review, setReview] = useState<{ title: string; data: NginxReview; files: { path: string; before: string; after: string; conflict: boolean }[] } | null>(null);
   const locked = useRef(false), initialized = useRef(false), polling = useRef(false);
   const current = state?.instances.find(instance => instance.id === selected), status = statuses.find(item => item.id === selected);
   const content = drafts[file] ?? '', dirtyFiles = documents.filter(doc => drafts[doc.path] !== doc.content), pendingFields = Object.values(fieldPending).some(Boolean);
   const dirty = dirtyFiles.length > 0 || pendingFields;
   const parsed = useMemo(() => { try { return { nodes: parseNginx(content), error: '' }; } catch (failure) { return { nodes: [], error: (failure as Error).message }; } }, [content]);
-  async function task(action: () => Promise<void>) {
+  async function task(action: () => Promise<unknown>) {
     if (locked.current) return;
     locked.current = true; setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (failure) { setError((failure as Error).message); }
@@ -143,9 +150,11 @@ export default function NginxCenter({ active }: { active: boolean }) {
   }
   async function refreshStatuses() { setStatuses(await nginxRequest<NginxStatus[]>('statuses')); }
   async function load(id: string) {
+    setLogsOpen(false); setReview(null);
     const result = await nginxRequest<NginxFiles>('documents', { id });
     setSelected(id); setDocuments(result.files); setDrafts(Object.fromEntries(result.files.map(doc => [doc.path, doc.content])));
     setFile(id === selected && result.files.some(doc => doc.path === file) ? file : result.files[0]?.path || ''); setWarnings(result.warnings); setFieldPending({}); setEpoch(value => value + 1); setOutput(null); setQuery('');
+    return result;
   }
   async function refresh(preferred = selected) {
     const next = await nginxRequest<NginxState>('get'); setState(next);
@@ -195,6 +204,16 @@ export default function NginxCenter({ active }: { active: boolean }) {
     setDocuments(result.files); setDrafts(Object.fromEntries(result.files.map(doc => [doc.path, doc.content]))); setWarnings(result.warnings);
     setFieldPending({}); setEpoch(value => value + 1); setNotice(`已保存 ${dirtyFiles.length} 个文件。原文件备份：${result.backup}`); setOutput(null); await refreshStatuses();
   }
+  async function previewChanges(backupId?: string) {
+    if (!current || pendingFields) throw new Error('请先完成当前字段编辑。');
+    const data = await nginxRequest<NginxReview>('review', { id: current.id });
+    const backup = backupId ? await nginxRequest<{ files: { path: string; content: string }[] }>('backup-files', { id: current.id, backupId }) : null;
+    const files = (backup?.files || dirtyFiles).map(doc => {
+      const disk = data.files.find(item => item.path === doc.path);
+      return { path: doc.path, before: backup ? doc.content : disk?.content ?? '', after: backup ? disk?.content ?? '' : drafts[doc.path], conflict: !disk || !backup && disk.hash !== documents.find(item => item.path === doc.path)?.hash };
+    });
+    setBackups(null); setReview({ title: backup ? '备份与当前磁盘对比' : '草稿变更预览', data, files });
+  }
   async function command(action: NginxCommand) {
     if (!current) return;
     if (dirty) throw new Error('请先保存配置或重新读取以放弃草稿，再执行命令。');
@@ -222,6 +241,7 @@ export default function NginxCenter({ active }: { active: boolean }) {
       {dirty && <p className="ng-warning ng-message">有未保存的修改。保存后才能检查、启动或重载；保存本身不会重载 Nginx。{pendingFields && '请移出字段或按 Enter 完成编辑。'}</p>}
       {output && <NginxCommandOutput output={output} compact={compact} />}</>}</NginxControlDock>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
+      <div className="feature-toolbar"><button className="secondary-button" disabled={busy || pendingFields} onClick={() => void task(() => previewChanges())}>变更与引用预览</button><button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button></div>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}
       <div className="ng-file-tabs" role="tablist" aria-label="配置文件">{documents.map(doc => <button key={doc.path}  role="tab" aria-selected={file === doc.path} disabled={busy || pendingFields} onClick={() => { setFile(doc.path); setFieldPending({}); setQuery(''); }}><FileCode2 size={14} /><span>{basename(doc.path)}</span><small>{doc.path === current.main ? '主' : '附属'}{drafts[doc.path] !== doc.content ? ' ●' : ''}</small></button>)}</div>
       {file && <><div className="ng-editor-heading"><code title={file}>{file}</code><NginxHelpTip id={editorHelpId} label="当前文件的填写规则">{mode === 'source' ? '全文编辑保留完整指令、分号与花括号，保存后检查并重载。' : '只填参数，不加指令名或分号；Enter 或离开输入框提交草稿，Esc恢复字段。'}{file !== current.main && <p>当前为附属文件，实际生效取决于 include；修改公共规则会影响所有引用它的服务。</p>}</NginxHelpTip><div className="ng-actions" role="group" aria-label="配置编辑方式">{content.startsWith('\uFEFF') && <button className="text-button" disabled={busy || pendingFields}  onClick={() => changeContent(content.slice(1))}>移除 UTF-8 BOM</button>}<button className={`text-button ${mode === 'fields' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'fields'} onClick={() => setMode('fields')}>字段配置</button><button className={`text-button ${mode === 'source' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'source'} onClick={() => setMode('source')}>全文编辑</button></div></div>
       <fieldset className="ng-editor-fieldset" aria-describedby={editorHelpId} disabled={busy}>
@@ -238,7 +258,8 @@ export default function NginxCenter({ active }: { active: boolean }) {
       const id = instance.id || result.instances.at(-1)?.id; setInstanceForm(null); await refresh(id);
     }} />}
     {snippet && <Modal title={`添加到 ${snippet.parent?.name || '主层级'}`} close={() => setSnippet(null)}><form onSubmit={event => { event.preventDefault(); try { changeContent(insertNginx(content, snippet.parent, snippet.value)); setSnippet(null); setError(''); } catch (failure) { setError((failure as Error).message); } }}><label>指令或配置块<NginxHelpTip label="新增指令的填写规则" id={snippetHelpId}>这里填写完整语法，例如 <code>include common_proxy.conf;</code>，普通指令以分号结束，配置块使用花括号。当前层级为 {snippet.parent?.name || '主层级'}；http 下可加 server，server 下可加 location，location 内可加 proxy_pass。示例需按实际情况调整；“加入草稿”不写入磁盘，之后还需保存并检查配置。</NginxHelpTip><textarea required rows={10} aria-label="新增 Nginx 指令" aria-describedby={snippetHelpId} value={snippet.value} onChange={event => setSnippet({ ...snippet, value: event.target.value })} /></label>{error && <p className="ng-error" role="alert">{error}</p>}<footer><button className="text-button"  type="button" onClick={() => setSnippet(null)}>取消</button><button className="run-button"  type="submit">加入草稿</button></footer></form></Modal>}
-    {backups && <Modal title="配置文件备份" close={() => setBackups(null)}><p className="ng-help">每次保存前备份原文件。载入只替换草稿；检查后保存才会写入原路径。备份保存在 configs/nginx/backups，可手动归档。</p>{error && <p className="ng-error" role="alert">{error}</p>}{!backups.length && <p>尚无备份。</p>}<div className="ng-backups">{backups.map(backup => <div key={backup.id}><div><strong>{new Date(backup.createdAt).toLocaleString()}</strong><small>{backup.files.map(item => basename(item.path)).join('、')}</small></div><button className="text-button"  disabled={busy} onClick={() => void task(async () => {
+    {review && <Modal title={review.title} close={() => setReview(null)} className="ng-review-modal"><p className="ng-help">草稿对比以当前磁盘为基准；仅扫描已登记实例的实际 include，动态引用或扫描失败会列出提示。保存仍会再次检查文件版本。</p>{review.data.warnings.map((warning, i) => <p key={i} className="ng-warning">{warning}</p>)}{!review.files.length && <p>尚无草稿修改。以下展示当前文件的引用关系。</p>}{review.files.map(item => <section key={item.path}><h3>{item.path}</h3>{item.conflict && <p className="ng-error">文件已被外部修改或当前不可读取，请先合并，不能直接保存。</p>}<ChangePreview before={item.before} after={item.after} /></section>)}<h3>配置引用与影响范围</h3>{review.data.impacts.map(item => <section className="ng-impact" key={item.id}><strong>{item.name}</strong>{item.files.filter(path => !review.files.length || review.files.some(file => file.path === path)).map(path => <div key={path}><button className="text-button" onClick={() => { setReview(null); if (item.id === selected && documents.some(doc => doc.path === path)) { setFile(path); setQuery(''); } else discardThen(() => void task(async () => { const loaded = await load(item.id); if (loaded.files.some(doc => doc.path === path)) setFile(path); else setNotice('引用目标未登记为可编辑文件，请先在实例设置中添加：' + path); })); }}>{path}</button>{item.references.filter(ref => ref.to === path).map((ref, i) => <small key={i}>{ref.context} · {ref.from}:{ref.line}</small>)}</div>)}</section>)}<footer><button className="text-button" onClick={() => void saveText(JSON.stringify(review, null, 2), 'nginx-change-review.json').catch(error => setError(String(error)))}>导出审阅报告</button><button className="secondary-button" onClick={() => setReview(null)}>返回编辑</button></footer></Modal>}
+    {backups && <Modal title="配置文件备份" close={() => setBackups(null)}><p className="ng-help">每次保存前备份原文件。载入只替换草稿；检查后保存才会写入原路径。备份保存在 configs/nginx/backups，可手动归档。</p>{error && <p className="ng-error" role="alert">{error}</p>}{!backups.length && <p>尚无备份。</p>}<div className="ng-backups">{backups.map(backup => <div key={backup.id}><div><strong>{new Date(backup.createdAt).toLocaleString()}</strong><small>{backup.files.map(item => basename(item.path)).join('、')}</small></div><button className="text-button" disabled={busy} onClick={() => void task(() => previewChanges(backup.id))}>对比当前</button><button className="text-button"  disabled={busy} onClick={() => void task(async () => {
       const result = await nginxRequest<{ files: { path: string; content: string }[] }>('backup-files', { id: selected, backupId: backup.id });
       const allowed = new Set(documents.map(doc => doc.path));
       if (result.files.some(doc => !allowed.has(doc.path))) throw new Error('此备份包含已取消登记的文件，请先在实例设置中重新添加对应路径。');

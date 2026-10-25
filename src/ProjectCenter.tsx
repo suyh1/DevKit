@@ -1,3 +1,5 @@
+import ProjectComparison from './ProjectComparison';
+import './features.css';
 import { useEffect, useRef, useState } from "react";
 import {
   FolderKanban,
@@ -100,6 +102,7 @@ export default function ProjectCenter({
     meta: Snapshot;
     data: ProjectState;
   } | null>(null);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const [snapshotName, setSnapshotName] = useState("");
   const [shareSaved, setShareSaved] = useState(0);
   const [confirmation, setConfirmation] = useState<{
@@ -411,6 +414,7 @@ export default function ProjectCenter({
     <section
       className={`project-center ${portal ? "pc-portal" : ""} ${canEdit ? "" : "pc-viewer"}`}
     >
+      {comparisonOpen && <ProjectComparison data={data} active={active} close={() => setComparisonOpen(false)} />}
       <header className="pc-heading">
         <div className="pc-brand">
           <FolderKanban size={27} />
@@ -419,7 +423,7 @@ export default function ProjectCenter({
             <p>项目定义一次维护，环境差异由配置档案管理。</p>
           </div>
         </div>
-        <div className="pc-actions">
+        <div className="pc-actions"><button className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比环境</button>
           <span className="pc-role">
             <ShieldCheck size={13} />
             {owner ? "主机管理" : canEdit ? "协作编辑" : "只读访问"} · 数据版本

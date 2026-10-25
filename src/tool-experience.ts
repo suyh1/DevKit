@@ -6,6 +6,7 @@ const entry = (workflow: Workflow, input: string, output: string, action: string
 
 // Explicit coverage: each tool chooses its interaction according to its data flow.
 export const toolExperiences: Record<ToolId, Experience> = {
+  'mock-data': entry('convert', 'JSON 示例 / Schema', '批量测试数据', '生成 Mock 数据', '从示例或 Schema 常用子集生成中文数据；同一种子及参数可复现。字段规则使用点分路径，数组元素用 []，例如 {"id":"sequence","name":"name","age":{"kind":"integer","min":18,"max":65}}。规则优先，示例数组取首项作为模板。'),
   'geo-coordinates': entry('geography', '经纬度与文本', '坐标结果', '处理坐标', '格式互转、椭球/球面圆周点和度分秒文本提取，共享精度与复制格式。'),
   json: entry('format', 'JSON 文档', '格式化与结构', '整理 JSON', '整理缩进后浏览结构；数字原文与重复字段保持不变。'),
   xml: entry('format', 'XML 文档', '整理后的 XML', '整理 XML', '按文档结构整理缩进，保留注释、CDATA 与空白约定。'),
@@ -54,6 +55,7 @@ export const toolExperiences: Record<ToolId, Experience> = {
 };
 
 export function experienceFor(id: ToolId, options: Options): Experience {
+  if (id === 'diff' && options.mode === 'json') return entry('compare', '原始 JSON', '字段差异', '对比结构', '按字段路径比较结构，对象键顺序忽略；数字按原文比较（1 与 1.0 视为不同）。对象数组可按指定字段匹配，缺失或重复标识会报错。');
   if (id === 'ulid' && options.mode === 'parse') return entry('inspect', 'ULID（每行一个）', '时间与随机段', '解析 ULID', '逐项查看标识中编码的 UTC 时间和随机段。');
   return toolExperiences[id];
 }

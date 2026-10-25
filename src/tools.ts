@@ -11,10 +11,11 @@ import { extendedDefaults, extendedTools, isExtendedTool, extendedTransform } fr
 import type { ExtendedToolId } from './extended';
 import { geoDefaults } from './geo-config';
 
-export type ToolId = 'geo-coordinates' | 'json' | 'json-code' | 'type-json' | 'json-csv' | 'base64' | 'url' | 'html' | 'timestamp' | 'hash' | 'uuid' | 'regex' | 'jwt' | 'radix' | 'text' | ColorToolId | PracticalToolId | DeveloperToolId | ExtendedToolId;
+export type ToolId = 'mock-data' | 'geo-coordinates' | 'json' | 'json-code' | 'type-json' | 'json-csv' | 'base64' | 'url' | 'html' | 'timestamp' | 'hash' | 'uuid' | 'regex' | 'jwt' | 'radix' | 'text' | ColorToolId | PracticalToolId | DeveloperToolId | ExtendedToolId;
 export type LegacyToolId = 'json-java' | 'json-ts';
 export type Options = Record<string, string>;
 export const defaultOptions: Record<ToolId, Options> = {
+  'mock-data': { source: 'example', count: '10', seed: 'devkit', format: 'json', rules: '{}' },
   'geo-coordinates': geoDefaults,
   ...practicalDefaults,
   ...developerDefaults,
@@ -30,6 +31,7 @@ export const defaultOptions: Record<ToolId, Options> = {
   'color-contrast': { second: '#FFFFFF' }, 'color-mix': { second: '#FFFFFF', amount: '50', space: 'srgb' },
 };
 const definitions: { id: ToolId; name: string; english: string; category: string; description: string; sample: string }[] = [
+  { id: 'mock-data', name: '批量 Mock 数据', english: 'Mock Data Generator', category: '结构化数据', description: '从 JSON 示例或常用 Schema 子集生成 1–1,000 份中文测试数据，支持字段规则、固定随机种子和 JSON/CSV 导出。纯本地生成，不是完整 Schema 校验器；规则优先于样本/Schema，最多 100,000 节点、20 层。', sample: '{"id":1,"name":"张三","email":"demo@example.com","city":"北京","active":true}' },
   { id: 'geo-coordinates', name: '经纬度工具', english: 'Geographic Coordinates', category: '时间与数值', description: '十进制度与度分秒互转；按圆心、半径及四方向计算椭球/球面圆周点；从文本提取度分秒坐标对。结果可逐项、整列或 CSV/TSV 复制，全部离线处理。', sample: '116.3913,39.9075' },
   ...practicalTools,
   ...developerTools,
@@ -87,6 +89,7 @@ function formatJson(input: string, options: Options): string {
 }
 
 export async function transform(id: ToolId | LegacyToolId, input: string, options: Options = {}): Promise<string> {
+  if (id === 'mock-data') return (await import('./mock-data')).generateMock(input, options);
   if (input.length > 2_000_000) throw new Error('输入超过 2 MB，请缩小内容后重试。');
   if (id === 'geo-coordinates') return (await import('./geography')).geographyTransform(input, options);
   if (id === 'json-java') return jsonToJava(input, options);

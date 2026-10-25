@@ -46,6 +46,7 @@ jobs:
       - run: npm run test:release
       - run: npm run test:projects
       - run: npm run test:nginx
+      - run: npm run test:http
       - run: python scripts/test-deb-packaging.py
       - run: npm run test:java
       - name: Electron integration smoke

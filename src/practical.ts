@@ -4,14 +4,14 @@ export type PracticalToolId = 'yaml' | 'csv-json' | 'sql' | 'diff' | 'url-inspec
 export const practicalDefaults: Record<PracticalToolId, Options> = {
   yaml: { mode: 'yaml-json' }, 'csv-json': { delimiter: 'comma', headers: 'first', types: 'strings' },
   sql: { dialect: 'sql', keywordCase: 'upper', indent: '2' },
-  diff: { target: 'name: DevKit\nversion: 0.5.0\noffline: true\ntools: 26\n', ignoreWhitespace: 'off' },
+  diff: { target: 'name: DevKit\nversion: 0.5.0\noffline: true\ntools: 26\n', ignoreWhitespace: 'off', mode: 'text', arrayKey: '' },
   'url-inspect': {}, password: { length: '24', count: '5', charset: 'all', ambiguous: 'exclude' },
 };
 export const practicalTools: { id: PracticalToolId; name: string; english: string; category: string; description: string; sample: string }[] = [
   { id: 'yaml', name: 'JSON ↔ YAML', english: 'JSON / YAML Converter', category: '数据处理', description: '转换配置文件，保留大整数，检测重复键与不兼容的 YAML 值。', sample: 'name: DevKit\nport: 1420\noffline: true\nplatforms:\n  - Windows\n  - Linux\n' },
   { id: 'csv-json', name: 'CSV 转 JSON', english: 'CSV to JSON', category: '数据处理', description: '导入 CSV / TSV，支持表头、引号内换行与可选类型推断。', sample: 'name,city,id,note\nAlice,上海,001,"hello, world"\nBob,北京,002,"多行备注\n第二行"' },
   { id: 'sql', name: 'SQL 格式化', english: 'SQL Formatter', category: '数据处理', description: '整理 SQL 缩进与关键字大小写，支持常用数据库方言，仅格式化、不执行。', sample: "select u.id,u.name,count(o.id) as order_count from users u left join orders o on u.id=o.user_id where u.active=true and u.city='上海' group by u.id,u.name order by order_count desc;" },
-  { id: 'diff', name: '文本差异对比', english: 'Text Diff', category: '效率工具', description: '逐行比较两份文本，突出新增与删除，导出 unified diff 补丁。', sample: 'name: DevKit\nversion: 0.4.0\noffline: true\ntools: 20\n' },
+  { id: 'diff', name: '文本与 JSON 差异', english: 'Text / JSON Diff', category: '效率工具', description: '逐行比较文本并导出补丁，或按 JSON 字段路径比较新增、删除、修改和数组移动；忽略对象键顺序，保留数字原文，可按业务标识匹配对象数组。', sample: 'name: DevKit\nversion: 0.4.0\noffline: true\ntools: 20\n' },
   { id: 'url-inspect', name: 'URL 解析', english: 'URL Inspector', category: '编码转换', description: '拆解地址、路径与查询参数，保留同名参数；全程不发起网络请求。', sample: 'https://example.com:8443/api/users?name=%E5%BC%A0%E4%B8%89&tag=java&tag=ts&empty=#details' },
   { id: 'password', name: '随机密码生成', english: 'Secure Password Generator', category: '效率工具', description: '使用系统安全随机数批量生成密码，支持字符集、长度与排除易混淆字符。', sample: '' },
 ];
@@ -138,6 +138,7 @@ export async function practicalTransform(id: PracticalToolId, input: string, opt
     return format(input, { language: language as 'sql', keywordCase: options.keywordCase === 'lower' ? 'lower' : options.keywordCase === 'preserve' ? 'preserve' : 'upper', tabWidth: options.indent === '4' ? 4 : 2 });
   }
   const target = options.target ?? '';
+  if (options.mode === 'json') return JSON.stringify((await import('./structured-diff')).structuredDiff(input, target, options.arrayKey || ''), null, 2);
   if (target.length > 500_000 || input.length > 500_000) throw new Error('对比文本每侧最多支持 500,000 字符。');
   const { createTwoFilesPatch } = await import('diff');
   const patch = createTwoFilesPatch('original.txt', 'modified.txt', input, target, '', '', { context: 3, ignoreWhitespace: options.ignoreWhitespace === 'on', timeout: 1200, maxEditLength: 20_000, headerOptions: { includeIndex: false, includeUnderline: false, includeFileHeaders: true } });
