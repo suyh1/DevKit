@@ -251,6 +251,6 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 
 ## 2026-10-26 v1.10.8 发行
 110. 更新版本、完成发行检查并稳定已确认的提示测试时序 — complete
-111. 制作三平台及独立服务包，核验真实产物 — in_progress
-112. 提交、推送并发布GitHub Release，核对远端与附件 — pending
+111. 制作三平台及独立服务包，核验真实产物 — complete
+112. 提交、推送并发布GitHub Release，核对远端与附件 — complete
 - 用户明确授权打包、提交、推送和发布。沿用现有三平台发行流程。

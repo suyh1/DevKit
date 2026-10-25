@@ -497,3 +497,14 @@
 - 进一步定位桌面自动化失败：退场中的原生dialog虽然inert，仍占顶层并阻止正文焦点；点击后的测试改为等待dialog退场完成再操作，不更改产品行为。真实Nginx26项全部通过。Java通过使用PATH的JAVA_HOME/bin重跑成功。临时基线目录已安全原子重命名到artifacts/baseline-cache/node_modules/DevKit，保留全部文件/依赖联接且不再被Vitest重复收集；默认npm test恢复174项。
 
 - Nginx提示、源码、字段提交、吸顶、自动目录和删除定向桌面回归最终全部通过，关闭生命周期与锁释放通过；产品代码已冻结为v1.10.8，准备提交推送并制作发行物。所有断言保留，修正的是等待真实可交互状态的自动化前置条件。
+
+- 实现提交86c99cf877e0d587bc955c3928fb16456279f758已推送origin/main并核对远端一致；GitHub CI 40215752706已通过Linux amd64/ARM64与独立服务三个作业，Windows源码完整Electron通过，正在制作并验证包内应用。
+- 本地Windows安装器及升级/卸载configs保留检查完成；Linux amd64空根解包、GLIBC2.25、root/4755沙箱等核验通过，正制作ARM64；真实Windows ASAR完整回归正在执行。GitHub发布草稿已创建，开始上传已生成的安装器，尚未公开。
+
+- 三平台与独立服务包已全部生成并通过verify:release；共同构建aa3f476d39b587be7ec4d6b979e86eeea54af4a6d271c6c33f5577431331b431，实际两份Deb载荷ASAR与Windows逐字节相同（55dd5c67f492db085edc55e7c491afeb3cffd2b5ec54a5c8cc64b6a0811e9df3），README及16指南一致。审计脚本最初假设gzip，实际为xz，已按真实成员格式修正后通过。
+- 最终Windows ASAR完整46工具/项目/Nginx/托盘/退出回归及新增HTTP关闭专项全部通过；NSIS配置保留、独立ZIP真实解包启动/迁移/快照/口令复用通过。1.10.8标签指向实现86c99cf，已推送；所有产物正上传GitHub草稿，等待CI收尾后公开发布。
+
+- v1.10.8最终GitHub CI 40215752706四作业全部success，来源86c99cf与1.10.8标签一致；CI报告、验收说明、SHA清单和实际载荷一致性报告已随发行上传。
+- https://github.com/suyh1/DevKit/releases/tag/1.10.8 已公开发布为latest，Windows x64、Linux amd64/ARM64、独立服务及9份验收/校验附件共13项；GitHub上传后的大小与SHA256全部匹配本地文件。远端注解标签解引用为86c99cf877e0d587bc955c3928fb16456279f758。
+- 本地发行目录artifacts/release-1.10.8，包内完整/专项回归、CI、227项JS/Node检查、Deb结构、Java、NSIS配置保留、独立ZIP真实服务、README和16指南核验均已完成。Linux未实机桌面/托盘运行，Windows安装器保持未签名，边界已写入公开验收说明。
+- 授权的打包、提交、推送与发布均完成；本完成记录按既有流程作为仅文档提交推送，不改变已发布二进制或其来源标签。

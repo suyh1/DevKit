@@ -251,3 +251,5 @@
 - 扩展桌面回归发现既有分类浮层定位缺陷：getBoundingClientRect取得入场缩放后的620.8px高度，最终布局640px但ResizeObserver不监测transform变化，top212.2导致845px视口底部溢出7px。改用offsetHeight布局高度，维持原有严格几何断言。
 
 - 最终全量桌面回归：46工具（40文本/坐标执行）、主题/四宽度、项目中心CRUD/共享/快照通过；Nginx提示焦点用例在nginx-smoke.cjs:121失败。用git archive导出未修改HEAD 6b1a6e8到artifacts/http-close-baseline，独立构建并运行相同--nginx-only，完全相同位置/条件失败，证实为既有问题。未改Nginx产品代码或放宽其断言。
+
+- v1.10.8已解决前述旧桌面回归失败：悬停提示在截图期间收起、退场中的原生dialog仍占顶层，两者均为自动化未等待可交互状态。修正真实焦点/退场等待及显式提交后，实际Windows ASAR完整回归及GitHub Windows源码/包内回归全部成功，未改Nginx产品行为。
