@@ -89,4 +89,6 @@ sudo dpkg -r devkit
 
 卸载移除应用文件，不会卸载系统图形库。用户偏好留在 Electron 用户数据目录中。旧 Tauri 版与新 Electron 版的偏好存储不同，迁移前可从旧版导出设置，再在新版导入。
 
+窗口关闭默认询问退出或最小化到托盘，可记住并在“偏好设置 → 窗口与托盘”中修改。托盘菜单提供打开/退出；Linux桌面需支持 StatusNotifierItem 或 GtkStatusIcon，某些桌面环境需启用托盘区域。无法创建托盘时应用保留可见窗口；托盘未显示时可再次启动 DevKit 恢复既有窗口。关闭偏好独立保存于用户数据目录的 `desktop-settings.json`。
+
 

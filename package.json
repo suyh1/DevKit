@@ -3,7 +3,7 @@
   "private": true,
   "description": "Offline developer workbench with bundled Chromium",
   "author": "DevKit maintainers",
-  "version": "1.10.7",
+  "version": "1.10.8",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",
@@ -20,7 +20,7 @@
     "bundle:linux:arm64": "npm run build && node scripts/package-desktop.mjs --platform=linux --arch=arm64 --format=deb",
     "bundle:kylin": "npm run bundle:linux:arm64",
     "bundle:host": "npm run build && node scripts/package-desktop.mjs",
-    "test:desktop": "node --test electron/policy.check.cjs",
+    "test:desktop": "node --test electron/policy.check.cjs electron/desktop-preferences.check.cjs",
     "test:electron": "npm run build && node scripts/smoke-desktop.mjs",
     "bundle:all": "npm run build && node scripts/package-all.mjs",
     "test:release": "node --test scripts/release-integrity.check.mjs",

@@ -15,7 +15,7 @@ require('node:fs').mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
 let tested = false;
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: path.join(output, 'saved.txt') });
-const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 180_000);
+const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 300_000);
 app.on('browser-window-created', (_event, window) => {
   window.webContents.on('console-message', event => { if (event.level === 'error') console.error(`Renderer: ${event.message}`); });
   window.webContents.once('did-finish-load', async () => {
@@ -37,6 +37,12 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      if (process.env.DEVKIT_TEST_HTTP_CLOSE_ONLY === '1') {
+        await require('./close-behavior-smoke.cjs')(window, output);
+        await require('./http-smoke.cjs')(window, output);
+        await require('./close-smoke.cjs')(window, output);
+        clearTimeout(timeout); return;
+      }
       if (process.env.DEVKIT_TEST_FEATURES_ONLY === '1') {
         await require('./features-smoke.cjs')(window, output);
         clearTimeout(timeout); app.exit(0); return;
@@ -188,6 +194,7 @@ app.on('browser-window-created', (_event, window) => {
       await require('./projects-smoke.cjs')(window, output, staging);
       await require('./nginx-smoke.cjs')(window, output);
       await require('./features-smoke.cjs')(window, output);
+      await require('./close-behavior-smoke.cjs')(window, output);
       console.log('Electron smoke passed: sandbox, secure origin, explicit recommendations with direction/data transfer, responsive home, all extended tool UIs/workers, local parsers, Web Crypto, native-save IPC and cancel.');
       await require('./close-smoke.cjs')(window, output);
       clearTimeout(timeout);

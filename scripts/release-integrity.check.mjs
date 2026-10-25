@@ -28,11 +28,20 @@ test('runtime inspection detects stale lazy chunks, desktop source and app versi
     for (const [name, content] of [['index.html', 'index'], ['assets/worker.js', 'worker']]) {
       await writeFile(path.join(root, 'dist', name), content); await writeFile(path.join(stage, 'dist', name), content);
     }
-    for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'security.json']) {
+    for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) {
       await writeFile(path.join(root, 'electron', name), name); await writeFile(path.join(stage, name), name);
     }
+    await mkdir(path.join(root, 'build', 'icons'), { recursive: true });
+    await writeFile(path.join(root, 'build', 'icons', '128x128.png'), 'icon');
+    await writeFile(path.join(stage, 'tray-icon.png'), 'icon');
     await createPackage(stage, archive);
     assert.match(await verifyRuntime(root, archive, '1.4.0'), /^[a-f0-9]{64}$/);
+    await writeFile(path.join(root, 'electron', 'desktop-preferences.cjs'), 'changed settings');
+    await assert.rejects(verifyRuntime(root, archive, '1.4.0'), /desktop-preferences.cjs/);
+    await writeFile(path.join(root, 'electron', 'desktop-preferences.cjs'), 'desktop-preferences.cjs');
+    await writeFile(path.join(root, 'build', 'icons', '128x128.png'), 'changed icon');
+    await assert.rejects(verifyRuntime(root, archive, '1.4.0'), /tray-icon.png/);
+    await writeFile(path.join(root, 'build', 'icons', '128x128.png'), 'icon');
     await assert.rejects(verifyRuntime(root, archive, '1.3.0'), /version/);
     await writeFile(path.join(root, 'dist', 'assets', 'worker.js'), 'new worker');
     await assert.rejects(verifyRuntime(root, archive, '1.4.0'), /worker.js/);

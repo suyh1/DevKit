@@ -10,11 +10,12 @@ module.exports = async function checkClose(window, output) {
       if (await js(expression)) return;
       await new Promise(resolve => setTimeout(resolve, 40));
     }
+    await fs.writeFile(path.join(output, 'close-lifecycle-failure.png'), (await window.webContents.capturePage()).toPNG());
     throw new Error(`Close condition failed: ${expression}`);
   }
   async function button(text, root = '.confirm-dialog[open]') {
     const expression = `[...document.querySelectorAll(${JSON.stringify(root + ' button')})].find(button=>button.textContent.trim()===${JSON.stringify(text)})`;
-    await wait(`!!${expression}`); return js(`${expression}.click()`);
+    await wait(`!!${expression}&&!${expression}.disabled`); return js(`${expression}.click()`);
   }
   const request = async (bridge, action) => {
     const result = await js(`window.${bridge}.request(${JSON.stringify(action)})`);
@@ -58,7 +59,34 @@ module.exports = async function checkClose(window, output) {
     assert.equal(await js('document.querySelector(".ng-form-modal input").value'), '重新加载后仍保护草稿');
     const storage = await request('devkitProjects', 'storage');
     const nginx = await request('devkitNginx', 'get');
+    // An explicit tray-menu quit bypasses a remembered tray action, but still protects drafts.
+    await js('window.devkitDesktop.closeSettings("set","tray")');
+    app.quit(); await wait('document.querySelector(".confirm-dialog h2")?.textContent === "关闭 DevKit？"');
+    await button('继续编辑'); await wait('!document.querySelector(".confirm-dialog[open]")');
+    assert.equal((await js('window.devkitDesktop.closeSettings("get")')).closeAction, 'tray');
+    await js('window.devkitDesktop.closeSettings("set","ask")');
+    window.close(); await wait('!!document.querySelector(".close-choice[open]")');
+    await button('最小化到托盘', '.close-choice');
+    await wait('!document.querySelector(".close-choice")');
+    assert.equal(window.isVisible(), false);
+    assert.equal(await js('document.querySelector(".ng-form-modal input").value'), '重新加载后仍保护草稿');
+    await request('devkitNginx', 'get'); await request('devkitProjects', 'get');
+    window.show(); window.focus();
+    window.close(); await wait('!!document.querySelector(".close-choice[open]")');
+    await js('document.querySelector(".close-remember input").click()');
+    await button('退出软件', '.close-choice');
+    await wait('document.querySelector(".confirm-dialog h2")?.textContent === "关闭 DevKit？"');
+    await button('继续编辑'); await wait('!document.querySelector(".confirm-dialog[open]")');
+    assert.equal((await js('window.devkitDesktop.closeSettings("get")')).closeAction, 'ask', 'Cancelled discard must not remember quit');
+    // Remembered quit skips the choice only; unsaved content still needs confirmation.
+    await js('window.devkitDesktop.closeSettings("set","quit")');
     window.close(); await wait('document.querySelector(".confirm-dialog h2")?.textContent === "关闭 DevKit？"');
+    await button('继续编辑'); await wait('!document.querySelector(".confirm-dialog[open]")');
+    await js('window.devkitDesktop.closeSettings("set","ask")');
+    window.close(); await wait('!!document.querySelector(".close-choice[open]")');
+    await js('document.querySelector(".close-remember input").click()');
+    await button('退出软件', '.close-choice');
+    await wait('document.querySelector(".confirm-dialog h2")?.textContent === "关闭 DevKit？"');
     const watchdog = setTimeout(() => { console.error('Confirmed close did not finish shutdown'); app.exit(1); }, 10000);
     app.once('will-quit', () => {
       clearTimeout(watchdog);
@@ -66,6 +94,7 @@ module.exports = async function checkClose(window, output) {
         const nativeFs = require('node:fs');
         assert.equal(nativeFs.existsSync(path.join(storage.directory, '.lock')), false);
         assert.equal(nativeFs.existsSync(path.join(nginx.directory, '.lock')), false);
+        assert.equal(JSON.parse(nativeFs.readFileSync(path.join(app.getPath('userData'), 'desktop-settings.json'), 'utf8')).closeAction, 'quit');
         assert.equal(nativePrompts, 0);
         console.log('Close lifecycle passed: single themed confirmation, no native prompt, cancel retains drafts and both managers, reload cancel/confirm and renewed guard, confirmed close releases storage locks.');
       } catch (error) { console.error(error); app.exit(1); }

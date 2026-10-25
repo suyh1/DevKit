@@ -1,5 +1,11 @@
 declare global {
-  interface Window { devkitDesktop?: { saveText: (text: string, filename: string) => Promise<string>; onCloseRequest: (listener: (intent: 'close' | 'reload') => void) => () => void; answerClose: (allow: boolean) => void } }
+  interface Window { devkitDesktop?: {
+    saveText: (text: string, filename: string) => Promise<string>;
+    onCloseRequest: (listener: (intent: 'close' | 'reload' | 'choose') => void) => () => void;
+    answerClose: (allow: boolean) => void;
+    closeSettings: (action: 'get' | 'set', value?: 'ask' | 'tray' | 'quit') => Promise<{ closeAction: 'ask' | 'tray' | 'quit' }>;
+    chooseClose: (action: 'cancel' | 'tray' | 'quit', remember: boolean) => Promise<void>;
+  } }
 }
 
 export async function saveText(text: string, filename: string): Promise<string> {

@@ -1,0 +1,185 @@
+.http-address {
+  display: flex;
+  gap: 10px;
+}
+.http-address label:first-child {
+  flex: 0 0 100px;
+}
+.http-address label:last-child {
+  flex: 1;
+  min-width: 0;
+}
+.http-edit-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.http-edit-tabs button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--tint);
+}
+.http-key-values {
+  min-width: 0;
+}
+.http-kv-row,
+.http-kv-heading {
+  display: grid;
+  grid-template-columns: 30px minmax(70px, 1fr) minmax(90px, 1.6fr) 30px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.http-kv-heading {
+  font-size: 11px;
+  color: var(--muted);
+}
+.request-form .http-kv-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  justify-self: center;
+  accent-color: var(--accent);
+}
+.http-kv-row input {
+  width: 100%;
+  min-width: 0;
+}
+.http-auth {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.http-auth > p {
+  grid-column: 1/-1;
+}
+.http-auth button {
+  align-self: end;
+  min-height: 34px;
+}
+.http-body {
+  min-width: 0;
+}
+.http-body-editor {
+  height: 230px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.http-body .feature-toolbar {
+  margin-top: 0;
+}
+.http-body .preview-note {
+  line-height: 1.6;
+}
+.http-request {
+  height: 490px;
+}
+.request-form .task-error {
+  margin: 0;
+}
+.http-response-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.http-response-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.http-response-controls input {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+}
+.http-headers-table {
+  max-height: 380px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.http-headers-table table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.http-headers-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  font-size: 12px;
+}
+.http-headers-table td:first-child {
+  width: 35%;
+  color: var(--muted);
+}
+.http-history {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.http-history h3 {
+  font-size: 13px;
+}
+.http-history > button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 6px;
+  color: var(--text);
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.http-history > button:hover {
+  background: var(--soft);
+}
+.http-history small {
+  display: block;
+}
+.http-collection-search {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  background: var(--soft);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.http-collection .http-history {
+  display: block !important;
+}
+.http-collection {
+  max-height: calc(100vh - 240px);
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .http-auth {
+    grid-template-columns: 1fr;
+  }
+  .http-kv-row,
+  .http-kv-heading {
+    grid-template-columns: 24px minmax(60px, 1fr) minmax(70px, 1.2fr) 26px;
+    gap: 4px;
+  }
+  .request-form {
+    padding: 12px;
+  }
+  .http-collection {
+    max-height: 240px;
+  }
+  .http-request {
+    height: 510px;
+  }
+  .http-address label:first-child {
+    flex-basis: 80px;
+  }
+}

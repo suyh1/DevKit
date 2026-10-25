@@ -6,7 +6,7 @@ const net = require('node:net');
 module.exports = async function checkNginx(window, output) {
   window.webContents.setBackgroundThrottling(false);
   window.show(); window.focus(); window.webContents.focus();
-  const js = source => window.webContents.executeJavaScript(source);
+  const js = source => window.webContents.executeJavaScript(source, true);
   async function wait(expression) {
     for (let index = 0; index < 180; index++) {
       if (await js(expression)) return;
@@ -19,7 +19,9 @@ module.exports = async function checkNginx(window, output) {
   const click = async (text, root = '.ng-center, .ng-modal[open], .confirm-dialog[open]') => {
     const expression = `[...document.querySelectorAll(${JSON.stringify(root)})].flatMap(root => [...root.querySelectorAll('button')]).find(button => button.textContent.trim() === ${JSON.stringify(text)})`;
     await wait(`!!${expression} && !${expression}.disabled`); await js(`${expression}.click()`);
-    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))'); await idle();
+    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
+    await wait('!document.querySelector("dialog[open][inert]")');
+    await idle();
   };
   const input = async (label, value, root = '.ng-modal[open]') => {
     await js(`{const element=[...document.querySelectorAll(${JSON.stringify(root + ' label')})].find(label=>label.childNodes[0]?.textContent.trim()===${JSON.stringify(label)}).querySelector('input'); element.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)});element.dispatchEvent(new Event('input',{bubbles:true}));}`);
@@ -28,35 +30,49 @@ module.exports = async function checkNginx(window, output) {
     const result = await js(`window.devkitNginx.request(${JSON.stringify(action)},${JSON.stringify(payload) || 'undefined'})`);
     assert.equal(result.error, undefined, result.error); return result.data;
   };
+  let lastHelpId = '';
   async function helpFor(control, text, interaction = 'click') {
     const tip = `document.querySelector(${JSON.stringify(control)})`;
     const id = await js(`${tip}.getAttribute('aria-describedby')`);
-    assert.ok(id, 'Inputs are linked to their help');
+    assert.ok(id, 'Inputs are linked to their help'); lastHelpId = id;
     const question = `[...document.querySelectorAll('.ng-help-trigger')].find(button=>button.getAttribute('aria-controls')===${JSON.stringify(id)})`;
     await js(`${question}.scrollIntoView({block:'nearest'})`);
     await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
     if (interaction === 'hover') {
       const point = await js(`(()=>{const r=${question}.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
       window.webContents.sendInputEvent({ type: 'mouseMove', ...point });
-    } else await js(`${question}.${interaction === 'focus' ? 'focus' : 'click'}()`);
+    } else {
+      if (interaction === 'focus') await js(`${question}.blur()`);
+      await js(`${question}.${interaction === 'focus' ? 'focus' : 'click'}()`);
+    }
     await wait(`document.getElementById(${JSON.stringify(id)})?.matches(':popover-open')`);
+    await wait(`${question}.getAttribute('aria-expanded') === 'true'`);
+    // Native popover state changes before React installs its Escape handler.
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     assert.ok((await js(`document.getElementById(${JSON.stringify(id)}).textContent`)).includes(text));
     assert.equal(await js(`(()=>{const r=document.getElementById(${JSON.stringify(id)}).getBoundingClientRect();return r.x>=0&&r.y>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})()`), true, 'Help stays inside viewport');
     return id;
   }
   async function dismissHelp() {
+    // Capture may outlast the hover leave timer. Focus the real trigger before testing Escape.
+    await js(`{ const trigger=[...document.querySelectorAll('.ng-help-trigger')].find(button=>button.getAttribute('aria-controls')===${JSON.stringify(lastHelpId)});trigger.blur();trigger.focus(); }`);
+    await wait(`document.getElementById(${JSON.stringify(lastHelpId)})?.matches(':popover-open')`);
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
     await wait('!document.querySelector(".ng-help-popover:popover-open")');
+    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   }
   const field = async (name, value) => {
     await js(`{ const element=[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})); let parent=element.closest('details');while(parent){parent.open=true;parent=parent.parentElement.closest('details');} element.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)}); element.dispatchEvent(new Event('input',{bubbles:true})); }`);
     await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
-    await js(`[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})).blur()`);
+    await js(`{const element=[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})); element.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));element.blur();}`);
     await wait('!document.querySelector(".ng-warning")?.textContent.includes("请移出字段")');
   };
   async function source(text) {
     await click('全文编辑'); await wait('!!document.querySelector(".ng-source .cm-content")');
+    window.show(); window.focus(); window.webContents.focus();
     await js('document.querySelector(".ng-source .cm-content").focus()');
+    await wait('!!document.activeElement.closest(".ng-source")');
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
     window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
     await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
@@ -114,7 +130,7 @@ module.exports = async function checkNginx(window, output) {
     await click('导入已有文件', '.ng-empty');
     assert.equal(await js(`[...document.querySelectorAll('.ng-form-modal input,.ng-form-modal select,.ng-form-modal textarea')].every(input=>!!document.getElementById(input.getAttribute('aria-describedby'))?.textContent)`), true);
     assert.equal(await js('document.querySelectorAll(".ng-input-help").length'), 0, 'Help is not printed beneath fields');
-    const prefixControl = '.ng-form-modal input[placeholder="nginx 安装目录或自定义运行前缀"]';
+    const prefixControl = '.ng-form-modal[open] input[placeholder="nginx 安装目录或自定义运行前缀"]';
     await helpFor(prefixControl, 'pid、error_log、root', 'hover');
     await fs.writeFile(path.join(output, 'nginx-help-form-hover.png'), (await window.webContents.capturePage()).toPNG());
     await dismissHelp(); assert.equal(await js('!!document.querySelector(".ng-form-modal[open]")'), true, 'Escape dismisses only help');

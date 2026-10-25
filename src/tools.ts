@@ -62,7 +62,7 @@ export const tools = definitions.map(tool => ({ ...tool, category: categoryFor(t
 
 // Validate with the native parser, but format the original tokens so large numbers,
 // exponent notation and duplicate keys are never silently rewritten.
-function formatJson(input: string, options: Options): string {
+export function formatJson(input: string, options: Options): string {
   JSON.parse(input);
   const tokens = input.match(/"(?:\\.|[^"\\])*"|[^\s]/g) || [];
   if (options.mode === 'compact') return tokens.join('');

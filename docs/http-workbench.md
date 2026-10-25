@@ -6,7 +6,7 @@
 
 表单与配置 JSON 切换保留编辑器实例；发送按钮原地切换为取消。等待、错误与响应区域使用高度过渡，响应到达立即展示；减少动态效果时直接切换。复制反馈取决于实际剪贴板写入结果。
 
-请求表单编辑方法/URL，“配置 JSON”编辑 Headers 和 body。支持 GET、HEAD、POST、PUT、PATCH、DELETE、OPTIONS；仅 HTTP(S)，URL 不支持内嵌用户名/密码。示例：
+请求表单支持方法/URL、参数表、请求头、鉴权和正文；“配置 JSON”可编辑完整配置。支持 GET、HEAD、POST、PUT、PATCH、DELETE、OPTIONS；仅 HTTP(S)，URL 不支持内嵌用户名/密码。示例：
 
 ```json
 {
@@ -19,7 +19,15 @@
 
 body 可为文本字符串或 JSON 值。结构化 body 按原始 JSON 数字/字段原文发送，未指定 Content-Type 时补 application/json；GET/HEAD 不支持非空请求体。重复配置字段、重复请求头名称（忽略大小写）会报错。
 
+- **参数 / 请求头**：逐行添加、删除与启停；参数与 URL 双向同步，保留重复参数名、空值并自动编码。禁用行保留在当前表单内存，不发送、不保存到配置；切换集合、恢复历史或重新载入表单后按实际配置重建。
+- **鉴权**：支持 Bearer Token 与 Basic Auth，点击“应用到请求头”显式设置 Authorization；“无鉴权”应用后移除该头。已有头可直接在请求头中修改，鉴权输入框不从头中反解密码。Basic 使用 UTF-8，用户名不允许冒号。
+- **正文**：支持 JSON、纯文本与 application/x-www-form-urlencoded 表单，选择类型并编辑时同步 Content-Type；自定义 Content-Type 可随后在请求头中修改。JSON 编辑保留大整数、指数及重复 body 字段原文；不完整 JSON 按原文发送，可用于接口校验测试。“清空正文”可用于切换 GET/HEAD。
+
 点击发送后可随时取消；超时覆盖 DNS、连接、响应读取及解压全过程，默认 15,000ms，可设 100–120,000ms。显示状态码、耗时、正文、完整响应头（保留重复头），支持复制和导出。HTTP 4xx/5xx 作为正常收到的响应展示；网络/TLS/超时错误另行显示。修改配置后保留上次响应并标注待更新。
+
+响应正文可切换格式化 / 原始视图；格式化 JSON 保留数字与重复字段，非 JSON、二进制或超过 1,000,000 字符时直接显示原文。使用编辑器 Ctrl/Cmd + F 搜索正文。响应头以表格展示并可按名称/值筛选，复制和导出采用当前显示的正文或筛选后的头。
+
+左侧集合支持搜索；“会话历史”保留最近 20 次成功、失败或取消的请求，配置总计最多 4,000,000 字符，仅留在内存，不保存响应。点击历史项恢复当时的请求配置及超时，不自动发送；替换未保存草稿仍需确认。历史中可包含鉴权和正文，刷新/退出或“清空历史”后清除；保存集合时继续遵循下方脱敏选项。
 
 请求由 Electron 主进程的受限客户端发出，不受网页 CORS 限制，不使用 shell/cURL，不修改页面 CSP 或关闭 TLS 验证。不会自动跟随 3xx，避免无意把认证数据带往其他目标。客户端不维护 Cookie jar、不读浏览器 Cookie；需要 Cookie 时在请求头中显式填写。HTTPS 使用 Node 默认 CA，不提供“忽略证书错误”开关。
 
@@ -27,7 +35,7 @@ body 可为文本字符串或 JSON 值。结构化 body 按原始 JSON 数字/�
 
 ## 请求集合与敏感信息
 
-- 请求草稿和响应默认只在内存；切换工作台模块保留，退出/刷新时有未保存草稿或运行中请求会提示。
+- 请求草稿、会话历史和响应默认只在内存；切换工作台模块或最小化到托盘时保留，真正退出/刷新时有未保存草稿或运行中请求会提示。
 - “保存请求”主动写入当前桌面用户的本地存储，最多 100 项、4MB；与项目中心 configs、文本工作区快照分别管理。
 - 默认排除 Authorization/Cookie 及常见 token/password/secret/api-key/signature/session/credential 请求头和 Query 参数，并排除整个 body。界面原草稿保留，重新选择集合项才载入保存的版本。
 - 这些名称筛选不能识别所有业务自定义敏感字段。勾选“保存时包含完整 Headers、正文与敏感参数（明文）”后会完整保存；集合项会明确标记。保存和导出前请根据实际配置选择。
@@ -39,4 +47,4 @@ body 可为文本字符串或 JSON 值。结构化 body 按原始 JSON 数字/�
 
 ## 验证与参考
 
-`npm run test:http` 使用隔离本地服务验证正文保真、重复响应头、取消/超时、重定向、二进制、压缩与解压预算；桌面 `node scripts/smoke-desktop.mjs --features-only` 验证真实 IPC/界面发送、集合脱敏及窄屏。设计参考 [Hoppscotch](https://github.com/hoppscotch/hoppscotch)（MIT）；不引入它的前端/后端。实现使用 Node 内置 HTTP/HTTPS/zlib，不增加网络运行依赖。
+`npm run test:http` 使用隔离本地服务验证正文保真、重复响应头、取消/超时、重定向、二进制、压缩与解压预算；`node scripts/smoke-desktop.mjs --http-close-only` 验证参数/请求头/鉴权/正文编辑、真实发送、格式化/重复头筛选、集合脱敏、历史恢复及深浅窄屏，并检查托盘和草稿退出保护。设计参考 [Hoppscotch](https://github.com/hoppscotch/hoppscotch) 与 [Bruno](https://github.com/usebruno/bruno)（均 MIT）；不引入它们的前端/后端。实现使用 Node 内置 HTTP/HTTPS/zlib，不增加网络运行依赖。

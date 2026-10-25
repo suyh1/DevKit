@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('devkitDesktop', {
     return () => ipcRenderer.removeListener('devkit:close-request', handler);
   },
   answerClose: allow => ipcRenderer.send('devkit:answer-close', allow === true),
+  closeSettings: (action, value) => ipcRenderer.invoke('devkit:desktop-settings', action, value),
+  chooseClose: (action, remember) => ipcRenderer.invoke('devkit:choose-close', action, remember),
 });
 contextBridge.exposeInMainWorld('devkitProjects', {
   request: (action, payload) => ipcRenderer.invoke('devkit:projects', action, payload),

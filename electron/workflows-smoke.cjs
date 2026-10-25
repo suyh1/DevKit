@@ -38,9 +38,9 @@ module.exports = async function workflowsSmoke(window, output) {
       await wait(`!!document.querySelector('${pane} .status-success')`);
       if (id === 'geo-coordinates') await require('./geography-smoke.cjs')(window, output);
       if (id === 'json') {
-        assert.equal(await js(`getComputedStyle(document.querySelector('${pane} .input-card')).display`), 'none');
+        await wait(`getComputedStyle(document.querySelector('${pane} .input-card')).display === 'none'`);
         await js(`document.querySelector('${pane} .document-tabs button').click()`);
-        assert.equal(await js(`getComputedStyle(document.querySelector('${pane} .output-card')).display`), 'none');
+        await wait(`getComputedStyle(document.querySelector('${pane} .output-card')).display === 'none'`);
         await js(`document.querySelectorAll('${pane} .document-tabs button')[1].click()`);
       }
       if (id === 'chmod') {

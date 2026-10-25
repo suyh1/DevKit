@@ -240,3 +240,14 @@
 - 来源：https://github.com/ajaxorg/ace/blob/master/src/mode/nginx_highlight_rules.js；https://github.com/ajaxorg/ace/blob/master/LICENSE；https://nginx.org/en/docs/beginners_guide.html。
 - GitHub日志证实run 40176844466 的 Windows test:nginx 有7项失败，根因均为TEMP的RUNNER~1路径与realpath展开的runneradmin路径不一致；Linux不受影响。日志保存在artifacts/ci-diagnostics/windows-40176844466.log。
 - 修正所有Nginx测试目录使用realpath，并保留真实路径下清理边界断言；修复无nginx测试运行时的吸顶测试getComputedStyle(null)，只在反馈存在时检查其动画。
+
+## 2026-10-26 HTTP 与关闭行为调查
+- HTTP 当前只有方法/URL表单，头和body只能通过JSON编辑；已有受限Node发送、取消、超时、集合脱敏及草稿保护，复用这些能力。
+- Electron 只有 beforeunload 的草稿确认，无托盘；需在窗口close拦截选择，并让显式退出继续触发草稿保护。
+- 参考 Hoppscotch（MIT，Vue/TS，约80k stars）参数/头/正文分区；Bruno（MIT，Electron/React，约48k stars）本地集合/鉴权组织。两者均有近期维护；仅借鉴交互，保留已有React/CodeMirror与Node网络栈，不引入完整客户端依赖。
+- 来源：https://github.com/hoppscotch/hoppscotch；https://github.com/usebruno/bruno；https://www.electronjs.org/docs/latest/api/tray；https://www.electronjs.org/docs/latest/api/dialog。
+- 已知边界重点：JS JSON重序列化会损失大整数精度，正文使用原始文本跨度；浏览器CORS限制继续交由现有主进程客户端处理；Linux托盘依赖桌面环境，创建失败不得隐藏窗口。
+
+- 扩展桌面回归发现既有分类浮层定位缺陷：getBoundingClientRect取得入场缩放后的620.8px高度，最终布局640px但ResizeObserver不监测transform变化，top212.2导致845px视口底部溢出7px。改用offsetHeight布局高度，维持原有严格几何断言。
+
+- 最终全量桌面回归：46工具（40文本/坐标执行）、主题/四宽度、项目中心CRUD/共享/快照通过；Nginx提示焦点用例在nginx-smoke.cjs:121失败。用git archive导出未修改HEAD 6b1a6e8到artifacts/http-close-baseline，独立构建并运行相同--nginx-only，完全相同位置/条件失败，证实为既有问题。未改Nginx产品代码或放宽其断言。

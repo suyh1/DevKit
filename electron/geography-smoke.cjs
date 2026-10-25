@@ -10,7 +10,7 @@ module.exports = async function geographySmoke(window, output) {
   const click = async label => { await js(`document.querySelector('${pane} [aria-label=${JSON.stringify(label)}]').click()`); };
   const set = async (label, value) => { await js(`{ const el = document.querySelector('${pane} [aria-label=${JSON.stringify(label)}]'); const proto = el.tagName === 'SELECT' ? HTMLSelectElement : el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement; Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,${JSON.stringify(value)}); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input',{bubbles:true})); }`); };
   const run = async () => { await js(`document.querySelector('${pane} .run-button').click()`); await wait(`!!document.querySelector('${pane} .status-success')`); };
-  const copy = async label => { await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()'); await clipboard.clear(); await click(label); await wait(`document.querySelector('.app-toast')?.textContent.includes('已复制坐标')`); return (await clipboard.readText()).replace(/\r\n/g, '\n'); };
+  const copy = async label => { await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()'); await wait('!document.querySelector(".app-toast")'); await clipboard.clear(); await click(label); await wait(`document.querySelector('.app-toast')?.textContent.includes('已复制坐标')`); return (await clipboard.readText()).replace(/\r\n/g, '\n'); };
   assert.match(await js(`document.querySelector('${pane} .geo-output').textContent`), /116°23′28.68″E/);
   assert.equal(await copy('复制全部坐标'), '116.391300,39.907500');
   assert.equal(await copy('复制经度十进制度'), '116.391300');

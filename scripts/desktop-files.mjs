@@ -11,7 +11,8 @@ export async function prepareDesktop(platform, arch) {
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Unsafe staging directory');
   await rm(staging, { recursive: true, force: true });
   await mkdir(staging, { recursive: true });
-  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'security.json']) await cp(path.join(root, 'electron', name), path.join(staging, name));
+  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) await cp(path.join(root, 'electron', name), path.join(staging, name));
+  await cp(path.join(root, 'build', 'icons', '128x128.png'), path.join(staging, 'tray-icon.png'));
   for (const name of ['server', 'shared']) await cp(path.join(root, name), path.join(staging, name), { recursive: true, filter: filename => !/\.(?:check|test)\.m?[jt]s$|\.d\.mts$/.test(filename) });
   await cp(path.join(root, 'dist'), path.join(staging, 'dist'), { recursive: true });
   await writeFile(path.join(staging, 'package.json'), JSON.stringify({ name: 'devkit', productName: 'DevKit', version: manifest.version, main: 'main.cjs', description: 'Offline developer workbench with bundled Chromium', author: 'DevKit maintainers' }, null, 2));

@@ -46,7 +46,8 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
       const rect = anchor.getBoundingClientRect();
       const width = Math.min(320, window.innerWidth - 24);
       const left = Math.max(12, Math.min((sidebar?.right ?? rect.right) + 10, window.innerWidth - width - 12));
-      const height = surface.getBoundingClientRect().height;
+      // Position against layout height; the entrance animation temporarily scales its visual bounds.
+      const height = surface.offsetHeight;
       const top = Math.max(12, Math.min(rect.top, window.innerHeight - height - 12));
       Object.assign(surface.style, { left: `${left}px`, top: `${top}px`, width: `${width}px` });
     }

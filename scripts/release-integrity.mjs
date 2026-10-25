@@ -26,7 +26,8 @@ export async function verifyRuntime(root, archive, version) {
   for (const folder of ['server', 'shared']) {
     try { await walk(path.join(root, folder), '', folder); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'security.json']) files.push({ source: path.join(root, 'electron', name), archive: name });
+  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) files.push({ source: path.join(root, 'electron', name), archive: name });
+  files.push({ source: path.join(root, 'build', 'icons', '128x128.png'), archive: 'tray-icon.png' });
   const packaged = JSON.parse(extractFile(archive, 'package.json').toString('utf8'));
   if (packaged.version !== version) throw new Error(`Stale runtime version: ${archive}`);
   const hashes = [];

@@ -3,7 +3,7 @@ import type { ToolId } from './tools';
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
-  { id: 'http', name: 'HTTP 调试', description: '在桌面本机显式发送 HTTP(S) 请求、查看响应与耗时，支持超时、取消和本地请求集合。', category: '工作台', badge: '本机' },
+  { id: 'http', name: 'HTTP 调试', description: '可视化编辑参数、请求头、鉴权与正文，在本机发送 HTTP(S) 请求；支持响应格式化、会话历史、超时取消和本地请求集合。', category: '工作台', badge: '本机' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。', category: '工作台', badge: '本机' },
 ] as const;

@@ -5,15 +5,16 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、本机 Nginx 配置与实例管理、HTTP 调试工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.10.7**。工具输入和结果默认只保存在内存中；偏好、收藏、手动保存的 HTTP 请求集合和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.10.8**。工具输入和结果默认只保存在内存中；偏好、收藏、手动保存的 HTTP 请求集合和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.7_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.7/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.10.8_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.10.8/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，再开启“局域网共享”。
 4. 需要维护本机 Nginx 时，打开与项目中心平级的“Nginx 配置”，登记主文件、附属文件、运行目录与 nginx 程序。默认按字段编辑，也可切换全文；保存后检查配置，再启动或重载。
-5. 调试接口时打开“HTTP 调试”，填写请求配置后主动发送。可从“HTTP 请求代码生成”带入配置，也可把调试配置送回代码生成器；集合只在点击保存时写入本机。详见 [HTTP 调试说明](docs/http-workbench.md)。
+5. 调试接口时打开“HTTP 调试”，通过参数表、请求头、Bearer / Basic 鉴权和 JSON / 文本 / URL Encoded 正文编辑后主动发送。支持响应格式化、响应头筛选和会话历史恢复；集合只在点击保存时写入本机。可与“HTTP 请求代码生成”互相带入配置，详见 [HTTP 调试说明](docs/http-workbench.md)。
+6. 点击窗口关闭按钮，选择“退出软件”或“最小化到托盘”，可勾选记住选择；在“偏好设置 → 窗口与托盘”中随时改回每次询问。托盘菜单可打开或退出，真正退出时仍检查未保存草稿。
 
 Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windows 安装包当前未配置代码签名。Linux / 麒麟离线安装、基础库检查和启动排查见 [麒麟 V10 部署说明](docs/kylin-offline-install.md)。
 
@@ -122,7 +123,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 | 模块 | 分类 | 功能 |
 | --- | --- | --- |
-| HTTP 调试 | 工作台 | 在桌面本机显式发送 HTTP(S) 请求、查看响应与耗时，支持超时、取消和本地请求集合。 |
+| HTTP 调试 | 工作台 | 可视化编辑参数、请求头、鉴权与正文，在本机发送 HTTP(S) 请求；支持响应格式化、会话历史、超时取消和本地请求集合。 |
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
 | Nginx 配置 | 工作台 | 从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。 |
 
@@ -146,6 +147,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 - **批量 Mock**：从 JSON 示例或常用 Schema 子集生成 1–1,000 份中文数据，支持固定种子、字段规则与 JSON/CSV 导出。规则、支持的 Schema 范围与资源限制见 [数据对比与 Mock](docs/data-workbench.md)。
 - **文件输入输出**：支持拖入或选择文本文件，最多 8 MB 且不超过 2,000,000 字符，可读取 UTF-8 与带 BOM 的 UTF-16 LE/BE。桌面导出使用原生另存对话框，浏览器预览使用下载。
 - **工作区与偏好**：可主动保存、恢复文本任务；默认排除密码、JWT、HMAC，颜色任务和图片不写入工作区。主题支持浅色、深色、跟随系统，另有密度、启动工具及设置 / 收藏导入导出。
+- **窗口与托盘**：关闭按钮默认询问退出或进入托盘，可记住并在设置中修改；托盘保留草稿、运行中的请求与项目共享服务。托盘创建失败时保留可见窗口；Linux 托盘显示依赖桌面环境支持。关闭偏好存放在 Electron 用户数据目录的 `desktop-settings.json`，独立于设置 / 收藏导入导出。
 
 | 快捷键 | 操作 |
 | --- | --- |
@@ -201,7 +203,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.10.7_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.10.8_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -232,13 +234,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.7_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.7-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.7-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.10.8_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.10.8-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.10.8-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.7/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.7/DevKit_ProjectCenter_1.10.7_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.10.8/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.10.8/DevKit_ProjectCenter_1.10.8_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

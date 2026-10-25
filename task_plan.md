@@ -240,3 +240,17 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 104. 更新版本、文档，完成发行前检查与三平台/独立服务打包核验 — complete
 105. 提交并推送，核对远端及新一轮CI结果 — complete
 - 用户已明确授权本轮打包发布、提交与推送；对失败检查先读实际证据。
+
+## 2026-10-26 HTTP 调试与窗口关闭行为
+106. 检查现有实现并调研成熟 HTTP 客户端与 Electron 托盘 — complete
+107. 完善参数、请求头、鉴权、正文及响应/会话历史 — complete
+108. 实现关闭选择、记住行为、托盘恢复/退出与设置 — complete
+109. 同步文档并验证模型、真实桌面交互及构建 — complete
+- 本轮只实现与验证；未授权发行打包、提交或推送。
+- 环境：默认 Python 为 Store 别名，catchup 失败；已读取现有计划与近期记录，初始工作区干净。
+
+## 2026-10-26 v1.10.8 发行
+110. 更新版本、完成发行检查并稳定已确认的提示测试时序 — complete
+111. 制作三平台及独立服务包，核验真实产物 — in_progress
+112. 提交、推送并发布GitHub Release，核对远端与附件 — pending
+- 用户明确授权打包、提交、推送和发布。沿用现有三平台发行流程。

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const path = require('node:path');
 const { origin, csp, isAppUrl, assetPath, validateSave } = require('./policy.cjs');
@@ -17,10 +17,38 @@ let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let httpClient;
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
+const desktopPreferences = require('./desktop-preferences.cjs').createDesktopPreferences(path.join(app.getPath('userData'), 'desktop-settings.json'));
+let tray, choosingClose = false, quitRequested = false, rememberQuit = false;
+function showWindow() {
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.show(); window.focus();
+}
+function requestQuit() {
+  if (!window || window.isDestroyed()) { app.quit(); return; }
+  choosingClose = false; quitRequested = true; showWindow(); window.close();
+}
+function hideToTray() {
+  if (!tray || tray.isDestroyed()) {
+    const created = new Tray(path.join(__dirname, 'tray-icon.png'));
+    try {
+      created.setToolTip('DevKit · 本地开发工作台');
+      created.setContextMenu(Menu.buildFromTemplate([
+        { label: '打开 DevKit', click: showWindow },
+        { type: 'separator' },
+        { label: '退出 DevKit', click: requestQuit },
+      ]));
+      created.on('click', showWindow); created.on('double-click', showWindow);
+      tray = created;
+    } catch (error) { created.destroy(); throw error; }
+  }
+  window.hide();
+}
 let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
-app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
+app.on('second-instance', showWindow);
+app.on('activate', showWindow);
 
 async function createWindow() {
   httpClient = (await import('./server/http-client.mjs')).createHttpClient();
@@ -31,17 +59,32 @@ async function createWindow() {
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) httpClient?.cancelAll(); });
-  window.on('closed', () => httpClient?.close());
-  window.on('close', () => { closeIntent = true; });
+  window.on('closed', () => {
+    httpClient?.close();
+    if (rememberQuit) { try { desktopPreferences.set('quit'); } catch (error) { dialog.showErrorBox('关闭偏好未保存', error.message); } rememberQuit = false; }
+  });
+  window.on('close', event => {
+    if (closeAllowed || quitRequested) { closeIntent = true; return; }
+    event.preventDefault();
+    if (choosingClose || pendingUnload) return;
+    const action = desktopPreferences.get().closeAction;
+    if (action === 'quit') { setImmediate(requestQuit); return; }
+    if (action === 'tray') {
+      try { hideToTray(); return; }
+      catch (error) { dialog.showErrorBox('无法最小化到托盘', `窗口仍保持打开。${error.message}`); }
+    }
+    choosingClose = true; window.webContents.send('devkit:close-request', 'choose');
+  });
   window.webContents.on('will-prevent-unload', event => {
     if (closeAllowed || reloadAllowed) { reloadAllowed = false; event.preventDefault(); return; }
     if (pendingUnload) return;
+    choosingClose = false;
     pendingUnload = closeIntent ? 'close' : 'reload';
     window.webContents.send('devkit:close-request', pendingUnload);
   });
   window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   window.webContents.on('will-attach-webview', event => event.preventDefault());
-  window.webContents.on('did-finish-load', () => { reloadAllowed = false; closeIntent = false; pendingUnload = null; });
+  window.webContents.on('did-finish-load', () => { reloadAllowed = false; closeIntent = false; pendingUnload = null; choosingClose = false; quitRequested = false; });
   window.once('ready-to-show', () => window.show());
   await window.loadURL(`${origin}/index.html`);
 }
@@ -149,19 +192,41 @@ app.whenReady().then(async () => {
       return { data: await nginxManager.request(action, value) };
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
+  const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
+  ipcMain.handle('devkit:desktop-settings', (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的桌面设置请求。');
+    if (action === 'get') return desktopPreferences.get();
+    if (action === 'set') return desktopPreferences.set(value);
+    throw new Error('未知桌面设置操作。');
+  });
+  ipcMain.handle('devkit:choose-close', (event, action, remember) => {
+    if (!trustedDesktop(event) || !choosingClose) return;
+    if (!['cancel', 'tray', 'quit'].includes(action) || typeof remember !== 'boolean') throw new Error('无效的关闭选择。');
+    if (action === 'tray') {
+      // Establish a usable tray before persisting or hiding anything.
+      try { hideToTray(); if (remember) desktopPreferences.set('tray'); }
+      catch (error) { showWindow(); throw error; }
+    }
+    choosingClose = false;
+    if (action === 'quit') { rememberQuit = remember; setImmediate(requestQuit); }
+  });
   ipcMain.on('devkit:answer-close', (event, allow) => {
     if (!window || window.isDestroyed() || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url) || !pendingUnload) return;
     const intent = pendingUnload; pendingUnload = null;
-    if (allow !== true) { closeIntent = false; return; }
+    if (allow !== true) { closeIntent = false; quitRequested = false; rememberQuit = false; return; }
     if (intent === 'reload') { reloadAllowed = true; window.webContents.reload(); }
-    else { closeAllowed = true; window.close(); }
+    else {
+      if (rememberQuit) { try { desktopPreferences.set('quit'); } catch (error) { dialog.showErrorBox('关闭偏好未保存', error.message); } }
+      rememberQuit = false; closeAllowed = true; window.close();
+    }
   });
   await createWindow();
 }).catch(error => { dialog.showErrorBox('DevKit 启动失败', String(error)); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
-  if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); window.close(); return; }
+  if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager) || closing) return;
   event.preventDefault(); closing = true;
   (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
+app.on('will-quit', () => tray?.destroy());
