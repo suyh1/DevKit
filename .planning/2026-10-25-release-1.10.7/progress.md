@@ -1,0 +1,25 @@
+# Progress
+
+2026-10-25：确认发布授权、远端main、最新Release及安全复用凭据。gh不在PATH，改用GitHub REST API；无需新Token。准备更新版本并验证。
+
+版本更新1.10.7并由生成器同步README；219项Node检查通过（167核心、7文档、3桌面策略、2发行、12项目、2HTTP、26Nginx含真实进程），Deb测试9通过/1项POSIX链接按平台跳过；4份Java17样例编译通过。现有CI的分段指示器选择器同步到.motion-pill，未新增或本地执行浏览器脚本。
+
+生产构建完成，bundle:all顺序打包中。准备提交推送产品源码与版本变更，触发既有CI；发布记录暂不提交以便完成后单独归档。
+
+源码提交3dc4e127已推送，CI run40201037981的Windows导航回归停在旧sidebar-collapsed类名（navigation-smoke.cjs:132）。窄屏已改用drawer-closed避免退出抽屉被桌面66px样式缩小；将现有回归改为验证侧栏inert与展开按钮的实际状态，保留行为断言。此次仅测试改动，无需重制产品载荷；Release草稿423445568尚未公开。
+
+测试适配99871436523f7f5e8dee59ea059ff5a082e4ed2c已推送并设为草稿来源，CI run40201304585进行中。本机3平台包和独立服务ZIP完成、共同构建指纹9c2800f82eacfc88db67d1da56a26322add2b5577e5e4424213e6fe131fc80a4。实际两份Deb载荷ASAR与Windows一致，SHA256 0bd0220eac0dbb14c98a96472755e04cd3779984b67aebb92f684bf153b74dde；README及16份专题文档在所有载荷一致。独立ZIP解包运行/配置迁移/密码复用、NSIS配置保留检查通过。开始上传草稿的大文件，最终CI与验收资料待CI完成后上传。
+
+上传辅助脚本首次因草稿API返回临时untagged标签而守卫退出，未上传或公开任何内容；核对Release ID/名称/草稿状态后修正为验证本轮草稿身份，重定向和发布时显式指定tag_name=1.10.7，最终公开后再次核对标签实际SHA。
+
+第二轮CI Linux两架构与独立服务成功；Windows已通过导航/设计，随后项目回归发现MotionButton隐藏测宽文字使textContent重复。改用aria-hidden测宽槽的CSS content:attr(data-label)，新增DOM正文唯一性回归测试，168核心测试和构建通过，45e4f642已提交推送。重新制作4份产物，旧草稿资产删除替换。删除中遇GitHubTLS ECONNRESET，辅助脚本加入幂等GET/DELETE/PATCH的有限网络重试；不对创建POST盲目重试。
+
+第三轮CI run40201783659：45e4f642的Windows完整源码Electron回归已通过，进入安装包制作；Linux amd64/arm64与独立服务均成功。旧草稿9个资产已全部删除，重制最终包进行中，公开发布前要求此来源的4项CI成功。
+
+最终4份产物重制完成且全部校验通过。共同构建指纹c1f1698f055f789a0bd3a9d55ccf16b35105290c061cb92e0fac06d821a0c4a5，实际跨平台ASAR一致为ac2b87cd2128d0d46ce86c795ed650e00cd63712f92b835dccfd14788918e259。包体：Windows113281413、amd6493453234、arm6488356366、独立ZIP247089字节。新版独立服务运行/迁移及16份文档载荷核对再次通过。Windows CI进入包内Electron回归；上传最终草稿产物中。
+
+CI run40201783659已全部成功，四作业均为success，来源45e4f642ab41f8586716ff8a79593aa9477fc671。VERIFICATION.zh-CN.md与SOURCE-COMMIT.txt已按最终来源和构建指纹生成。准备推送1.10.7标签、完成12个草稿附件的上传摘要核验后公开。
+
+2026-10-26继续：确认1.10.7标签已推送并指向45e4f642，GitHub草稿423445568保持draft=true。最终9个产物/清单附件已上传且GitHub摘要与本地一致；旧上传进程已结束。剩余SOURCE-COMMIT.txt、VERIFICATION.zh-CN.md、CI-RESULT.json三个验收附件，完成后正式公开。
+
+2026-10-26完成：来源、验收和CI三个附件补齐，12个附件全部核对GitHub服务端SHA256；Release423445568已公开，正式标签1.10.7准确指向45e4f642ab41f8586716ff8a79593aa9477fc671。发布链接https://github.com/suyh1/DevKit/releases/tag/1.10.7，CI四项全绿https://github.com/suyh1/DevKit/actions/runs/40201783659。安装包、独立ZIP、两个摘要文件、release.json、project-server.json、独立服务验收、来源提交、总验收与CI结果共12个附件齐全。后续只归档本发布记录，使用[skip ci]避免为无产品变更的记录重复打包，发行标签及产物保持本轮已验证来源。
