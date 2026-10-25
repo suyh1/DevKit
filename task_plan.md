@@ -228,3 +228,15 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 98. 提供明确的实例删除入口，覆盖草稿、选中切换和文件保留 — complete
 99. 移除全部操作提示及问号，仅保留输入字段提示 — complete
 100. 验证桌面流程、同步文档，打包并提交推送 — complete
+
+## 2026-10-25 Nginx 全文语法高亮
+101. 核对编辑器和成熟 Nginx 语言支持，接入现有主题 — complete
+102. 验证源码编辑、深浅主题与文档同步 — complete
+- 仅实现本轮高亮需求；不沿用历史记录中的打包、提交或推送授权。
+- 环境错误：默认 python 为 Windows Store 别名，session-catchup 未运行；已读取现有计划与近期记录，工作区初始干净。
+
+## 2026-10-25 v1.10.6 发行与 Windows CI 修复
+103. 查明 GitHub Windows 检查失败并修复对应跨平台问题 — complete
+104. 更新版本、文档，完成发行前检查与三平台/独立服务打包核验 — in_progress
+105. 提交并推送，核对远端及新一轮CI结果 — in_progress
+- 用户已明确授权本轮打包发布、提交与推送；对失败检查先读实际证据。

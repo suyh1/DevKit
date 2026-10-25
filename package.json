@@ -3,7 +3,7 @@
   "private": true,
   "description": "Offline developer workbench with bundled Chromium",
   "author": "DevKit maintainers",
-  "version": "1.10.5",
+  "version": "1.10.6",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",

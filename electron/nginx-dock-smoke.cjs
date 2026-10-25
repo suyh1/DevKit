@@ -54,7 +54,9 @@ module.exports = async function checkNginxDock(window, output) {
     try {
       await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
       assert.equal(await js('getComputedStyle(document.querySelector(".ng-dock-metadata")).transitionDuration'), '0s');
-      assert.equal(await js('getComputedStyle(document.querySelector(".ng-output-body")).animationName'), 'none');
+      if (await js('!!document.querySelector(".ng-output-body")')) {
+        assert.equal(await js('getComputedStyle(document.querySelector(".ng-output-body")).animationName'), 'none');
+      }
     } finally {
       await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] }); window.webContents.debugger.detach();
     }

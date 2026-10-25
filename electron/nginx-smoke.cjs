@@ -59,6 +59,32 @@ module.exports = async function checkNginx(window, output) {
     await window.webContents.insertText(text);
     await wait(`[...document.querySelectorAll('.ng-source .cm-line')].map(line=>line.textContent).join('\\n') === ${JSON.stringify(text)}`);
   }
+  async function sourceColors(name, samples) {
+    await click('全文编辑');
+    const colors = {};
+    for (const theme of ['light', 'dark']) {
+      await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      for (const [text, variable] of samples) {
+        const expression = `(() => {
+          const span=[...document.querySelectorAll('.ng-source .cm-line span')].find(span=>span.textContent===${JSON.stringify(text)});
+          if (!span) return false;
+          const probe=document.createElement('span'); probe.style.color=${JSON.stringify(`var(${variable})`)};
+          document.body.append(probe); const expected=getComputedStyle(probe).color; probe.remove();
+          return getComputedStyle(span).color===expected;
+        })()`;
+        await wait(expression);
+      }
+      colors[theme] = await js(`[...document.querySelectorAll('.ng-source .cm-line span')].map(span=>({text:span.textContent,color:getComputedStyle(span).color}))`);
+      await js('document.querySelector(".ng-source").scrollIntoView({block:"center"})');
+      await new Promise(resolve => setTimeout(resolve, 320));
+      await fs.writeFile(path.join(output, `nginx-source-${name}-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+    }
+    assert.notDeepEqual(colors.light, colors.dark, 'Nginx syntax colors follow the active theme');
+    await js('document.documentElement.dataset.theme="light"');
+    await click('字段配置');
+    assert.equal(await js('!!document.querySelector(".ng-warning")'), false, 'Viewing highlighted source leaves the file unchanged');
+  }
   const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port; await new Promise(resolve => server.close(resolve));
   const dir = path.join(output, `nginx-fixture-${Date.now()}`);
@@ -148,7 +174,9 @@ module.exports = async function checkNginx(window, output) {
     assert.equal(await js('[...document.querySelectorAll(".ng-argument input")].find(i=>i.getAttribute("aria-label").startsWith("server_name 第")).value'), 'ui.local');
     await click('保存文件 (1)');
     assert.equal(await fs.readFile(main, 'utf8'), original.replace('localhost', 'ui.local'));
+    await sourceColors('main', [['# 保留此注释', '--syntax-comment'], ['worker_processes', '--syntax-keyword'], ['1', '--syntax-number'], ['logs/ui.pid', '--syntax-string']]);
     await js(`[...document.querySelectorAll('.ng-file-tabs button')].find(button=>button.textContent.includes('common_proxy.conf')).click()`);
+    await sourceColors('include', [['# 公共代理', '--syntax-comment'], ['proxy_pass', '--syntax-keyword'], ['http://127.0.0.1:9000', '--syntax-string'], ['$host', '--syntax-key']]);
     await field('proxy_pass', 'http://127.0.0.1:9001'); await click('保存文件 (1)');
     assert.equal(await fs.readFile(common, 'utf8'), commonOriginal.replace(':9000', ':9001'));
     await click('备份'); await click('载入草稿', '.ng-modal[open]'); await click('保存文件 (1)');

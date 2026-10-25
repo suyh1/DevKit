@@ -2,7 +2,7 @@ import { Component, lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import Skeleton from './Skeleton';
 
-export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'sql' | 'diff' | 'text';
+export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'sql' | 'nginx' | 'diff' | 'text';
 export type CodeEditorProps = { value: string; onChange?: (value: string) => void; label: string; language?: EditorLanguage; readOnly?: boolean; wrap?: boolean; placeholder?: string; tabSize?: number };
 const Editor = lazy(() => import('./CodeEditorView'));
 class EditorRecovery extends Component<{ children: ReactNode; editor: CodeEditorProps }, { failed: boolean }> {

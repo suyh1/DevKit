@@ -229,3 +229,14 @@
 - 用户实际启动失败源于自定义prefix下缺少temp父目录，原nginx仅对temp/client_body_temp调用CreateDirectory而不递归创建。新增目录准备需按实际include读取，不能将未引用的登记附件当成生效配置。
 - 参考既有nginx-ui Docker运行目录预建和Nginx官方configure中的日志/临时目录选项，不复制代码。显式输出目录预先递归mkdir；隐式编译默认路径仅在真实-t报告对应缺目录时补齐，避免为未使用的系统默认目录索取权限。失败保留原文件且不启动，不生成配置/证书等输入资源。
 - UI技能检索的高饱和营销候选不适用现有工作台，保持当前中性主题，仅采用短缓动、少量动效、吸顶不遮挡字段及prefers-reduced-motion建议。
+
+## 2026-10-25 Nginx 高亮调查
+- 现有 CodeEditor 使用 CodeMirror 6、StreamLanguage 和 CSS syntax 变量，可直接加载官方 nginx 模式。
+- 官方 language-data 明确通过 @codemirror/legacy-modes/mode/nginx 加载 nginx。legacy-modes 为 MIT，GitHub 已迁至维护者自己的代码托管；Monaco 需替换现有编辑器并额外维护 Nginx 语法。
+- 来源：https://github.com/codemirror/legacy-modes；https://github.com/codemirror/language-data/blob/main/src/language-data.ts；https://github.com/microsoft/monaco-editor。
+- 实测 legacy nginx 模式错误：listen 8080 不输出数字 token，Host 被输出 number，$host 丢失高亮；因此移除试装依赖，改用现有 StreamLanguage 实现位置驱动的轻量词法规则。
+- Ace 27,132 stars，2026-10-21 push；官方 LICENSE 为 BSD。借鉴其指令、字符串、变量、注释分层，不复制代码与关键字表，也不引入另一编辑器。支持未知模块；不充当 nginx -t 校验器。
+- GitHub 快照：CodeMirror dev 7,807 stars，legacy-modes 107 stars / MIT，已于2026-04迁站；Monaco 46,883 stars / MIT，2026-10-23 push。Monaco替换成本较高，移动浏览器不受官方支持。
+- 来源：https://github.com/ajaxorg/ace/blob/master/src/mode/nginx_highlight_rules.js；https://github.com/ajaxorg/ace/blob/master/LICENSE；https://nginx.org/en/docs/beginners_guide.html。
+- GitHub日志证实run 40176844466 的 Windows test:nginx 有7项失败，根因均为TEMP的RUNNER~1路径与realpath展开的runneradmin路径不一致；Linux不受影响。日志保存在artifacts/ci-diagnostics/windows-40176844466.log。
+- 修正所有Nginx测试目录使用realpath，并保留真实路径下清理边界断言；修复无nginx测试运行时的吸顶测试getComputedStyle(null)，只在反馈存在时检查其动画。

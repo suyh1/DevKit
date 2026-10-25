@@ -419,3 +419,27 @@
 - Windows x64、Linux amd64/arm64和独立项目服务已打包核验；实际deb载荷与Windows ASAR一致（544b68a1b8a3d56739f76484f6efabbac26daa233429b491d53fd1e378f5a556），共同构建指纹6a2a4f09d75d5fbe530331e70534e930a816c43eaeec04341df47bfbfe3fbf70。README和13份专题文档在所有载荷中与源码一致。
 - 最终截图、删除确认、包内回归日志及VERIFICATION.zh-CN.md已归档artifacts/release-1.10.5。Linux未实机运行，未执行安装器安装；当前195项检查与文档/安装器配置保留验证通过，准备提交推送。
 - v1.10.5实现提交2f8de4da2505b3962385a2510c030770217c3a27已推送origin/main，远端SHA核对一致。实例删除与字段提示精简及发行全部完成；后续提交仅同步完成记录，SOURCE-COMMIT.txt记录最终来源。
+
+## 2026-10-25 Nginx 全文高亮
+- 已定位：NginxCenter 将共用 CodeEditor 的 language 固定为 text。CodeMirror 6 已支持动态语言和深浅主题，但尚未注册 nginx。
+- 读取现有规划与记录；默认 Python Store 别名导致 catchup 脚本未执行，已通过 git status 确认无既存修改。
+- 调研中一次临时 Node 探针误用了模板字符串插值，改为普通字符串后完成验证；web访问 CodeMirror参考和新托管返回403，改读已安装语言API类型。
+- 已接入 nginx 语言并实现轻量词法规则，使用已有色彩变量；安装试用的legacy依赖已移除，最终不新增依赖。
+- 词法测试首轮暴露 StreamLanguage 修饰标签写法错误，已改为 variableName.special；测试断言按官方 classHighlighter 的 variableName2 与相邻合并规则修正。9项定向测试已通过。
+- README生成与文档测试通过（6通过，1项Python打包测试因默认Python不可用跳过）；正在完成生产构建与真实Electron回归。
+- 主/附属文件深浅主题颜色DOM断言已通过；首轮完整Electron回归在既有吸顶测试中失败：未提供nginx可执行文件时不存在执行结果节点，测试却直接getComputedStyle(null)。已定位为测试前提，下一轮使用仓库内既有隔离nginx运行时验证完整流程。
+- 截图需等待主题及滚动绘制，已补充等待；rg在Windows直接传文件通配路径失败，改为目录加-g过滤。
+- 最终验证：npm test 全部152项通过；npm run build成功（保留既有geography动态导入提示）；npm run docs:update、npm run test:docs通过（Python打包项跳过），文档生成同步。
+- 配置DEVKIT_NGINX_TEST_EXECUTABLE后完整真实Electron回归通过：主/附属源码两种主题颜色、无损保存与备份、源码修复/外部冲突、窄屏、真实nginx检查/start/HTTP/reload/quit及关闭草稿保护。截图已检查，见artifacts/electron-smoke/nginx-source-{main,include}-{light,dark}.png。
+- 最终无新增依赖，无版本变更、发行打包、提交或推送。
+
+## 2026-10-25 v1.10.6 发行与 CI 排查
+- 用户授权打包发布、提交推送并要求解释截图中的Windows失败。远端suyh1/DevKit，当前HEAD 3c29895；GitHub run 40176844466 确认Windows失败，正在读取具体失败步骤和注释。
+- 本轮继续使用planning-with-files记录，运行时与打包缓存沿用已验证位置。
+- 已确定Windows失败根因并修复测试夹具路径，另修复CI无nginx时桌面吸顶测试对不存在节点的访问。版本更新为1.10.6，README由生成器同步。
+- 使用临时目录junction别名复现同类路径差异：修复前14通过/7失败，修复后21通过/0失败，三项真实nginx用例该轮未启用。证据：artifacts/ci-diagnostics/alias-before.log和alias-after.log。
+- 发行前已通过152核心、7文档（无跳过）、3桌面策略、2发行、12项目、24 Nginx（含真实生命周期）；Deb打包测试9通过，POSIX符号链接项在Windows按设计跳过。Java首次因javac不在PATH报ENOENT，已定位JAVA_HOME/bin并显式指定后重跑。
+- v1.10.6生产构建完成；开始与CI相同的无nginx完整桌面流程。
+- 路径别名回归已完成修复前后对照，完整无nginx桌面流程已通过45工具、项目中心和吸顶检查，正完成Nginx收尾与关闭生命周期。
+- 与CI一致、未配置nginx可执行文件的完整Electron流程全部通过：45工具、项目中心、Nginx编辑/备份/冲突/高亮/删除、主题窄屏、关闭保护。200项Node检查、9项Python检查及4份Java生成样例已通过。
+- 产品与文档已冻结，准备实现提交并推送；三平台打包及包内验收继续执行。

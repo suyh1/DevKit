@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm, readdir, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, readdir, symlink, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -12,7 +12,9 @@ import { createNginxConfigSet, nginxStarter } from './nginx-create.mjs';
 import { prepareNginxDirectories } from './nginx-directories.mjs';
 
 async function fixture(run, dependencies = {}) {
-  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-'));
+  // Windows runners may expose TEMP as an 8.3 alias (RUNNER~1). Match the
+  // canonical paths returned by the manager, including in process fixtures.
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-nginx-')));
   await mkdir(path.join(dir, 'logs')); await mkdir(path.join(dir, 'conf.d'));
   const main = path.join(dir, 'main.conf'), common = path.join(dir, 'common.conf');
   await writeFile(main, '\uFEFF# 原样保留\r\npid logs/one.pid;\r\nevents { worker_connections 64; }\r\nhttp { server { listen 19081; include common.conf; } }\r\n');
@@ -25,7 +27,7 @@ async function fixture(run, dependencies = {}) {
     return manager.request('upsert', { revision: state.revision, instance: { name: '测试实例', main, prefix: dir, files: [common], executable, platform: process.platform, ...values } });
   };
   try { await run({ dir, main, common, executable, manager, add }); }
-  finally { await manager.close(); assert.equal(path.dirname(dir), tmpdir()); assert.ok(path.basename(dir).startsWith('devkit-nginx-')); await rm(dir, { recursive: true, force: true }); }
+  finally { await manager.close(); assert.equal(path.dirname(dir), await realpath(tmpdir())); assert.ok(path.basename(dir).startsWith('devkit-nginx-')); await rm(dir, { recursive: true, force: true }); }
 }
 
 test('span editing preserves BOM, CRLF, comments, repeated directives, quoted delimiters and variables', () => {
@@ -273,7 +275,7 @@ async function unusedPort() {
   const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port;
 }
 test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and graceful stop', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-real-'));
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-nginx-real-')));
   const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE, main = path.join(dir, 'nginx.conf'), port = await unusedPort();
   const original = `worker_processes 1;\npid logs/real.pid;\nerror_log logs/error.log;\nevents { worker_connections 32; }\nhttp { access_log off; server { listen 127.0.0.1:${port}; location / { return 200 "before"; } } }\n`;
   await writeFile(main, original);
@@ -297,12 +299,12 @@ test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and
     assert.equal((await manager.request('statuses'))[0].state, 'stopped');
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
-    await manager.close(); assert.equal(path.dirname(dir), tmpdir()); await rm(dir, { recursive: true, force: true });
+    await manager.close(); assert.equal(path.dirname(dir), await realpath(tmpdir())); await rm(dir, { recursive: true, force: true });
   }
 });
 
 test('real nginx: a generated two-file set in a directory with spaces starts and serves its homepage', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-new space-'));
+  const directory = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-nginx-new space-')));
   const manager = await createNginxManager(path.join(directory, 'configs'));
   let id;
   try {
@@ -315,12 +317,12 @@ test('real nginx: a generated two-file set in a directory with spaces starts and
     assert.equal((await manager.request('command', { id, command: 'stop' })).ok, true);
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
-    await manager.close(); assert.equal(path.dirname(directory), tmpdir()); await rm(directory, { recursive: true, force: true });
+    await manager.close(); assert.equal(path.dirname(directory), await realpath(tmpdir())); await rm(directory, { recursive: true, force: true });
   }
 });
 
 test('real nginx: direct start and reload prepare absolute log parents and included temporary paths without changing configs', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-dirs-'));
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-nginx-dirs-')));
   const prefix = path.join(dir, 'runtime prefix'), config = path.join(dir, 'configuration'), logs = path.join(config, 'custom logs');
   await mkdir(config);
   const main = path.join(config, 'main.conf'), common = path.join(config, 'runtime.conf'), port = await unusedPort();
@@ -349,6 +351,6 @@ test('real nginx: direct start and reload prepare absolute log parents and inclu
     assert.equal(body, 'after'); assert.equal((await manager.request('command', { id, command: 'stop' })).ok, true);
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
-    await manager.close(); assert.equal(path.dirname(dir), tmpdir()); assert.ok(path.basename(dir).startsWith('devkit-nginx-dirs-')); await rm(dir, { recursive: true, force: true });
+    await manager.close(); assert.equal(path.dirname(dir), await realpath(tmpdir())); assert.ok(path.basename(dir).startsWith('devkit-nginx-dirs-')); await rm(dir, { recursive: true, force: true });
   }
 });

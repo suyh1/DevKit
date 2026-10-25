@@ -17,6 +17,7 @@ async function languageSupport(language: EditorLanguage) {
   if (language === 'css') return (await import('@codemirror/lang-css')).css();
   if (language === 'yaml') return (await import('@codemirror/lang-yaml')).yaml();
   if (language === 'sql') return (await import('@codemirror/lang-sql')).sql();
+  if (language === 'nginx') return (await import('./nginx-language')).nginx();
   if (language === 'diff') return StreamLanguage.define({ token(stream) { const char = stream.peek(); stream.skipToEnd(); return char === '+' ? 'inserted' : char === '-' ? 'deleted' : char === '@' ? 'meta' : null; } });
   return [];
 }
