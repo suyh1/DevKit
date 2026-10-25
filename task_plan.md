@@ -198,5 +198,5 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 ## 2026-10-25 Nginx v1.10.0 发行与推送
 83. 更新版本、生成文档并完成发行前检查 — complete
 84. 制作并核验三平台安装包与独立项目中心服务 — complete
-85. 核验打包后的真实桌面流程，提交并推送 origin/main — in_progress
+85. 核验打包后的真实桌面流程，提交并推送 origin/main — complete
 - 用户已明确授权打包、提交和推送。当前分支 main，与 origin/main 同步，AGENTS.md 无未提交修改。

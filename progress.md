@@ -350,3 +350,5 @@
 - 三平台与服务发行物全部完成并核验：Windows113080120字节、amd64 93258850字节、ARM64 88162326字节、服务ZIP208671字节。共同构建指纹181dddb74fec6fcdd27f1c508766ce428b4a55d8ff67bf63c14b766007684e26。
 - 实际deb载荷与Windows ASAR逐字节一致（f19cb15c08e866d2ade48c46cd1b005f7cf74a93d8f388f384bd807d9e934045）；各包README及13份专题文档一致。verify:release、服务实解包运行和NSIS配置保留均通过。
 - 最终验收说明、包内日志、截图与报告保存到artifacts/release-1.10.0。提交前fetch确认仍与origin/main一致，准备提交并推送本轮30个源代码/文档文件。
+- 功能提交491a683583b8af14763cdccc3acfbdd9da1623fb已成功推送origin/main，ls-remote确认远端SHA与本地一致。
+- v1.10.0三平台安装包、独立服务、校验清单和验收材料全部完成；所有授权源码变更已提交推送。此完成记录随文档提交正常推送，发行目录SOURCE-COMMIT.txt记录最终来源信息。
