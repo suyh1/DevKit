@@ -216,4 +216,4 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 ## 2026-10-25 Nginx 新手填写与操作提示
 92. 核对指令语义与现有多服务/公共代理配置，设计提示 — complete
 93. 为实例字段、配置指令和操作补充可访问的中文说明 — complete
-94. 验证实际配置覆盖、桌面交互与文档，打包提交推送 — in_progress
+94. 验证实际配置覆盖、桌面交互与文档，打包提交推送 — complete
