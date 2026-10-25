@@ -241,7 +241,7 @@ node scripts/package-all.mjs --collect-only
 npm run verify:release
 ```
 
-汇总前会校验各包的版本、架构、校验值、构建凭据及实际 ASAR 内容，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。CI 工作流 `.github/workflows/build.yml` 使用同一组打包入口，构建三平台产物与独立服务 ZIP。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤；Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
+汇总前会校验各包的版本、架构、校验值、构建凭据及实际 ASAR 内容，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。CI 工作流 `.github/workflows/build.yml` 使用同一组打包入口，构建三平台产物与独立服务 ZIP。Windows 打包显式设置 `publish: 'never'`，产物由 Actions 上传；普通构建不隐式发布 GitHub Release，也不要求 `GH_TOKEN`。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤；Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
 
 ### README 自动维护
 

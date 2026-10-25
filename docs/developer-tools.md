@@ -58,6 +58,8 @@ npm run bundle:all
 
 GitHub 提交旁的检查状态来自 `.github/workflows/build.yml`。失败时先查看任务中的具体步骤：测试失败会直接阻止后续安装包制作和上传。Windows runner 的临时目录可能使用 `RUNNER~1` 等 8.3 别名，Nginx 测试夹具通过 `realpath` 与管理器的规范路径保持一致，再比较文件路径及模拟进程身份；不改变正式配置的路径校验。未配置测试用 nginx 时，桌面回归仍覆盖编辑与无运行结果的操作区；设置 `DEVKIT_NGINX_TEST_EXECUTABLE` 可进一步验证真实运行及执行反馈。
 
+Windows NSIS 打包对 electron-builder 显式传入 `publish: 'never'`，本机及 CI 均只制作文件。CI 使用 `actions/upload-artifact` 保存产物，不需要 GitHub 发布令牌；正式 Release 通过单独的发布流程上传。这样可避免 electron-builder 26 根据 CI 环境隐式选择 `onTagOrDraft`，在安装包已生成后因缺少 `GH_TOKEN` 使任务失败。
+
 若下载暂时失败，可完成相应的独立打包命令后执行 `node scripts/package-all.mjs --collect-only` 汇总已生成的当前版本文件。该选项不重新编译，请先确认三个独立包均来自当前源码；任一文件缺失仍会报错。
 
 Windows 使用安装包或完整 `artifacts/desktop-runtime/DevKit-win32-x64/` 解压目录，不能单独拷贝 exe。Linux 包已包含 Chromium，无需系统 WebKitGTK；真实麒麟安装和启动仍需在目标机验证。参见 [麒麟离线安装](kylin-offline-install.md)。

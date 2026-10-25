@@ -33,7 +33,7 @@ if (format === 'deb') {
   execFileSync(python, [path.join(root, 'scripts', 'make-deb.py'), destination, manifest.version, arch], { stdio: 'inherit', cwd: root });
 } else if (format === 'nsis') {
   const { build, Platform, Arch } = await import('electron-builder');
-  await build({ prepackaged: destination, targets: Platform.WINDOWS.createTarget(['nsis'], arch === 'arm64' ? Arch.arm64 : Arch.x64), config: {
+  await build({ publish: 'never', prepackaged: destination, targets: Platform.WINDOWS.createTarget(['nsis'], arch === 'arm64' ? Arch.arm64 : Arch.x64), config: {
     appId: 'io.devkit.desktop', productName: 'DevKit', directories: { output: path.join(root, 'artifacts', `windows-${arch}`), buildResources: path.join(root, 'build') },
     artifactName: 'DevKit_${version}_${arch}-setup.${ext}', npmRebuild: false,
     win: { icon: path.join(root, 'build', 'icons', 'icon.ico') },

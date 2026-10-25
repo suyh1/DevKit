@@ -452,3 +452,5 @@
 - 发布草稿已创建，文件正上传；等待846b1fa对应CI run40180703428完成再公开发布。
 - GitHub第二轮仍停在动画CSS断言，data-paused已为true，说明并非React状态未提交；先前“等待不足”的判断不完整。源码中prefers-reduced-motion的!important animation:none会将animationPlayState恢复为running；设计回归改为在减少动态效果时验证animationName为none，普通模式仍验证paused。正在以Chromium强制减少动态效果的独立设计流程验证两种语义。
 - Chromium强制prefers-reduced-motion的设计回归已通过，明确输出“reduced (animation disabled)”，本地默认动画模式也已验证暂停语义。已确认并修正两种系统偏好下的断言；不是产品动画故障。
+- 第三轮CI已通过全部测试，Windows安装包亦成功生成，随后electron-builder26按CI环境隐式选onTagOrDraft，自动上传缺GH_TOKEN而失败（run40181068236）。当前工作流仅contents:read并使用upload-artifact，本不应自动发布。已核对本地PublishManager实现与官方v26发布文档，显式传buildOptions.publish=never；同步README模板与打包专题。将以CI=true且无发布令牌真实重制三平台包验证，不给普通构建添加发布权限。
+- 来源：https://www.electron.build/v26/docs/publish/；已安装node_modules/app-builder-lib/out/publish/PublishManager.js第46-64行。
