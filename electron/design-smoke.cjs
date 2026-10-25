@@ -89,6 +89,8 @@ module.exports = async function designSmoke(window, output) {
   await js('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例")).click()');
   await js('document.querySelector(".task-pane:not([hidden]) .run-button").click()');
   await wait('!!document.querySelector(".task-pane:not([hidden]) .status-success")');
+  // Resizing can leave the OS pointer over the run button; compare its base color.
+  window.webContents.sendInputEvent({ type: 'mouseMove', x: 1, y: 1 });
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .status-success")).color'), 'rgb(138, 197, 160)');
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(166, 184, 244)');

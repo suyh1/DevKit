@@ -222,3 +222,5 @@
 - 官方 nginx 1.28.0 Windows 测试运行时只下载到 artifacts/nginx-test-runtime，不打包 nginx，不改用户安装。真实检查/start/HTTP/reload/quit 通过。
 - 实测 nginx 不接受 BOM；文件无损保存保留 BOM，界面提供显式移除 BOM 的草稿动作。-t 创建空 PID 的行为已纳入回归。
 - 新建服务使用此前已调研的结构编辑/源码并存设计，模板按官方初学指南验证：http://nginx.org/en/docs/beginners_guide.html。主/附属文件独占写入、失败回滚、已有首页保留；18项定向回归含真实Nginx生成配置已通过。
+- UI技能候选为高饱和营销风格，不适用于当前DevKit；按用户要求保留中性灰白/石墨灰与蓝色主题，仅采用间距、焦点、键盘和响应式建议。
+- 参考Radix Alert Dialog的默认取消焦点/受控确认层，以及Electron will-prevent-unload语义：https://www.radix-ui.com/primitives/docs/components/alert-dialog；https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload。共享确认不复制其代码，不引入依赖。

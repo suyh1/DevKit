@@ -15,6 +15,7 @@ let window;
 let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
+let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
 let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
@@ -27,12 +28,16 @@ async function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.on('close', () => { closeIntent = true; });
   window.webContents.on('will-prevent-unload', event => {
-    const choice = dialog.showMessageBoxSync(window, { type: 'question', title: '尚有未保存的配置', message: '关闭 DevKit 并放弃当前草稿？', buttons: ['继续编辑', '放弃更改并关闭'], defaultId: 0, cancelId: 0, noLink: true });
-    if (choice === 1) event.preventDefault();
+    if (closeAllowed || reloadAllowed) { reloadAllowed = false; event.preventDefault(); return; }
+    if (pendingUnload) return;
+    pendingUnload = closeIntent ? 'close' : 'reload';
+    window.webContents.send('devkit:close-request', pendingUnload);
   });
   window.webContents.on('will-navigate', (event, url) => { if (!isAppUrl(url)) event.preventDefault(); });
   window.webContents.on('will-attach-webview', event => event.preventDefault());
+  window.webContents.on('did-finish-load', () => { reloadAllowed = false; closeIntent = false; pendingUnload = null; });
   window.once('ready-to-show', () => window.show());
   await window.loadURL(`${origin}/index.html`);
 }
@@ -131,10 +136,18 @@ app.whenReady().then(async () => {
       return { data: await nginxManager.request(action, value) };
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
+  ipcMain.on('devkit:answer-close', (event, allow) => {
+    if (!window || window.isDestroyed() || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url) || !pendingUnload) return;
+    const intent = pendingUnload; pendingUnload = null;
+    if (allow !== true) { closeIntent = false; return; }
+    if (intent === 'reload') { reloadAllowed = true; window.webContents.reload(); }
+    else { closeAllowed = true; window.close(); }
+  });
   await createWindow();
 }).catch(error => { dialog.showErrorBox('DevKit 启动失败', String(error)); app.quit(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
+  if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); window.close(); return; }
   if ((!projectStore && !nginxManager) || closing) return;
   event.preventDefault(); closing = true;
   (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));

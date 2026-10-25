@@ -20,6 +20,7 @@ import { createTask, defaultPreferences, editTask, importWorkspace, normalizeFav
 import type { Preferences, Task } from './workbench';
 import { saveText } from './files';
 import packageInfo from '../package.json';
+import { ConfirmationProvider } from './Confirmation';
 
 type Page = 'home' | 'favorites' | 'recent' | 'settings' | 'task' | 'projects' | 'nginx';
 type Job = { worker: Worker; timeout: ReturnType<typeof setTimeout> };
@@ -30,6 +31,9 @@ function initialPreferences(): Preferences {
 }
 
 export default function App() {
+  return <ConfirmationProvider><Workbench /></ConfirmationProvider>;
+}
+function Workbench() {
   const [preferences, setPreferences] = useState(initialPreferences);
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);

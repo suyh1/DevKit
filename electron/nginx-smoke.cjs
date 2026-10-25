@@ -14,9 +14,10 @@ module.exports = async function checkNginx(window, output) {
     throw new Error(`Nginx UI condition failed: ${expression}\n${await js('document.querySelector(".ng-center")?.innerText')}`);
   }
   const idle = () => wait('!document.querySelector(".ng-busy")');
-  const click = async (text, root = '.ng-center, .ng-modal[open]') => {
+  const click = async (text, root = '.ng-center, .ng-modal[open], .confirm-dialog[open]') => {
     const expression = `[...document.querySelectorAll(${JSON.stringify(root)})].flatMap(root => [...root.querySelectorAll('button')]).find(button => button.textContent.trim() === ${JSON.stringify(text)})`;
-    await wait(`!!${expression} && !${expression}.disabled`); await js(`${expression}.click()`); await idle();
+    await wait(`!!${expression} && !${expression}.disabled`); await js(`${expression}.click()`);
+    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))'); await idle();
   };
   const input = async (label, value, root = '.ng-modal[open]') => {
     await js(`{const element=[...document.querySelectorAll(${JSON.stringify(root + ' label')})].find(label=>label.childNodes[0]?.textContent.trim()===${JSON.stringify(label)}).querySelector('input'); element.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)});element.dispatchEvent(new Event('input',{bubbles:true}));}`);
@@ -34,7 +35,9 @@ module.exports = async function checkNginx(window, output) {
     await js('document.querySelector(".ng-source .cm-content").focus()');
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
     window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
     await window.webContents.insertText(text);
+    await wait(`[...document.querySelectorAll('.ng-source .cm-line')].map(line=>line.textContent).join('\\n') === ${JSON.stringify(text)}`);
   }
   const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port; await new Promise(resolve => server.close(resolve));
@@ -52,6 +55,32 @@ module.exports = async function checkNginx(window, output) {
     window.setMinimumSize(360, 600); window.setSize(1440, 1000);
     await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()'); await idle();
     await wait('!!document.querySelector(".ng-heading")');
+    await wait('document.querySelector(".ng-empty h2")?.textContent === "尚未添加 Nginx 实例"');
+    assert.equal(await js('document.querySelector(".ng-empty").textContent.includes("Windows 和 Linux 均支持相同的多文件配置")'), true);
+    await fs.writeFile(path.join(output, 'nginx-empty.png'), (await window.webContents.capturePage()).toPNG());
+    await click('新建配置', '.ng-empty'); await wait('document.querySelector(\'.ng-modal .ng-setup-tabs button[aria-pressed=true]\')?.textContent === "新建配置"');
+    await click('取消', '.ng-modal[open]'); await wait('!document.querySelector(".ng-modal[open]")');
+    assert.equal(await js('!!document.querySelector(".confirm-dialog[open]")'), false, 'Untouched forms must close immediately');
+    await click('导入已有文件', '.ng-empty');
+    await input('实例名称', '临时名称'); await input('实例名称', '');
+    await click('取消', '.ng-modal[open]'); await wait('!document.querySelector(".ng-modal[open]")');
+    assert.equal(await js('!!document.querySelector(".confirm-dialog[open]")'), false, 'Reverted forms must close immediately');
+    await click('导入已有文件', '.ng-empty');
+    await input('实例名称', '保留草稿');
+    await click('取消', '.ng-modal[open]'); await wait('!!document.querySelector(".confirm-dialog[open]")');
+    assert.equal(await js('document.querySelectorAll(".confirm-dialog[open]").length'), 1);
+    assert.equal(await js('document.activeElement.textContent'), '继续编辑');
+    assert.equal(await js('document.querySelector(".ng-modal").textContent.includes("实例设置尚未保存")'), false);
+    for (const theme of ['light', 'dark']) {
+      await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await fs.writeFile(path.join(output, `nginx-discard-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+    }
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    await wait('!document.querySelector(".confirm-dialog[open]")');
+    assert.equal(await js('document.querySelector(".ng-modal input").value'), '保留草稿');
+    await click('取消', '.ng-modal[open]'); await click('放弃更改', '.confirm-dialog[open]');
+    await wait('!document.querySelector(".ng-modal[open]")');
     await click('添加实例');
     await input('实例名称', '界面回归'); await input('主配置文件', main); await input('运行目录（-p prefix）', dir);
     if (executable) await input('nginx 程序路径（留空自动检测）', executable);
@@ -83,12 +112,12 @@ module.exports = async function checkNginx(window, output) {
     await click('备份'); await click('载入草稿', '.ng-modal[open]'); await click('保存文件 (1)');
     assert.equal(await fs.readFile(common, 'utf8'), commonOriginal);
     await field('proxy_pass', 'http://127.0.0.1:9002');
-    await click('重新读取'); await click('取消', '.ng-modal[open]');
+    await click('重新读取'); await click('继续编辑', '.confirm-dialog[open]');
     assert.equal(await js('[...document.querySelectorAll(".ng-argument input")].find(i=>i.getAttribute("aria-label").startsWith("proxy_pass 第")).value'), 'http://127.0.0.1:9002');
     await fs.writeFile(common, commonOriginal + '# 外部修改\n');
     await click('保存文件 (1)'); await wait('document.querySelector(".ng-center [role=alert]")?.textContent.includes("外部修改")');
     assert.equal(await fs.readFile(common, 'utf8'), commonOriginal + '# 外部修改\n');
-    await click('重新读取'); await click('放弃草稿并继续', '.ng-modal[open]');
+    await click('重新读取'); await click('放弃草稿并继续', '.confirm-dialog[open]');
     await source('location /api/ {'); await click('字段配置');
     await wait('document.querySelector(".ng-editor-fieldset [role=alert]")?.textContent.includes("缺少")');
     await source(commonOriginal); await click('字段配置'); await click('保存文件 (1)');
@@ -105,7 +134,7 @@ module.exports = async function checkNginx(window, output) {
       let body;
       for (let index = 0; index < 30; index++) { body = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(); if (body === 'after') break; await new Promise(resolve => setTimeout(resolve, 100)); }
       assert.equal(body, 'after');
-      await click('停止'); await click('停止 Nginx', '.ng-modal[open]');
+      await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
       await wait('document.querySelector(".ng-instance-heading .ng-status")?.textContent.includes("已停止")');
     }
     await js('document.querySelector(".workspace.nginx-workspace").scrollTop = 0');
@@ -141,6 +170,8 @@ module.exports = async function checkNginx(window, output) {
       await input('nginx 程序路径（留空自动检测）', executable); await click('检测 nginx', '.ng-modal[open]');
       assert.equal(await js('[...document.querySelectorAll(".ng-modal label")].find(label=>label.childNodes[0]?.textContent.trim()==="配置目录").querySelector("input").value'), createdDirectory);
     }
+    const footerPosition = await js(`(() => { const body=document.querySelector('.ng-form-scroll'),footer=document.querySelector('.ng-form-footer');body.scrollTop=0;const top=footer.getBoundingClientRect().top;body.scrollTop=body.scrollHeight;const after=footer.getBoundingClientRect();body.scrollTop=0;return {top,after:after.top,bottom:after.bottom,limit:document.querySelector('.ng-form-modal').getBoundingClientRect().bottom}; })()`);
+    assert.ok(Math.abs(footerPosition.top - footerPosition.after) < 1); assert.ok(footerPosition.bottom <= footerPosition.limit);
     await fs.writeFile(path.join(output, 'nginx-create.png'), (await window.webContents.capturePage()).toPNG());
     window.setSize(390, 844); await new Promise(resolve => setTimeout(resolve, 250));
     assert.equal(await js('document.querySelector(".ng-modal[open]").scrollWidth <= document.querySelector(".ng-modal[open]").clientWidth + 1'), true, 'Create dialog must fit narrow width');
@@ -161,7 +192,7 @@ module.exports = async function checkNginx(window, output) {
       await field('proxy_pass', `http://127.0.0.1:${backendPort}/`); await click('保存文件 (1)'); await click('重载');
       let body;
       for (let index = 0; index < 30; index++) { body = await (await fetch(`http://127.0.0.1:${port}/api/ping`, { headers: { Connection: 'close' } })).text(); if (body === 'included:/ping') break; await new Promise(resolve => setTimeout(resolve, 100)); }
-      assert.equal(body, 'included:/ping'); await click('停止'); await click('停止 Nginx', '.ng-modal[open]');
+      assert.equal(body, 'included:/ping'); await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
     }
     console.log(`Nginx UI passed: import and create sets, directory picker, filename validation, linked main/include editing, lossless save, backup recovery, draft preservation, source repair, external conflicts, themes, narrow layout${executable ? ', real nginx start/reload/quit, homepage and included proxy HTTP routing' : ''}.`);
   } catch (error) {

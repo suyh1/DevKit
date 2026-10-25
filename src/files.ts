@@ -1,5 +1,5 @@
 declare global {
-  interface Window { devkitDesktop?: { saveText: (text: string, filename: string) => Promise<string> } }
+  interface Window { devkitDesktop?: { saveText: (text: string, filename: string) => Promise<string>; onCloseRequest: (listener: (intent: 'close' | 'reload') => void) => () => void; answerClose: (allow: boolean) => void } }
 }
 
 export async function saveText(text: string, filename: string): Promise<string> {
