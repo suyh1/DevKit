@@ -30,6 +30,8 @@ Nginx 配置与项目中心同级，名称、分类、说明来自 `src/catalog.
 
 未保存确认由 `Confirmation.tsx` / `confirmation.css` 提供单一主题层，表单放弃与应用关闭/重新加载共享此层，不叠加系统消息框和底部警告。确认框提供标题、说明、取消及明确的放弃动作，默认焦点在“继续编辑”，Esc取消，原生dialog约束焦点并在关闭后返回。主进程只在用户确认退出后关闭服务和存储，取消退出仍可继续编辑、保存与执行操作。
 
+Nginx实例字段、配置参数和操作旁提供“？”；说明在悬停、点击或键盘聚焦时通过原生popover展示，点击外部或Esc关闭，平时不占字段下方空间。示例不替换原值；路径提示展示当前基准目录，附属文件解释公共规则的影响范围。同名指令按HTTP/stream/upstream层级解释，未知模块保留通用语法说明。输入项通过aria-describedby关联提示，浮层沿用主题并限制在视口内，在弹窗内部也可操作；Esc只关闭提示，不触发下层表单的关闭确认。
+
 样式入口为 `src/theme.css`，统一桌面和网页的层叠顺序；主题变量集中在最先导入的 `src/theme-tokens.css`，组件文件不重复声明全局配色。视觉规则与深色装饰适配位于 `src/design.css`，固定分类及浮层位于 `CategoryNavigation.tsx` / `category-navigation.css`。工作台、首页和共享组件分别位于 `App.tsx`、`Overview.tsx`、`SegmentedControl.tsx`、`Skeleton.tsx`；Nginx 工作区位于 `NginxCenter.tsx` / `nginx.css`。界面使用本地资源，不请求远程字体。
 
 构建后可用 `node scripts/smoke-desktop.mjs --design-only` 单独验证深浅主题、五档宽度、导航与快捷入口、分段筛选、键盘和减少动态效果设置，截图与几何检查记录保存在 `artifacts/electron-smoke/design-*`。`npm run test:electron` 会同时运行这些检查和完整功能回归。

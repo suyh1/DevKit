@@ -224,3 +224,5 @@
 - 新建服务使用此前已调研的结构编辑/源码并存设计，模板按官方初学指南验证：http://nginx.org/en/docs/beginners_guide.html。主/附属文件独占写入、失败回滚、已有首页保留；18项定向回归含真实Nginx生成配置已通过。
 - UI技能候选为高饱和营销风格，不适用于当前DevKit；按用户要求保留中性灰白/石墨灰与蓝色主题，仅采用间距、焦点、键盘和响应式建议。
 - 参考Radix Alert Dialog的默认取消焦点/受控确认层，以及Electron will-prevent-unload语义：https://www.radix-ui.com/primitives/docs/components/alert-dialog；https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload。共享确认不复制其代码，不引入依赖。
+- 用户实际Windows配置含8个server（9011至9018），共同include含13条location/proxy_pass的common_proxy.conf；提示需区分实例/服务/路径规则，避免单端口单目标误解。
+- 新手提示沿用现有字段编辑器，不引入依赖；以Nginx官方core/http/proxy/upstream文档核对语义。普通字段只填参数；新增配置块/全文则包含完整指令与分号；server在upstream内是后端节点而非前端站点，说明需按父层级区分。

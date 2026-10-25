@@ -26,6 +26,26 @@ module.exports = async function checkNginx(window, output) {
     const result = await js(`window.devkitNginx.request(${JSON.stringify(action)},${JSON.stringify(payload) || 'undefined'})`);
     assert.equal(result.error, undefined, result.error); return result.data;
   };
+  async function helpFor(control, text, interaction = 'click') {
+    const tip = `document.querySelector(${JSON.stringify(control)})`;
+    const id = await js(`${tip}.getAttribute('aria-describedby')`);
+    assert.ok(id, 'Inputs are linked to their help');
+    const question = `[...document.querySelectorAll('.ng-help-trigger')].find(button=>button.getAttribute('aria-controls')===${JSON.stringify(id)})`;
+    await js(`${question}.scrollIntoView({block:'nearest'})`);
+    await js('new Promise(resolve=>requestAnimationFrame(()=>resolve()))');
+    if (interaction === 'hover') {
+      const point = await js(`(()=>{const r=${question}.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+      window.webContents.sendInputEvent({ type: 'mouseMove', ...point });
+    } else await js(`${question}.${interaction === 'focus' ? 'focus' : 'click'}()`);
+    await wait(`document.getElementById(${JSON.stringify(id)})?.matches(':popover-open')`);
+    assert.ok((await js(`document.getElementById(${JSON.stringify(id)}).textContent`)).includes(text));
+    assert.equal(await js(`(()=>{const r=document.getElementById(${JSON.stringify(id)}).getBoundingClientRect();return r.x>=0&&r.y>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1})()`), true, 'Help stays inside viewport');
+    return id;
+  }
+  async function dismissHelp() {
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    await wait('!document.querySelector(".ng-help-popover:popover-open")');
+  }
   const field = async (name, value) => {
     await js(`{ const element=[...document.querySelectorAll('.ng-center .ng-argument input')].find(input=>input.getAttribute('aria-label').startsWith(${JSON.stringify(name + ' 第')})); let parent=element.closest('details');while(parent){parent.open=true;parent=parent.parentElement.closest('details');} element.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(element,${JSON.stringify(value)}); element.dispatchEvent(new Event('input',{bubbles:true})); }`);
     await js(`document.activeElement.blur()`);
@@ -62,6 +82,17 @@ module.exports = async function checkNginx(window, output) {
     await click('取消', '.ng-modal[open]'); await wait('!document.querySelector(".ng-modal[open]")');
     assert.equal(await js('!!document.querySelector(".confirm-dialog[open]")'), false, 'Untouched forms must close immediately');
     await click('导入已有文件', '.ng-empty');
+    assert.equal(await js(`[...document.querySelectorAll('.ng-form-modal input,.ng-form-modal select,.ng-form-modal textarea')].every(input=>!!document.getElementById(input.getAttribute('aria-describedby'))?.textContent)`), true);
+    assert.equal(await js('document.querySelectorAll(".ng-input-help").length'), 0, 'Help is not printed beneath fields');
+    const prefixControl = '.ng-form-modal input[placeholder="nginx 安装目录或自定义运行前缀"]';
+    await helpFor(prefixControl, 'pid、error_log、root', 'hover');
+    await fs.writeFile(path.join(output, 'nginx-help-form-hover.png'), (await window.webContents.capturePage()).toPNG());
+    await dismissHelp(); assert.equal(await js('!!document.querySelector(".ng-form-modal[open]")'), true, 'Escape dismisses only help');
+    await helpFor(prefixControl, '运行目录', 'focus'); await dismissHelp();
+    await helpFor(prefixControl, '运行目录');
+    const outside = await js(`(()=>{const r=document.querySelector('.ng-form-modal h2').getBoundingClientRect();return {x:Math.round(r.x+4),y:Math.round(r.y+4)}})()`);
+    window.webContents.sendInputEvent({ type: 'mouseDown', ...outside, button: 'left', clickCount: 1 }); window.webContents.sendInputEvent({ type: 'mouseUp', ...outside, button: 'left', clickCount: 1 });
+    await wait('!document.querySelector(".ng-help-popover:popover-open")');
     await input('实例名称', '临时名称'); await input('实例名称', '');
     await click('取消', '.ng-modal[open]'); await wait('!document.querySelector(".ng-modal[open]")');
     assert.equal(await js('!!document.querySelector(".confirm-dialog[open]")'), false, 'Reverted forms must close immediately');
@@ -99,6 +130,19 @@ module.exports = async function checkNginx(window, output) {
     const state = await ipc('get'); instanceId = state.instances.find(item => item.main === main).id;
     assert.equal(await js('document.querySelector(\'button[aria-pressed=true]\')?.textContent === "字段配置" || !!document.querySelector(".ng-tree")'), true);
     assert.equal(await js('document.querySelectorAll(".ng-file-tabs button").length'), 2);
+    assert.equal(await js(`[...document.querySelectorAll('.ng-argument input')].every(input=>!!document.getElementById(input.getAttribute('aria-describedby'))?.textContent)`), true);
+    await helpFor('.ng-argument input[aria-label^="pid 第"]', dir);
+    for (const theme of ['light', 'dark']) {
+      await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      await new Promise(resolve=>setTimeout(resolve,200));
+      await fs.writeFile(path.join(output, `nginx-help-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+    }
+    await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
+    await wait('!document.querySelector(".ng-help-popover:popover-open")');
+    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
+    await js(`[...document.querySelectorAll('.ng-toolbar .ng-action-with-help')].find(group=>group.textContent.includes('保存文件')).querySelector('.ng-help-trigger').click()`);
+    await wait('document.querySelector(".ng-help-popover:popover-open")?.textContent.includes("保存不会自动重载")');
+    assert.equal(await fs.readFile(main,'utf8'),original,'Clicking help does not perform the action'); await dismissHelp();
     await field('server_name', 'ui.local');
     await wait('document.querySelector(".ng-center .ng-warning")?.textContent.includes("未保存")');
     await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
@@ -149,6 +193,8 @@ module.exports = async function checkNginx(window, output) {
     assert.equal(await js('document.querySelector(".ng-detail").getBoundingClientRect().right <= innerWidth'), true);
     assert.equal(await js(`(() => { const title=document.querySelector('.ng-heading h1');const range=document.createRange();range.selectNodeContents(title);const text=range.getBoundingClientRect(),box=title.getBoundingClientRect();return title.textContent==='Nginx 配置' && text.left>=box.left-1 && text.right<=box.right+1; })()`), true, 'Narrow heading text must fit its column');
     await fs.writeFile(path.join(output, 'nginx-narrow.png'), (await window.webContents.capturePage()).toPNG());
+    await helpFor('.ng-argument input[aria-label^="pid 第"]', dir);
+    await fs.writeFile(path.join(output, 'nginx-help-narrow.png'), (await window.webContents.capturePage()).toPNG()); await dismissHelp();
     // Other-system profiles can be edited without accidentally executing on this host.
     const latest = await ipc('get'), instance = latest.instances.find(item => item.id === instanceId);
     await ipc('upsert', { revision: latest.revision, instance: { ...instance, platform: process.platform === 'win32' ? 'linux' : 'win32' } });
@@ -194,6 +240,7 @@ module.exports = async function checkNginx(window, output) {
       for (let index = 0; index < 30; index++) { body = await (await fetch(`http://127.0.0.1:${port}/api/ping`, { headers: { Connection: 'close' } })).text(); if (body === 'included:/ping') break; await new Promise(resolve => setTimeout(resolve, 100)); }
       assert.equal(body, 'included:/ping'); await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
     }
+    console.log('Nginx help passed: question marks with hover/click/focus, accessible field descriptions, modal Escape isolation, outside dismissal, operation help without execution, route cleanup, light/dark themes and narrow viewport bounds.');
     console.log(`Nginx UI passed: import and create sets, directory picker, filename validation, linked main/include editing, lossless save, backup recovery, draft preservation, source repair, external conflicts, themes, narrow layout${executable ? ', real nginx start/reload/quit, homepage and included proxy HTTP routing' : ''}.`);
   } catch (error) {
     console.error(await js('JSON.stringify({error:document.querySelector(".ng-center [role=alert]")?.textContent,notice:document.querySelector(".ng-notice")?.textContent,source:document.querySelector(".ng-source .cm-content")?.textContent,warning:document.querySelector(".ng-warning")?.textContent})'));
