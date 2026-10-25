@@ -9,6 +9,7 @@ import { parseNginx, flattenNginx, editNginxArgs, insertNginx } from '../shared/
 import { createNginxManager, discoverIncludes } from './nginx-manager.mjs';
 import { detectNginx, nginxArgs, processMatches } from './nginx-process.mjs';
 import { createNginxConfigSet, nginxStarter } from './nginx-create.mjs';
+import { prepareNginxDirectories } from './nginx-directories.mjs';
 
 async function fixture(run, dependencies = {}) {
   const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-'));
@@ -101,6 +102,81 @@ test('a failed config test prevents starting and reloading; shell fragments rema
   const argv = nginxArgs({ main: 'D:/path with spaces/a & b.conf', prefix: 'D:/nginx prefix' }, 'stop');
   assert.deepEqual(argv, ['-p', 'D:/nginx prefix/', '-c', 'D:/path with spaces/a & b.conf', '-s', 'quit']);
 });
+
+test('runtime preparation creates nested log, PID, temporary and cache directories from actual includes only', async () => fixture(async ({ dir, main, common, manager, add }) => {
+  const external = path.join(dir, 'absolute logs');
+  const quote = value => JSON.stringify(value.replaceAll('\\', '/'));
+  await writeFile(main, `pid run/deep/master.pid; error_log ${quote(path.join(external, 'errors/deep/error.log'))}; events {} http { access_log logs/deep/access.log; include conf.d/runtime.conf; }`);
+  await writeFile(path.join(dir, 'conf.d/runtime.conf'), 'client_body_temp_path temp/request/body; proxy_temp_path temp/proxy 1 2; proxy_cache_path cache/deep/proxy keys_zone=app:1m; include conf.d/nested.conf;');
+  await writeFile(path.join(dir, 'conf.d/nested.conf'), 'server { include common.conf; }');
+  await writeFile(common, 'location /api/ { fastcgi_temp_path temp/fastcgi; uwsgi_temp_path temp/uwsgi; scgi_temp_path temp/scgi; }');
+  const unused = path.join(dir, 'unused.conf'); await writeFile(unused, 'error_log unused-should-not-exist/error.log;');
+  const id = (await add({ files: [common, unused] })).instances[0].id;
+  const result = await manager.request('command', { id, command: 'test' });
+  assert.equal(result.ok, true); assert.match(result.output, /已自动创建运行目录/);
+  for (const name of ['run/deep', 'logs/deep', 'temp/request/body', 'temp/proxy', 'cache/deep/proxy', 'temp/fastcgi', 'temp/uwsgi', 'temp/scgi']) assert.ok((await readdir(path.join(dir, name))).length === 0);
+  assert.deepEqual(await readdir(path.join(external, 'errors/deep')), []);
+  assert.equal((await readdir(dir)).includes('unused-should-not-exist'), false);
+  const next = await manager.request('command', { id, command: 'test' }); assert.deepEqual(next.createdDirectories, []);
+}, { run: async () => ({ ok: true, output: 'test ok' }) }));
+
+test('runtime preparation preserves existing content and refuses directories occupied by files before launching', async () => {
+  let calls = 0, launched = false;
+  await fixture(async ({ dir, main, manager, add }) => {
+    await writeFile(main, 'pid logs/one.pid; error_log logs/deep/error.log; events {} http { client_body_temp_path blocked/body; }');
+    await writeFile(path.join(dir, 'logs/keep.log'), 'keep exact bytes'); await writeFile(path.join(dir, 'blocked'), 'not a directory');
+    const id = (await add()).instances[0].id;
+    const result = await manager.request('command', { id, command: 'start' });
+    assert.equal(result.ok, false); assert.match(result.output, /无法自动创建运行目录/); assert.ok(result.output.includes(path.join(dir, 'blocked/body')));
+    assert.equal(calls, 0); assert.equal(launched, false);
+    assert.equal(await readFile(path.join(dir, 'blocked'), 'utf8'), 'not a directory');
+    assert.equal(await readFile(path.join(dir, 'logs/keep.log'), 'utf8'), 'keep exact bytes');
+    assert.ok(result.createdDirectories.includes(path.join(dir, 'logs/deep')));
+  }, { run: async () => { calls++; return { ok: true }; }, launch: async () => { launched = true; } });
+});
+
+test('directory planning ignores non-file logs, dynamic paths, data maps, certificates and missing include inputs', async () => fixture(async ({ dir, main, manager, add }) => {
+  const original = 'pid logs/one.pid; error_log stderr; events {} http { access_log off; map $host $dir { error_log map-is-data/error.log; } server { access_log "dynamic/$host/access.log"; ssl_certificate certs/missing.pem; root frontend/dist; } }';
+  await writeFile(main, original); const id = (await add()).instances[0].id;
+  const result = await manager.request('command', { id, command: 'test' });
+  assert.equal(result.ok, false); assert.match(result.output, /含变量/);
+  for (const name of ['off', 'stderr', 'map-is-data', 'dynamic', 'certs', 'frontend']) assert.equal((await readdir(dir)).includes(name), false);
+  assert.equal(await readFile(main, 'utf8'), original);
+  await writeFile(main, 'pid brand-new/run.pid; error_log planned/log/error.log; include missing/input.conf;');
+  const missing = await manager.request('command', { id, command: 'test' }); assert.equal(missing.ok, false); assert.match(missing.output, /引用的配置文件不存在/);
+  assert.equal((await readdir(dir)).includes('planned'), false); assert.equal((await readdir(dir)).includes('brand-new'), false);
+}, { run: async () => ({ ok: false, output: 'missing certificate input' }) }));
+
+test('compiled default directory repair is demand-driven and rejects paths outside the known defaults', async () => {
+  let calls = 0;
+  await fixture(async ({ dir, main, manager, add }) => {
+    await writeFile(main, 'pid logs/one.pid; events {} http { server { listen 18080; } }');
+    const id = (await add()).instances[0].id;
+    const result = await manager.request('command', { id, command: 'test' });
+    assert.equal(result.ok, true); assert.equal(calls, 2); assert.deepEqual(await readdir(path.join(dir, 'build-default/temp/body')), []);
+    assert.equal((await readdir(dir)).includes('unused-build-cache'), false);
+  }, {
+    detect: async ({ executable }) => ({ found: true, executable, pid: 'logs/one.pid', output: "configure arguments: --http-client-body-temp-path='build-default/temp/body' --http-proxy-temp-path=unused-build-cache/proxy" }),
+    run: async (_exe, _args, prefix) => (++calls === 1 ? { ok: false, output: `nginx: [emerg] CreateDirectory() "${path.join(prefix, 'build-default/temp/body').replaceAll('\\', '/')}" failed (3: missing path)` } : { ok: true, output: 'ok' }),
+  });
+  await fixture(async ({ dir, manager, add }) => {
+    const id = (await add()).instances[0].id;
+    const result = await manager.request('command', { id, command: 'test' }); assert.equal(result.ok, false);
+    assert.equal((await readdir(dir)).includes('unexpected'), false);
+  }, { run: async (_exe, _args, prefix) => ({ ok: false, output: `nginx: [emerg] mkdir() "${path.join(prefix, 'unexpected/deep')}" failed (2: No such file)` }) });
+});
+
+test('directory permission failures identify the path and keep existing files and partial directory results', async () => fixture(async ({ dir, main }) => {
+  await writeFile(main, 'pid logs/one.pid; error_log protected/deep/error.log; events {}');
+  await assert.rejects(prepareNginxDirectories({ main, prefix: dir, pidPath: path.join(dir, 'logs/one.pid') }, {
+    readConfig: async filename => ({ content: await readFile(filename, 'utf8') }),
+    makeDirectory: async (directory, options) => {
+      if (directory.includes(`${path.sep}protected${path.sep}`)) throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+      return mkdir(directory, options);
+    },
+  }), error => error.message.includes(path.join(dir, 'protected/deep')) && error.message.includes('EACCES') && Array.isArray(error.createdDirectories));
+  assert.equal((await readdir(dir)).includes('protected'), false);
+}));
 test('PID reuse or shared PID files never authorize signaling another config; changing identity while running is blocked', async () => {
   let info, calls = 0;
   await fixture(async ({ dir, main, executable, manager, add }) => {
@@ -198,7 +274,6 @@ async function unusedPort() {
 }
 test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and graceful stop', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-real-'));
-  await mkdir(path.join(dir, 'logs')); await mkdir(path.join(dir, 'temp'));
   const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE, main = path.join(dir, 'nginx.conf'), port = await unusedPort();
   const original = `worker_processes 1;\npid logs/real.pid;\nerror_log logs/error.log;\nevents { worker_connections 32; }\nhttp { access_log off; server { listen 127.0.0.1:${port}; location / { return 200 "before"; } } }\n`;
   await writeFile(main, original);
@@ -208,6 +283,8 @@ test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and
     assert.equal((await detectNginx({ executable })).found, true);
     const state = await manager.request('upsert', { revision: 0, instance: { name: 'real', main, prefix: dir, files: [], executable, platform: process.platform } }); id = state.instances[0].id;
     const checked = await manager.request('command', { id, command: 'test' }); assert.equal(checked.ok, true, JSON.stringify(checked));
+    assert.ok(checked.createdDirectories.includes(path.join(dir, 'logs')));
+    assert.ok((await readdir(dir)).includes('temp') || (await readdir(dir)).includes('client_body_temp'));
     const start = await manager.request('command', { id, command: 'start' }); assert.equal(start.ok, true, JSON.stringify(start));
     assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), 'before');
     const doc = (await manager.request('documents', { id })).files[0];
@@ -239,5 +316,39 @@ test('real nginx: a generated two-file set in a directory with spaces starts and
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
     await manager.close(); assert.equal(path.dirname(directory), tmpdir()); await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('real nginx: direct start and reload prepare absolute log parents and included temporary paths without changing configs', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 45000 }, async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'devkit-nginx-dirs-'));
+  const prefix = path.join(dir, 'runtime prefix'), config = path.join(dir, 'configuration'), logs = path.join(config, 'custom logs');
+  await mkdir(config);
+  const main = path.join(config, 'main.conf'), common = path.join(config, 'runtime.conf'), port = await unusedPort();
+  const quote = value => JSON.stringify(value.replaceAll('\\', '/'));
+  const original = `worker_processes 1; pid ${quote(path.join(logs, 'pid/master.pid'))}; error_log ${quote(path.join(logs, 'errors/error.log'))}; events { worker_connections 32; } http { include runtime.conf; server { listen 127.0.0.1:${port}; location / { return 200 "before"; } } }`;
+  const included = `access_log ${quote(path.join(logs, 'access/access.log'))}; client_body_temp_path temp/nested/body; proxy_temp_path temp/nested/proxy;`;
+  await writeFile(main, original); await writeFile(common, included);
+  const manager = await createNginxManager(path.join(dir, 'configs'));
+  let id;
+  try {
+    const state = await manager.request('upsert', { revision: 0, instance: { name: 'directory preparation', main, prefix, files: [common], executable: process.env.DEVKIT_NGINX_TEST_EXECUTABLE, platform: process.platform } });
+    id = state.instances[0].id;
+    assert.equal((await readdir(dir)).includes('runtime prefix'), false, 'Registration does not create the runtime directory');
+    const started = await manager.request('command', { id, command: 'start' }); assert.equal(started.ok, true, started.output);
+    assert.ok(started.createdDirectories.includes(prefix));
+    assert.ok(started.createdDirectories.includes(path.join(logs, 'errors')));
+    assert.ok(started.createdDirectories.includes(path.join(prefix, 'temp/nested/body')));
+    assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), 'before');
+    assert.equal(await readFile(main, 'utf8'), original); assert.equal(await readFile(common, 'utf8'), included);
+    const docs = (await manager.request('documents', { id })).files;
+    await manager.request('save-files', { id, files: docs.map(doc => ({ ...doc, content: doc.path === main ? original.replace('before', 'after') : included.replace('access/access.log', 'reload/deep/access.log') })) });
+    const reloaded = await manager.request('command', { id, command: 'reload' }); assert.equal(reloaded.ok, true, reloaded.output);
+    assert.ok(reloaded.createdDirectories.includes(path.join(logs, 'reload/deep')));
+    let body;
+    for (let attempt = 0; attempt < 40; attempt++) { body = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(); if (body === 'after') break; await delay(100); }
+    assert.equal(body, 'after'); assert.equal((await manager.request('command', { id, command: 'stop' })).ok, true);
+  } finally {
+    if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
+    await manager.close(); assert.equal(path.dirname(dir), tmpdir()); assert.ok(path.basename(dir).startsWith('devkit-nginx-dirs-')); await rm(dir, { recursive: true, force: true });
   }
 });

@@ -226,3 +226,6 @@
 - 参考Radix Alert Dialog的默认取消焦点/受控确认层，以及Electron will-prevent-unload语义：https://www.radix-ui.com/primitives/docs/components/alert-dialog；https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload。共享确认不复制其代码，不引入依赖。
 - 用户实际Windows配置含8个server（9011至9018），共同include含13条location/proxy_pass的common_proxy.conf；提示需区分实例/服务/路径规则，避免单端口单目标误解。
 - 新手提示沿用现有字段编辑器，不引入依赖；以Nginx官方core/http/proxy/upstream文档核对语义。普通字段只填参数；新增配置块/全文则包含完整指令与分号；server在upstream内是后端节点而非前端站点，说明需按父层级区分。
+- 用户实际启动失败源于自定义prefix下缺少temp父目录，原nginx仅对temp/client_body_temp调用CreateDirectory而不递归创建。新增目录准备需按实际include读取，不能将未引用的登记附件当成生效配置。
+- 参考既有nginx-ui Docker运行目录预建和Nginx官方configure中的日志/临时目录选项，不复制代码。显式输出目录预先递归mkdir；隐式编译默认路径仅在真实-t报告对应缺目录时补齐，避免为未使用的系统默认目录索取权限。失败保留原文件且不启动，不生成配置/证书等输入资源。
+- UI技能检索的高饱和营销候选不适用现有工作台，保持当前中性主题，仅采用短缓动、少量动效、吸顶不遮挡字段及prefers-reduced-motion建议。

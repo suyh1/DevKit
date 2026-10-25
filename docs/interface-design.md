@@ -32,6 +32,8 @@ Nginx 配置与项目中心同级，名称、分类、说明来自 `src/catalog.
 
 Nginx实例字段、配置参数和操作旁提供“？”；说明在悬停、点击或键盘聚焦时通过原生popover展示，点击外部或Esc关闭，平时不占字段下方空间。示例不替换原值；路径提示展示当前基准目录，附属文件解释公共规则的影响范围。同名指令按HTTP/stream/upstream层级解释，未知模块保留通用语法说明。输入项通过aria-describedby关联提示，浮层沿用主题并限制在视口内，在弹窗内部也可操作；Esc只关闭提示，不触发下层表单的关闭确认。
 
+Nginx实例操作区使用NginxControlDock在工作区内吸顶，包含实例信息、运行操作和命令反馈；正文继续自然滚动。吸顶时以约220ms缓动收紧辅助信息并增加轻阴影，可展开详情，执行结果保持可展开摘要且内容高度有界。ResizeObserver维护滚动留白，避免定位字段时被固定区域遮挡；窄屏操作分组横向可达，减少动态效果时关闭动画。自动目录准备结果沿用命令反馈展示，不增加确认弹窗。
+
 样式入口为 `src/theme.css`，统一桌面和网页的层叠顺序；主题变量集中在最先导入的 `src/theme-tokens.css`，组件文件不重复声明全局配色。视觉规则与深色装饰适配位于 `src/design.css`，固定分类及浮层位于 `CategoryNavigation.tsx` / `category-navigation.css`。工作台、首页和共享组件分别位于 `App.tsx`、`Overview.tsx`、`SegmentedControl.tsx`、`Skeleton.tsx`；Nginx 工作区位于 `NginxCenter.tsx` / `nginx.css`。界面使用本地资源，不请求远程字体。
 
 构建后可用 `node scripts/smoke-desktop.mjs --design-only` 单独验证深浅主题、五档宽度、导航与快捷入口、分段筛选、键盘和减少动态效果设置，截图与几何检查记录保存在 `artifacts/electron-smoke/design-*`。`npm run test:electron` 会同时运行这些检查和完整功能回归。

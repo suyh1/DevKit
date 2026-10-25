@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, MAX_CONFIG_SIZE } from '../shared/nginx.mjs';
 import { acquireProjectLock } from './project-lock.mjs';
 import { createNginxConfigSet } from './nginx-create.mjs';
+import { prepareNginxDirectories, withDirectoryReport } from './nginx-directories.mjs';
 import { detectNginx, nginxArgs, runNginx, launchNginx, inspectNginxProcess, processMatches, pathKey } from './nginx-process.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -121,6 +122,24 @@ export async function createNginxManager(directory, dependencies = {}) {
     if (pidNodes.length > 1 || pidNodes.some(node => node.values.length !== 1 || node.values[0].includes('$'))) throw new Error('无法确定唯一 PID 文件，请检查顶层 pid 指令。');
     return { ...instance, executable: detected.executable, pidPath: path.resolve(instance.prefix, pidNodes[0]?.values[0] || detected.pid || 'logs/nginx.pid') };
   }
+  async function validateDirectories(instance, bound) {
+    let preparation;
+    try {
+      preparation = await prepareNginxDirectories(bound, { readConfig: readDocument, buildInfo: (await binary(instance)).output });
+      let result;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        result = await runtime.run(bound.executable, nginxArgs(bound, 'test'), bound.prefix);
+        try { if (!await preparation.repairMissing(result.output)) break; }
+        catch (error) {
+          if (!result.ok) throw error;
+          preparation.directoryWarnings.push(`配置检查已通过，但默认启动日志目录未能补齐：${message(error)}`); break;
+        }
+      }
+      return { result, preparation };
+    } catch (error) {
+      return { result: { ok: false, output: `运行目录准备失败，未启动或重载。\n${message(error)}` }, preparation: preparation || error };
+    }
+  }
   async function status(instance) {
     if (instance.platform !== 'any' && instance.platform !== process.platform) return { id: instance.id, state: 'platform', detail: '此配置属于其他操作系统，可编辑但不能在本机运行。' };
     try {
@@ -197,8 +216,11 @@ export async function createNginxManager(directory, dependencies = {}) {
     const old = input.id ? find(input.id) : null;
     if (!old && state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
     const main = await configFile(input.main);
-    const prefix = await realpath(absolute(input.prefix, '运行目录'));
-    if (!(await stat(prefix)).isDirectory()) throw new Error('运行目录不是文件夹。');
+    let prefix = absolute(input.prefix, '运行目录');
+    try {
+      prefix = await realpath(prefix);
+      if (!(await stat(prefix)).isDirectory()) throw new Error('运行目录不是文件夹。');
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (!Array.isArray(input.files) || input.files.length > 99) throw new Error('附属文件最多 99 个。');
     const files = [...new Set(await Promise.all(input.files.map(configFile)))].filter(file => pathKey(file) !== pathKey(main));
     let executable = '';
@@ -249,13 +271,17 @@ export async function createNginxManager(directory, dependencies = {}) {
           const bound = await effective(instance);
           const args = nginxArgs(bound, payload.command);
           const command = [bound.executable, ...args].map(value => JSON.stringify(value)).join(' ');
-          if (payload.command === 'test') return { ...await runtime.run(bound.executable, args, bound.prefix), command, status: await status(instance) };
+          if (payload.command === 'test') {
+            const { result, preparation } = await validateDirectories(instance, bound);
+            return withDirectoryReport({ ...result, command, status: await status(instance) }, preparation);
+          }
           const current = await status(instance);
           if (payload.command === 'start' && current.state !== 'stopped') throw new Error(current.state === 'running' ? '此实例已在运行。' : current.detail);
           if (payload.command !== 'start' && current.state !== 'running') throw new Error(`无法确认运行中的此实例：${current.detail}`);
+          let preparation;
           if (payload.command !== 'stop') {
-            const checked = await runtime.run(bound.executable, nginxArgs(bound, 'test'), bound.prefix);
-            if (!checked.ok) return { ...checked, command, output: `配置检查未通过，未${payload.command === 'start' ? '启动' : '重载'}。\n${checked.output}`, status: current };
+            const checked = await validateDirectories(instance, bound); preparation = checked.preparation;
+            if (!checked.result.ok) return withDirectoryReport({ ...checked.result, command, output: `配置检查未通过，未${payload.command === 'start' ? '启动' : '重载'}。\n${checked.result.output}`, status: current }, preparation);
           }
           // Recheck after -t to avoid signaling a PID which changed during validation.
           const latest = await status(instance);
@@ -272,7 +298,7 @@ export async function createNginxManager(directory, dependencies = {}) {
             await delay(150);
           }
           const ok = payload.command === 'stop' ? after.state === 'stopped' : after.state === 'running';
-          return { ok, command, status: after, output: ok ? ({ start: 'Nginx 已启动，主进程身份已确认。', reload: '重载信号已发送，主进程仍在运行；实际新配置启用情况请核对错误日志。', stop: 'Nginx 已优雅停止。' })[payload.command] : `命令已发送，尚未确认目标状态（优雅退出可能仍在等待连接）。${after.detail}` };
+          return withDirectoryReport({ ok, command, status: after, output: ok ? ({ start: 'Nginx 已启动，主进程身份已确认。', reload: '重载信号已发送，主进程仍在运行；实际新配置启用情况请核对错误日志。', stop: 'Nginx 已优雅停止。' })[payload.command] : `命令已发送，尚未确认目标状态（优雅退出可能仍在等待连接）。${after.detail}` }, preparation);
         }
         case 'backups': {
           const instance = find(payload.id), result = [];

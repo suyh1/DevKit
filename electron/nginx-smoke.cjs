@@ -62,9 +62,9 @@ module.exports = async function checkNginx(window, output) {
   const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port; await new Promise(resolve => server.close(resolve));
   const dir = path.join(output, `nginx-fixture-${Date.now()}`);
-  await fs.mkdir(path.join(dir, 'logs'), { recursive: true }); await fs.mkdir(path.join(dir, 'temp'));
+  await fs.mkdir(dir, { recursive: true });
   const main = path.join(dir, 'nginx-win.conf'), common = path.join(dir, 'common_proxy.conf');
-  const original = `\uFEFF# 保留此注释\r\nworker_processes 1;\r\npid logs/ui.pid;\r\nerror_log logs/error.log;\r\nevents { worker_connections 64; }\r\nhttp {\r\n    server {\r\n        listen 127.0.0.1:${port};\r\n        server_name localhost;\r\n        location / { return 200 "before"; }\r\n        include common_proxy.conf;\r\n    }\r\n}\r\n`;
+  const original = `\uFEFF# 保留此注释\r\nworker_processes 1;\r\npid logs/ui.pid;\r\nerror_log logs/error.log;\r\nevents { worker_connections 64; }\r\nhttp {\r\n    server {\r\n        listen 127.0.0.1:${port};\r\n        server_name localhost;\r\n        location / { return 200 "before"; }\r\n        include common_proxy.conf;\r\n    }\r\n${Array.from({length:7},(_,index)=>`    server { listen 127.0.0.1:${port}; server_name site${index+1}.ui; location / { return 200 \"site${index+1}\"; } include common_proxy.conf; }\r\n`).join('')}}\r\n`;
   const commonOriginal = '# 公共代理\nlocation /api/ {\n    proxy_pass http://127.0.0.1:9000;\n    proxy_set_header Host $host;\n}\n';
   await fs.writeFile(main, original); await fs.writeFile(common, commonOriginal);
   const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE || '';
@@ -172,6 +172,10 @@ module.exports = async function checkNginx(window, output) {
       // explicitly remove it through the BOM action before running this fixture.
       await click('移除 UTF-8 BOM'); await click('保存文件 (1)');
       await click('检查配置'); await wait('!!document.querySelector(".ng-output.success")');
+      assert.equal(await js('document.querySelector(".ng-output").textContent.includes("已自动创建运行目录")'), true);
+      assert.ok((await fs.readdir(dir)).includes('logs')); assert.ok((await fs.readdir(dir)).includes('temp') || (await fs.readdir(dir)).includes('client_body_temp'));
+      await js('document.querySelector(".nginx-workspace").scrollTop=0'); await new Promise(resolve=>setTimeout(resolve,320));
+      await fs.writeFile(path.join(output, 'nginx-directory-preparation.png'), (await window.webContents.capturePage()).toPNG());
       await click('启动'); await wait('document.querySelector(".ng-instance-heading .ng-status")?.textContent.includes("运行中")');
       assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), 'before');
       await field('return', '200 "after"'); await click('保存文件 (1)'); await click('重载');
@@ -181,6 +185,7 @@ module.exports = async function checkNginx(window, output) {
       await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
       await wait('document.querySelector(".ng-instance-heading .ng-status")?.textContent.includes("已停止")');
     }
+    await require('./nginx-dock-smoke.cjs')(window, output);
     await js('document.querySelector(".workspace.nginx-workspace").scrollTop = 0');
     for (const theme of ['light', 'dark']) {
       await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
@@ -240,6 +245,7 @@ module.exports = async function checkNginx(window, output) {
       for (let index = 0; index < 30; index++) { body = await (await fetch(`http://127.0.0.1:${port}/api/ping`, { headers: { Connection: 'close' } })).text(); if (body === 'included:/ping') break; await new Promise(resolve => setTimeout(resolve, 100)); }
       assert.equal(body, 'included:/ping'); await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
     }
+    console.log('Nginx directory preparation passed: missing log and temp directories are created before the real config test and start; created paths are visible in execution details.');
     console.log('Nginx help passed: question marks with hover/click/focus, accessible field descriptions, modal Escape isolation, outside dismissal, operation help without execution, route cleanup, light/dark themes and narrow viewport bounds.');
     console.log(`Nginx UI passed: import and create sets, directory picker, filename validation, linked main/include editing, lossless save, backup recovery, draft preservation, source repair, external conflicts, themes, narrow layout${executable ? ', real nginx start/reload/quit, homepage and included proxy HTTP routing' : ''}.`);
   } catch (error) {
