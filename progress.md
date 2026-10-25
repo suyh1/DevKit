@@ -447,3 +447,8 @@
 - 包内真实nginx定向回归重跑通过（高亮、主题、字段、保存、HTTP/重载、删除、关闭保护）。Windows NSIS升级/卸载配置保留检查通过。
 - GitHub第一轮修复验证已通过原test:nginx，继续执行时在既有首页动画测试出现running/paused时序差异（run40180389786，design-smoke.cjs:69）。已为设计回归关闭后台节流，并将固定350ms后的立即断言改为等待真实暂停状态；保留完整断言。准备验证并推送测试稳定性修正。
 - 设计回归修正后本机通过，包内定向回归亦通过；GitHub第一轮的Linux amd64、Linux ARM64与独立服务均已成功。继续推送仅测试相关的渲染/字段等待修正，包内产品代码无需重制。
+- v1.10.6三平台安装包和独立项目服务完成：Windows 113098815字节、amd64 93288274字节、arm64 88183698字节、项目服务ZIP 220267字节。release.json和SHA256SUMS核验通过，构建指纹5c297943dfe8059e0275f4360e4e53705cb430527e345fee44b4b45b373260ab。
+- 独立ZIP实际解包启动、登录、快照/配置迁移通过。实际两份Deb的ASAR与Windows逐字节一致（92bac9808d4e00b664a615a87151ef170c0b4ed4f9dd77d578f6374a90cc161a），README及13份专题文档一致。验收报告与高亮截图已归档artifacts/release-1.10.6。
+- 发布草稿已创建，文件正上传；等待846b1fa对应CI run40180703428完成再公开发布。
+- GitHub第二轮仍停在动画CSS断言，data-paused已为true，说明并非React状态未提交；先前“等待不足”的判断不完整。源码中prefers-reduced-motion的!important animation:none会将animationPlayState恢复为running；设计回归改为在减少动态效果时验证animationName为none，普通模式仍验证paused。正在以Chromium强制减少动态效果的独立设计流程验证两种语义。
+- Chromium强制prefers-reduced-motion的设计回归已通过，明确输出“reduced (animation disabled)”，本地默认动画模式也已验证暂停语义。已确认并修正两种系统偏好下的断言；不是产品动画故障。

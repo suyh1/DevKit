@@ -237,6 +237,6 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 
 ## 2026-10-25 v1.10.6 发行与 Windows CI 修复
 103. 查明 GitHub Windows 检查失败并修复对应跨平台问题 — complete
-104. 更新版本、文档，完成发行前检查与三平台/独立服务打包核验 — in_progress
+104. 更新版本、文档，完成发行前检查与三平台/独立服务打包核验 — complete
 105. 提交并推送，核对远端及新一轮CI结果 — in_progress
 - 用户已明确授权本轮打包发布、提交与推送；对失败检查先读实际证据。

@@ -68,7 +68,13 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js('document.querySelectorAll(".tool-card").length'), 45);
   await js('document.querySelector(".category-marquee button").click()');
   await wait('document.querySelector(".category-marquee").dataset.paused === "true"');
-  await wait('getComputedStyle(document.querySelector(".marquee-track")).animationPlayState === "paused"');
+  const reducedMotion = await js('matchMedia("(prefers-reduced-motion: reduce)").matches');
+  // A system-wide reduction disables animation entirely. Its shorthand resets
+  // animationPlayState to "running", even though nothing is moving.
+  await wait(reducedMotion
+    ? 'getComputedStyle(document.querySelector(".marquee-track")).animationName === "none"'
+    : 'getComputedStyle(document.querySelector(".marquee-track")).animationPlayState === "paused"');
+  console.log(`Home motion preference: ${reducedMotion ? 'reduced (animation disabled)' : 'normal (pause verified)'}`);
   await js('document.querySelector(".welcome-actions button").click()');
   assert.equal(await js('document.activeElement.getAttribute("aria-label")'), '筛选工具库');
   await js('document.querySelector(".overview-workspace").scrollTop = 0; document.activeElement.blur()');
