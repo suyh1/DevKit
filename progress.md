@@ -567,3 +567,11 @@ v1.12.0已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1
 用户明确要求提交、打包、推送、发布。当前main与origin/main均9e6dde3；本次发布全局共享入口及各模块快捷入口，版本1.12.1，沿用三平台+独立服务和数字注解标签。
 
 v1.12.1发行前：188核心、64 Node（含7文档、真实nginx和共享）、Java17四份样例、Deb9通过/1个POSIX项按Windows跳过、生产构建和docs:check均通过。新增全局共享入口专项在完整桌面流程开头通过，完整流程继续执行。
+
+v1.12.1实现6bc0d9f58ef3fef02cfff6fd9f3e17f3bbe5473f已提交推送并核对远端。完整源码桌面（含新的全局共享设置）、API和共享门户专项均通过；独立ZIP解包/保存迁移/共享资源验收通过，Linux双架构已制作并验证98文件/15目录、GLIBC2.25与root/4755沙箱。Release草稿424192148已创建，Windows安装器制作中，CI40318634420三个Linux/服务作业已成功。
+
+v1.12.1四类包全部完成，verify:release通过，共同构建43421fd496a32e05766541a8c9e992611e78dbff4d8b0cddc2515fa014d673be。两份Deb的实际ASAR与Windows逐字节一致95e230de45fb30b2526f834c83854f860b9d1f8a1b80b04aac5b7806d2f448b8，README/19份指南一致，独立ZIP无用户configs。Windows113356290、amd6493503110、ARM6488426162、独立ZIP622610字节。Windows包内全局共享专项已通过，完整包内回归及CI Windows作业继续执行。
+
+最终附件核验GET遇一次GitHub代理Socket关闭（UND_ERR_SOCKET），此前14附件已上传，未执行标签推送或发布。给临时发行助手的GET增加有上限重试与独立连接，写操作不自动重试，继续完整核对。
+
+v1.12.1已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1.12.1 。release id424192148，注解标签1.12.1解引用来源6bc0d9f58ef3fef02cfff6fd9f3e17f3bbe5473f；14附件发布前/后均逐项核对大小与SHA256一致。CI40318634420四作业全部success。实际Windows ASAR完整桌面（含全局共享面板与状态、地址复制、端口冲突及窄屏）、API专项和共享门户专项通过。两份Deb/Windows ASAR及README/19指南一致；独立ZIP保存迁移/主机配置创建验收通过，NSIS隔离清理保留configs通过。Windows未配置签名，用户目标Linux桌面/托盘与真实跨电脑路由未验收，边界已附公开说明。用户授权的提交、打包、推送和发布均完成；本记录仅作为文档提交推送，不改变发行标签来源或已校验的二进制。
