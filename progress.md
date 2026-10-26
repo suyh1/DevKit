@@ -588,3 +588,7 @@ v1.12.1已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1
 用户要求提交打包推送发布，本次版本1.12.2，内容为三服务独立权限和全局交互审查修复，沿用三平台安装包及独立Node服务。
 
 v1.12.2发行前检查通过：188工具+69 Node（含5新增共享策略、真实nginx、发行与文档），Java17四样例，Deb9通过/1个POSIX项按Windows跳过，生产构建和docs:check通过。javac未在PATH，显式指定已安装JDK后通过。
+
+v1.12.2来源6c0db675f116c91ec2f1a38a0bc6a6c19070178b已推送。四类包完成，共同构建ebe25acb988ed9259341f6e5bdf784ee92781a0b13b6b378d66ac6e7bf4ba7d7；实际Windows ASAR完整桌面、API和门户专项及NSIS configs清理验证通过。独立ZIP真实解包/保存迁移/主机创建验收通过，CI40328143760四作业全部success。发行草稿424265673正在上传附件，尚未公开。
+
+v1.12.2已正式发布为latest：https://github.com/suyh1/DevKit/releases/tag/1.12.2 。release id424265673；注解标签1.12.2已推送且解引用为6c0db675f116c91ec2f1a38a0bc6a6c19070178b。四个包和10份校验/验收附件发布前后共14份远端大小与SHA256一致。Windows113371112、amd6493520540、ARM6488430112、独立ZIP635921字节。三平台ASAR一致509d42e2c357921a05db344ed439afba22fa8713fb3583c290a6a9bada1f44b0，20份指南与README一致。CI四作业success，实际包内完整桌面/API/共享门户、独立ZIP、NSIS configs保留通过。此后文档提交只记录验收，不改变发行标签来源及二进制。

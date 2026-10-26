@@ -315,7 +315,9 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 用户要求审查整个项目是否有同类不合理行为，发现影响使用或权限边界的问题一并修复。
 
 ## v1.12.2 共享一致性修复发行
-- 更新版本、完成发行前检查并提交推送 — in_progress
-- 打包三平台与独立服务并验证实际载荷 — pending
-- 等待CI、发布并核对远端附件 — pending
+- 更新版本、完成发行前检查并提交推送 — complete
+- 打包三平台与独立服务并验证实际载荷 — complete
+- 等待CI、发布并核对远端附件 — complete
 用户明确授权提交、打包、推送及发布本次审查修复。
+
+- v1.12.2已作为latest发布：https://github.com/suyh1/DevKit/releases/tag/1.12.2 。14附件发布前后大小与SHA256均匹配；来源6c0db675f116c91ec2f1a38a0bc6a6c19070178b，CI40328143760四作业全部success。
