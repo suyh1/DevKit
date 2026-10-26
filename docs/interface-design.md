@@ -45,3 +45,6 @@ Nginx实例操作区使用NginxControlDock在工作区内吸顶，包含实例�
 样式入口为 `src/theme.css`，统一桌面和网页的层叠顺序；主题变量集中在最先导入的 `src/theme-tokens.css`，组件文件不重复声明全局配色。视觉规则与深色装饰适配位于 `src/design.css`，固定分类及浮层位于 `CategoryNavigation.tsx` / `category-navigation.css`。工作台、首页和共享组件分别位于 `App.tsx`、`Overview.tsx`、`SegmentedControl.tsx`、`Skeleton.tsx`；Nginx 工作区位于 `NginxCenter.tsx` / `nginx.css`。界面使用本地资源，不请求远程字体。
 
 构建后可用 `node scripts/smoke-desktop.mjs --design-only` 单独验证深浅主题、五档宽度、导航与快捷入口、分段筛选、键盘和减少动态效果设置，截图与几何检查记录保存在 `artifacts/electron-smoke/design-*`。`npm run test:electron` 会同时运行这些检查和完整功能回归。
+
+
+局域网共享属于应用级服务：顶部工具栏保留统一入口与开启/关闭/读取失败状态，运行时以状态点和文字反馈，窄屏缩为带状态点的地球图标并保留可访问名称。项目中心、Nginx、HTTP 使用同一Provider的快捷入口，设置面板与模块草稿独立；轮询和回到窗口会刷新运行状态，不覆盖正在填写的表单。统一管理地址/口令/开放模块/编辑和Nginx运行权限，沿用草稿关闭保护与主机API。实现位于Sharing.tsx和sharing.css。

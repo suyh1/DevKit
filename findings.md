@@ -272,3 +272,5 @@ v1.11.0发行完成：共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aed
 首轮集成测试HTTP夹具错误使用headers数组，已改为生产协议规定的对象后通过19项测试。
 
 用户澄清：Nginx共享是运行DevKit主机的远程填写页面，全部路径和运行命令均属于该主机，不是客户端。已开放编辑访客的create/upsert/remove/discover，detect与command需要运行权限，pick始终不向浏览器开放；Node独立服务无需先用桌面登记实例。
+
+全局共享入口调整：原共享表单在ProjectCenter内部，迁至Sharing.tsx单一Provider。服务仍走现有projectRequest/IPC，门户没有主机共享控制入口。状态与草稿分开维护，后台轮询不覆盖正在编辑的设置；顶部在窄屏显示地球图标与状态点并保留可访问名称。

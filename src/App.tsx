@@ -1,3 +1,4 @@
+import { SharingProvider, SharingButton } from './Sharing';
 import { MotionPresence, MotionToast, MotionText, useMotionList, MotionGroup, MotionButton } from './Motion';
 import HttpWorkbench from './HttpWorkbench';
 import { useEffect, useRef, useState } from 'react';
@@ -33,7 +34,7 @@ function initialPreferences(): Preferences {
 }
 
 export default function App() {
-  return <ConfirmationProvider><Workbench /></ConfirmationProvider>;
+  return <ConfirmationProvider><SharingProvider><Workbench /></SharingProvider></ConfirmationProvider>;
 }
 function Workbench() {
   const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
@@ -136,6 +137,7 @@ function Workbench() {
   useEffect(() => { try { localStorage.setItem('devkit:colors', JSON.stringify(colorFavorites)); } catch { notice('收藏色无法保存，请导出备份。'); } }, [colorFavorites]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (document.querySelector(".sharing-panel dialog[open]")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (!saveDialog.current?.open) setSearchOpen(current => !current); }
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); execute.current(); }
       if (event.key === '/' && !(event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))) {
@@ -187,7 +189,7 @@ function Workbench() {
     <main inert={narrow && !collapsed}><header className="topbar floating-navbar">
       <div className="breadcrumb"><button className="icon-button" aria-label={collapsed ? '展开导航' : '收起导航'} onClick={() => setCollapsed(current => !current)}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><button onClick={() => navigate('home')}>工作台</button><span>/</span><strong>{workspaceModules.find(item => item.id === page)?.name || (page === 'task' ? currentTool?.category : page === 'settings' ? '偏好设置' : page === 'favorites' ? '我的收藏' : page === 'recent' ? '最近使用' : '总览')}</strong></div>
       <MotionGroup as="nav" className="floating-nav-links" aria-label="主导航">{([{ id: 'home', label: '工作空间', Icon: LayoutGrid }, ...workspaceModules.map(item => ({ id: item.id, label: item.name, Icon: item.id === 'nginx' ? Server : FolderOpen })), { id: 'favorites', label: '收藏', Icon: Star }] as const).map(item => <button key={item.id} aria-label={item.label} aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><item.Icon size={14} /><span>{item.label}</span></button>)}</MotionGroup>
-      <div className="top-actions"><span className="offline-status"><span />本地处理</span><button className="text-button" onClick={() => workspaceFile.current?.click()} title="恢复工作区"><FolderOpen size={15} /><span>恢复</span></button><button className="text-button" disabled={!tasks.some(task => !isColorTool(task.toolId))} onClick={() => { setIncludeSensitive(false); setSaveOpen(true); }} title="保存工作区"><Save size={15} /><span>保存工作区</span></button><button className="icon-button navbar-search" aria-label="搜索全部工具" onClick={() => setSearchOpen(true)}><Search size={17} /></button></div>
+      <div className="top-actions"><SharingButton global /><span className="offline-status"><span />本地处理</span><button className="text-button" onClick={() => workspaceFile.current?.click()} title="恢复工作区"><FolderOpen size={15} /><span>恢复</span></button><button className="text-button" disabled={!tasks.some(task => !isColorTool(task.toolId))} onClick={() => { setIncludeSensitive(false); setSaveOpen(true); }} title="保存工作区"><Save size={15} /><span>保存工作区</span></button><button className="icon-button navbar-search" aria-label="搜索全部工具" onClick={() => setSearchOpen(true)}><Search size={17} /></button></div>
     </header>
       <MotionPresence kind="panel" present={tasks.length > 0}>{tasks.length > 0 && <div className="task-strip"><button className={`home-tab ${page !== 'task' ? 'selected' : ''}`} onClick={() => navigate('home')} title="工作台总览" aria-label="工作台总览"><LayoutGrid size={16} /></button><MotionGroup className="task-tabs" role="tablist" aria-label="已打开的任务" groupRef={tabs}>{tasks.map((task, index) => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId], selected = page === 'task' && task.id === activeId; const sequence = tasks.slice(0, index + 1).filter(item => item.toolId === task.toolId).length; return <div className={`task-tab ${selected ? 'selected' : ''}`} key={task.id} data-motion-key={task.id}><button role="tab" id={`tab-${task.id}`} aria-controls={`task-${task.id}`} aria-selected={selected} tabIndex={selected || page !== 'task' && index === 0 ? 0 : -1} onClick={() => focusTask(task.id)} onKeyDown={event => { let next = index; if (event.key === 'ArrowRight') next = (index + 1) % tasks.length; else if (event.key === 'ArrowLeft') next = (index + tasks.length - 1) % tasks.length; else if (event.key === 'Home') next = 0; else if (event.key === 'End') next = tasks.length - 1; else if (event.key === 'Delete') { event.preventDefault(); closeTask(task.id); return; } else return; event.preventDefault(); focusTask(tasks[next].id); document.getElementById(`tab-${tasks[next].id}`)?.focus(); }}>{task.status === 'running' ? <LoaderCircle size={14} className="spin" /> : <Icon size={14} />}<span>{tool.name}{sequence > 1 ? ` ${sequence}` : ''}</span>{['stale', 'idle'].includes(task.status) && task.input && <i title="未更新的输入" />}</button><button className="tab-close" tabIndex={selected ? 0 : -1} aria-label={`关闭${tool.name}任务 ${sequence}`} onClick={() => closeTask(task.id)}><X size={12} /></button></div>; })}</MotionGroup><button className="icon-button" aria-label="新建任务" onClick={() => setSearchOpen(true)}><Plus size={16} /></button></div>}</MotionPresence>
       <div className="workspace-stage">

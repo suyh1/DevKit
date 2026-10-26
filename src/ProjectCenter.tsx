@@ -1,3 +1,4 @@
+import { SharingButton } from './Sharing';
 import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence, MotionDetails } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
 import ProjectComparison from './ProjectComparison';
@@ -15,7 +16,6 @@ import {
   Archive,
   Upload,
   Download,
-  Globe,
   X,
   ShieldCheck,
   Settings2,
@@ -43,7 +43,6 @@ import {
 } from "./project-api";
 import type {
   Session,
-  Sharing,
   Snapshot,
   Health,
   ProjectStorage,
@@ -87,9 +86,7 @@ export default function ProjectCenter({
   const [entry, setEntry] = useState<Project | null>(null),
     [profileDraft, setProfileDraft] = useState<Profile | null>(null);
   const [imported, setImported] = useState<ProjectState | null>(null),
-    [history, setHistory] = useState<Snapshot[] | null>(null),
-    [sharing, setSharing] = useState<Sharing | null>(null),
-    [sharePassword, setSharePassword] = useState("");
+    [history, setHistory] = useState<Snapshot[] | null>(null);
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [storage, setStorage] = useState<ProjectStorage | null>(null),
     [storageOpen, setStorageOpen] = useState(false);
@@ -105,7 +102,6 @@ export default function ProjectCenter({
   } | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [snapshotName, setSnapshotName] = useState("");
-  const [shareSaved, setShareSaved] = useState(0);
   const [confirmation, setConfirmation] = useState<{
     title: string;
     description: string;
@@ -122,13 +118,11 @@ export default function ProjectCenter({
         ? "import"
         : history
           ? "history"
-          : sharing
-            ? "sharing"
-            : storageOpen
-              ? "storage"
-              : confirmation
-                ? confirmation.title
-                : "";
+          : storageOpen
+            ? "storage"
+            : confirmation
+              ? confirmation.title
+              : "";
   useEffect(() => {
     if (openModalKey) {
       setError("");
@@ -385,7 +379,6 @@ export default function ProjectCenter({
     !!profileDraft ||
     !!imported ||
     !!history ||
-    !!sharing ||
     storageOpen ||
     !!confirmation;
   const resolved = profile.projects.map((item) => resolveProject(item, profile));
@@ -445,21 +438,7 @@ export default function ProjectCenter({
               配置文件
             </MotionButton>
           )}
-          {owner && (
-            <MotionButton outcome={error ? "error" : ""} busy={busy}
-              className="secondary-button"
-              disabled={busy}
-              onClick={() =>
-                void action(async () => {
-                  setSharing(await projectRequest<Sharing>("sharing"));
-                  setSharePassword("");
-                })
-              }
-            >
-              <Globe size={14} />
-              局域网共享
-            </MotionButton>
-          )}
+          {owner && <SharingButton />}
           {portal && (
             <>
               <button
@@ -1795,159 +1774,6 @@ export default function ProjectCenter({
           <footer>
             <ModalCancel>知道了</ModalCancel>
           </footer>
-        </Modal>
-      )}</MotionPresence>
-      <MotionPresence kind="dialog" present={!!(sharing)}>{sharing && (
-        <Modal
-          feedback={message}
-          title="局域网共享 · 工作台"
-          close={() => setSharing(null)}
-          busy={busy}
-          savedKey={shareSaved}
-          draft={{
-            host: sharing.host,
-            port: sharing.port,
-            canEdit: sharing.canEdit,
-            shareNginx: sharing.shareNginx,
-            shareHttp: sharing.shareHttp,
-            nginxControl: sharing.nginxControl,
-            autoStart: sharing.autoStart,
-            password: sharePassword,
-          }}
-        >
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void action(async () => {
-                const result = await projectRequest<Sharing>("start", {
-                  host: sharing.host,
-                  port: Number(sharing.port),
-                  canEdit: sharing.canEdit,
-                  shareNginx: sharing.shareNginx,
-                  shareHttp: sharing.shareHttp,
-                  nginxControl: sharing.nginxControl,
-                  autoStart: sharing.autoStart,
-                  password: sharePassword,
-                });
-                setSharing((current) => (current === null ? null : result));
-                setSharePassword("");
-                setShareSaved((current) => current + 1);
-                setMessage("工作台共享已启动。");
-              });
-            }}
-          >
-            {errorBox}
-            <p>
-              主机运行期间，其他电脑可用浏览器访问。退出 DevKit 会停止共享。按下面的选项开放 Nginx 与 HTTP 工作台。
-            </p>
-            <div className="pc-form-grid">
-              <Field label="监听范围">
-                <select
-                  value={sharing.host}
-                  onChange={(event) =>
-                    setSharing({ ...sharing, host: event.target.value })
-                  }
-                >
-                  <option value="0.0.0.0">局域网（所有 IPv4 网卡）</option>
-                  <option value="127.0.0.1">仅本机（用于测试）</option>
-                </select>
-              </Field>
-              <Field label="端口">
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  max={65535}
-                  value={sharing.port}
-                  onChange={(event) =>
-                    setSharing({ ...sharing, port: Number(event.target.value) })
-                  }
-                />
-              </Field>
-            </div>
-            <Field
-              label={
-                sharing.hasPassword
-                  ? "更换访问口令（留空保留）"
-                  : "首次访问口令（至少 8 位）"
-              }
-            >
-              <input
-                type="password"
-                autoComplete="new-password"
-                required={!sharing.hasPassword}
-                minLength={8}
-                maxLength={128}
-                value={sharePassword}
-                onChange={(event) => setSharePassword(event.target.value)}
-              />
-            </Field>
-            <label className="pc-check">
-              <input
-                type="checkbox"
-                checked={sharing.canEdit}
-                onChange={(event) =>
-                  setSharing({ ...sharing, canEdit: event.target.checked })
-                }
-              />
-              允许持有口令的访客保存共享内容、恢复备份和发送 HTTP 请求
-            </label>
-            <label className="pc-check">
-              <input
-                type="checkbox"
-                checked={sharing.autoStart}
-                onChange={(event) =>
-                  setSharing({ ...sharing, autoStart: event.target.checked })
-                }
-              />
-              下次启动 DevKit 时自动开启共享
-            </label>
-            <p className="pc-hint">
-              默认只读。仅用于可信局域网，HTTP
-              不加密；访问口令请单独设置。系统防火墙需允许所选端口入站。
-            </p>
-            {([['shareNginx', '开放 Nginx 主机实例、路径配置与日志'], ['shareHttp', '开放 HTTP 接口项目、文档、环境和调试'], ['nginxControl', '允许主机程序检测及 Nginx 检查、启动、重载和停止（还需允许编辑）']] as const).map(([key, label]) => <label className="pc-check" key={key}><input type="checkbox" checked={sharing[key] === true} onChange={event => setSharing({ ...sharing, [key]: event.target.checked })} />{label}</label>)}
-            <div className="pc-sharing-state">
-              <strong>{sharing.running ? "共享正在运行" : "共享已停止"}</strong>
-              {sharing.addresses.map((url) => (
-                <div key={url}>
-                  <code>{url}</code>
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => void copy(url)}
-                  >
-                    复制地址
-                  </button>
-                </div>
-              ))}
-              <small>数据目录：{sharing.directory}</small>
-            </div>
-            <footer>
-              {sharing.running && (
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  type="button"
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void action(async () => {
-                      const stopped = await projectRequest<Sharing>("stop");
-                      setSharing((current) =>
-                        current === null ? null : stopped,
-                      );
-                      setSharePassword("");
-                      setShareSaved((current) => current + 1);
-                    })
-                  }
-                >
-                  停止共享
-                </MotionButton>
-              )}
-              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy}>
-                {sharing.running ? "应用设置并重启共享" : "开启共享"}
-              </MotionButton>
-            </footer>
-          </form>
         </Modal>
       )}</MotionPresence>
     </section>

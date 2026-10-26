@@ -1,0 +1,11 @@
+.global-sharing-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); font-size: 11px; white-space: nowrap; }
+.global-sharing-button:hover { background: var(--tint); color: var(--accent); }
+.global-sharing-button i { width: 6px; height: 6px; border-radius: 50%; background: var(--subtle); }
+.global-sharing-button[data-sharing-state=running] { color: var(--success); }
+.global-sharing-button[data-sharing-state=running] i { background: var(--success); }
+.global-sharing-button[data-sharing-state=unknown] i { background: var(--warning); }
+.sharing-fields { min-width: 0; border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.sharing-fields h3 { margin: 8px 0 0; font-size: 13px; }
+.http-workspace-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+@media(max-width: 1080px) { .global-sharing-button>span { display: none; } .global-sharing-button { padding: 7px; gap: 4px; } }
+@media(max-width: 760px) { .app .floating-nav-links button>span { display: none; } }
