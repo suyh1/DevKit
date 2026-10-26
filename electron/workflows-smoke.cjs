@@ -76,6 +76,7 @@ module.exports = async function workflowsSmoke(window, output) {
         await js(`document.querySelector('${pane} .input-card .cm-content').focus()`);
         window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
         window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+        await wait(`getSelection()?.toString() === document.querySelector('${pane} .input-card .cm-content')?.textContent`);
         await window.webContents.insertText(config);
         await wait(`document.querySelector('${pane} .input-card .cm-content')?.textContent===${JSON.stringify(config)}`);
         await js(`document.querySelector('${pane} .request-input-tabs button').click()`);

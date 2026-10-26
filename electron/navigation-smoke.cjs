@@ -86,6 +86,10 @@ module.exports = async function navigationSmoke(window, output) {
   await wait('!document.querySelector(".category-panel")');
   await open('data');
   const point = await js('({x:innerWidth-30,y:innerHeight-20})');
+  window.show(); window.focus(); window.webContents.focus();
+  await settle();
+  assert.equal(await js(`document.querySelector('.category-navigation').contains(document.elementFromPoint(${point.x},${point.y}))`), false);
+  window.webContents.sendInputEvent({ type:'mouseMove', x:point.x, y:point.y });
   window.webContents.sendInputEvent({ type:'mouseDown', x:point.x, y:point.y, button:'left', clickCount:1 });
   window.webContents.sendInputEvent({ type:'mouseUp', x:point.x, y:point.y, button:'left', clickCount:1 });
   await wait('!document.querySelector(".category-panel")');
