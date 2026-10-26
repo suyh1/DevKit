@@ -56,7 +56,7 @@ module.exports = async function featuresSmoke(window, output) {
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
     await js('document.querySelector(\'.floating-nav-links [aria-label="HTTP 调试"]\').click()');
-    await js(`[...document.querySelectorAll('.http-product-tabs button')].find(button=>button.textContent.trim()==='快速请求').click()`);
+    await click('快速请求', '.http-product-tabs');
     await wait('!!document.querySelector(\'.http-workspace:not([hidden])\')');
     await click('配置 JSON', '.http-request');
     const config = JSON.stringify({ method: 'POST', url: base + '/echo?token=secret-test', headers: { Authorization: 'Bearer secret-test' } }).slice(0, -1) + ',"body":{"id":9007199254740993,"name":"中文"}}';
