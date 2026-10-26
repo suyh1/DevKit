@@ -4,13 +4,15 @@ const path = require('node:path');
 
 module.exports = async function workflowsSmoke(window, output) {
   window.webContents.setBackgroundThrottling(false);
-  const js = code => window.webContents.executeJavaScript(code);
+  const js = code => window.webContents.executeJavaScript(code, true);
   const pane = '.task-pane:not([hidden])';
   async function wait(expression) {
     for (let attempt = 0; attempt < 120; attempt++) {
       if (await js(expression)) return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
+    console.error(await js(`JSON.stringify({focus:document.hasFocus(),status:document.querySelector('${pane} .color-status')?.textContent,tool:document.querySelector('${pane} h1')?.textContent})`));
+    await fs.writeFile(path.join(output, 'workflow-failure.png'), (await window.webContents.capturePage()).toPNG());
     throw new Error(`Workflow condition not met: ${expression}`);
   }
   const fill = async (selector, value) => {
@@ -125,6 +127,7 @@ module.exports = async function workflowsSmoke(window, output) {
       }
       const { clipboard } = require('electron');
       window.show(); window.focus(); window.webContents.focus();
+      await wait('document.hasFocus()');
       await clipboard.clear();
       if (await js(`!!document.querySelector('${pane} .color-formats button')`)) {
         const visible = await js(`document.querySelector('${pane} .color-formats button code').textContent`);
