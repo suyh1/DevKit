@@ -221,6 +221,7 @@ export function resolveProject(project, profile) {
       url: url.href,
       enabled: project.enabled,
       error: "",
+      missingVariables: [],
       localOnly: ["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(
         url.hostname,
       ),
@@ -231,6 +232,7 @@ export function resolveProject(project, profile) {
       enabled: project.enabled,
       error: error.message || "地址无效",
       localOnly: false,
+      missingVariables: [...missing],
     };
   }
 }

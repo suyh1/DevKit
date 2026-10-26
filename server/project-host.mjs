@@ -247,8 +247,6 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           });
         }
         if (url.pathname.startsWith("/api/")) {
-          if (!authorized)
-            return json(401, { error: "请先登录共享工作台。" });
           if (
             sessionPath(url.pathname) === "/api/projects/logout" &&
             request.method === "POST"
@@ -261,6 +259,8 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             );
             return json(200, {});
           }
+          if (!authorized)
+            return json(401, { error: "请先登录共享工作台。" });
           if (url.pathname.startsWith("/api/projects/") && !next.services.projects.enabled) return json(404, { error: "未开放项目中心共享。" });
           if (
             url.pathname === "/api/projects/state" &&

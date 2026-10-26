@@ -43,6 +43,7 @@ export function resolveProject(
   enabled: boolean;
   error: string;
   localOnly: boolean;
+  missingVariables: string[];
 };
 export function importState(input: string): ProjectState;
 export function exportState(state: ProjectState): string;

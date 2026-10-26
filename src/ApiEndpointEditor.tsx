@@ -299,7 +299,7 @@ export function ApiAuthEditor({
       </div>
       <p className="api-empty-note">
         使用环境变量引用凭据，例如 {"{{token}}"}
-        ；保存项目会将定义和环境变量以明文保存在本机。
+        ；保存项目会将定义和环境变量以明文保存在项目所在的主机。
       </p>
     </section>
   );

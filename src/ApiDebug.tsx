@@ -1,3 +1,6 @@
+import { debugOverrides, debugRequest } from './api-debug-draft';
+import type { DebugOverrides } from './api-debug-draft';
+import { useBeforeUnload } from './Confirmation';
 import { canSendHttp, canWriteWorkspace, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -45,14 +48,20 @@ export type ApiHistory = {
 };
 export default function ApiDebug({
   project,
-  endpoint,
+  endpoint: definition,
   environment,
   onChange,
   onBusy,
   onHistory,
   onGenerate,
   onNotice,
+  initialRequest,
+  resetRequest,
+  onDraftChange,
 }: {
+  initialRequest?: ApiHistory | null;
+  resetRequest?: number;
+  onDraftChange?: (dirty: boolean) => void;
   project: ApiProject;
   endpoint: ApiEndpoint;
   environment?: ApiEnvironment;
@@ -62,6 +71,12 @@ export default function ApiDebug({
   onGenerate: (config: string) => void;
   onNotice: (text: string) => void;
 }) {
+  const [overrides, setOverrides] = useState<DebugOverrides>({});
+  const endpoint = debugRequest(definition, overrides), hasOverrides = Object.keys(overrides).length > 0;
+  const changeRequest = (next: ApiEndpoint) => { setOverrides(debugOverrides(definition, next)); onNotice(''); };
+  useEffect(() => { setOverrides(initialRequest ? debugOverrides(definition, initialRequest.endpoint) : {}); }, [initialRequest?.id, resetRequest]);
+  useBeforeUnload(hasOverrides);
+  useEffect(() => { onDraftChange?.(hasOverrides); return () => onDraftChange?.(false); }, [hasOverrides, onDraftChange]);
   const timeout = endpoint.timeout;
   const [running, setRunning] = useState(false),
     [response, setResponse] = useState<HttpResponse | null>(null),
@@ -227,7 +242,7 @@ export default function ApiDebug({
             value={timeout}
             disabled={running}
             onChange={(event) =>
-              onChange({ ...endpoint, timeout: Number(event.target.value) })
+              changeRequest({ ...endpoint, timeout: Number(event.target.value) })
             }
           />
         </label>
@@ -251,17 +266,18 @@ export default function ApiDebug({
           {error}
         </p>
       )}
+      <div className="api-debug-scope"><p>本次请求值仅保留在当前页面，不会改写接口定义、默认示例或共享鉴权。需要修改定义时请切换“接口设计”。</p><button type="button" className="text-button" disabled={running || !hasOverrides} onClick={() => { setOverrides({}); onNotice('已恢复接口定义中的请求值。'); }}>恢复定义值</button></div>
       <fieldset className="api-debug-inputs" disabled={running}>
         <section className="api-section">
           <h3>请求参数</h3>
           <ApiParameters
             rows={endpoint.parameters}
             valuesOnly
-            onChange={(parameters) => onChange({ ...endpoint, parameters })}
+            onChange={(parameters) => changeRequest({ ...endpoint, parameters })}
           />
         </section>
-        <ApiAuthEditor endpoint={endpoint} onChange={onChange} />
-        <ApiBodyEditor endpoint={endpoint} onChange={onChange} />
+        <ApiAuthEditor endpoint={endpoint} onChange={changeRequest} />
+        <ApiBodyEditor endpoint={endpoint} onChange={changeRequest} />
       </fieldset>
       <details className="api-section">
         <summary>查看最终请求配置</summary>
@@ -400,7 +416,7 @@ export default function ApiDebug({
                     try {
                       const data = JSON.parse(response.body),
                         status = String(response.status),
-                        current = endpoint.responses.find(
+                        current = definition.responses.find(
                           (row) => row.status === status,
                         );
                       const row = {
@@ -420,12 +436,12 @@ export default function ApiDebug({
                         example: response.body,
                       };
                       onChange({
-                        ...endpoint,
+                        ...definition,
                         responses: current
-                          ? endpoint.responses.map((item) =>
+                          ? definition.responses.map((item) =>
                               item.id === current.id ? row : item,
                             )
-                          : [...endpoint.responses, row],
+                          : [...definition.responses, row],
                       });
                       onNotice("已填入响应定义草稿，保存接口后写入文档。");
                     } catch (error) {

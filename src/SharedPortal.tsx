@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { SunMoon, LogOut, Copy, Download } from "lucide-react";
 import ProjectCenter from "./ProjectCenter";
 import NginxCenter from "./NginxCenter";
@@ -22,6 +28,19 @@ const modules = [
 ] as const;
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
+const hashPage = () =>
+  modules.find((module) => location.hash === "#" + module.id)?.id;
+const pendingLogout = () => {
+  try {
+    return sessionStorage.getItem("devkit:logout-pending") === "true";
+  } catch {
+    return false;
+  }
+};
+const connectionMessage = (error: unknown) =>
+  error instanceof TypeError
+    ? "无法连接共享主机，请检查网络、地址和共享状态后重试。"
+    : (error as Error).message;
 function preference(key: string, fallback: string) {
   try {
     return localStorage.getItem(key) || fallback;
@@ -163,7 +182,8 @@ function RequestCode({ source, close }: { source: string; close: () => void }) {
 export default function SharedPortal() {
   const [session, setSession] = useState<Session | null>(null),
     [page, setPage] = useState<Page>(
-      () => preference("devkit:portal-page", "projects") as Page,
+      () =>
+        hashPage() || (preference("devkit:portal-page", "projects") as Page),
     );
   const [password, setPassword] = useState(""),
     [message, setMessage] = useState(""),
@@ -171,6 +191,77 @@ export default function SharedPortal() {
     [reauth, setReauth] = useState(false),
     [source, setSource] = useState<string | null>(null);
   const confirm = useConfirmation();
+  const bar = useRef<HTMLElement>(null),
+    content = useRef<HTMLDivElement | null>(null),
+    positions = useRef<Partial<Record<Page, number>>>({});
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null),
+    [notice, setNotice] = useState("");
+  const needsLogout = useRef(pendingLogout());
+  const notify = useCallback((text: string) => setNotice(text), []);
+  const attachContent = useCallback((node: HTMLDivElement | null) => {
+    content.current = node;
+    setScrollRoot(node);
+  }, []);
+  function rememberLogout(value: boolean) {
+    needsLogout.current = value;
+    try {
+      if (value) sessionStorage.setItem("devkit:logout-pending", "true");
+      else sessionStorage.removeItem("devkit:logout-pending");
+    } catch {
+      /* Keep the intent in memory. */
+    }
+  }
+  function navigate(next: Page, push = true) {
+    if (content.current) positions.current[page] = content.current.scrollTop;
+    if (push && location.hash !== "#" + next)
+      history.pushState(null, "", "#" + next);
+    setPage(next);
+    remember("devkit:portal-page", next);
+    setNotice("");
+    setMessage("");
+  }
+  useLayoutEffect(() => {
+    if (scrollRoot) scrollRoot.scrollTop = positions.current[page] || 0;
+  }, [page, scrollRoot]);
+  useLayoutEffect(() => {
+    const header = bar.current;
+    if (!header) return;
+    const resize = new ResizeObserver(() =>
+      header.parentElement?.style.setProperty(
+        "--portal-bar-height",
+        header.getBoundingClientRect().height + "px",
+      ),
+    );
+    resize.observe(header);
+    return () => resize.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!session?.authenticated) return;
+    const changed = () => {
+      const requested = hashPage(),
+        next =
+          requested && session.services?.[requested].enabled
+            ? requested
+            : modules.find((module) => session.services?.[module.id].enabled)
+                ?.id;
+      if (next) {
+        navigate(next, false);
+        if (location.hash !== "#" + next)
+          history.replaceState(null, "", "#" + next);
+      }
+    };
+    window.addEventListener("popstate", changed);
+    window.addEventListener("hashchange", changed);
+    return () => {
+      window.removeEventListener("popstate", changed);
+      window.removeEventListener("hashchange", changed);
+    };
+  }, [session, page]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 7000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   function adopt(value: Session) {
     const normalized = value.authenticated
       ? {
@@ -182,21 +273,31 @@ export default function SharedPortal() {
       : value;
     setRemoteAccess(normalized.authenticated ? normalized : null);
     setSession(normalized);
-    if (normalized.authenticated)
-      setPage((current) =>
-        normalized.services?.[current]?.enabled
-          ? current
-          : modules.find((module) => normalized.services?.[module.id].enabled)
-              ?.id || "projects",
-      );
+    if (normalized.authenticated) {
+      const requested = hashPage() || page;
+      const next = normalized.services?.[requested]?.enabled
+        ? requested
+        : modules.find((module) => normalized.services?.[module.id].enabled)
+            ?.id;
+      if (next) {
+        setPage(next);
+        history.replaceState(null, "", "#" + next);
+        remember("devkit:portal-page", next);
+      }
+    }
   }
   async function connect() {
     setBusy(true);
     setMessage("");
     try {
+      if (needsLogout.current) {
+        await projectRequest("logout");
+        rememberLogout(false);
+      }
       adopt(await projectRequest<Session>("session"));
     } catch (error) {
-      setMessage((error as Error).message);
+      if (needsLogout.current) adopt({ authenticated: false, role: "viewer" });
+      setMessage(connectionMessage(error));
     } finally {
       setBusy(false);
     }
@@ -218,6 +319,7 @@ export default function SharedPortal() {
       adopt(await projectRequest<Session>("login", { password }));
       setPassword("");
       setReauth(false);
+      rememberLogout(false);
     } catch (error) {
       setMessage((error as Error).message);
     } finally {
@@ -235,15 +337,25 @@ export default function SharedPortal() {
       }))
     )
       return;
+    rememberLogout(true);
+    let offline = false;
     try {
       await projectRequest("logout");
+      rememberLogout(false);
+    } catch {
+      offline = true;
+    } finally {
       adopt({ authenticated: false, role: "viewer" });
       setPassword("");
       setSource(null);
       setReauth(false);
-      setMessage("");
-    } catch (error) {
-      setMessage((error as Error).message);
+      setNotice("");
+      positions.current = {};
+      setMessage(
+        offline
+          ? "已退出本页并清除草稿。暂未连上主机，恢复连接后会先注销旧会话。"
+          : "",
+      );
     }
   }
   const services = session?.services || emptySharingServices(),
@@ -252,8 +364,11 @@ export default function SharedPortal() {
   const summary = !active?.enabled
     ? "没有可访问的服务"
     : [
-        modules.find((module) => module.id === page)?.name,
-        active.edit ? "可编辑" : ({projects:"项目只读",nginx:"配置只读",http:"接口定义只读"}[page]),
+        active.edit
+          ? "可编辑"
+          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读" }[
+              page
+            ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
         page === "http" && services.http.send ? "可发送请求" : "",
         page === "projects" && services.projects.probe ? "可检测入口" : "",
@@ -280,7 +395,7 @@ export default function SharedPortal() {
           {message}
         </p>
       )}
-      {!session && !busy && (
+      {(!session || needsLogout.current) && !busy && (
         <button
           type="button"
           className="text-button"
@@ -293,7 +408,7 @@ export default function SharedPortal() {
   );
   return (
     <main className="workspace-portal">
-      <header className="portal-bar">
+      <header className="portal-bar" ref={bar}>
         <strong>DevKit 共享工作台</strong>
         {session?.authenticated && (
           <nav aria-label="共享模块">
@@ -302,11 +417,7 @@ export default function SharedPortal() {
                 key={module.id}
                 className="secondary-button"
                 aria-current={page === module.id ? "page" : undefined}
-                onClick={() => {
-                  setPage(module.id);
-                  remember("devkit:portal-page", module.id);
-                  setMessage("");
-                }}
+                onClick={() => navigate(module.id)}
               >
                 {module.name}
               </button>
@@ -326,65 +437,97 @@ export default function SharedPortal() {
           )}
         </div>
       </header>
-      {!session?.authenticated ? (
-        <section className="portal-login">
-          <h1>登录共享工作台</h1>
-          <p>输入主机设置的访问口令，登录后只展示已开放的服务。</p>
-          {loginForm}
-        </section>
-      ) : (
-        <>
-          <div className="portal-access">
-            <strong>{summary}</strong>
-            <span>
-              所有路径、文件与执行均指共享主机；请求中的 localhost
-              也是共享主机。
-            </span>
-          </div>
-          {message && !reauth && <p role="status">{message}</p>}
-          {available.length === 0 && (
-            <section className="portal-empty">
-              <h1>尚无可访问的服务</h1>
-              <p>请联系主机管理者检查服务开放设置。</p>
-            </section>
-          )}
-          {services.projects.enabled && (
-            <div hidden={page !== "projects"} inert={page !== "projects"}>
-              <ProjectCenter portal portalSession={session} />
+      <div className="portal-content" ref={attachContent}>
+        {!session?.authenticated ? (
+          <section className="portal-login">
+            <h1>登录共享工作台</h1>
+            <p>输入主机设置的访问口令，登录后只展示已开放的服务。</p>
+            {loginForm}
+          </section>
+        ) : (
+          <>
+            <div className="portal-access">
+              <strong>{summary}</strong>
+              <span>
+                {page === "projects"
+                  ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
+                  : page === "nginx"
+                    ? "配置、路径及运行操作均属于共享主机；导出文件下载到当前浏览器。"
+                    : "接口项目保存在共享主机，请求从主机发出，localhost 指主机；快速请求集合保存在当前浏览器。"}
+              </span>
             </div>
-          )}
-          {services.nginx.enabled && (
-            <div hidden={page !== "nginx"} inert={page !== "nginx"}>
-              <NginxCenter active={page === "nginx"} />
-            </div>
-          )}
-          {services.http.enabled && (
-            <div hidden={page !== "http"} inert={page !== "http"}>
-              <HttpWorkbench
-                initial={null}
-                onNotice={setMessage}
-                onGenerate={setSource}
-              />
-            </div>
-          )}
-          {reauth && (
-            <Modal
-              title="重新登录共享工作台"
-              closeLabel="关闭重新登录提示"
-              close={() => setReauth(false)}
-              busy={busy}
-            >
-              <p>
-                会话已失效，当前草稿仍保留。可关闭此提示先导出；重新登录将按主机当前开放的服务和权限显示。
-              </p>
-              {loginForm}
-            </Modal>
-          )}
-          {source !== null && (
-            <RequestCode source={source} close={() => setSource(null)} />
-          )}
-        </>
-      )}
+            {notice && (
+              <div className="portal-notice" role="status">
+                <span>{notice}</span>
+                <button
+                  type="button"
+                  className="text-button"
+                  aria-label="关闭操作反馈"
+                  onClick={() => setNotice("")}
+                >
+                  关闭
+                </button>
+              </div>
+            )}
+            {available.length === 0 && (
+              <section className="portal-empty">
+                <h1>尚无可访问的服务</h1>
+                <p>请联系主机管理者检查服务开放设置。</p>
+              </section>
+            )}
+            {services.projects.enabled && (
+              <div
+                className="portal-page"
+                hidden={page !== "projects"}
+                inert={page !== "projects"}
+              >
+                <ProjectCenter portal portalSession={session} />
+              </div>
+            )}
+            {services.nginx.enabled && (
+              <div
+                className="portal-page"
+                hidden={page !== "nginx"}
+                inert={page !== "nginx"}
+              >
+                <NginxCenter
+                  active={page === "nginx"}
+                  scrollRoot={scrollRoot}
+                />
+              </div>
+            )}
+            {services.http.enabled && (
+              <div
+                className="portal-page"
+                hidden={page !== "http"}
+                inert={page !== "http"}
+              >
+                <HttpWorkbench
+                  initial={null}
+                  onNotice={notify}
+                  onGenerate={setSource}
+                />
+              </div>
+            )}
+            {reauth && (
+              <Modal
+                title="重新登录共享工作台"
+                closeLabel="关闭重新登录提示"
+                close={() => setReauth(false)}
+                busy={busy}
+              >
+                <p>
+                  会话已失效，当前草稿仍保留。可关闭此提示先导出；重新登录将按主机当前开放的服务和权限显示。
+                </p>
+                {loginForm}
+              </Modal>
+            )}
+            {source !== null && (
+              <RequestCode source={source} close={() => setSource(null)} />
+            )}
+          </>
+        )}
+      </div>
     </main>
   );
 }

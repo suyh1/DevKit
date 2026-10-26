@@ -58,6 +58,9 @@ jobs:
       - name: LAN workspaces browser integration
         if: runner.os == 'Windows'
         run: node scripts/smoke-sharing.mjs
+      - name: Portal native interaction and LAN clipboard regression
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-portal.mjs
       - run: npm run ${{ matrix.command }}
       - name: Verify packaged Electron app
         if: runner.os == 'Windows'
@@ -68,6 +71,9 @@ jobs:
       - name: Verify packaged LAN workspaces
         if: runner.os == 'Windows'
         run: node scripts/smoke-sharing.mjs --packaged
+      - name: Verify packaged portal native interaction
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-portal.mjs --packaged
       - name: Verify configs preservation in NSIS cleanup
         if: runner.os == 'Windows'
         run: node scripts/check-configs-installer.mjs

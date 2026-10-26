@@ -321,3 +321,16 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 用户明确授权提交、打包、推送及发布本次审查修复。
 
 - v1.12.2已作为latest发布：https://github.com/suyh1/DevKit/releases/tag/1.12.2 。14附件发布前后大小与SHA256均匹配；来源6c0db675f116c91ec2f1a38a0bc6a6c19070178b，CI40328143760四作业全部success。
+
+## 2026-10-27 共享网页版15项修复（已批准）
+- 修复门户滚动、HTTP高度与Nginx吸顶 — complete
+- 修复复制、调试覆盖值、过期状态与退出 — complete
+- 统一导航、缺变量修复、文案、帮助、焦点、草稿与反馈 — complete
+- 真实LAN HTTP/真实点击回归、文档同步与逐项验收 — complete
+用户已明确批准全部15项修复；本轮未要求提交、打包或发布。
+
+## v1.12.3 共享网页版修复发行
+- 更新版本、核对检查并提交推送 — in_progress
+- 制作三平台和独立服务包，验证实际载荷与包内交互 — pending
+- 等待CI、发布并核对远端附件 — pending
+用户已授权提交、打包、推送和发布全部15项修复。

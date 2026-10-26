@@ -1,6 +1,6 @@
 import { canWriteWorkspace, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Folder,
   FolderPlus,
@@ -87,6 +87,11 @@ export default function ApiWorkspace({
     lock = useRef(false),
     sendRef = useRef(false),
     confirm = useConfirmation();
+  const requestDirty = useRef(false);
+  const onRequestDirty = useCallback((dirty: boolean) => { requestDirty.current = dirty; }, []);
+  const [historyRequest, setHistoryRequest] = useState<ApiHistory | null>(null);
+  const [requestReset, setRequestReset] = useState(0);
+  function changeDraft(value: ApiEndpoint | null) { setDraft(value); setHistoryRequest(null); onNotice(''); }
   const state = library?.state || initialApiState(),
     project = state.projects.find((item) => item.id === projectId),
     saved = project?.endpoints.find((item) => item.id === draft?.id),
@@ -112,7 +117,7 @@ export default function ApiWorkspace({
             result.state.projects[0];
         setLibrary(result);
         setProjectId(item?.id || "");
-        setDraft(
+        changeDraft(
           item?.endpoints[0] ? structuredClone(item.endpoints[0]) : null,
         );
         setEnvironmentId(
@@ -146,7 +151,7 @@ export default function ApiWorkspace({
       selected?.endpoints[0];
     setLibrary(result);
     setProjectId(selected?.id || "");
-    setDraft(endpoint ? structuredClone(endpoint) : null);
+    changeDraft(endpoint ? structuredClone(endpoint) : null);
     if (!selected?.environments.some((item) => item.id === environmentId))
       setEnvironmentId("");
   }
@@ -155,6 +160,7 @@ export default function ApiWorkspace({
     lock.current = true;
     setBusy(true);
     setError("");
+    onNotice("");
     try {
       await work();
     } catch (error) {
@@ -169,16 +175,18 @@ export default function ApiWorkspace({
       onNotice("请先取消或等待当前操作完成。");
       return false;
     }
-    return (
-      !dirty ||
+    const allowed = (
+      (!dirty && !requestDirty.current) ||
       (await confirm({
         title: "放弃接口草稿？",
-        detail: "接口定义尚未保存。放弃后载入所选内容，已保存的项目不会变化。",
+        detail: "接口定义或本次调试值尚有草稿。放弃后载入所选内容，本次调试值会丢弃，主机已保存的定义不会变化。",
         confirm: "放弃草稿",
         cancel: "继续编辑",
         context: "API工作台",
       }))
     );
+    if (allowed) setRequestReset(current => current + 1);
+    return allowed;
   }
   async function commit(
     projects: ApiProject[],
@@ -198,7 +206,7 @@ export default function ApiWorkspace({
     void allowChange().then((allowed) => {
       if (allowed) {
         setProjectId(item.id);
-        setDraft(item.endpoints[0] ? structuredClone(item.endpoints[0]) : null);
+        changeDraft(item.endpoints[0] ? structuredClone(item.endpoints[0]) : null);
         setEnvironmentId(readPreference(`devkit:api-env:${item.id}`) || "");
         setSearch("");
         setError("");
@@ -208,7 +216,7 @@ export default function ApiWorkspace({
   function selectEndpoint(endpoint: ApiEndpoint) {
     void allowChange().then((allowed) => {
       if (allowed) {
-        setDraft(structuredClone(endpoint));
+        changeDraft(structuredClone(endpoint));
         setError("");
       }
     });
@@ -220,7 +228,7 @@ export default function ApiWorkspace({
       let i = 1;
       while (project.endpoints.some((item) => item.path === endpoint.path))
         endpoint.path = `/new-endpoint-${i++}`;
-      setDraft(endpoint);
+      changeDraft(endpoint);
       setView("design");
       setError("");
     });
@@ -228,7 +236,7 @@ export default function ApiWorkspace({
   function openProject(item?: ApiProject) {
     void allowChange().then((allowed) => {
       if (allowed) {
-        setDraft(saved ? structuredClone(saved) : null);
+        changeDraft(saved ? structuredClone(saved) : null);
         setProjectDraft(item ? structuredClone(item) : newApiProject());
         setError("");
       }
@@ -277,9 +285,9 @@ export default function ApiWorkspace({
     <section className="api-workspace" aria-busy={busy}>
       <div className="api-topline">
         <div>
-          <div className="eyebrow">LOCAL API WORKSPACE</div>
+          <div className="eyebrow">{remoteAccess() ? "SHARED API WORKSPACE" : "LOCAL API WORKSPACE"}</div>
           <h1>接口工作台</h1>
-          <p>设计接口、维护文档与调试，共用一份本地项目定义。</p>
+          <p>{remoteAccess() ? "接口定义与环境保存在共享主机，本次调试值仅留在当前页面。" : "设计接口、维护文档与调试，共用一份本地项目定义。"}</p>
         </div>
         <div className="api-actions">
           <button
@@ -341,7 +349,7 @@ export default function ApiWorkspace({
       {!library && (
         <div className="api-blank">
           <BookOpen size={32} />
-          <h2>{error ? "API工作区尚未加载" : "正在读取本地接口项目…"}</h2>
+          <h2>{error ? "API工作区尚未加载" : "正在读取接口项目…"}</h2>
           <p>项目、环境、接口和上次保存备份位于安装目录 configs/http。</p>
         </div>
       )}
@@ -373,7 +381,7 @@ export default function ApiWorkspace({
               <>
                 <div className="api-section-heading">
                   <strong>
-                    接口目录 <small>{project.endpoints.length}</small>
+                    接口目录 <small>{project.endpoints.length}{unsaved && " + 1 草稿"}</small>
                   </strong>
                   <div className="api-actions">
                     <button
@@ -403,6 +411,7 @@ export default function ApiWorkspace({
                     onChange={(event) => setSearch(event.target.value)}
                   />
                 </label>
+                {unsaved && draft && <div className="api-draft-item" role="status"><span className={'api-method method-' + draft.method.toLowerCase()}>{draft.method}</span><div><strong>{draft.name || '新接口'} · 未保存草稿</strong><small>{draft.path}</small><small>仅在当前页面，保存后进入项目目录</small></div></div>}
                 {[...new Set(["", ...project.groups])].map((group) => {
                   const rows = visible.filter((item) => item.group === group);
                   return (
@@ -438,7 +447,7 @@ export default function ApiWorkspace({
                 })}
                 {!visible.length && (
                   <p className="api-empty-note">
-                    {search ? "没有匹配的接口。" : "点击 + 添加第一个接口。"}
+                    {search ? "没有匹配的接口。" : unsaved ? "当前有未保存草稿，请在右侧继续编辑。" : "点击 + 添加第一个接口。"}
                   </p>
                 )}
                 <div className="api-sidebar-actions">
@@ -564,7 +573,8 @@ export default function ApiWorkspace({
                         return;
                       }
                       setProjectId(target.id);
-                      setDraft(structuredClone(row.endpoint));
+                      changeDraft(structuredClone(target.endpoints.find(item => item.id === row.endpoint.id) || row.endpoint));
+                      setHistoryRequest(row);
                       setEnvironmentId(row.environmentId);
                       setView("debug");
                     })
@@ -574,7 +584,7 @@ export default function ApiWorkspace({
                     {row.endpoint.method} · {row.status}
                   </strong>
                   <span>{row.endpoint.name}</span>
-                  <small>{row.time} · 点击恢复请求定义</small>
+                  <small>{row.time} · 点击恢复本次调试值</small>
                 </button>
               ))}
               {!history.length && (
@@ -583,7 +593,7 @@ export default function ApiWorkspace({
             </section>
             <div className="api-storage-note">
               <code>{library.directory}</code>
-              <span>版本 {state.revision} · 本机存储</span>
+              <span>版本 {state.revision} · {remoteAccess() ? "共享主机存储" : "本机存储"}</span>
               <button
                 className="text-button"
                 disabled={!canWriteWorkspace('http') || !library.canRestore || busy || sending}
@@ -614,7 +624,7 @@ export default function ApiWorkspace({
             {!project && (
               <div className="api-blank">
                 <FolderPlus size={36} />
-                <h2>建立本地接口项目</h2>
+                <h2>{remoteAccess() ? "建立共享接口项目" : "建立本地接口项目"}</h2>
                 <p>
                   按目录管理接口，通过环境变量切换服务，设计定义自动生成文档，并可直接调试。
                 </p>
@@ -695,7 +705,7 @@ export default function ApiWorkspace({
                               )
                             )
                               path = `${draft.path}-copy-${index++}`;
-                            setDraft({
+                            changeDraft({
                               ...structuredClone(draft),
                               id: newProjectId(),
                               name: `${draft.name} 副本`,
@@ -724,7 +734,7 @@ export default function ApiWorkspace({
                               })
                             ) {
                               if (unsaved)
-                                setDraft(
+                                changeDraft(
                                   project.endpoints[0]
                                     ? structuredClone(project.endpoints[0])
                                     : null,
@@ -810,7 +820,7 @@ export default function ApiWorkspace({
                   <ApiEndpointEditor
                     endpoint={draft}
                     groups={project.groups}
-                    onChange={setDraft}
+                    onChange={changeDraft}
                     onError={setError}
                   />
                 )}
@@ -823,7 +833,10 @@ export default function ApiWorkspace({
                     project={project}
                     endpoint={draft}
                     environment={environment}
-                    onChange={setDraft}
+                    onChange={changeDraft}
+                    initialRequest={historyRequest}
+                    resetRequest={requestReset}
+                    onDraftChange={onRequestDirty}
                     onBusy={onSending}
                     onGenerate={onGenerate}
                     onNotice={onNotice}

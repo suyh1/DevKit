@@ -421,3 +421,17 @@ test("Nginx read-only inspection never launches the configured executable and ca
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('logout is idempotent for anonymous and invalidated sessions, including closed projects and old route aliases', () => fixture(async ({start,call,host,options}) => {
+  const services=emptySharingServices(); services.http.enabled=true;
+  await start(services);
+  await host.start({...options,services});
+  for(const route of ['/api/sharing/logout','/api/projects/logout']) {
+    const result=await call(route,{},'POST');
+    assert.equal(result.status,200);
+    assert.match(result.headers.get('set-cookie'),/Max-Age=0/);
+  }
+  const anonymous=await call('/api/sharing/logout',{},'POST','');
+  assert.equal(anonymous.status,200);
+  assert.equal((await (await call('/api/sharing/session')).json()).authenticated,false);
+}));

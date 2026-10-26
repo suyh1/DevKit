@@ -251,12 +251,28 @@ export async function copyText(text: string): Promise<void> {
     document.activeElement instanceof HTMLButtonElement
       ? document.activeElement
       : null);
-  try {
-    await navigator.clipboard.writeText(text);
-    source?.dispatchEvent(new CustomEvent("motion-copy", { detail: true }));
-  } catch (error) {
-    source?.dispatchEvent(new CustomEvent("motion-copy", { detail: false }));
-    throw error;
+  let copied = false;
+  if (typeof navigator.clipboard?.writeText === 'function') {
+    try { await navigator.clipboard.writeText(text); copied = true; } catch { /* Try the user-gesture fallback below. */ }
+  }
+  if (!copied) {
+    const previous = document.activeElement, selection = window.getSelection();
+    const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
+    const input = document.createElement('textarea');
+    input.value = text; input.readOnly = true; input.tabIndex = -1;
+    input.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+    const dialogs = document.querySelectorAll('dialog[open]');
+    (dialogs[dialogs.length - 1] || document.body).appendChild(input);
+    try { input.focus({ preventScroll: true }); input.select(); copied = document.execCommand('copy'); } catch { copied = false; }
+    finally {
+      input.remove(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+      if (selection && ranges.every(range => range.commonAncestorContainer.isConnected)) { selection.removeAllRanges(); ranges.forEach(range => selection.addRange(range)); }
+    }
+  }
+  source?.dispatchEvent(new CustomEvent('motion-copy', { detail: copied }));
+  if (!copied) {
+    window.dispatchEvent(new CustomEvent('devkit:manual-copy', { detail: text }));
+    throw new Error('浏览器未允许自动复制，已打开手动复制窗口。');
   }
 }
 export function textDifference(before: string, after: string) {

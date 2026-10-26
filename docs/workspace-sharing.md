@@ -79,3 +79,5 @@ DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_EDIT=true DEVKIT_HTTP_SEND=true node server/s
 本次交互与权限审查的范围、发现和验证见 [交互一致性审查](interaction-audit.md)。
 
 同端口切换“仅本机/局域网”时，系统无法同时绑定两个重叠地址，会短暂重绑；失败尝试恢复原监听，保留原授权和会话，但既有 TCP 连接可能中断。若其他进程抢占端口导致恢复失败，会报告原因并显示实际停止状态。不同端口应用先验证新监听再关闭旧监听。
+
+门户路由、滚动、复制降级、调试值隔离、运行状态过期和离线退出规则见 [共享网页版说明](portal-browser.md)。专用验证入口为 `npm run test:portal`，使用临时数据和实际 LAN HTTP，覆盖原生点击、滚轮及页面最底部可达性。

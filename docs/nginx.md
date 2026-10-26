@@ -155,3 +155,5 @@ Windows 使用独立后台进程，等价于示例中的 `start nginx -c ...`，
 仅借鉴设计，无上述项目代码或运行依赖。命令依据 [Nginx 官方命令文档](https://nginx.org/en/docs/switches.html)与 [Windows 说明](https://nginx.org/en/docs/windows.html)。
 
 `npm run test:nginx` 检查解析、include、保存/备份、冲突及 PID 隔离。设置 `DEVKIT_NGINX_TEST_EXECUTABLE` 为 nginx 绝对路径可额外测试隔离临时目录中的真实启动、HTTP 响应、重载和停止。`node scripts/smoke-desktop.mjs --nginx-only` 检查桌面交互。测试不操作用户实际配置。Windows/Linux 共用实现，目标 Linux/麒麟仍需实际运行验收。
+
+共享门户将实际滚动容器接入吸顶栏，操作保持在顶部导航下方；字段定位留白随操作栏高度变化。状态读取失败后显示待重新确认及上次确认时间，停用启停/重载操作，恢复读取后更新。实例表单关闭恢复键盘焦点。路径和搜索操作不再提供问号，字段提示继续保留。详见 [共享网页版说明](portal-browser.md)。

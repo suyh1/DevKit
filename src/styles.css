@@ -70,7 +70,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-he
 .sidebar-collapsed .nav-item { justify-content: center; padding: 12px; }
 .sidebar-collapsed .nav-group { padding-top: 9px; margin-bottom: 9px; border-top: 1px solid #ffffff08; }
 .sidebar-collapsed .local-badge { justify-content: center; padding: 13px; margin-bottom: 18px; }
-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; background: var(--bg); }
+.app > main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; background: var(--bg); }
 .topbar { display: flex; justify-content: space-between; align-items: center; height: 68px; flex-shrink: 0; padding: 0 34px; border-bottom: 1px solid var(--line); background: var(--surface); gap: 20px; }
 .breadcrumb { display: flex; align-items: center; gap: 13px; color: var(--subtle); font-size: 12px; white-space: nowrap; }
 .breadcrumb>button:not(.icon-button) { color: var(--muted); background: transparent; padding: 4px 0; font-size: 12px; }

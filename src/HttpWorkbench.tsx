@@ -98,6 +98,7 @@ export default function HttpWorkbench({
     setResponse(null);
     setStale(false);
     setError('');
+    onNotice('');
     setBaseline({ config, name, timeout, includeSensitive: sensitive });
   }
   const latest = useRef({ dirty, running });

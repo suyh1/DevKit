@@ -152,8 +152,27 @@ export default function ProjectCenter({
       : session?.role === "editor");
   const canEdit = session?.role !== "viewer",
     owner = session?.role === "owner";
+  const [variableFocus, setVariableFocus] = useState<string | null>(null);
   const profile =
     data?.profiles.find((item) => item.id === active) || data?.profiles[0];
+  function manageVariables(names: string[] = []) {
+    if (!profile) return;
+    const next = structuredClone(profile), known = new Set(next.variables.map(row => row.key));
+    const missing = names.filter(name => !known.has(name));
+    if (next.variables.length + missing.length > 100) { setMessage('变量最多100项，请先整理当前档案的变量。'); return; }
+    next.variables.push(...missing.map(key => ({ key, value: '' })));
+    setVariableFocus(names[0] || '*'); setProfileDraft(next);
+  }
+  useEffect(() => {
+    if (!profileDraft) { setVariableFocus(null); return; }
+    if (!variableFocus) return;
+    const frame = requestAnimationFrame(() => {
+      const inputs = [...document.querySelectorAll<HTMLInputElement>('.pc-dialog input[data-variable-value]')];
+      const target = variableFocus === '*' ? inputs[0] : inputs.find(input => input.dataset.variableValue === variableFocus);
+      target?.focus(); target?.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [profileDraft?.id, variableFocus]);
   async function action(work: () => Promise<void>) {
     if (busyRef.current) return false;
     const feedback = buttonFeedback();
@@ -286,24 +305,9 @@ export default function ProjectCenter({
     try {
       await copyText(text);
       setMessage("已复制。");
-    } catch {
-      const previous = document.activeElement,
-        input = document.createElement("textarea");
-      input.value = text;
-      input.style.cssText =
-        "position:fixed;left:0;top:0;opacity:0;pointer-events:none";
-      (document.querySelector("dialog[open]") || document.body).appendChild(
-        input,
-      );
-      input.select();
-      const copied = document.execCommand("copy");
-      input.remove();
-      if (previous instanceof HTMLElement) previous.focus();
-      setMessage(
-        copied ? "已复制。" : "浏览器未开放剪贴板，可选中文字后手动复制。",
-      );
-    }
+    } catch (error) { setMessage((error as Error).message); }
   }
+
   function editEntry(project: Project) {
     setError("");
     setEntry(structuredClone(project));
@@ -410,6 +414,7 @@ export default function ProjectCenter({
     storageOpen ||
     !!confirmation;
   const resolved = profile.projects.map((item) => resolveProject(item, profile));
+  const missingVariables = [...new Set(resolved.flatMap(item => item.missingVariables))];
   let importTarget: ProjectState | null = null,
     importError = "";
   if (imported)
@@ -628,12 +633,13 @@ export default function ProjectCenter({
               配置异常
             </button>
             {canEdit && (
-              <button onClick={() => setProfileDraft(structuredClone(profile))}>
+              <button onClick={() => manageVariables()}>
                 <Settings2 size={14} />
                 管理 {profile.name} 变量
               </button>
             )}
           </div>
+          {missingVariables.length > 0 && <div className="pc-missing-variables" role="status"><span>当前档案缺少变量：<strong>{missingVariables.join('、')}</strong>。请填写变量值后保存档案。</span>{canEdit && <button className="secondary-button" onClick={() => manageVariables(missingVariables)}>补齐缺少的变量</button>}</div>}
           <div className="pc-toolbar">
             <label className="pc-search">
               <Search size={15} />
@@ -890,6 +896,7 @@ export default function ProjectCenter({
                       <code>{result.error || result.url}</code>
                     </div>
                   </MotionDetails>
+                  {result.missingVariables.length > 0 && canEdit && <button type="button" className="text-button pc-repair-variable" onClick={() => manageVariables(result.missingVariables)}>填写缺少的变量：{result.missingVariables.join('、')}</button>}
                   {portal && result.localOnly && (
                     <small className="pc-invalid">
                       此地址指向访问者自己的电脑；共享服务请使用主机局域网 IP。
@@ -1351,7 +1358,7 @@ export default function ProjectCenter({
               </button>
             </div>
             <p className="pc-hint">
-              变量会随配置导出和共享。此处不用于保存登录密码或密钥。
+              变量会随配置导出和共享。此处不用于保存登录密码或密钥。{variableFocus && " 新增或修改仅在当前草稿，保存档案后才生效。"}
             </p>
             {profileDraft.variables.map((row, index) => (
               <div className="pc-row" key={index}>
@@ -1374,6 +1381,7 @@ export default function ProjectCenter({
                 />
                 <input
                   aria-label={`变量 ${index + 1} 值`}
+                  data-variable-value={row.key}
                   maxLength={2000}
                   value={row.value}
                   placeholder="192.168.1.10"

@@ -127,13 +127,22 @@ describe("motion lifecycle and real outcomes", () => {
     await pending;
     expect(write).toHaveBeenCalledWith("9007199254740993");
     expect(results).toEqual([true]);
+    const manual = vi.fn(), clipboardWindow = Object.assign(new EventTarget(), { getSelection: () => null });
+    clipboardWindow.addEventListener('devkit:manual-copy', event => manual((event as CustomEvent<string>).detail));
+    vi.stubGlobal('window', clipboardWindow); vi.stubGlobal('HTMLElement', Button);
+    const legacy = vi.fn(() => false);
+    vi.stubGlobal('document', { activeElement: null, querySelectorAll: () => [], body: { appendChild: vi.fn() }, execCommand: legacy, createElement: () => ({ style: {}, focus: vi.fn(), select: vi.fn(), remove: vi.fn() }) });
     write.mockRejectedValueOnce(new Error("denied"));
     await expect(
       fromButton(first as unknown as HTMLButtonElement, () =>
         copyText("secret"),
       ),
-    ).rejects.toThrow("denied");
+    ).rejects.toThrow('已打开手动复制窗口');
+    expect(legacy).toHaveBeenCalledWith('copy'); expect(manual).toHaveBeenCalledWith('secret');
     expect(results).toEqual([true, false]);
+    vi.stubGlobal('navigator', {}); legacy.mockReturnValueOnce(true);
+    await fromButton(first as unknown as HTMLButtonElement, () => copyText('LAN copy'));
+    expect(results).toEqual([true,false,true]); expect(manual).toHaveBeenCalledTimes(1);
   });
   it("ties action feedback to the initiating button and ignores completions after it is removed", () => {
     class Button extends EventTarget {
