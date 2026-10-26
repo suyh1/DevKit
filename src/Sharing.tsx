@@ -10,6 +10,8 @@ import type { ReactNode } from "react";
 import { Globe, RefreshCw } from "lucide-react";
 import { isProjectDesktop, projectRequest } from "./project-api";
 import type { Sharing } from "./project-api";
+import { emptySharingServices } from "../shared/sharing.mjs";
+import type { SharingServices } from "../shared/sharing.mjs";
 import { Modal, Field } from "./project-components";
 import { MotionButton, MotionPresence } from "./Motion";
 import { copyText } from "./motion-primitives";
@@ -145,16 +147,17 @@ function SharingPanel({
     [message, setMessage] = useState(""),
     [saved, setSaved] = useState(0);
   const locked = useRef(false);
-  const panel = useRef<HTMLDivElement>(null), ready = draft !== null;
-  useEffect(() => { if (ready) panel.current?.querySelector<HTMLSelectElement>('select')?.focus(); }, [ready]);
+  const panel = useRef<HTMLDivElement>(null),
+    ready = draft !== null;
+  useEffect(() => {
+    if (ready)
+      panel.current?.querySelector<HTMLSelectElement>("select")?.focus();
+  }, [ready]);
   const fields = draft
     ? {
         host: draft.host,
         port: draft.port,
-        canEdit: draft.canEdit,
-        shareNginx: draft.shareNginx,
-        shareHttp: draft.shareHttp,
-        nginxControl: draft.nginxControl,
+        services: draft.services,
         autoStart: draft.autoStart,
         password,
       }
@@ -310,49 +313,164 @@ function SharingPanel({
                     onChange={(event) => setPassword(event.target.value)}
                   />
                 </Field>
-                <h3>开放模块</h3>
-                <p className="pc-hint">
-                  项目中心随共享服务开放，Nginx 与 HTTP 可分别开启。
-                </p>
-                {(
-                  [
-                    ["shareNginx", "开放 Nginx 主机实例、路径配置与日志"],
-                    ["shareHttp", "开放 HTTP 接口项目、文档、环境和调试"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label className="pc-check" key={key}>
-                    <input
-                      type="checkbox"
-                      checked={draft[key] === true}
-                      onChange={(event) =>
-                        setDraft({ ...draft, [key]: event.target.checked })
-                      }
-                    />
-                    {label}
-                  </label>
-                ))}
-                <h3>访问权限</h3>
-                <label className="pc-check">
-                  <input
-                    type="checkbox"
-                    checked={draft.canEdit}
-                    onChange={(event) =>
-                      setDraft({ ...draft, canEdit: event.target.checked })
-                    }
-                  />
-                  允许持有口令的访客保存共享内容、恢复备份和发送 HTTP 请求
-                </label>
-                <label className="pc-check">
-                  <input
-                    type="checkbox"
-                    checked={draft.nginxControl === true}
-                    onChange={(event) =>
-                      setDraft({ ...draft, nginxControl: event.target.checked })
-                    }
-                  />
-                  允许主机程序检测及 Nginx 检查、启动、重载和停止（还需开放
-                  Nginx 并允许编辑）
-                </label>
+                <div className="sharing-services-heading">
+                  <h3>共享服务与访问权限</h3>
+                  <p className="pc-hint">
+                    按需选择服务；开放后默认只允许查看，再分别授予编辑或执行权限。
+                  </p>
+                </div>
+                {draft.legacyAccess && (
+                  <p className="pc-hint">
+                    已按旧设置转换各服务权限。三个服务现在都可独立关闭，应用后保存为新设置。
+                  </p>
+                )}
+                <div className="sharing-services">
+                  {(
+                    [
+                      {
+                        id: "projects",
+                        name: "项目中心",
+                        description: "项目入口、环境档案与方案对比",
+                        permissions: [
+                          {
+                            key: "edit",
+                            label: "编辑项目与档案",
+                            detail: "允许新增、修改、删除、导入及备份恢复",
+                          },
+                          {
+                            key: "probe",
+                            label: "检测项目入口",
+                            detail: "允许由主机探测项目地址的可达性",
+                          },
+                        ],
+                      },
+                      {
+                        id: "nginx",
+                        name: "Nginx 配置",
+                        description: "主机实例、配置文件、日志与备份",
+                        permissions: [
+                          {
+                            key: "edit",
+                            label: "编辑配置与实例",
+                            detail:
+                              "允许填写主机路径、创建和保存文件、维护实例",
+                          },
+                          {
+                            key: "control",
+                            label: "运行管理",
+                            detail:
+                              "允许主机程序检测、配置检查、启动、停止和重载",
+                          },
+                        ],
+                      },
+                      {
+                        id: "http",
+                        name: "HTTP 调试",
+                        description: "接口项目、文档与环境",
+                        permissions: [
+                          {
+                            key: "edit",
+                            label: "编辑接口项目",
+                            detail:
+                              "允许保存、导入及恢复主机上的接口定义和环境",
+                          },
+                          {
+                            key: "send",
+                            label: "发送调试请求",
+                            detail:
+                              "允许从主机发送 HTTP(S) 请求及取消自己的请求",
+                          },
+                        ],
+                      },
+                    ] as const
+                  ).map((service) => {
+                    const policy = draft.services[service.id];
+                    return (
+                      <section
+                        className="sharing-service"
+                        data-service={service.id}
+                        data-enabled={policy.enabled}
+                        key={service.id}
+                      >
+                        <label className="sharing-service-toggle">
+                          <input
+                            type="checkbox"
+                            aria-label={"开放" + service.name}
+                            checked={policy.enabled}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft,
+                                services: {
+                                  ...draft.services,
+                                  [service.id]: {
+                                    ...emptySharingServices()[service.id],
+                                    enabled: event.target.checked,
+                                  },
+                                },
+                              })
+                            }
+                          />
+                          <span>
+                            <strong>{service.name}</strong>
+                            <small>{service.description}</small>
+                          </span>
+                          <em>{policy.enabled ? "已选择" : "未开放"}</em>
+                        </label>
+                        <fieldset
+                          className="sharing-service-permissions"
+                          hidden={!policy.enabled}
+                          disabled={!policy.enabled || busy}
+                          aria-label={service.name + "访问权限"}
+                        >
+                          <p>
+                            基础权限：查看
+                            {service.id === "nginx"
+                              ? "配置、日志和备份"
+                              : service.id === "http"
+                                ? "接口文档与环境"
+                                : "项目与档案"}
+                            。
+                          </p>
+                          {service.permissions.map((permission) => (
+                            <label key={permission.key}>
+                              <input
+                                type="checkbox"
+                                checked={
+                                  (
+                                    policy as unknown as Record<string, boolean>
+                                  )[permission.key]
+                                }
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...draft,
+                                    services: {
+                                      ...draft.services,
+                                      [service.id]: {
+                                        ...policy,
+                                        [permission.key]: event.target.checked,
+                                      },
+                                    } as SharingServices,
+                                  })
+                                }
+                              />
+                              <span>
+                                <strong>{permission.label}</strong>
+                                <small>{permission.detail}</small>
+                              </span>
+                            </label>
+                          ))}
+                        </fieldset>
+                      </section>
+                    );
+                  })}
+                </div>
+                {!Object.values(draft.services).some(
+                  (service) => service.enabled,
+                ) && (
+                  <p className="sharing-empty-hint" role="status">
+                    请至少选择一个服务后开启共享。如需关闭所有访问，请使用“停止共享”。
+                  </p>
+                )}
                 <label className="pc-check">
                   <input
                     type="checkbox"
@@ -403,7 +521,12 @@ function SharingPanel({
                 <MotionButton
                   busy={busy}
                   className="run-button"
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    !Object.values(draft.services).some(
+                      (service) => service.enabled,
+                    )
+                  }
                 >
                   {draft.running ? "应用设置并重启共享" : "开启共享"}
                 </MotionButton>

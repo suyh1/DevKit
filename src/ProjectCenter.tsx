@@ -58,6 +58,21 @@ import { saveText } from "./files";
 import Skeleton from "./Skeleton";
 import SegmentedControl from "./SegmentedControl";
 
+function projectPreference(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function saveProjectPreference(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* Host project data remains available when browser preferences are blocked. */
+  }
+}
+
 function upsert<T extends { id: string }>(items: T[], value: T): T[] {
   return items.some((item) => item.id === value.id)
     ? items.map((item) => (item.id === value.id ? value : item))
@@ -66,15 +81,15 @@ function upsert<T extends { id: string }>(items: T[], value: T): T[] {
 
 export default function ProjectCenter({
   portal = false,
-  onLogout,
+  portalSession,
 }: {
   portal?: boolean;
-  onLogout?: () => void;
+  portalSession?: Session;
 }) {
-  const [session, setSession] = useState<Session | null>(null),
+  const [loadedSession, setSession] = useState<Session | null>(null),
     [data, setData] = useState<ProjectState | null>(null);
   const [active, setActive] = useState(
-      () => localStorage.getItem("devkit:project-profile") || "",
+      () => projectPreference("devkit:project-profile") || "",
     ),
     [search, setSearch] = useState(""),
     [group, setGroup] = useState(""),
@@ -93,7 +108,7 @@ export default function ProjectCenter({
   const [selected, setSelected] = useState<string[]>([]),
     [sort, setSort] = useState("manual");
   const [view, setView] = useState<'grid' | 'list'>(() =>
-    localStorage.getItem("devkit:project-view") === "list" ? "list" : "grid",
+    projectPreference("devkit:project-view") === "list" ? "list" : "grid",
   );
   const [importMode, setImportMode] = useState("merge");
   const [restoring, setRestoring] = useState<{
@@ -129,6 +144,12 @@ export default function ProjectCenter({
       setMessage("");
     }
   }, [openModalKey]);
+  const session = portalSession || loadedSession;
+  const canProbe =
+    session?.role === "owner" ||
+    (session?.services
+      ? session.services.projects.enabled && session.services.projects.probe
+      : session?.role === "editor");
   const canEdit = session?.role !== "viewer",
     owner = session?.role === "owner";
   const profile =
@@ -155,6 +176,10 @@ export default function ProjectCenter({
   }
   async function load() {
     const auth = await projectRequest<Session>("session");
+    if (portal && !auth.authenticated) {
+      window.dispatchEvent(new Event("devkit:session-required"));
+      throw new Error("共享会话已失效，请重新登录；当前内容和草稿已保留。");
+    }
     setSession(auth);
     if (auth.role === "owner")
       setStorage(await projectRequest<ProjectStorage>("storage"));
@@ -165,15 +190,18 @@ export default function ProjectCenter({
     void action(load);
   }, []);
   useEffect(() => {
+    if (portalSession?.authenticated && !data) void action(load);
+  }, [portalSession]);
+  useEffect(() => {
     if (profile) {
-      localStorage.setItem("devkit:project-profile", profile.id);
+      saveProjectPreference("devkit:project-profile", profile.id);
       setHealth({});
       setSelected([]);
       setGroup("");
     }
   }, [profile?.id]);
   useEffect(() => {
-    localStorage.setItem("devkit:project-view", view);
+    saveProjectPreference("devkit:project-view", view);
   }, [view]);
   useEffect(() => {
     const closeMenus = (event: PointerEvent) => {
@@ -439,35 +467,6 @@ export default function ProjectCenter({
             </MotionButton>
           )}
           {owner && <SharingButton />}
-          {portal && (
-            <>
-              <button
-                className="text-button"
-                onClick={() => {
-                  const root = document.documentElement;
-                  root.dataset.theme =
-                    root.dataset.theme === "dark" ? "light" : "dark";
-                }}
-              >
-                切换主题
-              </button>
-              <MotionButton outcome={error ? "error" : ""} busy={busy}
-                className="text-button"
-                disabled={busy}
-                onClick={() =>
-                  void action(async () => {
-                    if (onLogout) { onLogout(); return; }
-                    await projectRequest("logout", {});
-                    setData(null);
-                    setSession(null);
-                    setHealth({});
-                  })
-                }
-              >
-                退出
-              </MotionButton>
-            </>
-          )}
         </div>
       </header>
       {!modalOpen && errorBox}
@@ -748,6 +747,10 @@ export default function ProjectCenter({
                 >
                   停用所选
                 </MotionButton>
+
+              </>
+            )}
+            {canProbe && (
                 <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={
                     busy ||
@@ -776,7 +779,6 @@ export default function ProjectCenter({
                 >
                   检测所选入口
                 </MotionButton>
-              </>
             )}
             <button
               disabled={!projects.length && !selectedProjects.length}

@@ -307,3 +307,15 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 用户已授权提交、打包、推送及发布本次全局共享入口调整。
 
 - v1.12.1已作为latest发布：https://github.com/suyh1/DevKit/releases/tag/1.12.1 。14份附件大小和SHA256均匹配；来源6bc0d9f58ef3fef02cfff6fd9f3e17f3bbe5473f，CI40318634420四作业全部成功。
+
+## 共享与全项目交互一致性审查
+- 梳理全局操作、默认值、权限依赖、数据/执行边界及失败行为 — complete
+- 实现三服务独立权限、门户统一控制、共享切换与兼容策略 — complete
+- 修复同类交互缺陷并完成权限矩阵/真实交互/文档验证 — complete
+用户要求审查整个项目是否有同类不合理行为，发现影响使用或权限边界的问题一并修复。
+
+## v1.12.2 共享一致性修复发行
+- 更新版本、完成发行前检查并提交推送 — in_progress
+- 打包三平台与独立服务并验证实际载荷 — pending
+- 等待CI、发布并核对远端附件 — pending
+用户明确授权提交、打包、推送及发布本次审查修复。

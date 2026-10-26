@@ -1,4 +1,5 @@
 import type { ProjectState } from "../shared/projects.mjs";
+import type { SharingServices } from '../shared/sharing.mjs';
 
 export type ProjectAction =
   | "session"
@@ -25,6 +26,9 @@ export type Snapshot = {
   profiles: number;
 };
 export type Sharing = {
+  services: SharingServices;
+  legacyAccess?: boolean;
+  shareProjects?: boolean;
   shareNginx?: boolean;
   shareHttp?: boolean;
   nginxControl?: boolean;
@@ -44,6 +48,8 @@ export type ProjectStorage = {
   error?: string;
 };
 export type Session = {
+  services?: SharingServices;
+  shareProjects?: boolean;
   shareNginx?: boolean;
   shareHttp?: boolean;
   nginxControl?: boolean;
@@ -95,7 +101,7 @@ export async function projectRequest<T>(
   };
   const route = routes[action];
   if (!route) throw new Error("此操作仅可在主机桌面端进行。");
-  const response = await fetch(`/api/projects/${route[0]}`, {
+  const response = await fetch(`/api/${['session', 'login', 'logout'].includes(action) ? 'sharing' : 'projects'}/${route[0]}`, {
     method: route[1],
     credentials: "same-origin",
     headers:
@@ -105,6 +111,7 @@ export async function projectRequest<T>(
     body: payload === undefined ? undefined : JSON.stringify(payload),
   });
   const result = await response.json();
+  if (response.status === 401 && !['session', 'login', 'logout'].includes(action)) window.dispatchEvent(new Event('devkit:session-required'));
   if (!response.ok)
     throw new Error(result.error || `请求失败（${response.status}）`);
   return result as T;

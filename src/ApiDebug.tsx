@@ -1,4 +1,4 @@
-import { canWriteWorkspace, remoteAccess } from './workspace-remote';
+import { canSendHttp, canWriteWorkspace, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -233,13 +233,14 @@ export default function ApiDebug({
         </label>
         <button
           className="run-button"
-          disabled={!running && (!request.value || !canWriteWorkspace() || (!window.devkitHttp && !remoteAccess()))}
+          disabled={!running && (!request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()))}
           onClick={() => void (running ? cancel() : send())}
         >
           {running ? <Square size={14} /> : <Send size={14} />}{" "}
           {running ? "取消API请求" : "发送API请求"}
         </button>
       </div>
+      {!canSendHttp() && <p className="preview-note">当前可查看与填写本地请求草稿，未授予从主机发送请求的权限。</p>}
       {request.error && (
         <p className="api-error" role="status">
           {request.error}
@@ -394,7 +395,7 @@ export default function ApiDebug({
                 </div>
                 <button
                   className="text-button"
-                  disabled={response.binary}
+                  disabled={response.binary || !canWriteWorkspace('http')}
                   onClick={() => {
                     try {
                       const data = JSON.parse(response.body),

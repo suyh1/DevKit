@@ -87,3 +87,5 @@ body 可为文本字符串或 JSON 值。结构化 body 按原始 JSON 数字/�
 ## 验证与参考
 
 `npm run test:http` 使用隔离本地服务验证正文保真、重复响应头、取消/超时、重定向、二进制、压缩与解压预算；`node scripts/smoke-desktop.mjs --http-close-only` 验证参数/请求头/鉴权/正文编辑、真实发送、格式化/重复头筛选、集合脱敏、历史恢复及深浅窄屏，并检查托盘和草稿退出保护。设计参考 [Hoppscotch](https://github.com/hoppscotch/hoppscotch) 与 [Bruno](https://github.com/usebruno/bruno)（均 MIT）；不引入它们的前端/后端，界面采用本项目主题。请求使用 Node 内置 HTTP/HTTPS/zlib；Schema校验器和官方meta-schema均编译到本地Worker，运行时没有CDN、代理或下载依赖。
+
+共享时在 HTTP 服务卡片分别授权“编辑接口项目”和“发送调试请求”，可以只发送而不保存定义，也可只维护定义而禁止从主机发送。请求始终由共享主机执行，localhost 指共享主机；生成请求代码在当前浏览器离线完成，不触发发送。会话失效会保留页面草稿并提供重新登录，退出登录先确认再清除当前会话。详见 [共享工作台](workspace-sharing.md)。

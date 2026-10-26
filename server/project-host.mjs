@@ -5,6 +5,7 @@ import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { probeProjects } from "./project-probe.mjs";
 import { createSharedWorkspaces } from './shared-workspaces.mjs';
+import { sharingServices, sharingAliases, hasLegacySharing } from '../shared/sharing.mjs';
 
 const csp =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -26,7 +27,7 @@ const localAddresses = () => [
 ];
 export async function createProjectHost(store, dist, managers = { nginx: () => null, library: () => null }) {
   const workspaces = createSharedWorkspaces(managers);
-  let server,
+  let server, activeContext,
     settings = await store.settings();
   const sessions = new Map(),
     attempts = new Map();
@@ -34,10 +35,9 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
     running: !!server?.listening,
     port: server?.address()?.port ?? settings.port ?? 8765,
     host: settings.host ?? "0.0.0.0",
-    canEdit: settings.canEdit === true,
-    shareNginx: settings.shareNginx === true,
-    shareHttp: settings.shareHttp === true,
-    nginxControl: settings.nginxControl === true,
+    ...sharingAliases(sharingServices(settings)),
+    services: sharingServices(settings),
+    legacyAccess: hasLegacySharing(settings),
     autoStart: settings.autoStart === true,
     hasPassword: !!settings.hash,
     addresses: server?.listening
@@ -75,18 +75,17 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       !["0.0.0.0", "127.0.0.1"].includes(input.host) ||
       !Number.isInteger(input.port) ||
       input.port < 1 ||
-      input.port > 65535 ||
-      typeof input.canEdit !== "boolean"
+      input.port > 65535
     )
       throw new Error("监听地址、端口或访问权限无效。");
+    const services = sharingServices(input);
+    if (!Object.values(services).some(service => service.enabled)) throw new Error("请至少开放一个共享服务。");
     let next = {
       ...settings,
       host: input.host,
       port: input.port,
-      canEdit: input.canEdit,
-      shareNginx: input.shareNginx === true,
-      shareHttp: input.shareHttp === true,
-      nginxControl: input.nginxControl === true,
+      ...sharingAliases(services),
+      services, accessVersion: 2,
       autoStart: input.autoStart === true,
     };
     if (input.password) {
@@ -121,11 +120,17 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
         include(dependency);
     }
     if (!manifest["portal.html"])
-      throw new Error("缺少项目中心网页构建，请先构建应用。");
+      throw new Error("缺少共享工作台网页构建，请先构建应用。");
     include("portal.html");
     allowed.delete("/portal.html");
-    await stop();
     const hosts = new Set(["localhost", ...localAddresses()]);
+    if (server?.listening && settings.host === next.host && server.address().port === next.port) {
+      await store.saveSettings(next);
+      settings = next; activeContext.settings = next; activeContext.allowed = allowed; activeContext.hosts = hosts;
+      sessions.clear(); workspaces.close(); attempts.clear();
+      return status();
+    }
+    const context = { settings: next, allowed, hosts, ready: false };
     const listener = http.createServer(async (request, response) => {
       const json = (code, value) => {
         response.writeHead(code, {
@@ -139,10 +144,13 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       response.setHeader("Referrer-Policy", "no-referrer");
       response.setHeader("X-Frame-Options", "DENY");
       try {
+        if (!context.ready) return json(503, { error: "共享设置正在应用，请稍后重试。" });
+        const next = context.settings;
+        const sessionPath = urlPath => urlPath.replace(/^\/api\/sharing\//, "/api/projects/");
         if (!request.headers.host) return json(403, { error: "Host required" });
         const origin = `http://${request.headers.host}`,
           url = new URL(request.url, origin);
-        if (!hosts.has(new URL(origin).hostname) || url.origin !== origin)
+        if (!context.hosts.has(new URL(origin).hostname) || url.origin !== origin)
           return json(403, {
             error: "未知访问地址，请使用共享面板提供的 IP 地址。",
           });
@@ -157,10 +165,10 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           )?.[1];
         const session = sessions.get(token);
         const authorized = !!session && session.expires > Date.now();
-        const capabilities = authorized ? { shareNginx: next.shareNginx, shareHttp: next.shareHttp, nginxControl: next.nginxControl } : {};
+        const capabilities = authorized ? { ...sharingAliases(next.services), services: next.services } : {};
         if (session && !authorized) { workspaces.release(token); sessions.delete(token); }
         if (
-          url.pathname === "/api/projects/session" &&
+          sessionPath(url.pathname) === "/api/projects/session" &&
           request.method === "GET"
         )
           return json(200, {
@@ -190,7 +198,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           }
         }
         if (
-          url.pathname === "/api/projects/login" &&
+          sessionPath(url.pathname) === "/api/projects/login" &&
           request.method === "POST"
         ) {
           const ip = request.socket.remoteAddress,
@@ -234,15 +242,15 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           );
           return json(200, {
             authenticated: true,
-            shareNginx: next.shareNginx, shareHttp: next.shareHttp, nginxControl: next.nginxControl,
+            ...sharingAliases(next.services), services: next.services,
             role: next.canEdit ? "editor" : "viewer",
           });
         }
         if (url.pathname.startsWith("/api/")) {
           if (!authorized)
-            return json(401, { error: "请先输入项目中心访问口令。" });
+            return json(401, { error: "请先登录共享工作台。" });
           if (
-            url.pathname === "/api/projects/logout" &&
+            sessionPath(url.pathname) === "/api/projects/logout" &&
             request.method === "POST"
           ) {
             sessions.delete(token);
@@ -253,6 +261,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             );
             return json(200, {});
           }
+          if (url.pathname.startsWith("/api/projects/") && !next.services.projects.enabled) return json(404, { error: "未开放项目中心共享。" });
           if (
             url.pathname === "/api/projects/state" &&
             request.method === "GET"
@@ -266,7 +275,11 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
               response.once('close', () => { if (!response.writableFinished) workspaces.cancel(token, payload?.id); });
             return json(200, await workspaces.request(workspaceRoute[1], workspaceRoute[2], payload, { token, settings: next }));
           }
-          if (!next.canEdit)
+          if (url.pathname === "/api/projects/probe" && request.method === "POST") {
+            if (!next.services.projects.probe) return json(403, { error: "未授予项目探活权限。" });
+            return json(200, await probeProjects(store, await body()));
+          }
+          if (!next.services.projects.edit)
             return json(403, { error: "当前共享为只读模式。" });
           if (
             url.pathname === "/api/projects/state" &&
@@ -294,18 +307,13 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             const value = await body();
             return json(200, await store.restore(value.id, value.revision));
           }
-          if (
-            url.pathname === "/api/projects/probe" &&
-            request.method === "POST"
-          )
-            return json(200, await probeProjects(store, await body()));
           return json(404, { error: "接口不存在。" });
         }
         if (!["GET", "HEAD"].includes(request.method))
           return json(405, { error: "Method not allowed" });
         const requested = decodeURIComponent(url.pathname);
-        if (requested !== "/" && !allowed.has(requested))
-          return json(404, { error: "这里只提供项目中心。" });
+        if (requested !== "/" && !context.allowed.has(requested))
+          return json(404, { error: "这里只提供共享工作台。" });
         const file = requested === "/" ? "portal.html" : requested.slice(1);
         const absolute = path.resolve(dist, file),
           relative = path.relative(dist, absolute);
@@ -330,20 +338,38 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
     listener.requestTimeout = 15_000;
     listener.headersTimeout = 10_000;
     listener.maxRequestsPerSocket = 100;
-    await new Promise((resolve, reject) => {
-      listener.once("error", reject);
-      listener.listen(next.port, next.host, resolve);
+    const previous = server;
+    // A scope change on the same port cannot bind while the old socket owns it.
+    // Keep authentication/settings until the replacement succeeds, and restore on failure.
+    const scopeChange = previous?.listening && previous.address().port === next.port;
+    const bind = (target, config) => new Promise((resolve, reject) => {
+      const done = () => { target.off('error', failed); resolve(); };
+      const failed = error => { target.off('listening', done); reject(error); };
+      target.once('error', failed); target.once('listening', done);
+      target.listen(config.port, config.host);
     });
+    const closeListener = async target => {
+      target.closeAllConnections();
+      await new Promise(resolve => target.close(resolve));
+    };
+    if (scopeChange) await closeListener(previous);
     try {
+      await bind(listener, next);
       await store.saveSettings(next);
     } catch (error) {
-      listener.closeAllConnections();
-      await new Promise((resolve) => listener.close(resolve));
+      if (listener.listening) await closeListener(listener);
+      if (scopeChange) {
+        try { await bind(previous, settings); }
+        catch (restoreError) { throw new Error(error.message + '；原监听恢复失败：' + restoreError.message); }
+      }
       throw error;
     }
-    server = listener;
-    settings = next;
+    server = listener; settings = next; activeContext = context; context.ready = true;
+    sessions.clear(); workspaces.close(); attempts.clear();
+    if (previous?.listening) await closeListener(previous);
     return status();
   }
-  return { status, start, stop };
+  let lifecycle = Promise.resolve();
+  const serialized = work => { const result = lifecycle.then(work); lifecycle = result.catch(() => {}); return result; };
+  return { status, start: input => serialized(() => start(input)), stop: disable => serialized(() => stop(disable)) };
 }

@@ -1,5 +1,5 @@
 import { SharingButton } from './Sharing';
-import { canWriteWorkspace, remoteAccess } from './workspace-remote';
+import { canSendHttp, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { MotionReveal, MotionGroup, useMotionList, MotionButton, MotionPresence } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
@@ -240,7 +240,7 @@ export default function HttpWorkbench({
         </button>
       </div>
       <p className="workflow-intro">
-        请求由共享主机或桌面本机发出，点击发送才访问目标。支持 HTTP(S)、文本/JSON 正文；不自动跟随重定向。响应仅在内存。
+        请求由共享主机或桌面本机发出，点击发送才访问目标。支持 HTTP(S)、文本/JSON 正文；不自动跟随重定向。响应仅在内存。{remoteAccess() && " 请求集合保存在当前浏览器；接口项目才与主机共享。"}
       </p>
       <div className="http-layout">
         <aside ref={collection} className="http-collection">
@@ -404,7 +404,7 @@ export default function HttpWorkbench({
               className="run-button"
               busy={!!running}
               outcome={error ? 'error' : response ? 'success' : ''}
-              disabled={!running && (!canWriteWorkspace() || (!window.devkitHttp && !remoteAccess()) || invalidDraft)}
+              disabled={!running && (!canSendHttp() || (!window.devkitHttp && !remoteAccess()) || invalidDraft)}
               onClick={() => {
                 if (running) void cancelHttp(running).catch((error) => setError(String(error)));
                 else void send();

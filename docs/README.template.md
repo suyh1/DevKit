@@ -92,7 +92,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 - **导入导出与恢复**：支持 JSON 导出、导入影响预览、合并或替换；保存时检查版本冲突。自动保留最近 30 份快照，支持命名备份、恢复预览，导入和恢复前自动备份。
 - **对比方案**：选择 2–4 个档案，按项目编码对齐并标记缺少的项目，比较完整配置、最终入口与变量，支持只看差异和 JSON 报告导出。
 - **手动检测**：主机按用户操作检测入口可达性。启停只控制入口状态，不启动或停止系统服务。
-- **局域网访问**：顶部工具栏提供全局“局域网共享”与实时状态；项目中心、Nginx、HTTP 页面可通过“共享设置”快捷打开同一面板。桌面端开启共享后，其他电脑通过主机 IP / 端口进入项目中心，使用口令登录。默认只读，可明确允许协作编辑，并设置下次启动自动共享。可分别开放 Nginx 配置和 HTTP 工作台；旧设置默认不开新模块，运行操作另需授权。详见 [共享工作台](docs/workspace-sharing.md)。
+- **局域网访问**：顶部工具栏提供全局“局域网共享”与实时状态；项目中心、Nginx、HTTP 页面可通过“共享设置”快捷打开同一面板。桌面端开启共享后，其他电脑通过主机 IP / 端口进入共享工作台，使用口令登录。三个服务均独立选择，首次不预选；权限在对应服务内设置，编辑与执行分别授权。浏览器顶部统一切换主题及退出登录，关闭服务会清除其权限。旧配置保留已有授权，应用失败保留原服务与会话。可设置下次启动自动共享。详见 [共享工作台](docs/workspace-sharing.md)。
 
 ### 配置保存与迁移
 
@@ -115,16 +115,17 @@ Windows PowerShell：
 
 ```powershell
 $env:DEVKIT_PROJECT_PASSWORD='替换为独立访问口令'
+$env:DEVKIT_SHARE_PROJECTS='true'
 node server/start.mjs
 ```
 
 Linux：
 
 ```sh
-DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' node server/start.mjs
+DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true node server/start.mjs
 ```
 
-默认监听 `0.0.0.0:8765`，只读访问。可通过 `HOST`、`PORT`、`DEVKIT_PROJECT_EDIT=true` 配置监听与协作编辑；通过 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 开放相应工作台，`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作；`DEVKIT_PROJECT_DATA` 可显式指定数据目录。后续启动可复用已保存的口令哈希。HTTP 共享用于可信局域网；同一配置目录只能由一个主机进程使用。完整步骤与权限处理见 [项目中心使用和部署说明](docs/project-center.md)。
+默认监听 `0.0.0.0:8765`。首次用 `DEVKIT_SHARE_PROJECTS=true`、`DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 至少选择一个服务，编辑和执行另行授权；后续复用已保存设置，明确的环境变量逐项覆盖。所有变量见 [共享工作台](docs/workspace-sharing.md)；`HOST`、`PORT` 设置监听，`DEVKIT_PROJECT_DATA` 可显式指定数据目录。后续启动可复用已保存的口令哈希。HTTP 共享用于可信局域网；同一配置目录只能由一个主机进程使用。完整步骤与权限处理见 [项目中心使用和部署说明](docs/project-center.md)。
 
 ## 开发与打包
 
@@ -206,3 +207,5 @@ python scripts/test-deb-packaging.py
 | `scripts/release-integrity.mjs`、`scripts/verify-release.mjs` | 构建内容和发行包一致性校验 |
 | `scripts/update-readme.mjs`、`docs/README.template.md` | 功能文档生成与维护源 |
 | `docs/` | 类型转换、开发工具、项目中心和麒麟部署专题说明 |
+
+共享及全局交互的审查范围、修复与验证见 [交互一致性审查记录](docs/interaction-audit.md)。

@@ -60,11 +60,46 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       'document.querySelector(".global-sharing-button")?.dataset.sharingState==="stopped"',
     );
     await openShortcut(".global-sharing-button");
+    assert.equal(
+      await js('document.querySelectorAll(".sharing-service").length'),
+      3,
+    );
+    assert.equal(
+      await js(
+        '[...document.querySelectorAll(".sharing-service-toggle input")].every(input=>!input.checked)',
+      ),
+      true,
+    );
+    assert.equal(
+      await js(
+        '[...document.querySelectorAll(".sharing-service-permissions")].every(fieldset=>fieldset.disabled)',
+      ),
+      true,
+    );
+    assert.equal(
+      await js('document.querySelector(".sharing-panel .run-button").disabled'),
+      true,
+    );
+    await js(
+      `document.querySelector('.sharing-service[data-service=nginx] .sharing-service-toggle input').click()`,
+    );
+    await js(
+      `document.querySelector('.sharing-service[data-service=nginx] .sharing-service-permissions input').click()`,
+    );
+    await js(
+      `document.querySelector('.sharing-service[data-service=nginx] .sharing-service-toggle input').click()`,
+    );
+    assert.equal(
+      await js(
+        '[...document.querySelectorAll(".sharing-service[data-service=nginx] .sharing-service-permissions input")].every(input=>!input.checked)',
+      ),
+      true,
+    );
     await fill("监听范围", "127.0.0.1");
     await fill("端口", port);
     await fill("首次访问口令（至少 8 位）", "global-sharing-test-only");
     await js(
-      `for(const name of ['开放 Nginx','开放 HTTP']) [...document.querySelectorAll('.sharing-panel label')].find(e=>e.textContent.startsWith(name)).querySelector('input').click()`,
+      `for(const id of ['nginx','http']) document.querySelector('.sharing-service[data-service='+id+'] .sharing-service-toggle input').click()`,
     );
     await js(
       'document.querySelector(".sharing-panel button[aria-label=关闭共享设置]").click()',
@@ -92,6 +127,18 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     );
     await close();
     await navigate("项目中心");
+    await click("添加项目", ".project-center button");
+    await wait('!!document.querySelector("dialog[open]")');
+    await js(
+      'window.dispatchEvent(new KeyboardEvent("keydown",{key:"k",ctrlKey:true,bubbles:true}))',
+    );
+    assert.equal(
+      await js('document.querySelectorAll("dialog[open]").length'),
+      1,
+      "Global search must not cover a module dialog",
+    );
+    await click("取消", "dialog[open] button");
+    await wait('!document.querySelector("dialog[open]")');
     await openShortcut(".project-center .sharing-shortcut");
     window.show();
     window.focus();
@@ -174,11 +221,26 @@ module.exports = async function sharingSettingsSmoke(window, output) {
         path.join(output, `sharing-global-${width}-${theme}.png`),
         (await window.webContents.capturePage()).toPNG(),
       );
-      assert.equal(await js('(()=>{const nav=document.querySelector(".floating-nav-links"),r=nav.getBoundingClientRect();return [...nav.querySelectorAll("button")].every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()'), true, `Navigation clipped at ${width}`);
-      await openShortcut('.global-sharing-button');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      assert.equal(await js('(()=>{const r=document.querySelector(".sharing-panel dialog").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()'), true, `Sharing dialog overflow at ${width}`);
-      await fs.writeFile(path.join(output, `sharing-settings-${width}-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+      assert.equal(
+        await js(
+          '(()=>{const nav=document.querySelector(".floating-nav-links"),r=nav.getBoundingClientRect();return [...nav.querySelectorAll("button")].every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
+        ),
+        true,
+        `Navigation clipped at ${width}`,
+      );
+      await openShortcut(".global-sharing-button");
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assert.equal(
+        await js(
+          '(()=>{const r=document.querySelector(".sharing-panel dialog").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()',
+        ),
+        true,
+        `Sharing dialog overflow at ${width}`,
+      );
+      await fs.writeFile(
+        path.join(output, `sharing-settings-${width}-${theme}.png`),
+        (await window.webContents.capturePage()).toPNG(),
+      );
       await close();
     }
     console.log(

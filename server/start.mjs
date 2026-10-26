@@ -5,6 +5,7 @@ import { createProjectHost } from "./project-host.mjs";
 import { prepareProjectConfigs } from './project-configs.mjs';
 import { createNginxManager } from './nginx-manager.mjs';
 import { createApiWorkspace } from './api-workspace.mjs';
+import { sharingFromEnvironment } from './sharing-environment.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
@@ -13,21 +14,19 @@ const store = await createProjectStore(directory);
 let nginx, library;
 const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library });
 try {
-  if (process.env.DEVKIT_SHARE_NGINX === 'true') nginx = await createNginxManager(directory);
-  if (process.env.DEVKIT_SHARE_HTTP === 'true') library = await createApiWorkspace(directory);
   const saved = await store.settings();
+  const services = sharingFromEnvironment(process.env, saved);
+  if (services.nginx.enabled) nginx = await createNginxManager(directory);
+  if (services.http.enabled) library = await createApiWorkspace(directory);
   const result = await host.start({
     host: process.env.HOST || "0.0.0.0",
     port: Number(process.env.PORT || 8765),
-    canEdit: process.env.DEVKIT_PROJECT_EDIT === "true",
-    shareNginx: process.env.DEVKIT_SHARE_NGINX === 'true',
-    shareHttp: process.env.DEVKIT_SHARE_HTTP === 'true',
-    nginxControl: process.env.DEVKIT_NGINX_CONTROL === 'true',
+    services,
     password:
       process.env.DEVKIT_PROJECT_PASSWORD || (saved.hash ? "" : undefined),
   });
   console.log(
-    "DevKit project center:",
+    "DevKit shared workspaces:",
     result.addresses.join("\n"),
     "\nData:",
     result.directory,

@@ -6,6 +6,25 @@
 .global-sharing-button[data-sharing-state=unknown] i { background: var(--warning); }
 .sharing-fields { min-width: 0; border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
 .sharing-fields h3 { margin: 8px 0 0; font-size: 13px; }
+.sharing-services { display: grid; gap: 12px; }
+.sharing-service { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.sharing-service[data-enabled=true] { border-color: var(--accent); }
+.sharing-service-toggle { display: flex; align-items: center; gap: 12px; padding: 16px; cursor: pointer; }
+.sharing-service-toggle>span { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.sharing-service-toggle small, .sharing-service-permissions small { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.6; }
+.sharing-service-toggle em { font-size: 11px; font-style: normal; color: var(--muted); white-space: nowrap; }
+.sharing-service-permissions { margin: 0; min-width: 0; padding: 4px 16px 16px 44px; border: 0; display: grid; gap: 12px; }
+.sharing-service-permissions:disabled { opacity: .5; }
+.sharing-service-permissions p { margin: 0; color: var(--muted); font-size: 12px; }
+.sharing-service-permissions label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.sharing-service-permissions label>span { display: grid; gap: 3px; }
+.sharing-service-permissions input { margin-top: 3px; flex-shrink: 0; }
+.sharing-service-permissions strong { font-size: 13px; }
+.sharing-empty-hint { padding: 12px; background: var(--tint); color: var(--accent); border-radius: 8px; font-size: 12px; line-height: 1.7; }
+@media(max-width:600px) { .sharing-service-toggle { padding: 12px; gap: 10px; } .sharing-service-permissions { padding-left: 36px; padding-right: 12px; } }
 .http-workspace-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 @media(max-width: 1080px) { .global-sharing-button>span { display: none; } .global-sharing-button { padding: 7px; gap: 4px; } }
 @media(max-width: 760px) { .app .floating-nav-links button>span { display: none; } }
+
+.sharing-service-permissions[hidden] { display: none; }
+@media(min-width:601px) { .sharing-service-permissions { grid-template-columns: 1fr 1fr; gap: 10px 20px; } .sharing-service-permissions p { grid-column: 1 / -1; } }

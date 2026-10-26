@@ -185,7 +185,7 @@ export default function ApiWorkspace({
     nextProject = projectId,
     nextEndpoint = draft?.id,
   ) {
-    if (!canWriteWorkspace()) throw new Error("当前共享为只读模式。");
+    if (!canWriteWorkspace('http')) throw new Error("当前共享为只读模式。");
     const data = validateApiState({ ...state, projects });
     const result = await apiLibrary("save-library", {
       data,
@@ -284,7 +284,7 @@ export default function ApiWorkspace({
         <div className="api-actions">
           <button
             className="secondary-button"
-            disabled={!canWriteWorkspace() || busy || sending || (!window.devkitHttp && !remoteAccess())}
+            disabled={!canWriteWorkspace('http') || busy || sending || (!window.devkitHttp && !remoteAccess())}
             onClick={() => openProject()}
           >
             <FolderPlus size={15} />
@@ -292,7 +292,7 @@ export default function ApiWorkspace({
           </button>
           <button
             className="secondary-button"
-            disabled={!canWriteWorkspace() || busy || sending}
+            disabled={!canWriteWorkspace('http') || busy || sending}
             onClick={() => file.current?.click()}
           >
             <Upload size={15} />
@@ -379,7 +379,7 @@ export default function ApiWorkspace({
                     <button
                       className="icon-button"
                       aria-label="API项目设置"
-                      disabled={!canWriteWorkspace() || busy || sending}
+                      disabled={!canWriteWorkspace('http') || busy || sending}
                       onClick={() => openProject(project)}
                     >
                       <Settings2 size={15} />
@@ -387,7 +387,7 @@ export default function ApiWorkspace({
                     <button
                       className="icon-button"
                       aria-label="新增API接口"
-                      disabled={!canWriteWorkspace() || busy || sending}
+                      disabled={!canWriteWorkspace('http') || busy || sending}
                       onClick={() => addEndpoint()}
                     >
                       <Plus size={16} />
@@ -504,7 +504,7 @@ export default function ApiWorkspace({
                   </button>
                   <button
                     className="text-button api-danger"
-                    disabled={!canWriteWorkspace() || busy || sending}
+                    disabled={!canWriteWorkspace('http') || busy || sending}
                     onClick={() => {
                       void allowChange().then((allowed) => {
                         if (allowed)
@@ -586,7 +586,7 @@ export default function ApiWorkspace({
               <span>版本 {state.revision} · 本机存储</span>
               <button
                 className="text-button"
-                disabled={!canWriteWorkspace() || !library.canRestore || busy || sending}
+                disabled={!canWriteWorkspace('http') || !library.canRestore || busy || sending}
                 onClick={() =>
                   void action(async () => {
                     if (
@@ -681,7 +681,7 @@ export default function ApiWorkspace({
                         className="icon-button"
                         aria-label="复制API接口"
                         title="复制接口到独立路径"
-                        disabled={!canWriteWorkspace() || busy || sending}
+                        disabled={!canWriteWorkspace('http') || busy || sending}
                         onClick={() => {
                           void allowChange().then((allowed) => {
                             if (!allowed) return;
@@ -710,7 +710,7 @@ export default function ApiWorkspace({
                       <button
                         className="icon-button api-danger"
                         aria-label="删除API接口"
-                        disabled={!canWriteWorkspace() || busy || sending}
+                        disabled={!canWriteWorkspace('http') || busy || sending}
                         onClick={() =>
                           void action(async () => {
                             if (
@@ -752,7 +752,7 @@ export default function ApiWorkspace({
                       </button>
                       <button
                         className="run-button"
-                        disabled={!canWriteWorkspace() || busy || sending || !dirty}
+                        disabled={!canWriteWorkspace('http') || busy || sending || !dirty}
                         onClick={() => void action(saveEndpoint)}
                       >
                         <Save size={15} />
@@ -777,7 +777,7 @@ export default function ApiWorkspace({
                             key={id as string}
                             role="tab"
                             aria-selected={view === id}
-                            disabled={sending || (id === "design" && !canWriteWorkspace())}
+                            disabled={sending || (id === "design" && !canWriteWorkspace('http'))}
                             onClick={() => setView(id as typeof view)}
                           >
                             <Component size={15} />
@@ -915,7 +915,7 @@ export default function ApiWorkspace({
             <ModalCancel />
             <button
               className="run-button"
-              disabled={!canWriteWorkspace() || busy || sending}
+              disabled={!canWriteWorkspace('http') || busy || sending}
               onClick={() =>
                 void allowChange().then((allowed) => {
                   if (allowed)

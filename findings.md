@@ -274,3 +274,9 @@ v1.11.0发行完成：共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aed
 用户澄清：Nginx共享是运行DevKit主机的远程填写页面，全部路径和运行命令均属于该主机，不是客户端。已开放编辑访客的create/upsert/remove/discover，detect与command需要运行权限，pick始终不向浏览器开放；Node独立服务无需先用桌面登记实例。
 
 全局共享入口调整：原共享表单在ProjectCenter内部，迁至Sharing.tsx单一Provider。服务仍走现有projectRequest/IPC，门户没有主机共享控制入口。状态与草稿分开维护，后台轮询不覆盖正在编辑的设置；顶部在窄屏显示地球图标与状态点并保留可访问名称。
+
+## 共享与交互一致性审查
+已确认：门户重复主题/退出；项目中心强制开放；全局canEdit绑三服务且HTTP编辑/发送混用；共享切换端口失败先停旧服务；门户生成代码按钮仅输出桌面提示；App全局快捷键只避开共享dialog；Nginx状态binary探测会运行-V，需对无运行权限的请求禁止隐式执行。拟采用services.projects(enabled/edit/probe)、nginx(enabled/edit/control)、http(enabled/edit/send)，共享身份与模块分离，服务关闭清除权限，新配置全关闭，旧设置转换不扩权。
+使用ui-ux-pro-max查询：采纳渐进展示、权限就近组织、焦点/ARIA/响应式建议；保持现有配色和本地字体，不采用搜索结果的新营销风格或远程字体。
+
+- 全局交互审查确认12类问题，修复服务独立/权限分离、全局操作重复、原服务原子切换、隐式程序检测、门户代码生成、空GET正文一致性、连接重试/会话恢复、全局快捷键及可选存储降级。设计参考Hoppscotch(MIT)和Portainer(zlib)逐能力/后端授权，无代码复制及新依赖；详见docs/interaction-audit.md。

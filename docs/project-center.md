@@ -42,7 +42,7 @@ flowchart LR
 1. 在 Windows、Linux amd64 或 Linux ARM64 主机安装本次 DevKit，打开左侧 **项目中心**。
 2. 添加项目定义与配置档案，先确认最终地址预览正确。供其他电脑访问的服务地址应填写实际内网 IP/域名，不能使用指向访问者自身的 `localhost`、`127.0.0.1`。
 3. 点击桌面顶部的 **局域网共享**（或项目中心的“共享设置”），选择“局域网（所有 IPv4 网卡）”，默认端口 `8765`。
-4. 设置单独的访问口令（至少 8 位）。默认只读；需要协作管理时勾选“允许持有口令的访客编辑”。勾选“下次启动 DevKit 时自动开启共享”可保存启动偏好。
+4. 设置单独的访问口令（至少 8 位）。在服务卡片中开放“项目中心”，按需分别授权“编辑项目与档案”和“检测项目入口”；其余服务可独立选择。勾选“下次启动 DevKit 时自动开启共享”可保存启动偏好。
 5. 点击“开启共享”，复制面板中主机真实网卡地址，例如 `http://192.168.1.50:8765/`。`0.0.0.0` 是监听设置，不是发给访客的访问地址。
 6. 其他电脑连接同一局域网，用现代浏览器打开地址并输入口令。客户端不需要安装 DevKit、Node、Python 或 JDK。
 
@@ -118,6 +118,7 @@ sudo chmod 700 /opt/devkit/configs
 $env:HOST='0.0.0.0'
 $env:PORT='8765'
 $env:DEVKIT_PROJECT_PASSWORD='替换为独立访问口令'
+$env:DEVKIT_SHARE_PROJECTS='true'
 $env:DEVKIT_PROJECT_EDIT='false'
 node server/start.mjs
 ```
@@ -127,12 +128,12 @@ Linux 启动方式：
 ```sh
 HOST=0.0.0.0 PORT=8765 \
 DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' \
-DEVKIT_PROJECT_EDIT=false node server/start.mjs
+DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 ```
 
-Nginx 与 HTTP 默认不开放，使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，详细权限与示例见 [共享工作台](workspace-sharing.md)。
+首次至少显式开放一项服务：`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，或使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，详细权限与示例见 [共享工作台](workspace-sharing.md)。
 
-首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。默认只读，明确设置 `DEVKIT_PROJECT_EDIT=true` 才允许访客编辑。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
+首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。项目编辑使用 `DEVKIT_PROJECT_EDIT=true`，入口检测使用 `DEVKIT_PROJECT_PROBE=true`，两者独立。后续启动复用已保存设置，环境变量逐项覆盖。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 
 默认直接使用解压根目录的 `configs`，不受终端当前工作目录影响。如部署者明确需要其他位置，可自行设置绝对路径 `DEVKIT_PROJECT_DATA`；这属于显式覆盖，桌面安装版仍使用安装目录的 `configs`。
 

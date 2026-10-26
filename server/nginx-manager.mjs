@@ -96,6 +96,7 @@ export async function createNginxManager(directory, dependencies = {}) {
     }
   } catch (error) { await unlock(); throw error; }
   const versions = new Map();
+  let allowExecution = true;
   const find = id => { const item = state.instances.find(item => item.id === id); if (!item) throw new Error('Nginx 实例不存在，请刷新。'); return item; };
   function checkRevision(revision) { if (revision !== state.revision) throw new Error('实例设置已改变，请刷新后重试。'); }
   async function commit(instances) {
@@ -106,6 +107,7 @@ export async function createNginxManager(directory, dependencies = {}) {
   async function binary(instance) {
     const key = `${instance.executable}|${instance.prefix}|${instance.main}`;
     if (versions.has(key)) return versions.get(key);
+    if (!allowExecution) throw new Error('未授予运行管理权限，未执行程序检测；运行状态未确认。');
     const detected = await runtime.detect(instance);
     if (!detected.found) throw new Error(detected.output);
     versions.set(key, detected); return detected;
@@ -189,7 +191,7 @@ export async function createNginxManager(directory, dependencies = {}) {
     const identityChanges = new Set(pending.filter(change => identityDirectives(change.content) !== identityDirectives(change.before.content)).map(change => pathKey(change.path)));
     for (const affected of state.instances.filter(item => [item.main, ...item.files].some(file => identityChanges.has(pathKey(file))))) {
       const beforeStatus = await status(affected);
-      if (beforeStatus.state === 'running' || beforeStatus.state === 'unknown' && beforeStatus.pid) throw new Error(`实例“${affected.name}”运行状态未确认停止，请先停止实例再修改共享文件中的 pid / include。`);
+      if (beforeStatus.state === 'running' || beforeStatus.state === 'unknown') throw new Error(`实例“${affected.name}”运行状态未确认停止，请先停止实例并由有运行权限的管理者确认，再修改共享文件中的 pid / include。`);
     }
     const backupId = `${Date.now()}-${randomUUID()}`;
     const backupDir = path.join(folder, 'backups', backupId);
@@ -241,9 +243,11 @@ export async function createNginxManager(directory, dependencies = {}) {
     versions.clear();
     return commit(old ? state.instances.map(item => item.id === old.id ? instance : item) : [...state.instances, instance]);
   }
-  async function request(action, payload = {}) {
+  async function request(action, payload = {}, options = {}) {
     if (closed) throw new Error('Nginx 管理器已关闭。');
     const promise = queue.then(async () => {
+      allowExecution = options.allowExecution !== false;
+      if (!allowExecution && ['detect', 'command'].includes(action)) throw new Error('未授予运行管理权限。');
       switch (action) {
         case 'get': return { ...structuredClone(state), platform: process.platform, directory: folder };
         case 'detect': versions.clear(); return runtime.detect(payload);

@@ -102,7 +102,7 @@ app.whenReady().then(async () => {
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
-      catch (error) { dialog.showErrorBox('项目中心共享未启动', `${error.message}\n项目数据与其他工具仍可使用，请在共享设置中检查端口。`); }
+      catch (error) { dialog.showErrorBox('局域网共享未启动', `${error.message}\n项目数据与其他工具仍可使用，请在共享设置中检查端口。`); }
     }
   } catch (error) { projectError = error.message; }
   try {

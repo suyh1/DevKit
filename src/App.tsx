@@ -137,7 +137,7 @@ function Workbench() {
   useEffect(() => { try { localStorage.setItem('devkit:colors', JSON.stringify(colorFavorites)); } catch { notice('收藏色无法保存，请导出备份。'); } }, [colorFavorites]);
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (document.querySelector(".sharing-panel dialog[open]")) return;
+      if (document.querySelector("dialog[open]")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (!saveDialog.current?.open) setSearchOpen(current => !current); }
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); execute.current(); }
       if (event.key === '/' && !(event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))) {

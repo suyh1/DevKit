@@ -60,6 +60,10 @@ describe('frontend and backend tools', () => {
     // Parse generated JS to catch escaping mistakes; constructing the function does not run it.
     const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
     expect(() => new AsyncFunction(fetch)).not.toThrow();
+    for (const method of ['GET', 'HEAD']) {
+      const empty = await run('http-code', JSON.stringify({method,url:'https://example.com',body:''}));
+      expect(empty).not.toContain('\"body\"');
+    }
     const curl = await run('http-code', input, { style: 'curl' });
     expect(curl).toContain("O'\\''Reilly"); expect(curl).toContain('--data-raw');
     const axios = await run('http-code', input, { style: 'axios' });
