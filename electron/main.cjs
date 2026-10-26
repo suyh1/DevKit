@@ -98,7 +98,7 @@ app.whenReady().then(async () => {
     const { prepareProjectConfigs } = await import('./server/project-configs.mjs');
     projectStorage = await prepareProjectConfigs(projectStorage.directory, [path.join(app.getPath('userData'), 'project-center')]);
     projectStore = await createProjectStore(projectStorage.directory);
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'));
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }

@@ -4,6 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { probeProjects } from "./project-probe.mjs";
+import { createSharedWorkspaces } from './shared-workspaces.mjs';
 
 const csp =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -23,7 +24,8 @@ const localAddresses = () => [
       .map((item) => item.address),
   ]),
 ];
-export async function createProjectHost(store, dist) {
+export async function createProjectHost(store, dist, managers = { nginx: () => null, library: () => null }) {
+  const workspaces = createSharedWorkspaces(managers);
   let server,
     settings = await store.settings();
   const sessions = new Map(),
@@ -33,6 +35,9 @@ export async function createProjectHost(store, dist) {
     port: server?.address()?.port ?? settings.port ?? 8765,
     host: settings.host ?? "0.0.0.0",
     canEdit: settings.canEdit === true,
+    shareNginx: settings.shareNginx === true,
+    shareHttp: settings.shareHttp === true,
+    nginxControl: settings.nginxControl === true,
     autoStart: settings.autoStart === true,
     hasPassword: !!settings.hash,
     addresses: server?.listening
@@ -46,6 +51,7 @@ export async function createProjectHost(store, dist) {
     const previous = server;
     server = undefined;
     sessions.clear();
+    workspaces.close();
     attempts.clear();
     if (previous) {
       previous.closeAllConnections();
@@ -78,6 +84,9 @@ export async function createProjectHost(store, dist) {
       host: input.host,
       port: input.port,
       canEdit: input.canEdit,
+      shareNginx: input.shareNginx === true,
+      shareHttp: input.shareHttp === true,
+      nginxControl: input.nginxControl === true,
       autoStart: input.autoStart === true,
     };
     if (input.password) {
@@ -148,12 +157,15 @@ export async function createProjectHost(store, dist) {
           )?.[1];
         const session = sessions.get(token);
         const authorized = !!session && session.expires > Date.now();
+        const capabilities = authorized ? { shareNginx: next.shareNginx, shareHttp: next.shareHttp, nginxControl: next.nginxControl } : {};
+        if (session && !authorized) { workspaces.release(token); sessions.delete(token); }
         if (
           url.pathname === "/api/projects/session" &&
           request.method === "GET"
         )
           return json(200, {
             authenticated: authorized,
+            ...capabilities,
             role: authorized && next.canEdit ? "editor" : "viewer",
           });
         async function body() {
@@ -167,7 +179,7 @@ export async function createProjectHost(store, dist) {
           let size = 0;
           for await (const chunk of request) {
             size += chunk.length;
-            if (size > 4_100_000)
+            if (size > (url.pathname === "/api/http/save-library" ? 16_100_000 : 4_100_000))
               throw Object.assign(new Error("请求过大。"), { status: 413 });
             chunks.push(chunk);
           }
@@ -209,9 +221,11 @@ export async function createProjectHost(store, dist) {
             return json(401, { error: "访问口令不正确。" });
           attempts.delete(ip);
           for (const [key, value] of sessions)
-            if (value.expires <= now) sessions.delete(key);
-          if (sessions.size >= 128)
-            sessions.delete(sessions.keys().next().value);
+            if (value.expires <= now) { workspaces.release(key); sessions.delete(key); }
+          if (sessions.size >= 128) {
+            const oldest = sessions.keys().next().value;
+            workspaces.release(oldest); sessions.delete(oldest);
+          }
           const created = randomBytes(32).toString("hex");
           sessions.set(created, { expires: now + 8 * 60 * 60 * 1000 });
           response.setHeader(
@@ -220,6 +234,7 @@ export async function createProjectHost(store, dist) {
           );
           return json(200, {
             authenticated: true,
+            shareNginx: next.shareNginx, shareHttp: next.shareHttp, nginxControl: next.nginxControl,
             role: next.canEdit ? "editor" : "viewer",
           });
         }
@@ -231,6 +246,7 @@ export async function createProjectHost(store, dist) {
             request.method === "POST"
           ) {
             sessions.delete(token);
+            workspaces.release(token);
             response.setHeader(
               "Set-Cookie",
               "devkit_project_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
@@ -242,6 +258,14 @@ export async function createProjectHost(store, dist) {
             request.method === "GET"
           )
             return json(200, await store.get());
+          const workspaceRoute = /^\/api\/(nginx|http)\/([a-z-]+)$/.exec(url.pathname);
+          if (workspaceRoute) {
+            if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
+            const payload = await body();
+            if (workspaceRoute[1] === 'http' && workspaceRoute[2] === 'send')
+              response.once('close', () => { if (!response.writableFinished) workspaces.cancel(token, payload?.id); });
+            return json(200, await workspaces.request(workspaceRoute[1], workspaceRoute[2], payload, { token, settings: next }));
+          }
           if (!next.canEdit)
             return json(403, { error: "当前共享为只读模式。" });
           if (

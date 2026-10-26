@@ -280,3 +280,16 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - 用户明确授权全部提交、打包、推送和发布，撤销上一轮暂不发行的限制。
 
 - v1.11.0已作为latest公开发布：https://github.com/suyh1/DevKit/releases/tag/1.11.0 。14份附件均按远端大小与SHA256核对一致，来源2821ffc，CI40278166607四作业全部成功；完成记录另行文档提交，不改变发行二进制或标签来源。
+
+## 2026-10-26 Nginx 与 HTTP 局域网共享
+- 调查并说明共享架构与权限 — complete
+- 实现服务、网页、独立入口与文档 — complete
+- 验证鉴权、权限、冲突、发送取消与构建 — complete
+
+- 补充远程填写主机实例与路径表单，验证主机执行语义 — complete
+
+## 2026-10-26 v1.12.0发行
+- 更新版本、核对变更和发行前检查 — complete
+- 提交并制作三平台安装包与独立服务，核验真实载荷 — in_progress
+- 推送、等待CI、发布并核对远端附件 — pending
+用户已授权提交、打包、推送和发布全部本次共享修改。

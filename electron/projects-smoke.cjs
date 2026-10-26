@@ -15,7 +15,7 @@ module.exports = async function checkProjects(window, output, staging) {
     }
     console.error(
       await contents.executeJavaScript(
-        'JSON.stringify({errors:[...document.querySelectorAll(".pc-error")].map(item=>item.textContent),role:document.querySelector(".pc-role")?.textContent,cards:[...document.querySelectorAll(".pc-card h3")].map(item=>item.textContent),dialog:document.querySelector("dialog[open] h2")?.textContent,busy:document.querySelector(".pc-login .run-button")?.disabled})',
+        'JSON.stringify({errors:[...document.querySelectorAll(".pc-error")].map(item=>item.textContent),role:document.querySelector(".pc-role")?.textContent,cards:[...document.querySelectorAll(".pc-card h3")].map(item=>item.textContent),dialog:document.querySelector("dialog[open] h2")?.textContent,busy:document.querySelector(".portal-login .run-button")?.disabled})',
       ),
     );
     await fs.writeFile(
@@ -312,17 +312,17 @@ module.exports = async function checkProjects(window, output, staging) {
     await remote.loadURL(url);
     await wait(
       remote.webContents,
-      '!!document.querySelector(".pc-login input[type=password]")',
+      '!!document.querySelector(".portal-login input[type=password]")',
     );
     await remote.webContents.executeJavaScript(
       `{const input=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'project-smoke-only');input.dispatchEvent(new Event('input',{bubbles:true}));}`,
     );
     await wait(
       remote.webContents,
-      '!document.querySelector(".pc-login .run-button").disabled',
+      '!document.querySelector(".portal-login .run-button").disabled',
     );
     await remote.webContents.executeJavaScript(
-      'document.querySelector(".pc-login .run-button").click()',
+      'document.querySelector(".portal-login .run-button").click()',
     );
     await wait(
       remote.webContents,

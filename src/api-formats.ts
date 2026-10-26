@@ -1,3 +1,4 @@
+import { newProjectId } from './project-api';
 import { parseDocument } from "yaml";
 import {
   newApiEndpoint,
@@ -7,7 +8,7 @@ import {
 import type { ApiProject, ApiParameter } from "../shared/api-workspace.mjs";
 import { readHttpCollection, parseHttpConfig } from "./http-model";
 import { schemaFromExample } from "./api-request";
-const uid = () => crypto.randomUUID();
+const uid = () => newProjectId();
 type Node = Record<string, any>;
 const object = (value: unknown): value is Node =>
   !!value && typeof value === "object" && !Array.isArray(value);

@@ -1,3 +1,4 @@
+import { newProjectId } from './project-api';
 import type { ApiProject } from "../shared/api-workspace.mjs";
 import { Plus, Trash2 } from "lucide-react";
 import { Modal, ModalCancel } from "./project-components";
@@ -151,7 +152,7 @@ export default function ApiProjectSettings({
                   environments: [
                     ...draft.environments,
                     {
-                      id: crypto.randomUUID(),
+                      id: newProjectId(),
                       name: `环境${draft.environments.length + 1}`,
                       baseUrl: "",
                       variables: [],

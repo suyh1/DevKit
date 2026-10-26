@@ -1,3 +1,4 @@
+import { remoteRequest } from './workspace-remote';
 export type NginxInstance = { id: string; name: string; main: string; files: string[]; executable: string; prefix: string; platform: 'win32' | 'linux' | 'any' };
 export type NginxState = { schemaVersion: number; revision: number; instances: NginxInstance[]; platform: string; directory: string };
 export type NginxDocument = { path: string; content: string; hash: string };
@@ -14,7 +15,7 @@ export type NginxLog = { path: string; text: string; size: number; modifiedAt: s
 export type NginxAction = 'inspect' | 'log-tail' | 'review' | 'get' | 'detect' | 'discover' | 'statuses' | 'documents' | 'save-files' | 'upsert' | 'create' | 'remove' | 'command' | 'pick' | 'backups' | 'backup-files';
 declare global { interface Window { devkitNginx?: { request: (action: NginxAction, payload?: unknown) => Promise<unknown> } } }
 export async function nginxRequest<T>(action: NginxAction, payload?: unknown): Promise<T> {
-  if (!window.devkitNginx) throw new Error('Nginx 配置与进程管理需要在 DevKit 桌面端使用。');
+  if (!window.devkitNginx) return remoteRequest<T>('nginx', action, payload);
   const result = await window.devkitNginx.request(action, payload) as { data?: T; error?: string };
   if (result.error) throw new Error(result.error);
   return result.data as T;

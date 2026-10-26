@@ -1,4 +1,4 @@
-"""Package only the browser project center and its built-in Node server."""
+"""Package the shared browser workspaces and their built-in Node server."""
 import hashlib
 import json
 import os
@@ -48,7 +48,7 @@ with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslev
     for guide in sorted((root / 'docs').rglob('*.md')):
         if guide.name != 'README.template.md':
             bundle.write(guide, guide.relative_to(root).as_posix())
-    bundle.writestr('README.txt', 'DevKit Project Center\nRequires Node.js 24+ on the HOST only. Clients need only a modern browser.\nNo npm install, build, Python or Electron needed for this ZIP.\n\nWindows PowerShell:\n$env:DEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password"\nnode server/start.mjs\n\nLinux:\nDEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password" node server/start.mjs\n\nDefault: 0.0.0.0:8765, read-only.\nHOST, PORT, DEVKIT_PROJECT_DATA and DEVKIT_PROJECT_EDIT=true are optional.\nData defaults to ./configs beside server/. Close both hosts before copying configs between installations. No user data is included in this archive.\nOnly for trusted LANs; HTTP is not encrypted. See GUIDE.zh-CN.md.\n')
+    bundle.writestr('README.txt', 'DevKit Project Center\nRequires Node.js 24+ on the HOST only. Clients need only a modern browser.\nNo npm install, build, Python or Electron needed for this ZIP.\n\nWindows PowerShell:\n$env:DEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password"\nnode server/start.mjs\n\nLinux:\nDEVKIT_PROJECT_PASSWORD="replace-with-a-separate-password" node server/start.mjs\n\nDefault: 0.0.0.0:8765, read-only.\nHOST, PORT, DEVKIT_PROJECT_DATA and DEVKIT_PROJECT_EDIT=true are optional.\nDEVKIT_SHARE_NGINX=true and DEVKIT_SHARE_HTTP=true opt in to more workspaces.\nDEVKIT_NGINX_CONTROL=true additionally permits Nginx commands for editors.\nPaths and HTTP requests refer to this host. See docs/workspace-sharing.md.\nData defaults to ./configs beside server/. Close both hosts before copying configs between installations. No user data is included in this archive.\nOnly for trusted LANs; HTTP is not encrypted. See GUIDE.zh-CN.md.\n')
 with zipfile.ZipFile(archive) as bundle:
     assert bundle.testzip() is None
     assert 'dist/index.html' not in bundle.namelist()

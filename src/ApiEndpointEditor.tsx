@@ -1,10 +1,11 @@
+import { newProjectId } from './project-api';
 import { Plus, Trash2 } from "lucide-react";
 import CodeEditor from "./CodeEditor";
 import { API_METHODS, parseApiSchema } from "../shared/api-workspace.mjs";
 import type { ApiEndpoint, ApiParameter } from "../shared/api-workspace.mjs";
 import { schemaFromExample } from "./api-request";
 
-const uid = () => crypto.randomUUID();
+const uid = () => newProjectId();
 export function ApiParameters({
   rows,
   onChange,

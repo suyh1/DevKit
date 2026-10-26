@@ -1,3 +1,5 @@
+import { canWriteWorkspace, remoteAccess } from './workspace-remote';
+import { newProjectId } from './project-api';
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Send,
@@ -127,7 +129,7 @@ export default function ApiDebug({
     if (live.current || !request.value) return;
     const input = request.value,
       snapshot = structuredClone(endpoint),
-      id = crypto.randomUUID();
+      id = newProjectId();
     live.current = id;
     setRunning(true);
     onBusy(true);
@@ -231,7 +233,7 @@ export default function ApiDebug({
         </label>
         <button
           className="run-button"
-          disabled={!running && (!request.value || !window.devkitHttp)}
+          disabled={!running && (!request.value || !canWriteWorkspace() || (!window.devkitHttp && !remoteAccess()))}
           onClick={() => void (running ? cancel() : send())}
         >
           {running ? <Square size={14} /> : <Send size={14} />}{" "}
@@ -401,7 +403,7 @@ export default function ApiDebug({
                           (row) => row.status === status,
                         );
                       const row = {
-                        id: current?.id || crypto.randomUUID(),
+                        id: current?.id || newProjectId(),
                         status,
                         description:
                           current?.description || response.statusText,

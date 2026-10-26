@@ -55,6 +55,9 @@ jobs:
       - name: Offline API workspace integration
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --api-only
+      - name: LAN workspaces browser integration
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-sharing.mjs
       - run: npm run ${{ matrix.command }}
       - name: Verify packaged Electron app
         if: runner.os == 'Windows'
@@ -62,6 +65,9 @@ jobs:
       - name: Verify packaged offline API workspace
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --packaged --api-only
+      - name: Verify packaged LAN workspaces
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-sharing.mjs --packaged
       - name: Verify configs preservation in NSIS cleanup
         if: runner.os == 'Windows'
         run: node scripts/check-configs-installer.mjs
@@ -104,6 +110,7 @@ jobs:
       - run: npm ci
       - run: npm run test:docs
       - run: npm run test:projects
+      - run: npm run test:http
       - run: npm run bundle:project-server
       - run: node scripts/check-project-server.mjs
       - uses: actions/upload-artifact@v4

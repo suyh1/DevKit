@@ -58,6 +58,9 @@ async function launch(directory, reusePassword = false) {
     PORT: String(port),
     DEVKIT_PROJECT_PASSWORD: password,
     DEVKIT_PROJECT_EDIT: "true",
+    DEVKIT_SHARE_NGINX: 'true',
+    DEVKIT_SHARE_HTTP: 'true',
+    DEVKIT_NGINX_CONTROL: 'false',
   };
   delete env.DEVKIT_PROJECT_DATA;
   if (reusePassword) delete env.DEVKIT_PROJECT_PASSWORD;
@@ -85,6 +88,10 @@ async function launch(directory, reusePassword = false) {
       body: JSON.stringify({ password }),
     });
     assert.equal(response.status, 200);
+    const capabilities = await response.json();
+    assert.equal(capabilities.shareNginx, true);
+    assert.equal(capabilities.shareHttp, true);
+    assert.equal(capabilities.nginxControl, false);
     const cookie = response.headers.get("set-cookie").split(";")[0];
     const request = async (route, method = "GET", body) => {
       const response = await fetch(base + "/api/projects/" + route, {
@@ -102,7 +109,12 @@ async function launch(directory, reusePassword = false) {
       );
       return response.json();
     };
-    return { child, base, request, output: () => output };
+    const workspace = async (module, action, payload = {}) => {
+      const result = await fetch(`${base}/api/${module}/${action}`, { method: 'POST', headers: { Cookie: cookie, Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      assert.ok(result.ok, await result.clone().text());
+      return result.json();
+    };
+    return { child, base, request, workspace, output: () => output };
   } catch (error) {
     child.kill();
     throw error;
@@ -145,8 +157,16 @@ try {
     await readFile(path.join(installation, "dist/.vite/manifest.json"), "utf8"),
   );
   for (const item of Object.values(build))
-    for (const asset of [item.file, ...(item.css || [])])
+    for (const asset of [item.file, ...(item.css || []), ...(item.assets || [])])
       assert.equal((await fetch(host.base + "/" + asset)).status, 200);
+  const api = await host.workspace('http', 'get-library');
+  await host.workspace('http', 'save-library', { revision: api.state.revision, data: api.state });
+  const configDirectory = path.join(installation, 'nginx-fixture');
+  await mkdir(configDirectory);
+  const instances = await host.workspace('nginx', 'get');
+  const registered = await host.workspace('nginx', 'create', { revision: instances.revision, name: '远程主机路径验收', platform: 'any', executable: '', directory: configDirectory, mainName: 'nginx.conf', commonName: 'common.conf', port: 8080 });
+  assert.equal(registered.instances[0].main, path.join(configDirectory, 'nginx.conf'));
+  assert.match(await readFile(registered.instances[0].main, 'utf8'), /include/);
   await stop(host);
   host = null;
   const copied = path.join(folder, "second");
@@ -155,6 +175,8 @@ try {
   host = await launch(copied, true);
   assert.equal((await host.request("state")).profiles[0].projects[0].name, "目录迁移验收");
   assert.equal((await host.request("snapshots"))[0].name, "可迁移快照");
+  assert.equal((await host.workspace('http', 'get-library')).state.revision, api.state.revision + 1);
+  assert.equal((await host.workspace('nginx', 'get')).instances[0].name, '远程主机路径验收');
   const proof = {
     version: manifest.version,
     zip: identity.name,
@@ -166,6 +188,9 @@ try {
     snapshotsTransferred: true,
     storedPasswordReused: true,
     allPortalAssets: true,
+    schemaWorkerAsset: true,
+    httpWorkspaceSavedAndTransferred: true,
+    remoteNginxCreatedOnHost: true,
     desktopEntryBlocked: true,
     network: "127.0.0.1 only",
   };

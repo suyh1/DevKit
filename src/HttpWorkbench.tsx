@@ -1,3 +1,5 @@
+import { canWriteWorkspace, remoteAccess } from './workspace-remote';
+import { newProjectId } from './project-api';
 import { MotionReveal, MotionGroup, useMotionList, MotionButton, MotionPresence } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -139,7 +141,7 @@ export default function HttpWorkbench({
       return;
     }
     const sent = {
-      id: crypto.randomUUID(),
+      id: newProjectId(),
       config,
       name,
       timeout,
@@ -182,7 +184,7 @@ export default function HttpWorkbench({
     try {
       if (!name.trim() || name.trim().length > 100) throw new Error('请求名称需要 1–100 字符。');
       const stored = savedHttpConfig(config, includeSensitive),
-        id = selected || crypto.randomUUID();
+        id = selected || newProjectId();
       const entry = { id, name: name.trim(), config: stored, timeout, sensitive: includeSensitive };
       const next = entries.some((item) => item.id === id) ? entries.map((item) => (item.id === id ? entry : item)) : [...entries, entry];
       persist(next);
@@ -237,7 +239,7 @@ export default function HttpWorkbench({
         </button>
       </div>
       <p className="workflow-intro">
-        请求由桌面本机发出，点击发送才访问目标。支持 HTTP(S)、文本/JSON 正文；不自动跟随重定向。响应仅在内存。
+        请求由共享主机或桌面本机发出，点击发送才访问目标。支持 HTTP(S)、文本/JSON 正文；不自动跟随重定向。响应仅在内存。
       </p>
       <div className="http-layout">
         <aside ref={collection} className="http-collection">
@@ -316,7 +318,7 @@ export default function HttpWorkbench({
                     }))
                   )
                     return;
-                  persist([...entries, ...imported.map((entry) => ({ ...entry, id: crypto.randomUUID() }))]);
+                  persist([...entries, ...imported.map((entry) => ({ ...entry, id: newProjectId() }))]);
                   setError('');
                   onNotice('请求集合已合并导入。');
                 } catch (error) {
@@ -401,7 +403,7 @@ export default function HttpWorkbench({
               className="run-button"
               busy={!!running}
               outcome={error ? 'error' : response ? 'success' : ''}
-              disabled={!running && (!window.devkitHttp || invalidDraft)}
+              disabled={!running && (!canWriteWorkspace() || (!window.devkitHttp && !remoteAccess()) || invalidDraft)}
               onClick={() => {
                 if (running) void cancelHttp(running).catch((error) => setError(String(error)));
                 else void send();
@@ -421,7 +423,7 @@ export default function HttpWorkbench({
             保存时包含完整 Headers、正文与敏感参数（明文）
           </label>
           {dirty && <p className="preview-note">请求草稿尚未保存。</p>}
-          {!window.devkitHttp && <p>真实发送仅支持桌面端。此处仍可编辑请求及管理集合。</p>}
+          {!window.devkitHttp && !remoteAccess() && <p>请在桌面端或已登录的共享工作台发送请求。</p>}
           <div className="http-request">
             <HttpRequestInput
               advanced

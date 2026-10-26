@@ -67,8 +67,10 @@ function upsert<T extends { id: string }>(items: T[], value: T): T[] {
 
 export default function ProjectCenter({
   portal = false,
+  onLogout,
 }: {
   portal?: boolean;
+  onLogout?: () => void;
 }) {
   const [session, setSession] = useState<Session | null>(null),
     [data, setData] = useState<ProjectState | null>(null);
@@ -475,6 +477,7 @@ export default function ProjectCenter({
                 disabled={busy}
                 onClick={() =>
                   void action(async () => {
+                    if (onLogout) { onLogout(); return; }
                     await projectRequest("logout", {});
                     setData(null);
                     setSession(null);
@@ -1797,7 +1800,7 @@ export default function ProjectCenter({
       <MotionPresence kind="dialog" present={!!(sharing)}>{sharing && (
         <Modal
           feedback={message}
-          title="局域网共享 · 仅项目中心"
+          title="局域网共享 · 工作台"
           close={() => setSharing(null)}
           busy={busy}
           savedKey={shareSaved}
@@ -1805,6 +1808,9 @@ export default function ProjectCenter({
             host: sharing.host,
             port: sharing.port,
             canEdit: sharing.canEdit,
+            shareNginx: sharing.shareNginx,
+            shareHttp: sharing.shareHttp,
+            nginxControl: sharing.nginxControl,
             autoStart: sharing.autoStart,
             password: sharePassword,
           }}
@@ -1817,20 +1823,22 @@ export default function ProjectCenter({
                   host: sharing.host,
                   port: Number(sharing.port),
                   canEdit: sharing.canEdit,
+                  shareNginx: sharing.shareNginx,
+                  shareHttp: sharing.shareHttp,
+                  nginxControl: sharing.nginxControl,
                   autoStart: sharing.autoStart,
                   password: sharePassword,
                 });
                 setSharing((current) => (current === null ? null : result));
                 setSharePassword("");
                 setShareSaved((current) => current + 1);
-                setMessage("项目中心共享已启动。");
+                setMessage("工作台共享已启动。");
               });
             }}
           >
             {errorBox}
             <p>
-              主机运行期间，其他电脑可用浏览器访问。关闭 DevKit 会停止共享。现有
-              44 个工具不通过此服务开放。
+              主机运行期间，其他电脑可用浏览器访问。退出 DevKit 会停止共享。按下面的选项开放 Nginx 与 HTTP 工作台。
             </p>
             <div className="pc-form-grid">
               <Field label="监听范围">
@@ -1882,7 +1890,7 @@ export default function ProjectCenter({
                   setSharing({ ...sharing, canEdit: event.target.checked })
                 }
               />
-              允许持有口令的访客编辑项目、档案和恢复备份
+              允许持有口令的访客保存共享内容、恢复备份和发送 HTTP 请求
             </label>
             <label className="pc-check">
               <input
@@ -1898,6 +1906,7 @@ export default function ProjectCenter({
               默认只读。仅用于可信局域网，HTTP
               不加密；访问口令请单独设置。系统防火墙需允许所选端口入站。
             </p>
+            {([['shareNginx', '开放 Nginx 主机实例、路径配置与日志'], ['shareHttp', '开放 HTTP 接口项目、文档、环境和调试'], ['nginxControl', '允许主机程序检测及 Nginx 检查、启动、重载和停止（还需允许编辑）']] as const).map(([key, label]) => <label className="pc-check" key={key}><input type="checkbox" checked={sharing[key] === true} onChange={event => setSharing({ ...sharing, [key]: event.target.checked })} />{label}</label>)}
             <div className="pc-sharing-state">
               <strong>{sharing.running ? "共享正在运行" : "共享已停止"}</strong>
               {sharing.addresses.map((url) => (

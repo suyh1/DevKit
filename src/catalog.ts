@@ -3,9 +3,9 @@ import type { ToolId } from './tools';
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
-  { id: 'http', name: 'HTTP 调试', description: '本地API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。', category: '工作台', badge: '本机' },
+  { id: 'http', name: 'HTTP 调试', description: '可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。', category: '工作台', badge: '共享' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
-  { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 本机 Nginx 的启动、优雅停止和重载。', category: '工作台', badge: '本机' },
+  { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 主机 Nginx，支持局域网远程填写主机实例与路径、编辑配置、查看日志与授权运行操作。', category: '工作台', badge: '共享' },
 ] as const;
 
 export const categories = [

@@ -36,3 +36,6 @@ OpenAPI支持3.0/3.1、Swagger支持2.0；可读JSON/YAML并解析同文档引�
 - npm run test:http：本地HTTP传输与API文件存储、并发版本、失败写入、损坏保护和恢复。
 - node scripts/smoke-desktop.mjs --api-only：真实桌面创建/设计/文档/发送/响应校验、文件重载、草稿保护、取消、导入失败、导出及离线资源与响应式检查。
 - node scripts/smoke-desktop.mjs --http-close-only：原快速请求及托盘/退出生命周期回归。
+
+
+局域网入口复用相同API存储管理器，保存仍检查revision并保留上次保存。只读访问禁止持久化及HTTP发送；详情见 [共享工作台](workspace-sharing.md)。

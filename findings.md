@@ -266,3 +266,9 @@
 离线实现已落地：API项目configs/http/api-workspace.json（当前+上次保存），独立目录锁、原子同步替换与版本检查；原HTTP集合保留并显式迁入。未引入Scalar/Vue，仅新增MIT @cfworker/json-schema4.1.1及官方2020-12meta数据。支持标准JSON Schema常用验证，动态引用/超时/异常/数字精度不足均不冒充通过；文本/表单按对应实例类型验证。OpenAPI本地循环引用打包与JSON原始示例导出回读保真已测；无法转换的外部引用/文件等明确拒绝。关键边界和依赖许可已写入docs/http-workbench.md、docs/api-workspace-design.md、docs/api-third-party-notices.md。
 
 v1.11.0发行完成：共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aedd5e837672697572bbb，三平台实际ASAR同adcc34df9ac4a9531c86295bbb935541f59fc6f692c88a2fedb8c417bb005106；README及18指南一致。发布release id423908013，tag1.11.0来源2821ffc，14远端附件SHA与大小均匹配本地，latest状态确认。产物及验收在artifacts/release-1.11.0；Windows仍为NotSigned，Linux未做用户目标桌面/托盘实测，边界已附公开验收。
+
+## 2026-10-26 局域网工作台共享
+复用项目中心会话、同源与清单资源白名单；独立模块显式开启，Nginx注册路径仍限主机，远程仅已有实例与授权命令。复用nginxManager和apiWorkspace避免双重锁。HTTP客户端按会话隔离，退出/共享重启/连接断开取消请求。API项目限制16MB，保存传输上限16.1MB。普通HTTP浏览器不支持randomUUID，门户相关组件改用getRandomValues生成ID。参考GitHub nginx-ui（AGPL-3.0，约11k stars，近期维护，Go/Vue及配置/运行集中管理）和Hoppscotch（MIT，约80k，近期维护，TS/Vue及代理转发）。只借鉴架构，无复制和新依赖；关注公开鉴权问题，坚持统一会话鉴权，不增加旁路。来源：https://github.com/0xJacky/nginx-ui ；https://github.com/hoppscotch/hoppscotch 。
+首轮集成测试HTTP夹具错误使用headers数组，已改为生产协议规定的对象后通过19项测试。
+
+用户澄清：Nginx共享是运行DevKit主机的远程填写页面，全部路径和运行命令均属于该主机，不是客户端。已开放编辑访客的create/upsert/remove/discover，detect与command需要运行权限，pick始终不向浏览器开放；Node独立服务无需先用桌面登记实例。

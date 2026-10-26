@@ -25,6 +25,9 @@ export type Snapshot = {
   profiles: number;
 };
 export type Sharing = {
+  shareNginx?: boolean;
+  shareHttp?: boolean;
+  nginxControl?: boolean;
   running: boolean;
   port: number;
   host: string;
@@ -41,6 +44,9 @@ export type ProjectStorage = {
   error?: string;
 };
 export type Session = {
+  shareNginx?: boolean;
+  shareHttp?: boolean;
+  nginxControl?: boolean;
   authenticated: boolean;
   role: "owner" | "editor" | "viewer";
 };

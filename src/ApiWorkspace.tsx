@@ -1,3 +1,5 @@
+import { canWriteWorkspace, remoteAccess } from './workspace-remote';
+import { newProjectId } from './project-api';
 import { useEffect, useRef, useState } from "react";
 import {
   Folder,
@@ -183,6 +185,7 @@ export default function ApiWorkspace({
     nextProject = projectId,
     nextEndpoint = draft?.id,
   ) {
+    if (!canWriteWorkspace()) throw new Error("当前共享为只读模式。");
     const data = validateApiState({ ...state, projects });
     const result = await apiLibrary("save-library", {
       data,
@@ -213,7 +216,7 @@ export default function ApiWorkspace({
   function addEndpoint(group = "") {
     void allowChange().then((allowed) => {
       if (!allowed || !project) return;
-      const endpoint = newApiEndpoint(crypto.randomUUID(), group);
+      const endpoint = newApiEndpoint(newProjectId(), group);
       let i = 1;
       while (project.endpoints.some((item) => item.path === endpoint.path))
         endpoint.path = `/new-endpoint-${i++}`;
@@ -281,7 +284,7 @@ export default function ApiWorkspace({
         <div className="api-actions">
           <button
             className="secondary-button"
-            disabled={busy || sending || !window.devkitHttp}
+            disabled={!canWriteWorkspace() || busy || sending || (!window.devkitHttp && !remoteAccess())}
             onClick={() => openProject()}
           >
             <FolderPlus size={15} />
@@ -289,7 +292,7 @@ export default function ApiWorkspace({
           </button>
           <button
             className="secondary-button"
-            disabled={busy || sending}
+            disabled={!canWriteWorkspace() || busy || sending}
             onClick={() => file.current?.click()}
           >
             <Upload size={15} />
@@ -376,7 +379,7 @@ export default function ApiWorkspace({
                     <button
                       className="icon-button"
                       aria-label="API项目设置"
-                      disabled={busy || sending}
+                      disabled={!canWriteWorkspace() || busy || sending}
                       onClick={() => openProject(project)}
                     >
                       <Settings2 size={15} />
@@ -384,7 +387,7 @@ export default function ApiWorkspace({
                     <button
                       className="icon-button"
                       aria-label="新增API接口"
-                      disabled={busy || sending}
+                      disabled={!canWriteWorkspace() || busy || sending}
                       onClick={() => addEndpoint()}
                     >
                       <Plus size={16} />
@@ -501,7 +504,7 @@ export default function ApiWorkspace({
                   </button>
                   <button
                     className="text-button api-danger"
-                    disabled={busy || sending}
+                    disabled={!canWriteWorkspace() || busy || sending}
                     onClick={() => {
                       void allowChange().then((allowed) => {
                         if (allowed)
@@ -583,7 +586,7 @@ export default function ApiWorkspace({
               <span>版本 {state.revision} · 本机存储</span>
               <button
                 className="text-button"
-                disabled={!library.canRestore || busy || sending}
+                disabled={!canWriteWorkspace() || !library.canRestore || busy || sending}
                 onClick={() =>
                   void action(async () => {
                     if (
@@ -678,7 +681,7 @@ export default function ApiWorkspace({
                         className="icon-button"
                         aria-label="复制API接口"
                         title="复制接口到独立路径"
-                        disabled={busy || sending}
+                        disabled={!canWriteWorkspace() || busy || sending}
                         onClick={() => {
                           void allowChange().then((allowed) => {
                             if (!allowed) return;
@@ -694,7 +697,7 @@ export default function ApiWorkspace({
                               path = `${draft.path}-copy-${index++}`;
                             setDraft({
                               ...structuredClone(draft),
-                              id: crypto.randomUUID(),
+                              id: newProjectId(),
                               name: `${draft.name} 副本`,
                               path,
                             });
@@ -707,7 +710,7 @@ export default function ApiWorkspace({
                       <button
                         className="icon-button api-danger"
                         aria-label="删除API接口"
-                        disabled={busy || sending}
+                        disabled={!canWriteWorkspace() || busy || sending}
                         onClick={() =>
                           void action(async () => {
                             if (
@@ -749,7 +752,7 @@ export default function ApiWorkspace({
                       </button>
                       <button
                         className="run-button"
-                        disabled={busy || sending || !dirty}
+                        disabled={!canWriteWorkspace() || busy || sending || !dirty}
                         onClick={() => void action(saveEndpoint)}
                       >
                         <Save size={15} />
@@ -774,7 +777,7 @@ export default function ApiWorkspace({
                             key={id as string}
                             role="tab"
                             aria-selected={view === id}
-                            disabled={sending}
+                            disabled={sending || (id === "design" && !canWriteWorkspace())}
                             onClick={() => setView(id as typeof view)}
                           >
                             <Component size={15} />
@@ -912,14 +915,14 @@ export default function ApiWorkspace({
             <ModalCancel />
             <button
               className="run-button"
-              disabled={busy || sending}
+              disabled={!canWriteWorkspace() || busy || sending}
               onClick={() =>
                 void allowChange().then((allowed) => {
                   if (allowed)
                     void action(async () => {
                       const next = {
                         ...imported.project,
-                        id: crypto.randomUUID(),
+                        id: newProjectId(),
                       };
                       await commit([...state.projects, next], next.id, "");
                       setImported(null);

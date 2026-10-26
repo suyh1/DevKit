@@ -111,7 +111,7 @@ sudo chmod 700 /opt/devkit/configs
 
 ## 无桌面常驻的部署方式
 
-仓库还提供独立 Node 服务入口，同样只托管项目中心。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
+仓库还提供独立 Node 服务入口，可按选项托管项目中心、Nginx 配置及 HTTP 工作台。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
 
 ```powershell
 # 仅源码部署需要先执行：npm run build
@@ -130,12 +130,14 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' \
 DEVKIT_PROJECT_EDIT=false node server/start.mjs
 ```
 
+Nginx 与 HTTP 默认不开放，使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，详细权限与示例见 [共享工作台](workspace-sharing.md)。
+
 首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。默认只读，明确设置 `DEVKIT_PROJECT_EDIT=true` 才允许访客编辑。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 
 默认直接使用解压根目录的 `configs`，不受终端当前工作目录影响。如部署者明确需要其他位置，可自行设置绝对路径 `DEVKIT_PROJECT_DATA`；这属于显式覆盖，桌面安装版仍使用安装目录的 `configs`。
 
 ## 实现边界与验证
 
-桌面端走受来源校验的最小 IPC；浏览器走独立 HTTP API，两者复用同一个模型校验和存储。局域网静态资源根据 `portal.html` 的构建依赖清单列白名单，不开放主工具箱入口、Worker、主机文件路径或桌面共享控制接口。
+桌面端走受来源校验的最小 IPC；浏览器走独立 HTTP API，两者复用同一个模型校验和存储。局域网静态资源根据 `portal.html` 的构建依赖清单列白名单，不开放主工具箱入口、通用工具 Worker、任意主机文件读取或桌面共享控制接口。HTTP 的 Schema 校验 Worker 随门户依赖开放。新增模块与权限见 [共享工作台](workspace-sharing.md)。
 
 自动检查涵盖变量解析、重复参数、输入验证、并发保存、快照恢复/保留数量、损坏数据保护、进程锁、登录、读写权限、会话注销、来源检查、资源隔离及手动探活。真实 Electron / 浏览器集成验证覆盖项目创建、独立配置档案、项目删除、方案对比、导入预览、冲突时草稿保留、Cookie 登录、只读页面和窄窗口。目标局域网的路由/防火墙及真实麒麟启动仍需在相应机器确认。
