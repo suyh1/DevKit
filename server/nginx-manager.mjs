@@ -34,7 +34,13 @@ async function atomic(filename, bytes, mode = 0o600) {
   try {
     const handle = await open(temporary, 'wx', mode);
     try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
-    await rename(temporary, filename);
+    for (let attempt = 0; ; attempt++) {
+      try { await rename(temporary, filename); break; }
+      catch (error) {
+        if (!['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt >= 7) throw error;
+        await delay(Math.min(20 * 2 ** attempt, 250));
+      }
+    }
   } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 export async function discoverIncludes(main) {

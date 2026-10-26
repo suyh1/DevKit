@@ -253,3 +253,14 @@
 - 最终全量桌面回归：46工具（40文本/坐标执行）、主题/四宽度、项目中心CRUD/共享/快照通过；Nginx提示焦点用例在nginx-smoke.cjs:121失败。用git archive导出未修改HEAD 6b1a6e8到artifacts/http-close-baseline，独立构建并运行相同--nginx-only，完全相同位置/条件失败，证实为既有问题。未改Nginx产品代码或放宽其断言。
 
 - v1.10.8已解决前述旧桌面回归失败：悬停提示在截图期间收起、退场中的原生dialog仍占顶层，两者均为自动化未等待可交互状态。修正真实焦点/退场等待及显式提交后，实际Windows ASAR完整回归及GitHub Windows源码/包内回归全部成功，未改Nginx产品行为。
+
+## 2026-10-26 项目档案独立
+当前 schemaVersion 1 使用全局 projects，profiles 仅有 variables/overrides。store 将全部状态及快照写入 projects.json。需要 schema v2 将 projects 移入 profile，迁移时展开各档案覆盖。
+
+完成schema v2：projects归属每个profile，项目编码/ID只在档案内唯一；configs/profile-<hex-id>.json为独立档案，projects.json只保存当前索引/版本与历史快照。ID十六进制编码避免Windows大小写碰撞。跨文件日志支持同进程失败恢复及崩溃重启恢复，未变档案不重写。旧v1覆盖展开为独立项目，原件留projects.v1.backup.json；无法从旧结构推断最初归属，因此保留各档案原先可见项目，由用户分别整理。导入与恢复预览按档案标记项目，对比按编码并集展示缺失与完整配置。
+
+## HTTP/API 工作台调研 2026-10-26
+用户明确调整为不嵌入第三方UI，参照成熟产品交互而沿用本项目主题，并要求完整、健壮。Scalar MIT 16319 stars、2026-10-25更新；Bruno MIT 47846 stars、2026-10-24更新；Hoppscotch官方MIT约80.6k stars，均活跃。Scalar API-reference npm1.76.0导入约55MB并依赖Vue，整合将引入第二设计系统，因此取消安装（package和lock未变）。采用原生项目/接口目录、设计/文档/调试视图、环境变量、响应契约、OpenAPI导入导出和configs文件存储。
+校验依赖选择@cfworker/json-schema（MIT），官方支持draft4/7/2019-09/2020-12且通过4500规格断言，无eval/new Function，适合当前严格CSP。Ajv需运行时代码生成与当前renderer CSP冲突；在隔离Worker中运行Schema验证并加超时，避免大Schema或正则阻塞界面。来源：https://github.com/cfworker/cfworker/tree/main/packages/json-schema ，https://github.com/usebruno/bruno ，https://github.com/hoppscotch/hoppscotch ，https://github.com/scalar/scalar 。
+
+离线实现已落地：API项目configs/http/api-workspace.json（当前+上次保存），独立目录锁、原子同步替换与版本检查；原HTTP集合保留并显式迁入。未引入Scalar/Vue，仅新增MIT @cfworker/json-schema4.1.1及官方2020-12meta数据。支持标准JSON Schema常用验证，动态引用/超时/异常/数字精度不足均不冒充通过；文本/表单按对应实例类型验证。OpenAPI本地循环引用打包与JSON原始示例导出回读保真已测；无法转换的外部引用/文件等明确拒绝。关键边界和依赖许可已写入docs/http-workbench.md、docs/api-workspace-design.md、docs/api-third-party-notices.md。

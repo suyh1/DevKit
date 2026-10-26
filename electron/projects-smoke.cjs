@@ -50,20 +50,20 @@ module.exports = async function checkProjects(window, output, staging) {
     assert.equal(result.error, undefined, result.error);
     return result.data;
   };
+  window.setSize(1440, 1000);
   const current = await ipc("get");
   await ipc("save", {
     revision: current.revision,
     data: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision: current.revision,
-      projects: [],
       profiles: [
         {
           id: "smoke-default",
           name: "开发环境",
           description: "本机开发入口",
           variables: [{ key: "host", value: "127.0.0.1" }],
-          overrides: [],
+          projects: [],
         },
       ],
     },
@@ -102,23 +102,37 @@ module.exports = async function checkProjects(window, output, staging) {
   await aria("变量 1 名称", "host");
   await aria("变量 1 值", "192.0.2.10");
   await click("保存配置档案");
-  await wait(
-    window.webContents,
-    'document.querySelector(".project-workspace .pc-card code")?.textContent.includes("192.0.2.10") && !document.querySelector("dialog[open]")',
-  );
-  await js(
-    `document.querySelector('button[aria-label="配置 管理控制台 环境覆盖"]').click()`,
-  );
-  await field("覆盖地址模板", "https://{{host}}/console");
-  await click("保存当前档案覆盖");
-  await wait(
-    window.webContents,
-    'document.querySelector(".project-workspace .pc-card code")?.textContent.includes("https://192.0.2.10/console") && !document.querySelector("dialog[open]")',
-  );
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelectorAll(".project-workspace .pc-card").length === 0');
+  assert.equal((await ipc('get')).profiles[0].projects.length, 1, 'new profile starts empty without modifying the first');
+  await click('添加项目');
+  await field('项目名称', '管理控制台'); await field('唯一编码', 'admin');
+  await field('HTTP(S) 地址模板', 'https://{{host}}/console');
+  await click('＋ 添加参数'); await aria('参数 1 名称', 'lang'); await aria('参数 1 值', '中文');
+  await click('保存项目定义');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-card code")?.textContent.includes("https://192.0.2.10/console")');
+  assert.equal(await js(`!!document.querySelector('button[title="仅覆盖当前档案"]')`), false);
+  await click('对比方案');
+  await wait(window.webContents, 'document.querySelector("dialog[open] h2")?.textContent === "对比方案" && document.querySelectorAll(".pc-comparison tbody tr").length > 0');
+  assert.equal(await js('document.querySelector(".pc-comparison").textContent.includes("地址模板")'), true);
+  await js('new Promise(resolve => setTimeout(resolve, 250))');
+  await fs.writeFile(path.join(output, 'preview-project-comparison.png'), (await window.webContents.capturePage()).toPNG());
+  await click('关闭'); await wait(window.webContents, '!document.querySelector("dialog[open]")');
+  // Delete is directly available, with cancel and profile-local removal.
+  await click('添加项目'); await field('项目名称', '待删除项目'); await field('唯一编码', 'delete-me');
+  await field('HTTP(S) 地址模板', 'https://example.test/delete'); await click('保存项目定义');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelectorAll(".pc-card").length === 2');
+  await js(`document.querySelector('button[aria-label="删除 待删除项目"]').click()`);
+  await wait(window.webContents, 'document.querySelector("dialog[open] h2")?.textContent.includes("删除项目")');
+  await click('取消'); await wait(window.webContents, '!document.querySelector("dialog[open]")');
+  assert.equal((await ipc('get')).profiles[1].projects.length, 2);
+  await js(`document.querySelector('button[aria-label="删除 待删除项目"]').click()`);
+  await click('确认删除'); await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelectorAll(".pc-card").length === 1');
+  assert.equal((await ipc('get')).profiles[0].projects.length, 1);
   const saved = await ipc("get");
-  assert.equal(saved.projects.length, 1);
+  assert.equal(saved.profiles[1].projects.length, 1);
   assert.equal(saved.profiles.length, 2);
-  assert.equal(saved.projects[0].url, "http://{{host}}:8080/");
+  assert.equal(saved.profiles[0].projects[0].url, "http://{{host}}:8080/");
+  assert.equal(saved.profiles[1].projects[0].url, "https://{{host}}/console");
   await js(
     `document.querySelector('button[aria-label="编辑 管理控制台"]').click()`,
   );
@@ -157,10 +171,10 @@ module.exports = async function checkProjects(window, output, staging) {
   );
   const beforeImport = await ipc("get"),
     imported = structuredClone(beforeImport);
-  imported.projects[0].name = "团队管理台";
+  imported.profiles[1].projects[0].name = "团队管理台";
   const importSource = JSON.stringify({
     format: "devkit-project-center",
-    version: 1,
+    version: 2,
     data: imported,
   });
   const chooseFile = () =>
@@ -173,7 +187,7 @@ module.exports = async function checkProjects(window, output, staging) {
     'document.querySelector("dialog[open] h2")?.textContent === "导入预览"',
   );
   assert.equal(
-    (await ipc("get")).projects[0].name,
+    (await ipc("get")).profiles[1].projects[0].name,
     "管理控制台草稿",
     "import preview must not write",
   );
@@ -184,7 +198,7 @@ module.exports = async function checkProjects(window, output, staging) {
   );
   const storage = await ipc('storage');
   assert.equal(path.resolve(storage.directory), path.resolve(process.env.DEVKIT_DEV_ROOT, 'configs'));
-  assert.equal(JSON.parse(await fs.readFile(path.join(storage.directory,'projects.json'),'utf8')).current.projects[0].name, '团队管理台');
+  assert.equal(JSON.parse(await fs.readFile(path.join(storage.directory, 'profile-' + Buffer.from(imported.profiles[1].id).toString('hex') + '.json'),'utf8')).projects[0].name, '团队管理台');
   await click('配置文件');
   await wait(window.webContents, 'document.querySelector("dialog[open] .pc-path code")?.textContent.endsWith("configs")');
   await click('知道了');
@@ -196,21 +210,22 @@ module.exports = async function checkProjects(window, output, staging) {
   await click('继续编辑');
   assert.equal(await js('[...document.querySelectorAll("dialog[open] label")].find(label=>label.querySelector("span")?.textContent==="项目名称").querySelector("input").value'), '尚未保存的名称');
   await click('取消'); await click('放弃更改');
-  assert.equal((await ipc('get')).projects[0].name,'团队管理台');
+  assert.equal((await ipc('get')).profiles[1].projects[0].name,'团队管理台');
   // A second merge must retain entries absent from the file.
   const existing = await ipc('get');
-  existing.projects.push({ ...existing.projects[0], id:'retained', code:'retained', name:'保留项目', url:'https://example.test/status', query:[] });
+  existing.profiles[1].projects.push({ ...existing.profiles[1].projects[0], id:'retained', code:'retained', name:'保留项目', url:'https://example.test/status', query:[] });
   await ipc('save', {data:existing, revision:existing.revision});
   await click('刷新'); await chooseFile();
   await wait(window.webContents, '!!document.querySelector("dialog[open] .pc-import-modes")');
   await click('备份当前数据并导入');
   await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelectorAll(".project-workspace .pc-card").length===2');
-  assert.equal((await ipc('get')).projects.length,2);
+  assert.equal((await ipc('get')).profiles[1].projects.length,2);
   await js(`document.querySelector('input[aria-label="选择 团队管理台"]').click()`);
   await click('停用所选');
   await wait(window.webContents, '!!document.querySelector(\'button[aria-label="启用 团队管理台（仅当前档案）"]\')');
   let after = await ipc('get');
-  assert.equal(after.profiles.find(item=>item.name==='测试环境').overrides.find(item=>item.projectId==='retained'), undefined);
+  assert.equal(after.profiles[1].projects.find(item=>item.id==='retained').enabled, true);
+  assert.equal(after.profiles[0].projects[0].enabled, true);
   await click('启用所选'); await click('清除选择');
   await js(`document.querySelector('button[aria-label="列表视图"]').click()`);
   await wait(window.webContents, '!!document.querySelector(".project-workspace .pc-list")');
@@ -220,16 +235,33 @@ module.exports = async function checkProjects(window, output, staging) {
   await aria('快照名称','恢复验收快照'); await click('创建手动快照');
   await wait(window.webContents, 'document.querySelector(".pc-snapshots")?.textContent.includes("恢复验收快照") && !document.querySelector(\'dialog[open] button[aria-label="关闭项目中心窗口"]\').disabled');
   await js(`document.querySelector('dialog[open] button[aria-label="关闭项目中心窗口"]').click()`);
-  after=await ipc('get'); after.projects[0].name='临时变更';
+  after=await ipc('get'); after.profiles[1].projects[0].name='临时变更';
   await ipc('save',{data:after,revision:after.revision});
   await click('刷新'); await click('备份与恢复');
   await js(`[...document.querySelectorAll('.pc-snapshots > div')].find(row=>row.querySelector('strong')?.textContent==='恢复验收快照').querySelector('button').click()`);
   await wait(window.webContents, 'document.querySelector("dialog[open] h2")?.textContent==="恢复预览"');
-  assert.equal((await ipc('get')).projects[0].name,'临时变更');
+  assert.equal((await ipc('get')).profiles[1].projects[0].name,'临时变更');
   await click('备份当前数据并恢复');
   await wait(window.webContents, 'document.querySelector("dialog[open] h2")?.textContent==="备份与恢复" && !document.querySelector(\'dialog[open] button[aria-label="关闭项目中心窗口"]\').disabled');
-  assert.equal((await ipc('get')).projects[0].name,'团队管理台');
+  assert.equal((await ipc('get')).profiles[1].projects[0].name,'团队管理台');
   await js(`document.querySelector('dialog[open] button[aria-label="关闭项目中心窗口"]').click()`);
+  // A copied profile owns independent projects, and deleting it removes only its file.
+  await click('复制档案'); await click('保存配置档案');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-environment h2")?.textContent === "测试环境 副本"');
+  let copyState = await ipc('get');
+  const copiedId = copyState.profiles.find(item => item.name === '测试环境 副本').id;
+  const copiedFile = path.join(storage.directory, 'profile-' + Buffer.from(copiedId).toString('hex') + '.json');
+  assert.equal(JSON.parse(await fs.readFile(copiedFile, 'utf8')).projects.length, 2);
+  await js(`document.querySelector('button[aria-label="编辑 团队管理台"]').click()`);
+  await field('项目名称', '副本独立入口'); await click('保存项目定义');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-card h3")?.textContent === "副本独立入口"');
+  copyState = await ipc('get');
+  assert.equal(copyState.profiles[1].projects[0].name, '团队管理台');
+  await click('删除档案'); await click('确认删除');
+  await wait(window.webContents, '!document.querySelector("dialog[open]")');
+  await assert.rejects(fs.access(copiedFile));
+  await js(`[...document.querySelectorAll('.pc-profile')].find(button => button.querySelector('strong')?.textContent === '测试环境').click()`);
+  await wait(window.webContents, 'document.querySelector(".pc-environment h2")?.textContent === "测试环境"');
   await js(`document.querySelector('button[aria-label="编辑 团队管理台"]').click()`);
   window.show();
   await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
@@ -294,7 +326,7 @@ module.exports = async function checkProjects(window, output, staging) {
     );
     await wait(
       remote.webContents,
-      'document.querySelector(".pc-card h3")?.textContent === "团队管理台"',
+      'document.querySelector(".pc-card h3")?.textContent === "管理控制台"',
     );
     assert.equal(
       await remote.webContents.executeJavaScript(
@@ -377,6 +409,6 @@ module.exports = async function checkProjects(window, output, staging) {
     await ipc("stop");
   }
   console.log(
-    "Project center smoke passed: real CRUD, environment overrides, import preview, snapshots, conflict draft retention, browser cookie login, readonly access, toolkit resource isolation and responsive portal.",
+    "Project center smoke passed: real independent profile CRUD, direct deletion, scheme comparison, import preview, snapshots, conflict draft retention, browser cookie login, readonly access, toolkit resource isolation and responsive portal.",
   );
 };

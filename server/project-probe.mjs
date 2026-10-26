@@ -18,7 +18,7 @@ export async function probeProjects(store, input) {
     Array.from({ length: Math.min(3, ids.length) }, async () => {
       while (index < ids.length) {
         const id = ids[index++],
-          project = state.projects.find((item) => item.id === id),
+          project = profile.projects.find((item) => item.id === id),
           started = Date.now();
         try {
           if (!project) throw new Error("项目不存在。");

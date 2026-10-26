@@ -8,6 +8,7 @@ import {
   mkdir,
   cp,
   access,
+  rmdir,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,7 +22,7 @@ import {
   importState,
   mergeProjectState,
 } from "../shared/projects.mjs";
-import { createProjectStore } from "./project-store.mjs";
+import { createProjectStore, profileFilename, readProjectEnvelope } from "./project-store.mjs";
 import { createProjectHost } from "./project-host.mjs";
 import { probeProjects } from "./project-probe.mjs";
 import { prepareProjectConfigs } from "./project-configs.mjs";
@@ -41,7 +42,7 @@ const project = {
 };
 const fixture = () => ({
   ...initialState(),
-  projects: [structuredClone(project)],
+  profiles: [{ ...initialState().profiles[0], projects: [structuredClone(project)] }],
 });
 async function temporary(work) {
   const folder = await mkdtemp(path.join(tmpdir(), "devkit-project-test-"));
@@ -63,24 +64,22 @@ async function freePort() {
 test("environment variables resolve without losing duplicate query rows or mutating project definitions", () => {
   const state = validateState(fixture()),
     profile = state.profiles[0];
-  const result = resolveProject(state.projects[0], profile),
+  const result = resolveProject(state.profiles[0].projects[0], profile),
     url = new URL(result.url);
   assert.deepEqual(url.searchParams.getAll("tag"), [
     "中文 & 127.0.0.1",
     "other",
   ]);
   assert.equal(result.localOnly, true);
-  assert.equal(state.projects[0].url, project.url);
+  assert.equal(state.profiles[0].projects[0].url, project.url);
   const other = {
     ...profile,
     variables: [{ key: "host", value: "192.168.2.3" }],
-    overrides: [
-      { projectId: "web", url: "https://{{host}}/test", enabled: false },
-    ],
+    projects: [{ ...project, url: "https://{{host}}/test", enabled: false }],
   };
-  assert.equal(resolveProject(project, other).enabled, false);
+  assert.equal(resolveProject(other.projects[0], other).enabled, false);
   assert.match(
-    resolveProject(project, other).url,
+    resolveProject(other.projects[0], other).url,
     /^https:\/\/192\.168\.2\.3\/test/,
   );
 });
@@ -139,60 +138,38 @@ test("URL previews ignore empty rows, validate unnamed values and preserve exist
     () =>
       validateState({
         ...initialState(),
-        projects: [
-          {
-            ...input,
-            query: [{ id: "bad", key: "", value: "filled", enabled: true }],
-          },
-        ],
+        profiles: [{ ...initialState().profiles[0], projects: [{ ...input, query: [{ id: "bad", key: "", value: "filled", enabled: true }] }] }],
       }),
     /参数名/,
   );
 });
 
-test("merge imports by code/name, remap colliding IDs, retain other data and attach overrides correctly", () => {
+test("merge within matching profiles by code/name, remap colliding IDs and retain other data", () => {
   const current = validateState(fixture());
   current.profiles[0].variables.push({ key: "keep", value: "retained" });
-  const imported = validateState({
-    ...initialState(),
-    projects: [
-      { ...project, id: "remote-web", name: "Updated", query: [] },
-      { ...project, id: "web", name: "New", code: "other", query: [] },
-    ],
-    profiles: [
-      {
-        ...initialState().profiles[0],
-        id: "remote-profile",
-        variables: [{ key: "host", value: "192.0.2.55" }],
-        overrides: [
-          {
-            projectId: "remote-web",
-            url: "https://{{host}}/override",
-            enabled: false,
-          },
-          { projectId: "web", url: "https://other.test/", enabled: true },
-        ],
-      },
-    ],
-  });
+  const imported = validateState({ ...initialState(), profiles: [{
+    ...initialState().profiles[0], id: "remote-profile", variables: [{ key: "host", value: "192.0.2.55" }],
+    projects: [{ ...project, id: "remote-web", name: "Updated", url: "https://{{host}}/override", query: [], enabled: false },
+      { ...project, id: "web", name: "New", code: "other", url: "https://other.test/", query: [] }],
+  }] });
   const before = JSON.stringify({ current, imported });
   const merged = mergeProjectState(current, imported);
-  assert.equal(merged.projects.length, 2);
+  assert.equal(merged.profiles[0].projects.length, 2);
   assert.equal(merged.profiles.length, 1);
-  assert.equal(merged.projects[0].id, "web");
-  assert.equal(merged.projects[0].name, "Updated");
-  assert.notEqual(merged.projects[1].id, "web");
+  assert.equal(merged.profiles[0].projects[0].id, "web");
+  assert.equal(merged.profiles[0].projects[0].name, "Updated");
+  assert.notEqual(merged.profiles[0].projects[1].id, "web");
   assert.equal(merged.profiles[0].id, "default");
   assert.equal(
     merged.profiles[0].variables.find((item) => item.key === "keep").value,
     "retained",
   );
   assert.equal(
-    resolveProject(merged.projects[0], merged.profiles[0]).url,
+    resolveProject(merged.profiles[0].projects[0], merged.profiles[0]).url,
     "https://192.0.2.55/override",
   );
   assert.equal(
-    resolveProject(merged.projects[1], merged.profiles[0]).url,
+    resolveProject(merged.profiles[0].projects[1], merged.profiles[0]).url,
     "https://other.test/",
   );
   assert.equal(JSON.stringify({ current, imported }), before);
@@ -222,12 +199,12 @@ test("configs migration preserves snapshots/settings/source, is idempotent and f
       original,
     );
     store = await createProjectStore(destination);
-    assert.equal((await store.get()).projects[0].id, "web");
+    assert.equal((await store.get()).profiles[0].projects[0].id, "web");
     assert.equal((await store.snapshots())[0].name, "transfer snapshot");
     assert.equal((await store.settings()).hash, "fixture-hash");
     const snapshot = await store.snapshot((await store.snapshots())[0].id);
-    snapshot.projects[0].name = "outside";
-    assert.notEqual((await store.get()).projects[0].name, "outside");
+    snapshot.profiles[0].projects[0].name = "outside";
+    assert.notEqual((await store.get()).profiles[0].projects[0].name, "outside");
     await store.close();
     await prepareProjectConfigs(destination, [legacy]);
     assert.equal(
@@ -246,7 +223,7 @@ test("configs migration preserves snapshots/settings/source, is idempotent and f
     );
     await prepareProjectConfigs(copied);
     store = await createProjectStore(copied);
-    assert.equal((await store.get()).projects.length, 1);
+    assert.equal((await store.get()).profiles[0].projects.length, 1);
     assert.equal((await store.snapshots())[0].name, "transfer snapshot");
     await store.close();
     await assert.rejects(access(path.join(copied, ".lock")));
@@ -273,8 +250,8 @@ test("existing configs win over legacy data; broken legacy is preserved without 
     assert.equal(
       JSON.parse(
         await readFile(path.join(destination, "projects.json"), "utf8"),
-      ).current.projects.length,
-      0,
+      ).current.profiles.length,
+      1,
     );
     await assert.rejects(
       prepareProjectConfigs(path.join(destination, "projects.json", "configs")),
@@ -285,19 +262,13 @@ test("validates unique identifiers/codes/names, bounded input and exact import e
   const original = fixture();
   assert.deepEqual(importState(exportState(original)), original);
   for (const mutate of [
-    (s) => s.projects.push(structuredClone(s.projects[0])),
-    (s) => s.projects.push({ ...s.projects[0], id: "other" }),
+    (s) => s.profiles[0].projects.push(structuredClone(s.profiles[0].projects[0])),
+    (s) => s.profiles[0].projects.push({ ...s.profiles[0].projects[0], id: "other" }),
     (s) => s.profiles.splice(0),
-    (s) => (s.projects[0].id = undefined),
+    (s) => (s.profiles[0].projects[0].id = undefined),
     (s) => s.profiles[0].variables.push({ key: "host", value: "duplicate" }),
-    (s) =>
-      s.profiles[0].overrides.push({
-        projectId: "missing",
-        url: "",
-        enabled: true,
-      }),
-    (s) => (s.projects[0].enabled = "yes"),
-    (s) => (s.projects[0].url = "javascript:alert(1)"),
+    (s) => (s.profiles[0].projects[0].enabled = "yes"),
+    (s) => (s.profiles[0].projects[0].url = "javascript:alert(1)"),
   ]) {
     const changed = structuredClone(original);
     mutate(changed);
@@ -307,7 +278,7 @@ test("validates unique identifiers/codes/names, bounded input and exact import e
     importState(
       JSON.stringify({
         format: "devkit-project-center",
-        version: 2,
+        version: 99,
         data: original,
       }),
     ),
@@ -321,7 +292,7 @@ test("serialized saves reject stale concurrent writers and backups restore as a 
       const original = await store.get();
       const results = await Promise.allSettled([
         store.save(fixture(), 0),
-        store.save({ ...fixture(), projects: [] }, 0),
+        store.save(initialState(), 0),
       ]);
       assert.equal(
         results.filter((item) => item.status === "fulfilled").length,
@@ -332,11 +303,11 @@ test("serialized saves reject stale concurrent writers and backups restore as a 
         409,
       );
       assert.equal((await store.get()).revision, 1);
-      assert.deepEqual(original.projects, []);
+      assert.deepEqual(original.profiles[0].projects, []);
       const snapshot = (await store.snapshots())[0];
       assert.equal(snapshot.projects, 0);
       assert.equal((await store.restore(snapshot.id, 1)).revision, 2);
-      assert.equal((await store.get()).projects.length, 0);
+      assert.equal((await store.get()).profiles[0].projects.length, 0);
       assert.equal((await store.snapshots())[0].projects, 1);
       await assert.rejects(store.restore(snapshot.id, 1), /其他使用者/);
       await store.backup("手动备份");
@@ -369,7 +340,7 @@ test("snapshot retention is bounded to thirty and copied read results cannot mut
     try {
       const first = await store.get();
       first.profiles[0].name = "outside";
-      assert.equal((await store.get()).profiles[0].name, "默认环境");
+      assert.equal((await store.get()).profiles[0].name, "默认方案");
       for (let index = 0; index < 32; index++)
         await store.backup(`snapshot ${index}`);
       assert.equal((await store.snapshots()).length, 30);
@@ -535,7 +506,7 @@ test("LAN gateway authenticates, enforces viewer/editor and blocks toolkit, trav
         body: { id: meta.id },
       });
       assert.equal(preview.status, 200);
-      assert.equal((await preview.json()).projects.length, 0);
+      assert.equal((await preview.json()).profiles[0].projects.length, 0);
       assert.equal(
         (
           await request("/api/projects/state", {
@@ -570,7 +541,7 @@ test("manual probes resolve saved projects, cap work, never follow redirects and
     const store = await createProjectStore(folder);
     try {
       const data = fixture();
-      data.projects[0].url = `http://127.0.0.1:${target.address().port}/`;
+      data.profiles[0].projects[0].url = `http://127.0.0.1:${target.address().port}/`;
       await store.save(data, 0);
       const results = await probeProjects(store, {
         profileId: "default",
@@ -588,4 +559,124 @@ test("manual probes resolve saved projects, cap work, never follow redirects and
       await store.close();
       await new Promise((resolve) => target.close(resolve));
     }
+  }));
+
+test("v1 migration expands overrides into independent files and preserves original bytes and snapshots", async () =>
+  temporary(async folder => {
+    const legacy = { schemaVersion: 1, revision: 7, projects: [structuredClone(project)], profiles: [
+      { id: 'dev', name: '开发', description: '', variables: [{ key: 'host', value: 'localhost' }], overrides: [] },
+      { id: 'test', name: '测试', description: '', variables: [{ key: 'host', value: 'test.example' }], overrides: [{ projectId: 'web', url: 'https://{{host}}/test', enabled: false }] },
+    ] };
+    const bytes = JSON.stringify({ current: legacy, snapshots: [{ id: 'old', name: '旧快照', createdAt: new Date().toISOString(), state: legacy }] });
+    await writeFile(path.join(folder, 'projects.json'), bytes);
+    const store = await createProjectStore(folder);
+    try {
+      const state = await store.get();
+      assert.equal(state.schemaVersion, 2);
+      assert.equal(state.revision, 7);
+      assert.equal(state.profiles[0].projects[0].url, project.url);
+      assert.equal(state.profiles[1].projects[0].url, 'https://{{host}}/test');
+      assert.equal(state.profiles[1].projects[0].enabled, false);
+      assert.equal(await readFile(path.join(folder, 'projects.v1.backup.json'), 'utf8'), bytes);
+      assert.deepEqual((await store.snapshot('old')).profiles, state.profiles);
+      assert.deepEqual(importState(JSON.stringify({ format: 'devkit-project-center', version: 1, data: legacy })), state);
+      state.profiles[0].projects[0].name = '仅开发改名';
+      await store.save(state, 7);
+      assert.equal((await store.get()).profiles[1].projects[0].name, project.name);
+      assert.equal(JSON.parse(await readFile(path.join(folder, profileFilename('test')), 'utf8')).projects[0].enabled, false);
+      assert.equal(JSON.parse(await readFile(path.join(folder, 'projects.json'), 'utf8')).current.projects, undefined);
+    } finally { await store.close(); }
+    const reopened = await createProjectStore(folder);
+    assert.equal((await reopened.get()).profiles[0].projects[0].name, '仅开发改名');
+    await reopened.close();
+  }));
+
+test("project changes, deletes, imports and profile deletes stay within their profile", async () =>
+  temporary(async folder => {
+    const state = fixture();
+    state.profiles.push({ ...structuredClone(state.profiles[0]), id: 'TEST', name: '独立方案' });
+    const store = await createProjectStore(folder);
+    try {
+      let saved = await store.save(state, 0);
+      const otherFile = path.join(folder, profileFilename('TEST'));
+      const before = await readFile(otherFile, 'utf8');
+      saved.profiles[0].projects[0].enabled = false;
+      saved.profiles[0].projects.push({ ...project, id: 'new', code: 'new' });
+      saved = await store.save(saved, 1);
+      assert.equal(await readFile(otherFile, 'utf8'), before);
+      const imported = initialState();
+      imported.profiles[0].projects = [{ ...project, name: '只合并默认方案' }];
+      saved = await store.save(mergeProjectState(saved, imported), 2);
+      assert.equal(saved.profiles[1].projects[0].name, project.name);
+      saved.profiles[0].projects = [];
+      saved = await store.save(saved, 3);
+      assert.equal(saved.profiles[1].projects.length, 1);
+      assert.equal(await readFile(otherFile, 'utf8'), before);
+      const snapshot = await store.backup('删除档案前');
+      saved.profiles.pop();
+      saved = await store.save(saved, 4);
+      await assert.rejects(access(otherFile));
+      await store.restore(snapshot, 5);
+      assert.equal(JSON.parse(await readFile(otherFile, 'utf8')).projects.length, 1);
+      assert.notEqual(profileFilename('TEST'), profileFilename('test'));
+    } finally { await store.close(); }
+  }));
+
+test("pending multi-file saves recover before reads after a restart", async () =>
+  temporary(async folder => {
+    let store = await createProjectStore(folder);
+    await store.save(fixture(), 0);
+    await store.close();
+    const pending = await readProjectEnvelope(folder);
+    pending.current.revision++;
+    pending.current.profiles[0].projects = [];
+    pending.current.profiles.push({ ...initialState().profiles[0], id: 'new', name: '新增档案' });
+    await writeFile(path.join(folder, '.projects-pending.json'), JSON.stringify(pending));
+    // Simulate a crash after replacing one profile and before updating the index.
+    await writeFile(path.join(folder, profileFilename('default')), JSON.stringify(pending.current.profiles[0]));
+    store = await createProjectStore(folder);
+    try {
+      assert.deepEqual(await store.get(), pending.current);
+      await assert.rejects(access(path.join(folder, '.projects-pending.json')));
+      assert.equal((await readProjectEnvelope(folder)).current.profiles.length, 2);
+    } finally { await store.close(); }
+  }));
+
+test("missing/corrupt profile files fail without resetting other profiles or the index", async () =>
+  temporary(async folder => {
+    const store = await createProjectStore(folder);
+    await store.save(fixture(), 0);
+    await store.close();
+    const index = await readFile(path.join(folder, 'projects.json'), 'utf8');
+    const file = path.join(folder, profileFilename('default'));
+    await writeFile(file, '{broken');
+    await assert.rejects(createProjectStore(folder), /原文件已保留/);
+    assert.equal(await readFile(file, 'utf8'), '{broken');
+    await rm(file);
+    await assert.rejects(createProjectStore(folder), /档案.*无法读取/);
+    assert.equal(await readFile(path.join(folder, 'projects.json'), 'utf8'), index);
+  }));
+
+test("probes cannot resolve a project from another profile", async () => {
+  const state = fixture();
+  state.profiles.push({ ...initialState().profiles[0], id: 'empty', name: '空方案' });
+  const results = await probeProjects({ get: async () => state }, { profileId: 'empty', projectIds: ['web'] });
+  assert.equal(results[0].error, '项目不存在。');
+});
+
+test("a failed file write retains the journal and recovers in-process before checking later revisions", async () =>
+  temporary(async folder => {
+    const store = await createProjectStore(folder);
+    const file = path.join(folder, profileFilename('default'));
+    try {
+      await rm(file);
+      await mkdir(file);
+      await assert.rejects(store.save(fixture(), 0));
+      assert.equal(JSON.parse(await readFile(path.join(folder, '.projects-pending.json'), 'utf8')).current.revision, 1);
+      await rmdir(file);
+      assert.equal((await store.get()).profiles[0].projects[0].code, 'web');
+      assert.equal((await store.get()).revision, 1);
+      await assert.rejects(store.save(initialState(), 0), error => error.status === 409);
+      await assert.rejects(access(path.join(folder, '.projects-pending.json')));
+    } finally { await store.close(); }
   }));

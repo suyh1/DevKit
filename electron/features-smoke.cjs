@@ -56,6 +56,7 @@ module.exports = async function featuresSmoke(window, output) {
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
     await js('document.querySelector(\'.floating-nav-links [aria-label="HTTP 调试"]\').click()');
+    await js(`[...document.querySelectorAll('.http-product-tabs button')].find(button=>button.textContent.trim()==='快速请求').click()`);
     await wait('!!document.querySelector(\'.http-workspace:not([hidden])\')');
     await click('配置 JSON', '.http-request');
     const config = JSON.stringify({ method: 'POST', url: base + '/echo?token=secret-test', headers: { Authorization: 'Bearer secret-test' } }).slice(0, -1) + ',"body":{"id":9007199254740993,"name":"中文"}}';
@@ -84,11 +85,11 @@ module.exports = async function featuresSmoke(window, output) {
 
   const project = await js('window.devkitProjects.request("get")'); assert.equal(project.error, undefined);
   const data = project.data;
-  const a = { id: 'feature-dev', name: '功能测试开发', description: '', variables: [{ key: 'host', value: 'localhost' }], overrides: [] };
-  const b = { id: 'feature-prod', name: '功能测试生产', description: '', variables: [{ key: 'host', value: 'example.com' }], overrides: [] };
+  const a = { id: 'feature-dev', name: '功能测试开发', description: '', variables: [{ key: 'host', value: 'localhost' }], projects: [] };
+  const b = { id: 'feature-prod', name: '功能测试生产', description: '', variables: [{ key: 'host', value: 'example.com' }], projects: [] };
   const updated = await js(`window.devkitProjects.request('save',${JSON.stringify({ revision: data.revision, data: { ...data, profiles: [...data.profiles, a, b] } })})`); assert.equal(updated.error, undefined);
   await js('document.querySelector(\'.floating-nav-links [aria-label="项目中心"]\').click()');
-  await click('刷新', '.project-workspace'); await click('对比环境', '.project-workspace');
+  await click('刷新', '.project-workspace'); await click('对比方案', '.project-workspace');
   await wait('!!document.querySelector(".pc-comparison table")'); await snap('features-environment-comparison');
   await click('关闭', '.pc-dialog[open]');
 

@@ -48,6 +48,7 @@ export default function HttpKeyValues({
             onChange={(event) => patch(index, { value: event.target.value })}
           />
           <button
+            type="button"
             className="icon-button"
             aria-label={`删除${label} ${index + 1}`}
             disabled={disabled}
@@ -57,7 +58,7 @@ export default function HttpKeyValues({
           </button>
         </div>
       ))}
-      <button className="text-button" disabled={disabled} onClick={() => onChange([...rows, blankHttpRow()])}>
+      <button type="button" className="text-button" disabled={disabled} onClick={() => onChange([...rows, blankHttpRow()])}>
         <Plus size={14} />
         添加{label}
       </button>

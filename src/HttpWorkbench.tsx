@@ -2,6 +2,7 @@ import { MotionReveal, MotionGroup, useMotionList, MotionButton, MotionPresence 
 import { buttonFeedback, copyText } from './motion-primitives';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, Square, Save, Plus, Trash2, Download, Upload, Copy } from 'lucide-react';
+import ApiWorkspace from './ApiWorkspace';
 import HttpRequestInput from './HttpRequestInput';
 import CodeEditor from './CodeEditor';
 import { parseHttpConfig, savedHttpConfig, readHttpCollection, collectionText } from './http-model';
@@ -31,6 +32,8 @@ export default function HttpWorkbench({
   onNotice: (message: string) => void;
   onGenerate: (config: string) => void;
 }) {
+  const [workspaceMode, setWorkspaceMode] = useState<'api'|'quick'>('api');
+  const [apiBusy, setApiBusy] = useState(false);
   const [loaded] = useState(initialCollection);
   const [entries, setEntries] = useState(loaded.entries),
     [error, setError] = useState(loaded.error);
@@ -113,6 +116,7 @@ export default function HttpWorkbench({
     );
   }
   useEffect(() => {
+    if (initial) { setWorkspaceMode('quick'); }
     if (initial)
       void allowReplace().then((allow) => {
         if (allow) reset(initial.config, '从代码生成器导入');
@@ -213,7 +217,7 @@ export default function HttpWorkbench({
     }
   }
   return (
-    <section className="http-workbench">
+    <><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目 · 文档与调试</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading">
         <div className="page-title">
           <div className="eyebrow">HTTP CLIENT</div>
@@ -546,6 +550,6 @@ export default function HttpWorkbench({
           </MotionReveal>
         </div>
       </div>
-    </section>
+    </section></>
   );
 }

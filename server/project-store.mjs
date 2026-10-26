@@ -1,16 +1,50 @@
 import {
   mkdir,
   readFile,
-  writeFile,
   rename,
   open,
   unlink,
+  readdir,
+  copyFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { initialState, validateState } from "../shared/projects.mjs";
 import { acquireProjectLock } from "./project-lock.mjs";
+
+export const profileFilename = (id) => {
+  if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(id))
+    throw new Error("档案文件标识无效。");
+  // Hex encoding avoids case-insensitive filename collisions on Windows.
+  return `profile-${Buffer.from(id).toString("hex")}.json`;
+};
+
+export async function readProjectEnvelope(directory) {
+  const input = JSON.parse(
+    await readFile(path.join(directory, "projects.json"), "utf8"),
+  );
+  if (input.current?.schemaVersion === 2) {
+    if (!Array.isArray(input.current.profiles))
+      throw new Error("档案索引无效。");
+    input.current.profiles = await Promise.all(
+      input.current.profiles.map(async ({ id }) => {
+        const profile = await readFile(
+          path.join(directory, profileFilename(id)),
+          "utf8",
+        )
+          .then(JSON.parse)
+          .catch((error) => {
+            throw new Error(`档案 ${id} 无法读取：${error.message}`);
+          });
+        if (profile.id !== id) throw new Error("档案文件与索引不匹配。");
+        return profile;
+      }),
+    );
+  }
+  return validateProjectEnvelope(input);
+}
 
 export function validateProjectEnvelope(input) {
   if (!input || typeof input !== "object") throw new Error("项目数据无效。");
@@ -41,6 +75,7 @@ export function validateProjectEnvelope(input) {
 export async function createProjectStore(directory) {
   await mkdir(directory, { recursive: true });
   const filename = path.join(directory, "projects.json");
+  const journal = path.join(directory, ".projects-pending.json");
   const releaseLock = await acquireProjectLock(directory);
   async function atomic(file, value) {
     const temporary = `${file}.${randomUUID()}.tmp`;
@@ -72,16 +107,87 @@ export async function createProjectStore(directory) {
     }
   }
   let envelope;
+  async function materialize(next) {
+    const files = new Set();
+    for (const profile of next.current.profiles) {
+      const name = profileFilename(profile.id);
+      files.add(name);
+      const file = path.join(directory, name);
+      let previous;
+      try {
+        previous = await readFile(file, "utf8");
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+      if (previous !== JSON.stringify(profile, null, 2))
+        await atomic(file, profile);
+    }
+    await atomic(filename, {
+      ...next,
+      current: {
+        schemaVersion: 2,
+        revision: next.current.revision,
+        profiles: next.current.profiles.map(({ id }) => ({ id })),
+      },
+    });
+    for (const file of await readdir(directory)) {
+      if (
+        /^profile-(?:[a-f0-9]{2}){1,80}\.json$/.test(file) &&
+        !files.has(file)
+      )
+        await unlink(path.join(directory, file));
+    }
+    await unlink(journal);
+  }
+  let pending;
+  async function recover() {
+    if (!pending) return;
+    await materialize(pending);
+    envelope = pending;
+    pending = undefined;
+  }
+  async function persist(next) {
+    await atomic(journal, next);
+    pending = next;
+    await recover();
+  }
   try {
+    let journalBytes;
     try {
-      envelope = validateProjectEnvelope(
-        JSON.parse(await readFile(filename, "utf8")),
-      );
+      journalBytes = await readFile(journal, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (journalBytes !== undefined) {
+      pending = validateProjectEnvelope(JSON.parse(journalBytes));
+      await recover();
+    }
+    let raw;
+    try {
+      raw = JSON.parse(await readFile(filename, "utf8"));
     } catch (error) {
       if (error.code !== "ENOENT")
         throw new Error(`项目数据无法读取，原文件已保留：${error.message}`);
+    }
+    if (raw !== undefined) {
+      try {
+        envelope = await readProjectEnvelope(directory);
+        if (raw.current.schemaVersion === 1) {
+          await copyFile(
+            filename,
+            path.join(directory, "projects.v1.backup.json"),
+            constants.COPYFILE_EXCL,
+          ).catch((error) => {
+            if (error.code !== "EEXIST") throw error;
+          });
+          await persist(envelope);
+        }
+      } catch (error) {
+        throw new Error(`项目数据无法读取，原文件已保留：${error.message}`);
+      }
+    } else {
       envelope = { current: initialState(), snapshots: [] };
-      await atomic(filename, envelope);
+      await persist(envelope);
     }
   } catch (error) {
     await releaseLock();
@@ -90,7 +196,10 @@ export async function createProjectStore(directory) {
   let queue = Promise.resolve();
   const clone = (value) => structuredClone(value);
   function transaction(action) {
-    const promise = queue.then(action);
+    const promise = queue.then(async () => {
+      await recover();
+      return action();
+    });
     queue = promise.catch(() => {});
     return promise;
   }
@@ -109,7 +218,7 @@ export async function createProjectStore(directory) {
       current,
       snapshots: [backup, ...envelope.snapshots].slice(0, 30),
     };
-    await atomic(filename, next);
+    await persist(next);
     envelope = next;
     return clone(current);
   }
@@ -124,29 +233,32 @@ export async function createProjectStore(directory) {
   }
   return {
     directory,
-    get: async () => {
-      await queue;
-      return clone(envelope.current);
-    },
+    get: () =>
+      transaction(async () => {
+        return clone(envelope.current);
+      }),
     save: (data, revision) =>
       transaction(async () => {
         checkRevision(revision);
         return commit(validateState(data), "修改前自动备份");
       }),
-    snapshots: async () => {
-      await queue;
-      return envelope.snapshots.map(({ state, ...meta }) => ({
-        ...meta,
-        projects: state.projects.length,
-        profiles: state.profiles.length,
-      }));
-    },
-    snapshot: async (id) => {
-      await queue;
-      const snapshot = envelope.snapshots.find((item) => item.id === id);
-      if (!snapshot) throw new Error("快照不存在。");
-      return clone(snapshot.state);
-    },
+    snapshots: () =>
+      transaction(async () => {
+        return envelope.snapshots.map(({ state, ...meta }) => ({
+          ...meta,
+          projects: state.profiles.reduce(
+            (count, profile) => count + profile.projects.length,
+            0,
+          ),
+          profiles: state.profiles.length,
+        }));
+      }),
+    snapshot: (id) =>
+      transaction(async () => {
+        const snapshot = envelope.snapshots.find((item) => item.id === id);
+        if (!snapshot) throw new Error("快照不存在。");
+        return clone(snapshot.state);
+      }),
     backup: (name) =>
       transaction(async () => {
         if (typeof name !== "string" || !name.trim() || name.length > 100)
@@ -161,7 +273,7 @@ export async function createProjectStore(directory) {
           ...envelope,
           snapshots: [snapshot, ...envelope.snapshots].slice(0, 30),
         };
-        await atomic(filename, next);
+        await persist(next);
         envelope = next;
         return snapshot.id;
       }),

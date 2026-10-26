@@ -21,6 +21,7 @@ export function Modal({
   wide = false,
   savedKey = 0,
   feedback,
+  closeLabel = "关闭项目中心窗口",
 }: {
   title: string;
   close: () => void;
@@ -30,6 +31,7 @@ export function Modal({
   wide?: boolean;
   savedKey?: number;
   feedback?: string;
+  closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     heading = useId();
@@ -98,7 +100,7 @@ export function Modal({
           <button
             type="button"
             className="icon-button"
-            aria-label="关闭项目中心窗口"
+            aria-label={closeLabel}
             disabled={busy}
             onClick={requestClose}
           >
@@ -257,7 +259,12 @@ export function StateChanges({
       removed: before.filter((item) => !incoming.has(key(item))).length,
     };
   };
-  const projects = diff(current.projects, next.projects, (item) => item.code),
+  const scopedProjects = (state: ProjectState) =>
+    state.profiles.flatMap(profile => profile.projects.map(project => ({
+      ...project,
+      identity: JSON.stringify([profile.name, project.code]),
+    })));
+  const projects = diff(scopedProjects(current), scopedProjects(next), item => item.identity),
     profiles = diff(current.profiles, next.profiles, (item) => item.name);
   return (
     <div className="pc-change-grid">

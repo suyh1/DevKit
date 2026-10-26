@@ -93,6 +93,7 @@ module.exports = async function checkClose(window, output) {
       try {
         const nativeFs = require('node:fs');
         assert.equal(nativeFs.existsSync(path.join(storage.directory, '.lock')), false);
+        assert.equal(nativeFs.existsSync(path.join(storage.directory, 'http', '.lock')), false);
         assert.equal(nativeFs.existsSync(path.join(nginx.directory, '.lock')), false);
         assert.equal(JSON.parse(nativeFs.readFileSync(path.join(app.getPath('userData'), 'desktop-settings.json'), 'utf8')).closeAction, 'quit');
         assert.equal(nativePrompts, 0);

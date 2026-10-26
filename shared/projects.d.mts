@@ -19,12 +19,11 @@ export type Profile = {
   name: string;
   description: string;
   variables: { key: string; value: string }[];
-  overrides: { projectId: string; url: string; enabled: boolean }[];
+  projects: Project[];
 };
 export type ProjectState = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   revision: number;
-  projects: Project[];
   profiles: Profile[];
 };
 export const LIMITS: {
@@ -43,7 +42,6 @@ export function resolveProject(
   url: string;
   enabled: boolean;
   error: string;
-  overridden: boolean;
   localOnly: boolean;
 };
 export function importState(input: string): ProjectState;

@@ -11,7 +11,7 @@ import { constants } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { acquireProjectLock } from "./project-lock.mjs";
-import { validateProjectEnvelope } from "./project-store.mjs";
+import { readProjectEnvelope, profileFilename } from "./project-store.mjs";
 
 const exists = async (file) => {
   try {
@@ -22,7 +22,7 @@ const exists = async (file) => {
     throw error;
   }
 };
-const instructions = `DevKit project center configs\n\nprojects.json: projects, environment profiles and the latest 30 snapshots.\nsharing.json: host sharing options and salted password hash (no plaintext password).\nmigration.json: optional migration history.\n\nClose DevKit / the Node host on BOTH computers before copying this entire folder.\nCopy configs beside the other installation's executable (or beside server/ in the standalone ZIP).\nKeep the destination folder writable by the user who launches DevKit.\nDo not merge projects.json by hand. Use the UI JSON import to merge projects/profiles.\n.lock and *.tmp are runtime files, never configuration. A clean shutdown removes the lock.\nJSON UI export excludes sharing passwords and snapshot history. Folder copy includes them.\n`;
+const instructions = `DevKit project center configs\n\nprojects.json: profile index, revision and the latest 30 snapshots.\nprofile-<hex-encoded-id>.json: one independent profile, including projects and variables.\nprojects.v1.backup.json: original v1 data retained during automatic migration.\n.projects-pending.json: recoverable pending save; copy it with the entire folder.\nsharing.json: host sharing options and salted password hash (no plaintext password).\nmigration.json: optional migration history.\n\nClose DevKit / the Node host on BOTH computers before copying this entire folder.\nCopy configs beside the other installation's executable (or beside server/ in the standalone ZIP).\nKeep the destination folder writable by the user who launches DevKit.\nDo not merge projects.json by hand. Use the UI JSON import to merge projects/profiles.\n.lock and *.tmp are runtime files, never configuration. A clean shutdown removes the lock.\nJSON UI export excludes sharing passwords and snapshot history. Folder copy includes them.\n`;
 
 export async function prepareProjectConfigs(directory, legacyDirectories = []) {
   directory = path.resolve(directory);
@@ -31,7 +31,10 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
     await mkdir(directory, { recursive: true });
     release = await acquireProjectLock(directory);
     let migratedFrom = "";
-    if (!(await exists(path.join(directory, "projects.json")))) {
+    if (
+      !(await exists(path.join(directory, "projects.json"))) &&
+      !(await exists(path.join(directory, ".projects-pending.json")))
+    ) {
       for (const legacy of legacyDirectories.map((item) =>
         path.resolve(item),
       )) {
@@ -43,7 +46,20 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
         const unlockLegacy = await acquireProjectLock(legacy);
         try {
           const bytes = await readFile(path.join(legacy, "projects.json"));
-          validateProjectEnvelope(JSON.parse(bytes.toString("utf8")));
+          const validated = await readProjectEnvelope(legacy);
+          if (await exists(path.join(legacy, ".projects-pending.json")))
+            throw new Error(
+              "来源目录存在待恢复的保存，请先启动来源主机完成恢复，再迁移。",
+            );
+          if (JSON.parse(bytes.toString("utf8")).current.schemaVersion === 2) {
+            for (const profile of validated.current.profiles) {
+              const name = profileFilename(profile.id);
+              await copyFile(
+                path.join(legacy, name),
+                path.join(directory, name),
+              );
+            }
+          }
           // Commit projects.json last; a partial migration is retried on next start.
           if (
             (await exists(path.join(legacy, "sharing.json"))) &&
@@ -86,11 +102,9 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
         break;
       }
     }
-    if (!(await exists(path.join(directory, "README.txt"))))
-      await writeFile(path.join(directory, "README.txt"), instructions, {
-        flag: "wx",
-        mode: 0o600,
-      });
+    await writeFile(path.join(directory, "README.txt"), instructions, {
+      mode: 0o600,
+    });
     return { directory, portable: true, migratedFrom };
   } catch (error) {
     if (["EACCES", "EPERM", "EROFS"].includes(error.code))

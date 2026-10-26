@@ -118,7 +118,7 @@ let host;
 try {
   host = await launch(installation);
   let state = await host.request("state");
-  state.projects.push({
+  state.profiles[0].projects.push({
     id: "portable",
     code: "portable",
     name: "目录迁移验收",
@@ -135,8 +135,8 @@ try {
   await host.request("backup", "POST", { name: "可迁移快照" });
   assert.equal(
     JSON.parse(
-      await readFile(path.join(installation, "configs/projects.json"), "utf8"),
-    ).current.projects[0].name,
+      await readFile(path.join(installation, `configs/profile-${Buffer.from(state.profiles[0].id).toString("hex")}.json`), "utf8"),
+    ).projects[0].name,
     "目录迁移验收",
   );
   assert.equal((await fetch(host.base + "/index.html")).status, 404);
@@ -153,7 +153,7 @@ try {
   await cp(installation, copied, { recursive: true, filter: source => path.basename(source) !== 'configs' });
   await cp(path.join(installation,'configs'),path.join(copied,'configs'),{recursive:true});
   host = await launch(copied, true);
-  assert.equal((await host.request("state")).projects[0].name, "目录迁移验收");
+  assert.equal((await host.request("state")).profiles[0].projects[0].name, "目录迁移验收");
   assert.equal((await host.request("snapshots"))[0].name, "可迁移快照");
   const proof = {
     version: manifest.version,

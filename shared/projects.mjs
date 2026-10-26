@@ -35,7 +35,7 @@ function unique(items, key, label) {
     fail(`${label}不能重复。`);
   return items;
 }
-export function validateState(input) {
+function validateLegacyState(input) {
   if (
     !record(input) ||
     input.schemaVersion !== 1 ||
@@ -126,10 +126,64 @@ export function validateState(input) {
     fail("项目中心数据超过 1,000,000 字符。");
   return result;
 }
-export function resolveProject(project, profile) {
-  const override = profile.overrides.find(
-    (item) => item.projectId === project.id,
+export function validateState(input) {
+  if (input?.schemaVersion === 1) {
+    const legacy = validateLegacyState(input);
+    return validateState({
+      schemaVersion: 2,
+      revision: legacy.revision,
+      profiles: legacy.profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        description: profile.description,
+        variables: profile.variables,
+        projects: legacy.projects.map((project) => {
+          const override = profile.overrides.find(
+            (row) => row.projectId === project.id,
+          );
+          return {
+            ...structuredClone(project),
+            url: override?.url || project.url,
+            enabled: override?.enabled ?? project.enabled,
+          };
+        }),
+      })),
+    });
+  }
+  if (
+    !record(input) ||
+    input.schemaVersion !== 2 ||
+    !Number.isSafeInteger(input.revision) ||
+    input.revision < 0
+  )
+    fail("不是受支持的项目中心数据。");
+  if (Object.hasOwn(input, "projects")) fail("项目必须保存在所属档案中。");
+  const profiles = unique(
+    list(input.profiles, LIMITS.profiles, "配置档案").map((profile) => {
+      if (!record(profile)) fail("配置档案无效。");
+      if (Object.hasOwn(profile, "overrides"))
+        fail("独立档案不再使用环境覆盖。");
+      // Reuse the exact project/variable validation, scoped to this profile.
+      const validated = validateLegacyState({
+        schemaVersion: 1,
+        revision: input.revision,
+        projects: profile.projects,
+        profiles: [{ ...profile, overrides: [] }],
+      });
+      const { overrides, ...meta } = validated.profiles[0];
+      return { ...meta, projects: validated.projects };
+    }),
+    "id",
+    "档案 ID",
   );
+  if (!profiles.length) fail("至少保留一个配置档案。");
+  unique(profiles, "name", "档案名称");
+  const result = { schemaVersion: 2, revision: input.revision, profiles };
+  if (JSON.stringify(result).length > LIMITS.bytes)
+    fail("项目中心数据超过 1,000,000 字符。");
+  return result;
+}
+export function resolveProject(project, profile) {
   const variables = new Map(
     profile.variables.map((item) => [item.key, item.value]),
   );
@@ -143,7 +197,7 @@ export function resolveProject(project, profile) {
       return variables.get(key);
     });
   try {
-    const raw = fill(override?.url || project.url).trim();
+    const raw = fill(project.url).trim();
     const rows = project.query
       .filter((item) => item.enabled)
       .map((item) => ({ key: fill(item.key).trim(), value: fill(item.value) }));
@@ -165,9 +219,8 @@ export function resolveProject(project, profile) {
     }
     return {
       url: url.href,
-      enabled: override?.enabled ?? project.enabled,
+      enabled: project.enabled,
       error: "",
-      overridden: !!override,
       localOnly: ["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(
         url.hostname,
       ),
@@ -175,25 +228,23 @@ export function resolveProject(project, profile) {
   } catch (error) {
     return {
       url: "",
-      enabled: override?.enabled ?? project.enabled,
+      enabled: project.enabled,
       error: error.message || "地址无效",
-      overridden: !!override,
       localOnly: false,
     };
   }
 }
 export function initialState() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 0,
-    projects: [],
     profiles: [
       {
         id: "default",
-        name: "默认环境",
-        description: "填写共享环境变量，再添加项目入口。",
+        name: "默认方案",
+        description: "此档案独立保存项目和变量。",
         variables: [{ key: "host", value: "127.0.0.1" }],
-        overrides: [],
+        projects: [],
       },
     ],
   };
@@ -204,7 +255,8 @@ export function importState(input) {
   const source = JSON.parse(input);
   if (
     source.format &&
-    (source.format !== "devkit-project-center" || source.version !== 1)
+    (source.format !== "devkit-project-center" ||
+      ![1, 2].includes(source.version))
   )
     fail("项目中心文件版本不受支持。");
   return validateState(
@@ -213,61 +265,52 @@ export function importState(input) {
 }
 export function exportState(state) {
   return JSON.stringify(
-    { format: "devkit-project-center", version: 1, data: validateState(state) },
+    { format: "devkit-project-center", version: 2, data: validateState(state) },
     null,
     2,
   );
 }
 
-// Merge by business identity, remapping imported IDs before attaching overrides.
-// Existing entries outside the import are retained; matching entries are updated.
+// Business identities are scoped to a profile: names select profiles, codes select projects.
 export function mergeProjectState(currentInput, importedInput) {
   const current = validateState(currentInput),
     imported = validateState(importedInput);
-  const projects = structuredClone(current.projects),
-    profiles = structuredClone(current.profiles);
-  const projectIds = new Set(projects.map((item) => item.id)),
-    profileIds = new Set(profiles.map((item) => item.id));
+  const profiles = structuredClone(current.profiles),
+    used = new Set(profiles.map((item) => item.id));
   let counter = 0;
-  function available(preferred, used) {
+  const available = (preferred, ids) => {
     let value = preferred;
-    while (used.has(value)) value = `imported_${++counter}`;
-    used.add(value);
+    while (ids.has(value)) value = `imported_${++counter}`;
+    ids.add(value);
     return value;
-  }
-  const mapped = new Map();
-  for (const source of imported.projects) {
-    const index = projects.findIndex((item) => item.code === source.code);
-    const id =
-      index >= 0 ? projects[index].id : available(source.id, projectIds);
-    mapped.set(source.id, id);
-    const project = { ...structuredClone(source), id };
-    if (index >= 0) projects[index] = project;
-    else projects.push(project);
-  }
+  };
   for (const source of imported.profiles) {
     const index = profiles.findIndex((item) => item.name === source.name);
     const existing = index >= 0 ? profiles[index] : null;
-    const overrides = new Map(
-      (existing?.overrides || []).map((item) => [item.projectId, item]),
-    );
+    const projects = structuredClone(existing?.projects || []),
+      ids = new Set(projects.map((item) => item.id));
+    for (const project of source.projects) {
+      const at = projects.findIndex((item) => item.code === project.code);
+      const next = {
+        ...structuredClone(project),
+        id: at >= 0 ? projects[at].id : available(project.id, ids),
+      };
+      if (at >= 0) projects[at] = next;
+      else projects.push(next);
+    }
     const variables = new Map(
-      (existing?.variables || []).map((item) => [item.key, item]),
+      (existing?.variables || []).map((row) => [row.key, row]),
     );
     for (const row of source.variables)
       variables.set(row.key, structuredClone(row));
-    for (const row of source.overrides) {
-      const projectId = mapped.get(row.projectId);
-      overrides.set(projectId, { ...row, projectId });
-    }
-    const profile = {
+    const next = {
       ...structuredClone(source),
-      id: existing?.id || available(source.id, profileIds),
+      id: existing?.id || available(source.id, used),
+      projects,
       variables: [...variables.values()],
-      overrides: [...overrides.values()],
     };
-    if (index >= 0) profiles[index] = profile;
-    else profiles.push(profile);
+    if (index >= 0) profiles[index] = next;
+    else profiles.push(next);
   }
-  return validateState({ ...current, projects, profiles });
+  return validateState({ ...current, profiles });
 }

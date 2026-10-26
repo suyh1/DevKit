@@ -52,10 +52,16 @@ jobs:
       - name: Electron integration smoke
         if: runner.os == 'Windows'
         run: npm run test:electron
+      - name: Offline API workspace integration
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --api-only
       - run: npm run ${{ matrix.command }}
       - name: Verify packaged Electron app
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --packaged
+      - name: Verify packaged offline API workspace
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --packaged --api-only
       - name: Verify configs preservation in NSIS cleanup
         if: runner.os == 'Windows'
         run: node scripts/check-configs-installer.mjs

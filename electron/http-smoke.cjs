@@ -63,6 +63,7 @@ module.exports = async function httpSmoke(window, output) {
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     await js('document.querySelector(\'.floating-nav-links [aria-label="HTTP 调试"]\').click()');
+    await js(`[...document.querySelectorAll('.http-product-tabs button')].find(button=>button.textContent.trim()==='快速请求').click()`);
     await fill('请求 URL', base + '/?tag=a&tag=b');
     await select('HTTP 方法', 'POST');
     await wait('document.querySelectorAll(".http-kv-row").length===2');

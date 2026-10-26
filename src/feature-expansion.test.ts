@@ -34,17 +34,35 @@ describe('Mock data', () => {
   });
 });
 
-describe('environment comparison', () => {
-  it('compares resolved URLs, empty/missing vars, overrides and query variable names', () => {
+describe('scheme comparison', () => {
+  it('compares resolved URLs, empty/missing vars, independent projects and query variable names', () => {
     const state = initialState();
-    state.profiles = [{ id: 'dev', name: '开发', description: '', variables: [{ key: 'host', value: 'localhost' }, { key: 'q', value: '' }], overrides: [] }, { id: 'prod', name: '生产', description: '', variables: [{ key: 'host', value: 'example.com' }], overrides: [{ projectId: 'web', url: '', enabled: false }] }];
-    state.projects = [{ id: 'web', name: 'web', code: 'web', group: '', description: '', url: 'https://{{ host }}/', enabled: true, query: [{ id: 'query', key: '{{ q }}', value: 'a', enabled: true }] }];
+    state.profiles = [{ id: 'dev', name: '开发', description: '', variables: [{ key: 'host', value: 'localhost' }, { key: 'q', value: '' }], projects: [] }, { id: 'prod', name: '生产', description: '', variables: [{ key: 'host', value: 'example.com' }], projects: [] }];
+    state.profiles[0].projects = [{ id: 'web', name: 'web', code: 'web', group: '', description: '', url: 'https://{{ host }}/', enabled: true, query: [{ id: 'query', key: '{{ q }}', value: 'a', enabled: true }] }];
+    state.profiles[1].projects = state.profiles[0].projects.map(project => ({ ...structuredClone(project), enabled: false }));
     const report = compareProfiles(state, ['dev', 'prod']);
     expect(report.variables.find(row => row.key === 'q')?.values).toEqual(['', undefined]);
     expect(report.projects[0].different).toBe(true);
-    expect(report.projects[0].values[1].missing).toEqual(['q']);
-    expect(report.projects[0].values[1].enabled).toBe(false);
+    expect(report.projects[0].values[1]?.missing).toEqual(['q']);
+    expect(report.projects[0].values[1]?.enabled).toBe(false);
     expect(state.revision).toBe(0);
+  });
+});
+
+describe('scheme alignment', () => {
+  it('compares the union by code, reports absence and ignores internal IDs', () => {
+    const state = initialState();
+    const project = { id: 'a', code: 'same', name: '甲', group: '', description: '', url: 'https://example.test/', enabled: true, query: [] };
+    state.profiles[0].projects = [project];
+    state.profiles.push({ ...structuredClone(state.profiles[0]), id: 'b', name: '乙', projects: [{ ...project, id: 'different' }, { ...project, id: 'other', code: 'only-b' }] });
+    let report = compareProfiles(state, ['default', 'b']);
+    expect(report.projects[0].different).toBe(false);
+    expect(report.projects[1].values[0]).toBeNull();
+    expect(report.projects[1].different).toBe(true);
+    state.profiles[1].projects[0].description = 'changed';
+    report = compareProfiles(state, ['default', 'b']);
+    expect(report.projects[0].different).toBe(true);
+    expect(() => compareProfiles(state, ['default', 'default'])).toThrow('2–4');
   });
 });
 

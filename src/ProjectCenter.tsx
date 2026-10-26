@@ -83,10 +83,7 @@ export default function ProjectCenter({
     [busy, setBusy] = useState(false),
     [password, setPassword] = useState("");
   const [entry, setEntry] = useState<Project | null>(null),
-    [profileDraft, setProfileDraft] = useState<Profile | null>(null),
-    [overrideMode, setOverrideMode] = useState(false),
-    [overrideUrl, setOverrideUrl] = useState(""),
-    [overrideEnabled, setOverrideEnabled] = useState(true);
+    [profileDraft, setProfileDraft] = useState<Profile | null>(null);
   const [imported, setImported] = useState<ProjectState | null>(null),
     [history, setHistory] = useState<Snapshot[] | null>(null),
     [sharing, setSharing] = useState<Sharing | null>(null),
@@ -176,6 +173,7 @@ export default function ProjectCenter({
       localStorage.setItem("devkit:project-profile", profile.id);
       setHealth({});
       setSelected([]);
+      setGroup("");
     }
   }, [profile?.id]);
   useEffect(() => {
@@ -202,7 +200,7 @@ export default function ProjectCenter({
     const saved = await saveProjects(next, revision);
     setData(saved);
     setSelected((current) =>
-      current.filter((id) => saved.projects.some((item) => item.id === id)),
+      current.filter((id) => saved.profiles.find(item => item.id === profile?.id)?.projects.some((item) => item.id === id)),
     );
     setHealth({});
     setMessage(`已保存 · 版本 ${saved.revision}`);
@@ -212,7 +210,7 @@ export default function ProjectCenter({
     setHistory((current) => (current === null ? null : result));
   }
   const projects =
-    data?.projects
+    profile?.projects
       .filter((item) => {
         const result = profile && resolveProject(item, profile),
           needle = search.trim().toLowerCase();
@@ -244,7 +242,7 @@ export default function ProjectCenter({
         !projects.every((item) => selected.includes(item.id));
   }, [projects, selected]);
   const selectedProjects =
-    data?.projects.filter((item) => selected.includes(item.id)) || [];
+    profile?.projects.filter((item) => selected.includes(item.id)) || [];
   async function setEnabled(enabled: boolean, targets = selectedProjects) {
     const ids = new Set(targets.map((item) => item.id));
     if (!ids.size || !data || !profile) return;
@@ -255,16 +253,7 @@ export default function ProjectCenter({
           ? item
           : {
               ...item,
-              overrides: [
-                ...item.overrides.filter((row) => !ids.has(row.projectId)),
-                ...targets.map((project) => ({
-                  projectId: project.id,
-                  url:
-                    item.overrides.find((row) => row.projectId === project.id)
-                      ?.url || "",
-                  enabled,
-                })),
-              ],
+              projects: item.projects.map(project => ids.has(project.id) ? { ...project, enabled } : project),
             },
       ),
     });
@@ -291,15 +280,12 @@ export default function ProjectCenter({
       );
     }
   }
-  function editEntry(project: Project, scoped = false) {
+  function editEntry(project: Project) {
     setError("");
-    const override = profile?.overrides.find(
-      (item) => item.projectId === project.id,
-    );
     setEntry(structuredClone(project));
-    setOverrideMode(scoped);
-    setOverrideUrl(override?.url || "");
-    setOverrideEnabled(override?.enabled ?? project.enabled);
+  }
+  function withProjects(projects: Project[]): ProjectState {
+    return { ...data!, profiles: data!.profiles.map(item => item.id === profile!.id ? { ...item, projects } : item) };
   }
   async function probe(ids: string[]) {
     const results = await projectRequest<Health[]>("probe", {
@@ -389,7 +375,7 @@ export default function ProjectCenter({
         )}
       </section>
     );
-  const groups = [...new Set(data.projects.map((item) => item.group))]
+  const groups = [...new Set(profile.projects.map((item) => item.group))]
     .filter(Boolean)
     .sort();
   const modalOpen =
@@ -400,7 +386,7 @@ export default function ProjectCenter({
     !!sharing ||
     storageOpen ||
     !!confirmation;
-  const resolved = data.projects.map((item) => resolveProject(item, profile));
+  const resolved = profile.projects.map((item) => resolveProject(item, profile));
   let importTarget: ProjectState | null = null,
     importError = "";
   if (imported)
@@ -412,10 +398,10 @@ export default function ProjectCenter({
     }
   let draftError = "";
   try {
-    if (entry && !overrideMode)
-      validateState({ ...data, projects: upsert(data.projects, entry) });
+    if (entry)
+      validateState(withProjects(upsert(profile.projects, entry)));
     if (profileDraft)
-      validateState({ ...data, profiles: upsert(data.profiles, profileDraft) });
+      validateState({ ...data, profiles: upsert(data.profiles, { ...profileDraft, projects: data.profiles.find(item => item.id === profileDraft.id)?.projects ?? profileDraft.projects }) });
   } catch (failure) {
     draftError = (failure as Error).message;
   }
@@ -430,10 +416,10 @@ export default function ProjectCenter({
           <FolderKanban size={27} />
           <div>
             <h1>项目中心</h1>
-            <p>项目定义一次维护，环境差异由配置档案管理。</p>
+            <p>每个档案独立管理项目与变量，按需对比不同方案。</p>
           </div>
         </div>
-        <div className="pc-actions"><MotionButton outcome={error ? "error" : ""} busy={busy} className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比环境</MotionButton>
+        <div className="pc-actions"><MotionButton outcome={error ? "error" : ""} busy={busy} className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比方案</MotionButton>
           <span className="pc-role">
             <ShieldCheck size={13} />
             {owner ? "主机管理" : canEdit ? "协作编辑" : "只读访问"} · 数据版本
@@ -534,7 +520,7 @@ export default function ProjectCenter({
                   name: "",
                   description: "",
                   variables: [],
-                  overrides: [],
+                  projects: [],
                 })
               }
             >
@@ -556,7 +542,7 @@ export default function ProjectCenter({
               <strong>{item.name}</strong>
               <small>
                 {item.description ||
-                  `${item.variables.length} 个变量 · ${item.overrides.length} 个覆盖`}
+                  `${item.projects.length} 个项目 · ${item.variables.length} 个变量`}
               </small>
             </MotionButton>
           ))}
@@ -596,7 +582,7 @@ export default function ProjectCenter({
                 setConfirmation({
                   title: `删除配置档案“${profile.name}”？`,
                   description:
-                    "此档案的变量和环境覆盖会移除，项目定义及其他档案保留。删除前自动备份。",
+                    "此档案的项目和变量会一起移除，其他档案保留。删除前自动备份。",
                   run: async (base) => {
                     await persist(
                       {
@@ -635,7 +621,7 @@ export default function ProjectCenter({
               </p>
             </div>
             <span>
-              {data.projects.length} 个项目 · {profile.variables.length} 个变量
+              {profile.projects.length} 个项目 · {profile.variables.length} 个变量
             </span>
           </div>
           <div className="pc-metrics" aria-label="当前档案概况">
@@ -830,14 +816,14 @@ export default function ProjectCenter({
             <div className="pc-empty">
               <FolderKanban size={34} />
               <h3>
-                {data.projects.length ? "没有匹配的项目" : "添加第一个项目入口"}
+                {profile.projects.length ? "没有匹配的项目" : "添加第一个项目入口"}
               </h3>
               <p>
-                {data.projects.length
+                {profile.projects.length
                   ? "试试其他关键词或清除分组、状态筛选。"
-                  : "先添加项目定义，再通过配置档案切换环境。地址可以引用 {{host}} 等变量。"}
+                  : "在当前档案添加项目。各档案独立保存，地址可引用 {{host}} 等变量。"}
               </p>
-              {data.projects.length > 0 && (
+              {profile.projects.length > 0 && (
                 <button
                   className="secondary-button"
                   onClick={() => {
@@ -881,7 +867,7 @@ export default function ProjectCenter({
                     <small className="pc-code" title={project.code}>
                       {project.code}
                     </small>
-                    <span>{result.overridden ? "档案覆盖" : "基础定义"}</span>
+                    <span>当前方案</span>
                   </div>
                   <div className="pc-card-identity">
                     <h3 title={project.name}>{project.name}</h3>
@@ -964,20 +950,36 @@ export default function ProjectCenter({
                         <MotionButton outcome={error ? "error" : ""} busy={busy}
                           className="icon-button"
                           aria-label={`编辑 ${project.name}`}
-                          title="编辑基础定义（所有档案）"
+                          title="编辑当前方案项目"
                           disabled={busy}
                           onClick={() => editEntry(project)}
                         >
                           <Pencil size={14} />
                         </MotionButton>
                         <MotionButton outcome={error ? "error" : ""} busy={busy}
-                          className="icon-button"
-                          title="仅覆盖当前档案"
-                          aria-label={`配置 ${project.name} 环境覆盖`}
+                          className="icon-button pc-invalid"
+                          aria-label={`删除 ${project.name}`}
                           disabled={busy}
-                          onClick={() => editEntry(project, true)}
+                          onClick={() =>
+                            setConfirmation({
+                              title: `删除项目“${project.name}”？`,
+                              description:
+                                "仅删除当前档案中的此项目，其他档案不受影响。删除前自动备份，可在“备份与恢复”中找回。",
+                              run: async (base) => {
+                                await persist(
+                                  {
+                                    ...base,
+                                    profiles: base.profiles.map(item => item.id === profile.id ? {
+                                      ...item, projects: item.projects.filter(row => row.id !== project.id),
+                                    } : item),
+                                  },
+                                  base.revision,
+                                );
+                              },
+                            })
+                          }
                         >
-                          <Settings2 size={14} />
+                          <Trash2 size={14} />
                         </MotionButton>
                         <MotionDetails
                           className="pc-menu"
@@ -1012,39 +1014,6 @@ export default function ProjectCenter({
                             >
                               <Plus size={14} />
                               复制定义
-                            </MotionButton>
-                            <MotionButton outcome={error ? "error" : ""} busy={busy}
-                              className="text-button pc-invalid"
-                              aria-label={`删除 ${project.name}`}
-                              disabled={busy}
-                              onClick={() =>
-                                setConfirmation({
-                                  title: `删除项目“${project.name}”？`,
-                                  description:
-                                    "项目及其在所有配置档案中的覆盖都会移除。删除前自动备份，可在“备份与恢复”中找回。",
-                                  run: async (base) => {
-                                    await persist(
-                                      {
-                                        ...base,
-                                        projects: base.projects.filter(
-                                          (item) => item.id !== project.id,
-                                        ),
-                                        profiles: base.profiles.map((item) => ({
-                                          ...item,
-                                          overrides: item.overrides.filter(
-                                            (row) =>
-                                              row.projectId !== project.id,
-                                          ),
-                                        })),
-                                      },
-                                      base.revision,
-                                    );
-                                  },
-                                })
-                              }
-                            >
-                              <Trash2 size={14} />
-                              删除项目
                             </MotionButton>
                           </div>
                         </MotionDetails>
@@ -1099,7 +1068,7 @@ export default function ProjectCenter({
             <span>
               {owner
                 ? "项目与档案保存到安装目录的 configs；整目录复制可迁移，导出 JSON 可选择合并导入。"
-                : "数据保存在主机；当前环境和视图选择只影响你自己。"}
+                : "数据保存在主机；当前档案和视图选择只影响你自己。"}
             </span>
           </footer>
           <input
@@ -1125,13 +1094,9 @@ export default function ProjectCenter({
       <MotionPresence kind="dialog" present={!!(entry)}>{entry && (
         <Modal
           feedback={message}
-          title={
-            overrideMode
-              ? `当前档案覆盖 · ${profile.name}`
-              : "项目定义 · 对所有档案生效"
-          }
+          title={`项目定义 · ${profile.name}`}
           close={() => setEntry(null)}
-          draft={{ entry, overrideUrl, overrideEnabled }}
+          draft={entry}
           busy={busy}
           wide
         >
@@ -1139,91 +1104,16 @@ export default function ProjectCenter({
             onSubmit={(event) => {
               event.preventDefault();
               void action(async () => {
-                if (overrideMode) {
-                  await persist({
-                    ...data,
-                    profiles: data.profiles.map((item) =>
-                      item.id !== profile.id
-                        ? item
-                        : {
-                            ...item,
-                            overrides: [
-                              ...item.overrides.filter(
-                                (row) => row.projectId !== entry.id,
-                              ),
-                              {
-                                projectId: entry.id,
-                                url: overrideUrl,
-                                enabled: overrideEnabled,
-                              },
-                            ],
-                          },
-                    ),
-                  });
-                } else
-                  await persist({
-                    ...data,
-                    projects: upsert(data.projects, entry),
-                  });
+                await persist(withProjects(upsert(profile.projects, entry)));
                 setEntry(null);
               });
             }}
           >
             {errorBox}
-            {overrideMode ? (
-              <>
-                <p>
-                  只修改此档案中的“{entry.name}”。留空地址表示继续使用基础模板。
-                </p>
-                <Field label="覆盖地址模板">
-                  <input
-                    maxLength={4000}
-                    value={overrideUrl}
-                    placeholder={entry.url}
-                    onChange={(event) => setOverrideUrl(event.target.value)}
-                  />
-                </Field>
-                <label className="pc-check">
-                  <input
-                    type="checkbox"
-                    checked={overrideEnabled}
-                    onChange={(event) =>
-                      setOverrideEnabled(event.target.checked)
-                    }
-                  />
-                  在当前档案启用
-                </label>
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  type="button"
-                  className="text-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void action(async () => {
-                      await persist({
-                        ...data,
-                        profiles: data.profiles.map((item) =>
-                          item.id !== profile.id
-                            ? item
-                            : {
-                                ...item,
-                                overrides: item.overrides.filter(
-                                  (row) => row.projectId !== entry.id,
-                                ),
-                              },
-                        ),
-                      });
-                      setEntry(null);
-                    })
-                  }
-                >
-                  移除覆盖，恢复基础定义
-                </MotionButton>
-              </>
-            ) : (
-              <>
+            <>
                 <div className="pc-scope">
                   <Settings2 size={15} />
-                  基础定义对所有档案生效。已有环境覆盖的档案仍优先使用覆盖地址。
+                  项目仅属于当前档案“{profile.name}”，在此保存、启停或删除。
                 </div>
                 <div className="pc-form-grid">
                   <Field label="项目名称">
@@ -1396,58 +1286,8 @@ export default function ProjectCenter({
                     </button>
                   </div>
                 ))}
-                {data.projects.some((item) => item.id === entry.id) &&
-                  profile.overrides.some(
-                    (row) => row.projectId === entry.id,
-                  ) && (
-                    <p className="pc-invalid">
-                      当前档案已为该项目设置覆盖。修改基础定义后，覆盖内容仍优先。
-                    </p>
-                  )}
-              </>
-            )}
-            <UrlPreview
-              project={entry}
-              profile={
-                overrideMode
-                  ? {
-                      ...profile,
-                      overrides: [
-                        ...profile.overrides.filter(
-                          (row) => row.projectId !== entry.id,
-                        ),
-                        {
-                          projectId: entry.id,
-                          url: overrideUrl,
-                          enabled: overrideEnabled,
-                        },
-                      ],
-                    }
-                  : profile
-              }
-              copy={copy}
-            />
-            {!overrideMode && (
-              <MotionDetails className="pc-profile-preview">
-                <summary>
-                  查看所有配置档案的地址（{data.profiles.length}）
-                </summary>
-                {data.profiles.map((item) => {
-                  const result = resolveProject(entry, item);
-                  return (
-                    <div key={item.id}>
-                      <strong>
-                        {item.name}
-                        {result.overridden ? " · 环境覆盖优先" : ""}
-                      </strong>
-                      <code className={result.error ? "pc-invalid" : ""}>
-                        {result.error || result.url}
-                      </code>
-                    </div>
-                  );
-                })}
-              </MotionDetails>
-            )}
+            </>
+            <UrlPreview project={entry} profile={profile} copy={copy} />
             {draftError && (
               <p className="pc-validation" role="status">
                 {draftError}
@@ -1456,7 +1296,7 @@ export default function ProjectCenter({
             <footer>
               <ModalCancel />
               <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
-                保存{overrideMode ? "当前档案覆盖" : "项目定义"}
+                保存项目定义
               </MotionButton>
             </footer>
           </form>
@@ -1477,7 +1317,7 @@ export default function ProjectCenter({
               void action(async () => {
                 await persist({
                   ...data,
-                  profiles: upsert(data.profiles, profileDraft),
+                  profiles: upsert(data.profiles, { ...profileDraft, projects: data.profiles.find(item => item.id === profileDraft.id)?.projects ?? profileDraft.projects }),
                 });
                 setActive(profileDraft.id);
                 setProfileDraft(null);
@@ -1588,9 +1428,9 @@ export default function ProjectCenter({
             )}
             <MotionDetails className="pc-profile-preview">
               <summary>
-                查看此档案的项目地址预览（{data.projects.length}）
+                查看此档案的项目地址预览（{profileDraft.projects.length}）
               </summary>
-              {data.projects.map((item) => {
+              {profileDraft.projects.map((item) => {
                 const result = resolveProject(item, profileDraft);
                 return (
                   <div key={item.id}>
@@ -1625,7 +1465,7 @@ export default function ProjectCenter({
         >
           {errorBox}
           <p>
-            文件包含 {imported.projects.length} 个项目、
+            文件包含 {imported.profiles.flatMap(item => item.projects).length} 个项目、
             {imported.profiles.length}{" "}
             个配置档案。确认前不会写入数据；导入前自动备份，访问口令和共享设置不变。
           </p>
@@ -1642,7 +1482,7 @@ export default function ProjectCenter({
               <span>
                 <strong>合并到当前数据</strong>
                 <small>
-                  同编码项目更新；同名档案合并变量与覆盖；保留文件外的内容。
+                  同名档案内按项目编码合并项目、按变量名合并变量；保留文件外的内容。
                 </small>
               </span>
             </label>
@@ -1672,13 +1512,13 @@ export default function ProjectCenter({
               配置档案：{imported.profiles.map((item) => item.name).join("、")}
             </p>
             <ul>
-              {imported.projects.slice(0, 50).map((item) => (
-                <li key={item.id}>
-                  {item.name} · {item.code} · {item.group || "未分组"}
+              {imported.profiles.flatMap(profile => profile.projects.map(item => ({ ...item, profileId: profile.id, profileName: profile.name }))).slice(0, 50).map((item) => (
+                <li key={JSON.stringify([item.profileId, item.id])}>
+                  {item.profileName} / {item.name} · {item.code} · {item.group || "未分组"}
                 </li>
               ))}
             </ul>
-            {imported.projects.length > 50 && (
+            {imported.profiles.flatMap(item => item.projects).length > 50 && (
               <p>仅展示前 50 项，全部内容均参与导入。</p>
             )}
           </MotionDetails>
@@ -1740,9 +1580,9 @@ export default function ProjectCenter({
                   {restoring.data.profiles.map((item) => item.name).join("、")}
                 </p>
                 <ul>
-                  {restoring.data.projects.slice(0, 50).map((item) => (
-                    <li key={item.id}>
-                      {item.name} · {item.code}
+                  {restoring.data.profiles.flatMap(profile => profile.projects.map(item => ({ ...item, profileId: profile.id, profileName: profile.name }))).slice(0, 50).map((item) => (
+                    <li key={JSON.stringify([item.profileId, item.id])}>
+                      {item.profileName} / {item.name} · {item.code}
                     </li>
                   ))}
                 </ul>
@@ -1917,7 +1757,11 @@ export default function ProjectCenter({
           <dl className="pc-file-list">
             <div>
               <dt>projects.json</dt>
-              <dd>项目、配置档案与最近 30 份快照</dd>
+              <dd>档案索引、版本及最近 30 份快照</dd>
+            </div>
+            <div>
+              <dt>profile-&lt;编码 ID&gt;.json</dt>
+              <dd>每个档案独立保存的项目、变量与说明</dd>
             </div>
             <div>
               <dt>sharing.json</dt>

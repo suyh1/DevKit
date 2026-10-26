@@ -16,6 +16,7 @@ let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let httpClient;
+let apiWorkspace, apiWorkspaceError = '';
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
 const desktopPreferences = require('./desktop-preferences.cjs').createDesktopPreferences(path.join(app.getPath('userData'), 'desktop-settings.json'));
 let tray, choosingClose = false, quitRequested = false, rememberQuit = false;
@@ -108,6 +109,9 @@ app.whenReady().then(async () => {
     const { createNginxManager } = await import('./server/nginx-manager.mjs');
     nginxManager = await createNginxManager(projectStorage.directory);
   } catch (error) { nginxError = error.message; }
+  try {
+    apiWorkspace = await (await import('./server/api-workspace.mjs')).createApiWorkspace(projectStorage.directory);
+  } catch (error) { apiWorkspaceError = error.message; }
   const root = path.join(__dirname, 'dist');
   protocol.handle('devkit', async request => {
     if (request.method !== 'GET') return new Response(null, { status: 405 });
@@ -171,6 +175,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('devkit:http', async (event, action, value) => {
     if (!window || window.isDestroyed() || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的 HTTP 请求。');
     try {
+      if (['get-library', 'save-library', 'restore-library'].includes(action)) {
+        if (!apiWorkspace) throw new Error(apiWorkspaceError || 'API工作区尚未准备好。');
+        if (action === 'get-library') return { data: await apiWorkspace.get() };
+        if (action === 'save-library') return { data: await apiWorkspace.save(value?.data, value?.revision) };
+        return { data: await apiWorkspace.restore(value?.revision) };
+      }
       if (!httpClient) throw new Error('HTTP 客户端尚未准备好。');
       if (action === 'send') return { data: await httpClient.send(value?.id, value?.request) };
       if (action === 'cancel') return { data: httpClient.cancel(value?.id) };
@@ -225,8 +235,8 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
-  if ((!projectStore && !nginxManager) || closing) return;
+  if ((!projectStore && !nginxManager && !apiWorkspace) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());
