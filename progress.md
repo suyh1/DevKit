@@ -525,3 +525,11 @@ HTTP/API升级实现：原生项目/目录、接口设计/文档/调试三视图
 v1.11.0发行前：188核心、55个Node检查（Nginx26含真实进程全部通过）、7文档、Java17四份示例、Deb9通过/1个POSIX项按Windows跳过；完整源码桌面流程进行中。首轮Windows临时占用令Nginx原子rename报EPERM，已增加与项目/API同策略的有上限重试并重跑26项通过；同步说明文档。CI加入源码和包内API专用回归。
 
 实现7258ae0732abba6637957c3fca9bf628fbb88fb5已推送origin/main并核对远端。完整桌面回归发现颜色剪贴板自动化缺少用户手势/焦点等待，保留内容断言并补齐前置条件；后一次启动因本地同时运行旧版包测试导致键盘焦点被抢占，已终止旧包验证，改为单窗口串行完整回归。API旧包失败是尚未重打包的1.10.8无新UI，不能作为产品回归结果。当前在制作Linux包，CI并行运行。
+
+单窗口完整源码Electron最终通过：分类/主题/4宽度、46工具、项目中心独立档案/删除/方案对比/共享、Nginx完整UI、HTTP/Mock/日志/差异、托盘/退出保护与锁释放。新API专项再次通过。Linux amd64和ARM64包完成并验证GLIBC2.25、空根解包、97文件/15目录、root/4755沙箱；独立ZIP真实解包/服务/目录迁移/快照/口令复用通过，三份已上传Release草稿。Windows安装器制作中。当前来源2821ffca246f9843fd3a94361724d8d715692d1c，CI40278166607的Linux双架构与独立服务已成功，Windows在打包。
+
+三平台和独立服务制作完成。verify:release三包共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aedd5e837672697572bbb；Windows113336991、amd6493503140、ARM6488415208、服务268458字节。NSIS隔离升级/卸载均逐字节保留configs，Windows签名状态NotSigned。实际载荷审计及Windows ASAR完整回归进行中；CI同来源的Linux/ARM/服务三作业已成功，Windows已进包内完整检查。
+
+最终Windows ASAR完整46工具/项目中心/Nginx/HTTP/托盘/退出回归，以及新增API专项和原HTTP关闭专项均通过。CI40278166607四作业全部success，来源2821ffca246f9843fd3a94361724d8d715692d1c。实际两份Deb ASAR与Windows逐字节相同（adcc34df9ac4a9531c86295bbb935541f59fc6f692c88a2fedb8c417bb005106），README和18指南一致，独立ZIP无用户configs。四个二进制均已上传草稿；正在上传10份校验/验收附件，再按远端大小及SHA256核验。1.11.0注解标签已推送并核对解引用来源一致。
+
+v1.11.0已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1.11.0 。Windows x64、Linux amd64/ARM64、独立服务及10份验收/校验附件共14项，发布前与发布后均验证远端大小和SHA256与本地完全一致；注解标签1.11.0解引用为2821ffca246f9843fd3a94361724d8d715692d1c。来源CI40278166607四作业全部成功，Windows包内完整及API/HTTP关闭专项全通过。授权的全部提交、打包、推送和发布已完成；本记录作为仅文档提交推送，发行包与来源标签保持不变。

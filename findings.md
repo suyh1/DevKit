@@ -264,3 +264,5 @@
 校验依赖选择@cfworker/json-schema（MIT），官方支持draft4/7/2019-09/2020-12且通过4500规格断言，无eval/new Function，适合当前严格CSP。Ajv需运行时代码生成与当前renderer CSP冲突；在隔离Worker中运行Schema验证并加超时，避免大Schema或正则阻塞界面。来源：https://github.com/cfworker/cfworker/tree/main/packages/json-schema ，https://github.com/usebruno/bruno ，https://github.com/hoppscotch/hoppscotch ，https://github.com/scalar/scalar 。
 
 离线实现已落地：API项目configs/http/api-workspace.json（当前+上次保存），独立目录锁、原子同步替换与版本检查；原HTTP集合保留并显式迁入。未引入Scalar/Vue，仅新增MIT @cfworker/json-schema4.1.1及官方2020-12meta数据。支持标准JSON Schema常用验证，动态引用/超时/异常/数字精度不足均不冒充通过；文本/表单按对应实例类型验证。OpenAPI本地循环引用打包与JSON原始示例导出回读保真已测；无法转换的外部引用/文件等明确拒绝。关键边界和依赖许可已写入docs/http-workbench.md、docs/api-workspace-design.md、docs/api-third-party-notices.md。
+
+v1.11.0发行完成：共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aedd5e837672697572bbb，三平台实际ASAR同adcc34df9ac4a9531c86295bbb935541f59fc6f692c88a2fedb8c417bb005106；README及18指南一致。发布release id423908013，tag1.11.0来源2821ffc，14远端附件SHA与大小均匹配本地，latest状态确认。产物及验收在artifacts/release-1.11.0；Windows仍为NotSigned，Linux未做用户目标桌面/托盘实测，边界已附公开验收。

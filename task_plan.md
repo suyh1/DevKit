@@ -274,7 +274,9 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 
 ## 2026-10-26 v1.11.0 发行
 119. 更新发行版本并核对全部本地改动、依赖和验证入口 — complete
-120. 完成源码与真实桌面验证，提交并推送实现 — in_progress
-121. 制作并核验Windows/Linux双架构与独立服务包 — pending
-122. 等待CI、发布GitHub Release并核对远端附件 — pending
+120. 完成源码与真实桌面验证，提交并推送实现 — complete
+121. 制作并核验Windows/Linux双架构与独立服务包 — complete
+122. 等待CI、发布GitHub Release并核对远端附件 — complete
 - 用户明确授权全部提交、打包、推送和发布，撤销上一轮暂不发行的限制。
+
+- v1.11.0已作为latest公开发布：https://github.com/suyh1/DevKit/releases/tag/1.11.0 。14份附件均按远端大小与SHA256核对一致，来源2821ffc，CI40278166607四作业全部成功；完成记录另行文档提交，不改变发行二进制或标签来源。
