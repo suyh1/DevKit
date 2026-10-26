@@ -5,7 +5,10 @@ const http = require('node:http');
 
 module.exports = async function featuresSmoke(window, output) {
   window.webContents.setBackgroundThrottling(false); window.show(); window.focus(); window.webContents.focus();
-  const js = code => window.webContents.executeJavaScript(code, true);
+  const js = async code => {
+    try { return await window.webContents.executeJavaScript(code, true); }
+    catch (error) { console.error('Failed feature test script:', code); throw error; }
+  };
   const wait = async expression => {
     for (let i = 0; i < 150; i++) { if (await js('Boolean(' + expression + ')')) return; await new Promise(resolve => setTimeout(resolve, 50)); }
     await fs.writeFile(path.join(output, 'features-failure.png'), (await window.webContents.capturePage()).toPNG());
@@ -13,7 +16,7 @@ module.exports = async function featuresSmoke(window, output) {
   };
   const click = async (text, root) => {
     const selector = `[...document.querySelectorAll(${JSON.stringify(root + ' button')})].find(button=>button.textContent.trim()===${JSON.stringify(text)}||(button.classList.contains('run-button')&&button.textContent.trim().startsWith(${JSON.stringify(text)})))`;
-    await wait(`!!${selector}&&!${selector}.disabled`); await js(`${selector}.click()`);
+    await wait(`!!${selector}&&!${selector}.disabled&&!${selector}.closest('[inert]')`); await js(`${selector}.click()`);
   };
   const fill = async (selector, value) => {
     await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
@@ -25,6 +28,7 @@ module.exports = async function featuresSmoke(window, output) {
     await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
     await js(`document.querySelector(${JSON.stringify(selector)}).focus()`);
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+    await wait(`getSelection()?.toString().replace(/\\r|\\n/g,'') === document.querySelector(${JSON.stringify(selector)})?.textContent.replace(/\\r|\\n/g,'')`);
     await js('new Promise(resolve=>requestAnimationFrame(resolve))'); await window.webContents.insertText(value);
     await wait(`document.querySelector(${JSON.stringify(selector)})?.textContent===${JSON.stringify(value)}`);
   };
@@ -104,6 +108,7 @@ module.exports = async function featuresSmoke(window, output) {
   }
   await js('document.querySelector(\'.floating-nav-links [aria-label="Nginx 配置"]\').click()'); await click('刷新', '.ng-heading');
   const id = state.instances.find(item => item.name === 'feature-a').id;
+  await wait(`!!document.querySelector('.ng-instance[data-instance-id="${id}"] .ng-instance-select')`);
   await js(`document.querySelector('.ng-instance[data-instance-id="${id}"] .ng-instance-select').click()`);
   await wait(`document.querySelector('.ng-instance[data-instance-id="${id}"] .ng-instance-select').getAttribute('aria-pressed')==='true'`);
   await click('查看日志', '.ng-center'); await wait('document.querySelector(".ng-log-view")?.textContent.includes("实例日志") && !!document.querySelector(".ng-log-editor .cm-content")');
@@ -120,9 +125,11 @@ module.exports = async function featuresSmoke(window, output) {
   assert.match(await js('document.querySelector(".ng-review-modal").textContent'), /feature-b/);
   assert.match(await js('document.querySelector(".change-preview").textContent'), /9001/);
   await snap('features-nginx-change-preview'); await click('返回编辑', '.ng-review-modal');
+  await wait('!document.querySelector(".ng-review-modal")');
   await click('保存文件 (1)', '.ng-center').catch(async () => { await js('[...document.querySelectorAll(".ng-center button")].find(button=>button.textContent.startsWith("保存文件")).click()'); });
   await wait('document.querySelector(".ng-notice")?.textContent.includes("已保存")');
-  await click('备份', '.ng-center'); await click('对比当前', '.ng-backups'); await wait('!!document.querySelector(".ng-review-modal .change-preview")'); await click('返回编辑', '.ng-review-modal');
+  await click('备份', '.ng-center'); await click('对比当前', '.ng-backups'); await wait('!!document.querySelector(".ng-review-modal[open] .change-preview")'); await click('返回编辑', '.ng-review-modal');
+  await wait('!document.querySelector(".ng-review-modal")');
   for (const theme of ['light', 'dark']) {
     await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`); window.setSize(390, 1000);
     await click('查看日志', '.ng-center'); await wait('!!document.querySelector(".ng-log-editor .cm-content")');
