@@ -553,3 +553,7 @@ v1.11.0已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1
 用户已授权提交、打包、推送并发布。当前main与origin/main一致22c54e7。版本1.12.0，沿用数字标签和四类产物。增加CI共享门户及包内回归，独立ZIP验收覆盖API保存迁移、Schema Worker资源和主机Nginx创建。首轮发行补丁因已格式化代码锚点不符未应用，按准确行修正。
 
 发行前188项Vitest与64项Node检查（含真实nginx、独立服务、文档）均通过，生产构建通过。默认javac不在PATH，改用已有C:/Program Files/jdk/bin/javac.exe；Deb检查9通过/1个POSIX权限用例按Windows跳过。完整桌面回归正在运行。
+
+v1.12.0实现6cbfeb7a9da80fc9a8e565e48d647969cde8e539已推送origin/main并核对。源码完整桌面、API与共享专项通过；NSIS隔离升级/卸载保留configs通过。Windows/Linux双架构及独立服务四包完成并上传Release草稿424162627。共同构建4468e2955ab083642cca27e027669f80e57e8901f8a4976c0ffeb8ef2de0e769；实际Deb/Windows ASAR同f10bb8ced8c2215c39716190c7fb606b419309280f48dc4a704b441a963d2515，README及19指南匹配，独立ZIP无用户configs。CI40314617517三个Linux/独立服务作业成功，Windows正在包内回归；本地实际ASAR完整回归进行中。
+
+v1.12.0已公开发布为latest：https://github.com/suyh1/DevKit/releases/tag/1.12.0 。release id424162627，14附件在发布前/后均核对大小和SHA256与本地完全一致；注解标签1.12.0解引用来源6cbfeb7a9da80fc9a8e565e48d647969cde8e539。CI40314617517四作业全部success。本地实际Windows ASAR完整46工具/项目/Nginx/HTTP/托盘/退出、API专项及新增共享专项均通过，包含浏览器远程修改主机路径、文件保存及只读阻止写入。Windows113352053、amd6493498594、ARM6488406046、独立服务619927字节。安装器NotSigned；Linux未做用户目标桌面/托盘实测，跨电脑网络防火墙未验收，边界均附公开验收。授权的提交、打包、推送与发布已完成；本记录只作文档提交，不改变发行来源与二进制。
