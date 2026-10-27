@@ -210,4 +210,4 @@ python scripts/test-deb-packaging.py
 
 共享及全局交互的审查范围、修复与验证见 [交互一致性审查记录](docs/interaction-audit.md)。
 
-共享网页使用独立主滚动区和 `/#projects`、`/#nginx`、`/#http` 入口；支持浏览器前进/返回。局域网 HTTP 复制提供回退与手动复制，本次调试值与共享接口定义分开，Nginx 连接失败明确标记状态过期。使用和15项修复验收见 [共享网页版说明](docs/portal-browser.md)。
+共享网页使用独立主滚动区和 `/#projects`、`/#nginx`、`/#http` 入口；支持浏览器前进/返回。局域网 HTTP 复制提供回退与手动复制，本次调试值与共享接口定义分开，Nginx 连接失败明确标记状态过期。Nginx 帮助浮层内置离线 Popover 兼容层，避免旧版浏览器登录后因不支持的选择器而空白。使用和15项修复验收见 [共享网页版说明](docs/portal-browser.md)。

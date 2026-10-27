@@ -137,11 +137,56 @@ app
         await button("登录");
         await wait('!!document.querySelector(".portal-bar nav")');
       };
+      if (process.argv.includes('--legacy-popover')) {
+        console.log('Portal: simulating browser without native Popover');
+        await window.loadURL('about:blank');
+        window.webContents.debugger.attach('1.3');
+        await window.webContents.debugger.sendCommand('Page.enable');
+        await window.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `
+          delete HTMLElement.prototype.popover;
+          delete HTMLElement.prototype.showPopover;
+          delete HTMLElement.prototype.hidePopover;
+          delete HTMLElement.prototype.togglePopover;
+          for (const [proto, names] of [[Document.prototype, ['querySelector', 'querySelectorAll']], [Element.prototype, ['querySelector', 'querySelectorAll', 'matches', 'closest']]]) {
+            for (const name of names) {
+              const original = proto[name];
+              proto[name] = function(selector) {
+                if (String(selector).includes(':popover-open') && !String(selector).includes('\\\\:popover-open')) throw new DOMException('Unsupported :popover-open', 'SyntaxError');
+                return original.call(this, selector);
+              };
+            }
+          }
+          // Emulate the older UA without native [popover] display:none rules.
+          addEventListener('DOMContentLoaded', () => {
+            const style = document.createElement('style');
+            style.textContent = '.ng-help-popover.\\\\:popover-open { display: block; }';
+            document.head.append(style);
+          });
+        ` });
+      }
       await window.loadURL(fixture.url + "#projects");
+      console.log('Portal: loaded');
       window.show();
       window.focus();
       window.webContents.focus();
       await login();
+      console.log('Portal: authenticated');
+      {
+        await button('Nginx 配置', '.portal-bar button');
+        await wait('!!document.querySelector(".ng-editor-fieldset")');
+        await wait('[...document.querySelectorAll(".ng-center button")].some(e=>e.textContent.trim()==="实例设置"&&!e.disabled)');
+        await button('实例设置');
+        await wait('!!document.querySelector(".ng-form-modal[open]")');
+        await selector('.ng-form-modal [aria-label="查看实例名称说明"]');
+        await wait('!!document.querySelector(".ng-help-popover:popover-open")');
+        await wait('(()=>{const e=document.querySelector(".ng-help-popover:popover-open"),s=getComputedStyle(e);return e.getBoundingClientRect().height>0&&Number(s.opacity)===1})()');
+        assert.equal(await js('(()=>{const r=document.querySelector(".ng-help-popover:popover-open").getBoundingClientRect(),d=document.querySelector(".ng-form-modal").getBoundingClientRect();return r.left>=d.left&&r.right<=d.right&&r.top>=d.top&&r.bottom<=d.bottom})()'), true, 'Help must remain inside the dialog without clipping');
+        await screenshot(process.argv.includes('--legacy-popover') ? 'legacy-popover' : 'native-popover');
+        key('Escape');
+        await wait('!document.querySelector(".ng-help-popover:popover-open")');
+        await selector('.ng-form-modal [aria-label="关闭对话框"]');
+        await button('项目中心', '.portal-bar button');
+      }
       for (const [width, height] of [
         [1440, 900],
         [1024, 768],
@@ -445,6 +490,7 @@ app
             nativePointerAndWheel: true,
             sticky: true,
             nginxPhoneBottom: true,
+            legacyPopover: process.argv.includes('--legacy-popover'),
             statusFailureAndRecovery: true,
             copyAndManualFallback: true,
             debugDefinitionIsolation: true,

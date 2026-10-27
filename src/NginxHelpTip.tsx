@@ -1,3 +1,6 @@
+// Also patches :popover-open queries on browsers without the native Popover API.
+// Load before NginxCenter effects, including when its shared portal page is hidden.
+import '@oddbird/popover-polyfill';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -14,10 +17,16 @@ export default function NginxHelpTip({ label, id, children }: { label: string; i
   function place() {
     const button = trigger.current?.getBoundingClientRect(), panel = popup.current;
     if (!button || !panel) return;
-    const width = panel.offsetWidth, height = panel.offsetHeight;
-    const left = Math.max(12, Math.min(button.left, innerWidth - width - 12)), below = button.bottom + 8 + height <= innerHeight - 12;
-    panel.style.left = `${left}px`;
-    panel.style.top = `${Math.max(12, Math.min(below ? button.bottom + 8 : button.top - height - 8, innerHeight - height - 12))}px`;
+    // The polyfill stays inside its dialog; transformed dialogs establish a fixed
+    // positioning container, unlike a native popover in the browser's top layer.
+    panel.style.left = '0px'; panel.style.top = '0px';
+    const origin = panel.getBoundingClientRect(), width = origin.width, height = origin.height;
+    const dialog = panel.classList.contains(':popover-open') ? panel.closest('dialog')?.getBoundingClientRect() : undefined;
+    const bounds = { left: Math.max(0, dialog?.left ?? 0), right: Math.min(innerWidth, dialog?.right ?? innerWidth), top: Math.max(0, dialog?.top ?? 0), bottom: Math.min(innerHeight, dialog?.bottom ?? innerHeight) };
+    const left = Math.max(bounds.left + 12, Math.min(button.left, bounds.right - width - 12)), below = button.bottom + 8 + height <= bounds.bottom - 12;
+    const top = Math.max(bounds.top + 12, Math.min(below ? button.bottom + 8 : button.top - height - 8, bounds.bottom - height - 12));
+    panel.style.left = `${(left - origin.left) / (width / panel.offsetWidth || 1)}px`;
+    panel.style.top = `${(top - origin.top) / (height / panel.offsetHeight || 1)}px`;
     panel.style.setProperty('--popover-origin', `${Math.max(0, Math.min(width, button.left + button.width / 2 - left))}px ${below ? 'top' : 'bottom'}`);
   }
   function show() {

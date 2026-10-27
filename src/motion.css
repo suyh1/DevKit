@@ -318,13 +318,13 @@ dialog.motion-native[open] {
     overlay 160ms allow-discrete;
   transform-origin: var(--popover-origin, left top);
 }
-.ng-help-popover:popover-open {
+.ng-help-popover:where(:popover-open, .\:popover-open) {
   opacity: 1;
   transform: none;
   transition-duration: 240ms;
 }
 @starting-style {
-  .ng-help-popover:popover-open {
+  .ng-help-popover:where(:popover-open, .\:popover-open) {
     opacity: 0;
     transform: translateY(4px) scale(0.96);
   }

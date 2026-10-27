@@ -3,7 +3,7 @@
   "private": true,
   "description": "Offline developer workbench with bundled Chromium",
   "author": "DevKit maintainers",
-  "version": "1.12.3",
+  "version": "1.12.4",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",
@@ -49,6 +49,7 @@
     "@codemirror/view": "^6.43.15",
     "@faker-js/faker": "^10.6.0",
     "@lezer/highlight": "^1.2.5",
+    "@oddbird/popover-polyfill": "^0.7.3",
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
     "geographiclib-dms": "2.2.0",

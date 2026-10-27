@@ -86,6 +86,7 @@ module.exports = async function geographySmoke(window, output) {
         window.setSize(width, 1000);
         await js('new Promise(resolve=>setTimeout(resolve,100))');
         assert.equal(await js('document.documentElement.scrollWidth <= innerWidth'), true, `${tab} ${theme} ${width}`);
+        assert.equal(await js(`(()=>{const group=document.querySelector('${pane} [aria-label="经纬度功能"]'),r=group.getBoundingClientRect();return [...group.querySelectorAll('button')].every(button=>{const b=button.getBoundingClientRect();return b.height>=30&&b.top>=r.top&&b.bottom<=r.bottom;});})()`), true, `${tab} ${theme} ${width}: mode buttons must not be clipped`);
       }
       await fs.writeFile(path.join(output, `geography-${tab}-${theme}-narrow.png`), (await window.webContents.capturePage()).toPNG());
     }
