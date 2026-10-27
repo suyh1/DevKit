@@ -17,6 +17,16 @@ export default function NginxHelpTip({ label, id, children }: { label: string; i
   function place() {
     const button = trigger.current?.getBoundingClientRect(), panel = popup.current;
     if (!button || !panel) return;
+    if (!panel.classList.contains(':popover-open')) {
+      // Native top-layer geometry must use layout dimensions, not its animated
+      // visual rectangle, which can still be scaled during the opening frame.
+      const width = panel.offsetWidth, height = panel.offsetHeight;
+      const left = Math.max(12, Math.min(button.left, innerWidth - width - 12)), below = button.bottom + 8 + height <= innerHeight - 12;
+      panel.style.left = `${left}px`;
+      panel.style.top = `${Math.max(12, Math.min(below ? button.bottom + 8 : button.top - height - 8, innerHeight - height - 12))}px`;
+      panel.style.setProperty('--popover-origin', `${Math.max(0, Math.min(width, button.left + button.width / 2 - left))}px ${below ? 'top' : 'bottom'}`);
+      return;
+    }
     // The polyfill stays inside its dialog; transformed dialogs establish a fixed
     // positioning container, unlike a native popover in the browser's top layer.
     panel.style.left = '0px'; panel.style.top = '0px';
