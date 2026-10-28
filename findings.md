@@ -298,3 +298,5 @@ v1.12.5发行完成：三平台和独立Node服务已发布，14附件远端大�
 - 本轮参考StyleKit visual筛选页；该URL网页工具报不可访问，已读同站完整风格目录确认柔和界面、macOS毛玻璃、现代渐变、复古怀旧四种视觉风格。保留既有五套，加到九套。
 - 沿用已比较的MIT开源daisyUI/shadcn语义主题设计，无需引入新库；新增风格将包含形状/表面/光影变化，控制透明表面文字对比。
 - ui-ux-pro-max design-system已运行，继续保持工具布局与本地字体。
+
+v1.12.7已发布为latest，包含九套深浅主题、项目中心批量删除及图标对齐；最终来源ef7acb3964dfef086060ff2d2389d9a2479832d8，同源CI40738196721四项success，14附件大小/SHA256全部匹配。发行地址：https://github.com/suyh1/DevKit/releases/tag/1.12.7 。

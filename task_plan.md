@@ -372,8 +372,8 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 延续ui-ux-pro-max与planning-with-files工作流，本轮不重新打包。
 
 ## 2026-10-29 发行1.12.7（用户明确授权打包、提交、推送、发布）
-- [ ] 更新版本与README，运行发行检查并审查差异。
-- [ ] 提交并推送main，等待同源CI四项成功。
-- [ ] 重建三平台和独立服务包，核对载荷，运行包内回归。
-- [ ] 创建标签与Release，上传并校验附件，正式发布并核对latest。
+- [x] 更新版本与README，运行发行检查并审查差异。
+- [x] 提交并推送main，等待同源CI四项成功。
+- [x] 重建三平台和独立服务包，核对载荷，运行包内回归。
+- [x] 创建标签与Release，上传并校验附件，正式发布并核对latest。
 保留旧发行和本地1.12.6；本次使用1.12.7区分最终修改。
