@@ -103,6 +103,10 @@ export default function ProjectCenter({
   const [imported, setImported] = useState<ProjectState | null>(null),
     [history, setHistory] = useState<Snapshot[] | null>(null);
   const [health, setHealth] = useState<Record<string, Health>>({});
+  const [probing, setProbing] = useState<string[]>([]);
+  const [probeProgress, setProbeProgress] = useState<{
+    profileId: string; total: number; done: number; success: number; failed: number; skipped: number;
+  } | null>(null);
   const [storage, setStorage] = useState<ProjectStorage | null>(null),
     [storageOpen, setStorageOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]),
@@ -202,7 +206,11 @@ export default function ProjectCenter({
     setSession(auth);
     if (auth.role === "owner")
       setStorage(await projectRequest<ProjectStorage>("storage"));
-    if (auth.authenticated) setData(await projectRequest<ProjectState>("get"));
+    if (auth.authenticated) {
+      setData(await projectRequest<ProjectState>("get"));
+      setHealth({});
+      setProbeProgress(null);
+    }
     else setData(null);
   }
   useEffect(() => {
@@ -215,6 +223,7 @@ export default function ProjectCenter({
     if (profile) {
       saveProjectPreference("devkit:project-profile", profile.id);
       setHealth({});
+      setProbeProgress(null);
       setSelected([]);
       setGroup("");
     }
@@ -246,6 +255,7 @@ export default function ProjectCenter({
       current.filter((id) => saved.profiles.find(item => item.id === profile?.id)?.projects.some((item) => item.id === id)),
     );
     setHealth({});
+    setProbeProgress(null);
     setMessage(`已保存 · 版本 ${saved.revision}`);
   }
   async function refreshSnapshots() {
@@ -315,17 +325,42 @@ export default function ProjectCenter({
   function withProjects(projects: Project[]): ProjectState {
     return { ...data!, profiles: data!.profiles.map(item => item.id === profile!.id ? { ...item, projects } : item) };
   }
-  async function probe(ids: string[]) {
-    const results = await projectRequest<Health[]>("probe", {
-      profileId: profile!.id,
-      projectIds: ids,
-    });
-    setHealth((current) => ({
-      ...current,
-      ...Object.fromEntries(
-        results.map((item) => [`${profile!.id}:${item.id}`, item]),
-      ),
-    }));
+  async function probe(items: Project[]) {
+    if (!profile) return;
+    const profileId = profile.id;
+    const targets = items.filter(item => item.enabled);
+    const skipped = items.length - targets.length;
+    setProbeProgress({ profileId, total: targets.length, done: 0, success: 0, failed: 0, skipped });
+    setProbing(targets.map(item => item.id));
+    setHealth(current => Object.fromEntries(Object.entries(current).filter(([key]) =>
+      !targets.some(item => key === `${profileId}:${item.id}`))));
+    let index = 0;
+    try {
+      const outcomes = await Promise.allSettled(Array.from({ length: Math.min(3, targets.length) }, async () => {
+        while (index < targets.length) {
+          const project = targets[index++];
+          let result: Health;
+          try {
+            const results = await projectRequest<Health[]>("probe", { profileId, projectIds: [project.id] });
+            if (!results[0]) throw new Error("主机未返回检测结果。");
+            result = results[0];
+          } catch (error) {
+            // Permission/session/transport failures apply to the whole operation.
+            index = targets.length;
+            throw error;
+          }
+          setHealth(current => ({ ...current, [`${profileId}:${project.id}`]: result }));
+          setProbing(current => current.filter(id => id !== project.id));
+          setProbeProgress(current => current && ({ ...current, done: current.done + 1,
+            success: current.success + Number(result.state === "online"),
+            failed: current.failed + Number(result.state !== "online") }));
+        }
+      }));
+      const failure = outcomes.find(result => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+    } finally {
+      setProbing([]);
+    }
   }
   const grid = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLElement>(null);
@@ -609,7 +644,16 @@ export default function ProjectCenter({
             <span>
               {profile.projects.length} 个项目 · {profile.variables.length} 个变量
             </span>
+            {canProbe && <button className="secondary-button" disabled={busy || !profile.projects.length}
+              title="检测当前档案全部已启用项目，包含筛选外项目，跳过停用项目"
+              onClick={() => void action(() => probe(profile.projects))}>
+              <ShieldCheck size={15} />全部探活
+            </button>}
           </div>
+          {probeProgress?.profileId === profile.id && <div className="pc-probe-progress" role="status">
+            <span>{probing.length ? "主机探活中" : probeProgress.done === probeProgress.total ? "主机探活完成" : "主机探活中断"} · {probeProgress.done}/{probeProgress.total} · 正常 {probeProgress.success} · 异常 {probeProgress.failed} · 跳过停用 {probeProgress.skipped}</span>
+            <progress aria-label="当前档案探活进度" value={probeProgress.done} max={Math.max(1, probeProgress.total)} />
+          </div>}
           <div className="pc-metrics" aria-label="当前档案概况">
             <span>
               <CheckCircle2 size={14} />
@@ -760,27 +804,10 @@ export default function ProjectCenter({
                 <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={
                     busy ||
-                    !selectedProjects.some(
-                      (item) =>
-                        resolveProject(item, profile).enabled &&
-                        !resolveProject(item, profile).error,
-                    )
+                    !selectedProjects.length
                   }
                   onClick={() =>
-                    void action(async () => {
-                      await probe(
-                        selectedProjects
-                          .filter((item) => {
-                            const result = resolveProject(item, profile);
-                            return result.enabled && !result.error;
-                          })
-                          .slice(0, 20)
-                          .map((item) => item.id),
-                      );
-                      setMessage(
-                        "已从主机检测所选入口（最多 20 项）；状态不代表完整业务可用性。",
-                      );
-                    })
+                    void action(() => probe(selectedProjects))
                   }
                 >
                   检测所选入口
@@ -902,19 +929,26 @@ export default function ProjectCenter({
                       此地址指向访问者自己的电脑；共享服务请使用主机局域网 IP。
                     </small>
                   )}
-                  {probeResult && (
+                  {probing.includes(project.id) && <small role="status">主机检测中…</small>}
+                  {probeResult && !probing.includes(project.id) && (
                     <small
                       className={
                         probeResult.state === "online" ? "pc-ok" : "pc-invalid"
                       }
                     >
-                      {probeResult.status
+                      {probeResult.state === "online" ? "正常" : "异常"} · {probeResult.status
                         ? `HTTP ${probeResult.status}`
                         : probeResult.error}{" "}
-                      · {probeResult.elapsed} ms（主机检测）
+                      · {probeResult.elapsed} ms · {new Date(probeResult.checkedAt).toLocaleTimeString()}（主机检测）
                     </small>
                   )}
                   <div className="pc-card-actions">
+                    {canProbe && <button className="secondary-button"
+                      aria-label={`探活 ${project.name}`} disabled={busy || !project.enabled || !!result.error}
+                      title={result.error || (!project.enabled ? "项目已停用" : "由主机检测当前档案的项目入口")}
+                      onClick={() => void action(() => probe([project]))}>
+                      <ShieldCheck size={14} />{probing.includes(project.id) ? "检测中…" : "探活"}
+                    </button>}
                     <button
                       className="secondary-button"
                       disabled={!result.enabled || !!result.error}

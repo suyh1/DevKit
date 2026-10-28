@@ -62,6 +62,7 @@ export type Health = {
   status?: number;
   elapsed: number;
   error?: string;
+  checkedAt: string;
 };
 declare global {
   interface Window {

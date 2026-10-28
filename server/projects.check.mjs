@@ -531,10 +531,10 @@ test("LAN gateway authenticates, enforces viewer/editor and blocks toolkit, trav
       await store.close();
     }
   }));
-test("manual probes resolve saved projects, cap work, never follow redirects and do not alter revisions", async () =>
+test("manual probes resolve saved projects, cap batches, follow redirects and do not alter revisions", async () =>
   temporary(async (folder) => {
-    const target = http.createServer((_request, response) => {
-      response.writeHead(302, { Location: "http://127.0.0.1:1/never-follow" });
+    const target = http.createServer((request, response) => {
+      response.writeHead(request.url === "/ok" ? 200 : 302, { Location: "/ok" });
       response.end();
     });
     await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
@@ -547,7 +547,9 @@ test("manual probes resolve saved projects, cap work, never follow redirects and
         profileId: "default",
         projectIds: ["web"],
       });
-      assert.equal(results[0].status, 302);
+      assert.equal(results[0].status, 200);
+      assert.equal(results[0].state, "online");
+      assert.ok(Number.isFinite(Date.parse(results[0].checkedAt)));
       assert.equal((await store.get()).revision, 1);
       await assert.rejects(
         probeProjects(store, {
@@ -680,3 +682,88 @@ test("a failed file write retains the journal and recovers in-process before che
       await assert.rejects(access(path.join(folder, '.projects-pending.json')));
     } finally { await store.close(); }
   }));
+
+test("manual probe fallback, HTTP errors, redirects and disabled/config errors", async () => {
+  const calls = [];
+  const target = http.createServer((request, response) => {
+    calls.push(`${request.method} ${request.url}`);
+    if (request.url === '/loop') response.writeHead(302, { Location: '/loop' });
+    else if (request.url === '/unsafe') response.writeHead(302, { Location: 'file:///secret' });
+    else if (request.url === '/fallback' && request.method === 'HEAD') response.writeHead(405);
+    else if (request.url === '/fallback501' && request.method === 'HEAD') response.writeHead(501);
+    else if (request.url === '/missing') response.writeHead(404);
+    else response.writeHead(204);
+    response.end();
+  });
+  await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+  try {
+    const state = fixture(), profile = state.profiles[0];
+    profile.projects = ['fallback', 'fallback501', 'loop', 'unsafe', 'missing', 'disabled', 'invalid'].map(id => ({
+      ...project, id, code: id, query: [], enabled: id !== 'disabled',
+      url: id === 'invalid' ? 'http://{{absent}}/' : `http://127.0.0.1:${target.address().port}/${id}`,
+    }));
+    const results = await probeProjects({ get: async () => state }, { profileId: profile.id, projectIds: profile.projects.map(p => p.id) });
+    const byId = Object.fromEntries(results.map(r => [r.id, r]));
+    assert.equal(byId.fallback.state, 'online');
+    assert.equal(byId.fallback501.state, 'online');
+    assert.ok(calls.includes('GET /fallback'));
+    assert.ok(calls.includes('GET /fallback501'));
+    assert.match(byId.loop.error, /重定向超过/);
+    assert.equal(calls.filter(c => c === 'HEAD /loop').length, 6);
+    assert.match(byId.unsafe.error, /HTTP\(S\)/);
+    assert.equal(byId.missing.state, 'http-error');
+    assert.equal(byId.missing.status, 404);
+    assert.match(byId.disabled.error, /停用/);
+    assert.match(byId.invalid.error, /变量/);
+    assert.ok(!calls.some(c => /disabled|invalid/.test(c)));
+  } finally {
+    target.closeAllConnections();
+    await new Promise(resolve => target.close(resolve));
+  }
+});
+
+test("simultaneous manual probe calls share three host slots", async () => {
+  let active = 0, peak = 0;
+  const target = http.createServer((_request, response) => {
+    active++; peak = Math.max(peak, active);
+    setTimeout(() => { active--; response.writeHead(200); response.end(); }, 30);
+  });
+  await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+  try {
+    const state = fixture(), profile = state.profiles[0];
+    profile.projects = Array.from({ length: 24 }, (_, index) => ({ ...project, id: `p${index}`, code: `p${index}`, query: [], url: `http://127.0.0.1:${target.address().port}/` }));
+    const batches = await Promise.all(profile.projects.map(p => probeProjects({ get: async () => state }, { profileId: profile.id, projectIds: [p.id] })));
+    assert.equal(batches.flat().length, 24);
+    assert.ok(batches.flat().every(result => result.state === 'online'));
+    assert.equal(peak, 3);
+  } finally {
+    target.closeAllConnections();
+    await new Promise(resolve => target.close(resolve));
+  }
+});
+
+test("manual probe cancels GET bodies and bounds the whole fallback chain to five seconds", async () => {
+  const target = http.createServer((request, response) => {
+    if (request.method === 'HEAD') {
+      const send = () => { response.writeHead(405); response.end(); };
+      if (request.url === '/slow') setTimeout(send, 2800);
+      else send();
+    } else if (request.url !== '/slow') {
+      response.writeHead(200);
+      response.flushHeaders(); // Deliberately never finish the body.
+    }
+  });
+  await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+  try {
+    const state = fixture(), profile = state.profiles[0];
+    profile.projects = ['body', 'slow'].map(id => ({ ...project, id, code: id, query: [], url: `http://127.0.0.1:${target.address().port}/${id}` }));
+    const results = await probeProjects({ get: async () => state }, { profileId: profile.id, projectIds: ['body', 'slow'] });
+    assert.equal(results.find(r => r.id === 'body').state, 'online');
+    const slow = results.find(r => r.id === 'slow');
+    assert.match(slow.error, /检测超时/);
+    assert.ok(slow.elapsed >= 4500 && slow.elapsed < 7000, String(slow.elapsed));
+  } finally {
+    target.closeAllConnections();
+    await new Promise(resolve => target.close(resolve));
+  }
+});

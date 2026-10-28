@@ -478,6 +478,8 @@ app
       );
       assert.equal(fixture.calls.commands, 0);
       assert.deepEqual(errors, []);
+      await require('./project-probe-smoke.cjs')(window, fixture, output);
+      assert.deepEqual(errors, []);
       await fs.writeFile(
         path.join(output, "results.json"),
         JSON.stringify(
