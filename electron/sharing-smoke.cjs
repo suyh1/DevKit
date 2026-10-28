@@ -150,9 +150,11 @@ app
       };
       await login();
       assert.equal(
-        await js('document.querySelectorAll(".portal-theme").length'),
+        await js('document.querySelectorAll(".portal-appearance").length'),
         1,
       );
+      assert.equal(await js(`document.querySelectorAll('select[aria-label="共享页面主题风格"]').length`), 1);
+      assert.equal(await js(`document.querySelectorAll('select[aria-label="共享页面主题"]').length`), 1);
       assert.equal(
         await js('document.querySelectorAll(".portal-logout").length'),
         1,
@@ -164,7 +166,7 @@ app
         false,
       );
       await js(
-        '(()=>{const input=document.querySelector(".portal-theme select");Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(input,"dark");input.dispatchEvent(new Event("change",{bubbles:true}));})()',
+        `(()=>{const input=document.querySelector('select[aria-label="共享页面主题"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set.call(input,"dark");input.dispatchEvent(new Event("change",{bubbles:true}));})()`,
       );
       await wait('document.documentElement.dataset.theme==="dark"');
       console.log("Portal login passed; checking shared API.");
@@ -448,7 +450,7 @@ app
           1,
         );
         assert.equal(
-          await js('document.querySelectorAll(".portal-theme").length'),
+          await js('document.querySelectorAll(".portal-appearance").length'),
           1,
         );
         assert.equal(

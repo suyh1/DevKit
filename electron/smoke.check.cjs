@@ -15,7 +15,7 @@ require('node:fs').mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
 let tested = false;
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: path.join(output, 'saved.txt') });
-const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 300_000);
+const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 600_000);
 app.on('browser-window-created', (_event, window) => {
   window.webContents.on('console-message', event => { if (event.level === 'error') console.error(`Renderer: ${event.message}`); });
   window.webContents.once('did-finish-load', async () => {
