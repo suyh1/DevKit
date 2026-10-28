@@ -621,3 +621,7 @@ UI测试脚本首轮登录点击早于React更新导致选择器异常，补充�
 用户授权本次修改打包、提交、推送及发布。远端latest为1.12.4，本次升至1.12.5。找到bundled Python3.12.14，发行检查将覆盖直接Python打包路径。
 
 v1.12.5发行前：190工具测试、73项Node检查（70通过，3项真实Nginx随后显式路径补跑）、26项Nginx含真实程序全部通过；Python直接打包文档检查7项全部通过；Deb9通过/1POSIX权限按Windows跳过；Java17四份示例用已安装JBR显式javac路径编译通过。初次默认Java因PATH无javac失败，已修正调用后通过。完整桌面回归进行中。
+
+v1.12.5发行来源d078d4ef8482903061630d84d73c2fcac4b5016e已提交推送；注解标签1.12.5为79e576269902f2aa2ab6cd728508a8d0d9ee8354，解引用已通过远端核对。CI40723140286四作业全部success。源码完整桌面/API/共享和实际Windows包内项目中心/门户探活/NSIS configs保留检查通过。四包完成，verify:release通过；共同构建4b1404d8decb1514558c919b2b7ae2373f37a1a41ef35690ed9c69b829ae1f99，三平台ASAR一致4397d89427f4e3d9efda1db0ad508dea6a05475fbc19cf9e400d3e4af7541de4，README及21指南逐字节一致。草稿426896818已创建，Windows附件上传进行中，其余安装包与校验/验收附件上传完成，尚未公开发布。
+
+v1.12.5已正式发布并确认latest：https://github.com/suyh1/DevKit/releases/tag/1.12.5 。Release id426896818，来源d078d4ef8482903061630d84d73c2fcac4b5016e；CI40723140286四作业全部success。14附件发布前后逐项核对大小和SHA256均一致。Windows113383773、amd6493518150、ARM6488445886、独立ZIP651679字节。Windows上传连接吞吐较低，但持续完成，无覆盖或修改旧发行附件。未改动用户真实configs或运行中的共享服务。产物、校验和验收报告位于artifacts/release-1.12.5。本记录提交不改变已验证二进制、发行来源或标签。

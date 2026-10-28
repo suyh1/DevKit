@@ -338,9 +338,9 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - v1.12.3已作为latest发布：https://github.com/suyh1/DevKit/releases/tag/1.12.3 。14附件发布前后大小与SHA256一致；注解标签来源66e72e005da2e82fa508e0fc977780064d47edec，CI40371137218四作业全部成功。
 
 ## 2026-10-29 项目中心手动探活（用户已批准）
-- 扩展主机探活：HEAD 回退、重定向、超时与并发 — in_progress
-- 单项目、当前档案和所选项目入口，逐项进度与临时结果 — pending
-- 回归测试、界面核对、文档生成与检查 — pending
+- 扩展主机探活：HEAD 回退、重定向、超时与并发 — complete
+- 单项目、当前档案和所选项目入口，逐项进度与临时结果 — complete
+- 回归测试、界面核对、文档生成与检查 — complete
 仅手动触发；无自动任务、持久化历史、提交或发行。
 
 ## 2026-10-29 手动探活完成
@@ -349,6 +349,6 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - 结果仅页面内存，无自动任务、历史存储、提交或发行。
 
 ## v1.12.5 手动探活发行（2026-10-29 用户已授权）
-- 版本更新、发行检查、提交推送 — in_progress
-- 制作三平台与独立服务包并验证载荷 — pending
-- 等待CI、发布正式版并核对远端附件 — pending
+- 版本更新、发行检查、提交推送 — complete
+- 制作三平台与独立服务包并验证载荷 — complete
+- 等待CI、发布正式版并核对远端附件 — complete
