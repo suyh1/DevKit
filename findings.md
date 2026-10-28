@@ -285,3 +285,16 @@ v1.11.0发行完成：共同构建87fe6e8224d220ec9795818c1b9ce6bb540c47d4b82aed
 已核对现有 probeProjects、IPC、HTTP 授权与界面：既有 HEAD/4秒/并发3/单批20项目，界面只支持勾选检测且截断20项。批准方案保留单次请求上限，通过前端三个工作线程逐项请求覆盖整档案并即时展示进度；服务端统一限制并发3。参考先前检索的 Uptime Kuma（MIT）及 Gatus（Apache-2.0），只借鉴设计，无新增依赖或代码复制。
 
 v1.12.5发行完成：三平台和独立Node服务已发布，14附件远端大小/SHA256全部匹配，latest状态确认；同源CI四作业全部成功。发行地址：https://github.com/suyh1/DevKit/releases/tag/1.12.5 。
+
+## 2026-10-29 调研
+- 项目中心所选操作栏缺少删除；复用 confirmation 的 fresh base、persist 版本检查和主机自动备份。
+- StyleKit 风格参考：https://www.stylekit.top/zh/styles 。采用极简扁平、自然有机、编辑杂志、新野兽派；自行实现配色和组件表现。
+- 对比 MIT 项目 daisyUI（42.7k stars，CSS 语义变量与 data-theme）与 shadcn/ui（126.8k stars，语义变量和独立 dark 模式）。二者引入都需 Tailwind/组件迁移，本项目已有 CSS token，无需新增依赖。采用风格与模式分离，避免替换现有 data-theme=dark 影响编辑器和浮层。已知风险是硬编码色与局部覆盖，须视觉检查。
+- ui-ux-pro-max 已运行 design-system。保留现有高密度工具布局，不采用其落地页单列推荐；使用对比度、焦点和减少动态规则。
+- 环境 python 命令无运行时，改用 bundled Python；早期泛读有路径不存在，改用已确认文件。
+
+## 2026-10-29 主题扩展与操作栏
+- 用户截图反映操作栏仅删除带图标，而且inline SVG参与文字基线导致垂直不齐。优先统一为Lucide图标+显式文字槽，flex垂直居中，检查MotionButton内部包装。
+- 本轮参考StyleKit visual筛选页；该URL网页工具报不可访问，已读同站完整风格目录确认柔和界面、macOS毛玻璃、现代渐变、复古怀旧四种视觉风格。保留既有五套，加到九套。
+- 沿用已比较的MIT开源daisyUI/shadcn语义主题设计，无需引入新库；新增风格将包含形状/表面/光影变化，控制透明表面文字对比。
+- ui-ux-pro-max design-system已运行，继续保持工具布局与本地字体。

@@ -128,6 +128,52 @@ module.exports = async function designSmoke(window, output) {
   await wait('!!document.querySelector(".overview-workspace:not([hidden]) .home-bento")');
   await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
   window.setSize(...size); window.setMinimumSize(...minimum);
+  window.setMinimumSize(360, 600);
+  // Use the actual preference controls; check all style/brightness pairs and persistence.
+  await js(`document.querySelector('.sidebar button[title="设置"]').click()`);
+  await wait('!!document.querySelector(".settings-page .theme-picker")');
+  await settle();
+  for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
+    await js(`document.querySelector('input[name="theme-style"][value="${style}"]').click()`);
+    for (const mode of ['light', 'dark']) {
+      await js(`{ const select = document.querySelector('.settings-page select[aria-label="明暗模式"]'); select.value = '${mode}'; select.dispatchEvent(new Event('change', { bubbles: true })); }`);
+      await wait(`document.documentElement.dataset.themeStyle === '${style}' && document.documentElement.dataset.theme === '${mode}'`);
+      for (const width of [1440, 768, 375]) {
+        window.setContentSize(width, 1000); await settle();
+        const appearance = await js(`(() => {
+          const section = document.querySelector('.theme-picker');
+          const styles = getComputedStyle(document.documentElement);
+          return { overflow: document.documentElement.scrollWidth > innerWidth || section.scrollWidth > section.clientWidth + 1,
+            background: styles.getPropertyValue('--bg').trim(), text: styles.getPropertyValue('--text').trim(),
+            heroImage: getComputedStyle(document.querySelector('.welcome-card')).backgroundImage,
+            panelRadius: getComputedStyle(document.querySelector('.settings-section')).borderRadius,
+            panelBlur: getComputedStyle(document.querySelector('.settings-section')).backdropFilter,
+            heroBorder: getComputedStyle(document.querySelector('.welcome-card')).borderTopStyle,
+            saved: JSON.parse(localStorage.getItem('devkit:preferences')) };
+        })()`);
+        assert.equal(appearance.overflow, false, `${style}/${mode}/${width} fits`);
+        assert.equal(appearance.saved.themeStyle, style);
+        assert.equal(appearance.saved.theme, mode);
+        if (style === 'soft') assert.equal(appearance.panelRadius, '22px');
+        if (style === 'glass') assert.ok(appearance.panelBlur.includes('blur(24px)'));
+        if (style === 'gradient') assert.ok(appearance.heroImage.includes('linear-gradient'), 'gradient hero must render in both modes');
+        if (style === 'retro') assert.equal(appearance.heroBorder, 'double');
+        const rgb = hex => hex.match(/[a-f0-9]{2}/gi).map(c => parseInt(c, 16) / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+        const lum = hex => rgb(hex).reduce((sum, c, index) => sum + c * [.2126, .7152, .0722][index], 0);
+        const a = lum(appearance.background), b = lum(appearance.text);
+        assert.ok((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 4.5, `${style}/${mode} contrast`);
+        if (width === 1440) await fs.writeFile(path.join(output, `design-theme-${style}-${mode}.png`), (await window.webContents.capturePage()).toPNG());
+      }
+      window.setContentSize(1440, 1000);
+      await js(`document.querySelector('.floating-nav-links button[aria-label="工作空间"]').click()`);
+      await settle();
+      await fs.writeFile(path.join(output, `design-home-${style}-${mode}.png`), (await window.webContents.capturePage()).toPNG());
+      await js(`document.querySelector('.sidebar button[title="设置"]').click()`);
+      await settle();
+    }
+  }
+  await js(`document.querySelector('input[name="theme-style"][value="default"]').click()`);
+  window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'design-report.json'), JSON.stringify(report, null, 2));
   console.log('Design smoke passed: graphite palette, semantic success, editor, projects, responsive themes, navigation, keyboard and reduced motion.');
 };

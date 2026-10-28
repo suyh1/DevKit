@@ -24,6 +24,8 @@ import {
   List,
   MoreHorizontal,
   CheckCircle2,
+  Power,
+  PowerOff,
   AlertCircle,
   ChevronDown,
 } from "lucide-react";
@@ -781,7 +783,7 @@ export default function ProjectCenter({
                 : ""}
             </span>
             {selected.length > 0 && (
-              <button onClick={() => setSelected([])}>清除选择</button>
+              <button onClick={() => setSelected([])}><X size={14} aria-hidden="true" /><span>清除选择</span></button>
             )}
             {canEdit && (
               <>
@@ -789,14 +791,34 @@ export default function ProjectCenter({
                   disabled={busy || !selectedProjects.length}
                   onClick={() => void action(() => setEnabled(true))}
                 >
-                  启用所选
+                  <Power size={14} aria-hidden="true" />启用所选
                 </MotionButton>
                 <MotionButton outcome={error ? "error" : ""} busy={busy}
                   disabled={busy || !selectedProjects.length}
                   onClick={() => void action(() => setEnabled(false))}
                 >
-                  停用所选
+                  <PowerOff size={14} aria-hidden="true" />停用所选
                 </MotionButton>
+                <MotionButton outcome={error ? "error" : ""} busy={busy}
+                  className="pc-invalid"
+                  disabled={busy || !selectedProjects.length}
+                  onClick={() => {
+                    if (!profile || !selectedProjects.length) return;
+                    const profileId = profile.id;
+                    const ids = new Set(selectedProjects.map(item => item.id));
+                    const names = selectedProjects.map(item => item.name).join("、");
+                    const hidden = selectedProjects.filter(item => !projects.some(visible => visible.id === item.id)).length;
+                    setConfirmation({
+                      title: `删除所选 ${ids.size} 个项目？`,
+                      description: `将从档案“${profile.name}”删除：${names}。${hidden ? `包含 ${hidden} 个筛选外的已勾选项目。` : ""}删除前自动备份，可在“备份与恢复”中找回；其他档案不受影响。`,
+                      run: async base => {
+                        await persist({ ...base, profiles: base.profiles.map(item => item.id === profileId ? {
+                          ...item, projects: item.projects.filter(project => !ids.has(project.id)),
+                        } : item) }, base.revision);
+                      },
+                    });
+                  }}
+                ><Trash2 size={14} aria-hidden="true" />删除所选</MotionButton>
 
               </>
             )}
@@ -810,7 +832,7 @@ export default function ProjectCenter({
                     void action(() => probe(selectedProjects))
                   }
                 >
-                  检测所选入口
+                  <ShieldCheck size={14} aria-hidden="true" />检测所选入口
                 </MotionButton>
             )}
             <button
@@ -826,7 +848,7 @@ export default function ProjectCenter({
                 )
               }
             >
-              {selectedProjects.length ? "复制所选清单" : "复制当前清单"}
+              <Copy size={14} aria-hidden="true" /><span>{selectedProjects.length ? "复制所选清单" : "复制当前清单"}</span>
             </button>
           </div>
           {!projects.length && (

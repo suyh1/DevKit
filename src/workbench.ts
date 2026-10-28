@@ -1,3 +1,5 @@
+import { normalizeThemeStyle } from './themes';
+import type { ThemeStyle } from './themes';
 import { defaultOptions, tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { validateGeoOptions } from './geo-config';
@@ -8,10 +10,10 @@ export type Task = {
   error: string; elapsed: number | null; status: TaskStatus; fileName?: string; encoding?: string;
 };
 export type Preferences = {
-  theme: 'system' | 'light' | 'dark'; fontSize: number; indent: '2' | '4'; wrap: boolean;
+  themeStyle: ThemeStyle; theme: 'system' | 'light' | 'dark'; fontSize: number; indent: '2' | '4'; wrap: boolean;
   layout: 'split' | 'stack'; density: 'comfortable' | 'compact'; library: 'grid' | 'list'; startup: ToolId | 'home';
 };
-export const defaultPreferences: Preferences = { theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home' };
+export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home' };
 export const MAX_TASKS = 12;
 export function isToolId(value: unknown): value is ToolId { return tools.some(tool => tool.id === value); }
 export function normalizeToolId(value: unknown): ToolId | undefined {
@@ -42,7 +44,7 @@ export function validatePreferences(value: unknown): Preferences {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const choose = <Key extends keyof Preferences>(key: Key, values: readonly Preferences[Key][]): Preferences[Key] => values.includes(source[key] as Preferences[Key]) ? source[key] as Preferences[Key] : defaultPreferences[key];
   return {
-    theme: choose('theme', ['system', 'light', 'dark']), fontSize: choose('fontSize', [12, 13, 14, 15, 16, 17, 18]),
+    themeStyle: normalizeThemeStyle(source.themeStyle), theme: choose('theme', ['system', 'light', 'dark']), fontSize: choose('fontSize', [12, 13, 14, 15, 16, 17, 18]),
     indent: choose('indent', ['2', '4']), wrap: choose('wrap', [true, false]), layout: choose('layout', ['split', 'stack']),
     density: choose('density', ['comfortable', 'compact']), library: choose('library', ['grid', 'list']),
     startup: normalizeToolId(source.startup) ?? 'home',

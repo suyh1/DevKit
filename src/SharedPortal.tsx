@@ -1,3 +1,4 @@
+import { themeStyles, normalizeThemeStyle } from './themes';
 import {
   useCallback,
   useEffect,
@@ -57,6 +58,11 @@ function remember(key: string, value: string) {
 }
 
 function PortalTheme() {
+  const [themeStyle, setThemeStyle] = useState(() => normalizeThemeStyle(preference("devkit:portal-theme-style", "default")));
+  useEffect(() => {
+    document.documentElement.dataset.themeStyle = themeStyle;
+    remember("devkit:portal-theme-style", themeStyle);
+  }, [themeStyle]);
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = preference("devkit:portal-theme", "system");
     return ["system", "light", "dark"].includes(saved)
@@ -75,7 +81,14 @@ function PortalTheme() {
     return () => media.removeEventListener("change", apply);
   }, [theme]);
   return (
-    <label className="portal-theme">
+    <div className="portal-appearance">
+      <label className="portal-theme">
+        <span className="sr-only">主题风格</span>
+        <select aria-label="共享页面主题风格" value={themeStyle} onChange={event => setThemeStyle(normalizeThemeStyle(event.target.value))}>
+          {themeStyles.map(style => <option key={style.id} value={style.id}>{style.name}</option>)}
+        </select>
+      </label>
+      <label className="portal-theme">
       <SunMoon size={16} aria-hidden="true" />
       <select
         aria-label="共享页面主题"
@@ -86,7 +99,8 @@ function PortalTheme() {
         <option value="light">浅色主题</option>
         <option value="dark">深色主题</option>
       </select>
-    </label>
+      </label>
+    </div>
   );
 }
 

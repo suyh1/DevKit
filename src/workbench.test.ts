@@ -61,6 +61,16 @@ describe('workbench workflows', () => {
     fixture.tasks = Array.from({ length: 13 }, () => ({ ...createTask('json') }));
     expect(() => importWorkspace(JSON.stringify(fixture))).toThrow();
   });
+  it('migrates old appearance settings and preserves paired style and brightness on import', () => {
+    expect(validatePreferences({ theme: 'dark' }).themeStyle).toBe('default');
+    expect(validatePreferences({ themeStyle: 'unknown', theme: 'light' }).themeStyle).toBe('default');
+    for (const themeStyle of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
+      for (const theme of ['light', 'dark', 'system']) {
+        const imported = validatePreferences(JSON.parse(JSON.stringify({ themeStyle, theme })));
+        expect(imported).toMatchObject({ themeStyle, theme });
+      }
+    }
+  });
   it('validates corrupted preferences rather than trusting local storage', () => {
     const prefs = validatePreferences({ theme: 'invalid', fontSize: 2000, indent: '4', wrap: 'false', startup: 'missing' });
     expect(prefs.theme).toBe('system'); expect(prefs.fontSize).toBe(13);

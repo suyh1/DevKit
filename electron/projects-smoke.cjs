@@ -7,7 +7,7 @@ const { BrowserWindow } = require("electron");
 module.exports = async function checkProjects(window, output, staging) {
   window.webContents.setBackgroundThrottling(false);
   window.show();
-  const js = (source) => window.webContents.executeJavaScript(source);
+  const js = async (source) => { try { return await window.webContents.executeJavaScript(source); } catch (error) { console.error("Failed project UI script:", source); throw error; } };
   const wait = async (contents, expression) => {
     for (let index = 0; index < 100; index++) {
       if (await contents.executeJavaScript(expression)) return;
@@ -128,6 +128,81 @@ module.exports = async function checkProjects(window, output, staging) {
   await js(`document.querySelector('button[aria-label="删除 待删除项目"]').click()`);
   await click('确认删除'); await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelectorAll(".pc-card").length === 1');
   assert.equal((await ipc('get')).profiles[0].projects.length, 1);
+  // Batch deletion includes filtered selections, keeps other profiles and backs up once.
+  const beforeBatch = await ipc('get');
+  const batchState = structuredClone(beforeBatch);
+  const template = batchState.profiles[1].projects[0];
+  batchState.profiles[1].projects.push(...['batch-a', 'batch-b'].map((id, index) => ({ ...template, id, code: id, name: `批量项目${index + 1}` })));
+  batchState.profiles[0].projects.push({ ...template, id: 'batch-a', code: 'batch-a', name: '其他档案同ID' });
+  await ipc('save', { data: batchState, revision: batchState.revision });
+  await click('刷新');
+  await wait(window.webContents, 'document.querySelectorAll(".pc-card").length === 3');
+  assert.equal(await js('[...document.querySelectorAll(".pc-bulk button")].find(b => b.textContent.includes("删除所选")).disabled'), true);
+  const originalMinimum = window.getMinimumSize();
+  window.setMinimumSize(360, 600);
+  async function checkBulkAlignment(state) {
+    for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
+      for (const mode of ['light', 'dark']) {
+        await js(`document.documentElement.dataset.themeStyle = '${style}'; document.documentElement.dataset.theme = '${mode}'`);
+        for (const width of [1440, 768, 375]) {
+          window.setContentSize(width, 1000);
+          await js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+          const geometry = await js(`(() => {
+            const bar = document.querySelector('.project-workspace .pc-bulk');
+            return { overflow: bar.scrollWidth > bar.clientWidth + 1, buttons: [...bar.querySelectorAll('button')].map(button => {
+              const icon = button.querySelector('.motion-original-glyph svg, :scope > svg');
+              const label = button.querySelector('.motion-label-slot') || button.querySelector('span');
+              const i = icon?.getBoundingClientRect(), t = label?.getBoundingClientRect();
+              return { name: button.textContent.trim(), icon: !!icon, gap: i && t ? t.x - i.right : 999, delta: i && t ? Math.abs(i.y + i.height / 2 - t.y - t.height / 2) : 999 };
+            }) };
+          })()`);
+          assert.equal(geometry.overflow, false, `${style}/${mode}/${width}/${state} bulk fits`);
+          for (const button of geometry.buttons) {
+            assert.equal(button.icon, true, `${button.name} has icon`);
+            assert.ok(Math.abs(button.gap - 6) <= .5, `${button.name} has consistent 6px gap: ${button.gap}`);
+            assert.ok(button.delta <= 1, `${button.name} vertically centered: ${button.delta}`);
+          }
+          if (state === 'selected' && style === 'default' && [1440, 375].includes(width)) {
+            await js(`document.querySelector('.pc-bulk').scrollIntoView({ block: 'center' })`);
+            await js('new Promise(resolve => setTimeout(resolve, 200))');
+            await fs.writeFile(path.join(output, `projects-bulk-${mode}-${width}.png`), (await window.webContents.capturePage()).toPNG());
+          }
+        }
+      }
+    }
+    await js(`document.documentElement.dataset.themeStyle = 'default'; document.documentElement.dataset.theme = 'dark'`);
+    window.setContentSize(1440, 1000);
+  }
+  await checkBulkAlignment('disabled');
+
+  await js(`[...document.querySelectorAll('.pc-card')].filter(card => card.textContent.includes('批量项目')).forEach(card => card.querySelector('input[type=checkbox]').click())`);
+  await wait(window.webContents, 'document.querySelector(".pc-bulk").textContent.includes("已选 2 项")');
+  await checkBulkAlignment('selected');
+  window.setMinimumSize(...originalMinimum);
+  await js(`{ const input = document.querySelector('.pc-search input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '批量项目1'); input.dispatchEvent(new Event('input', { bubbles: true })); }`);
+  await wait(window.webContents, 'document.querySelectorAll(".pc-card").length === 1');
+  await click('删除所选');
+  await wait(window.webContents, 'document.querySelector("dialog[open]")?.textContent.includes("包含 1 个筛选外")');
+  const batchRevision = (await ipc('get')).revision;
+  await click('取消');
+  await wait(window.webContents, '!document.querySelector("dialog[open]")');
+  assert.equal((await ipc('get')).revision, batchRevision, 'cancel does not save');
+  const snapshotsBefore = await ipc('snapshots');
+  await click('删除所选');
+  await wait(window.webContents, 'document.querySelector("dialog[open]")?.textContent.includes("包含 1 个筛选外")');
+  await js('new Promise(resolve => setTimeout(resolve, 250))');
+  await fs.writeFile(path.join(output, 'preview-project-batch-delete.png'), (await window.webContents.capturePage()).toPNG());
+  await click('确认删除');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-bulk").textContent.includes("已选 0 项")');
+  const afterBatch = await ipc('get');
+  assert.equal(afterBatch.revision, batchRevision + 1, 'one atomic save');
+  assert.equal(afterBatch.profiles[1].projects.length, 1);
+  assert.equal(afterBatch.profiles[0].projects.some(project => project.id === 'batch-a'), true);
+  const snapshotsAfter = await ipc('snapshots');
+  assert.notEqual(snapshotsAfter[0].id, snapshotsBefore[0]?.id, 'automatic backup created');
+  await js(`{ const input = document.querySelector('.pc-search input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ''); input.dispatchEvent(new Event('input', { bubbles: true })); }`);
+  await ipc('save', { data: beforeBatch, revision: afterBatch.revision });
+  await click('刷新');
   const saved = await ipc("get");
   assert.equal(saved.profiles[1].projects.length, 1);
   assert.equal(saved.profiles.length, 2);

@@ -292,6 +292,17 @@ app
       key("End");
       key("Return");
       await wait('document.documentElement.dataset.theme==="dark"');
+      // Shared portal uses the same paired styles, stored only in this browser.
+      for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
+        for (const mode of ['light', 'dark']) {
+          await js(`{ const style = document.querySelector('select[aria-label="共享页面主题风格"]'); style.value = '${style}'; style.dispatchEvent(new Event('change', { bubbles: true })); const mode = document.querySelector('select[aria-label="共享页面主题"]'); mode.value = '${mode}'; mode.dispatchEvent(new Event('change', { bubbles: true })); }`);
+          await wait(`document.documentElement.dataset.themeStyle === '${style}' && document.documentElement.dataset.theme === '${mode}'`);
+          assert.equal(await js('localStorage.getItem("devkit:portal-theme-style")'), style);
+          window.setContentSize(390, 844); await delay(160);
+          assert.equal(await js('document.documentElement.scrollWidth <= innerWidth'), true, `${style}/${mode} mobile portal fits`);
+        }
+      }
+      await js(`{ const select = document.querySelector('select[aria-label="共享页面主题风格"]'); select.value = 'default'; select.dispatchEvent(new Event('change', { bubbles: true })); }`);
       for (const [width, height, zoom] of [
         [1920, 1080, 1],
         [1366, 768, 1.25],

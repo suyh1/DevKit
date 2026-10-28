@@ -128,7 +128,7 @@ function Workbench() {
   }
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const update = () => { document.documentElement.dataset.theme = preferences.theme === 'system' ? media.matches ? 'dark' : 'light' : preferences.theme; };
+    const update = () => { document.documentElement.dataset.themeStyle = preferences.themeStyle; document.documentElement.dataset.theme = preferences.theme === 'system' ? media.matches ? 'dark' : 'light' : preferences.theme; };
     update(); media.addEventListener('change', update);
     try { localStorage.setItem('devkit:preferences', JSON.stringify(preferences)); } catch { notice('偏好设置无法持久保存；本次会话仍然生效。'); }
     return () => media.removeEventListener('change', update);

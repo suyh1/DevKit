@@ -655,8 +655,19 @@ body:has(.pc-login) {
   margin-right: auto;
 }
 .pc-bulk button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 30px;
+  padding: 4px 6px;
+  line-height: 20px;
+  white-space: nowrap;
 }
+.pc-bulk button > svg { display: block; flex: none; width: 14px; height: 14px; }
+.pc-bulk .motion-glyph-slot, .pc-bulk .motion-glyph-slot > svg { width: 14px; height: 14px; }
+.pc-bulk .motion-original-glyph { display: flex; align-items: center; justify-content: center; }
+.pc-bulk .pc-invalid:hover:not(:disabled) { color: var(--error); }
 .pc-select-all,
 .pc-card-select {
   display: inline-flex;
