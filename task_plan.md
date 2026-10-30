@@ -385,5 +385,5 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 
 ## 2026-10-30 发行 1.12.8
 - 用户授权：打包、提交、推送、发布。
-- 版本/检查与四包制作 — in_progress
-- 提交推送、同源 CI、附件校验与发布 — pending
+- 版本/检查与四包制作 — complete
+- 提交推送、同源 CI、附件校验与发布 — complete

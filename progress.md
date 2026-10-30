@@ -695,3 +695,5 @@ v1.12.7正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.7 
 - 完成：原生 manual popover 顶层修复；九套主题×深浅18组顶层/四角中心命中与定位、42组分类几何以及完整键盘/焦点/外部点击/窄屏导航回归通过。Windows毛玻璃截图已核对。构建通过，docs:update、test:docs和docs:check通过（文档测试6通过、Python环境项1跳过）。安装包未重建，未提交/推送。
 - 开始1.12.8发行：远端main一致，latest1.12.7，无同版本草稿。已确认GitHub权限，打包TEMP/TMP使用D盘。
 - 1.12.8生产构建、191项单测、7项文档、桌面策略及发行/服务回归通过。Windows安装包已制作，Linux和独立服务继续制作；包内完整Electron回归中。提交源码以启动同源CI，最终发布等待四项CI和本地包验证。
+- 四包已制作并核对大小、SHA256和共同构建e2fe323cff8991f03baa3c1f49e03c7481b0be9541e540f336f515f0cd721154；DEB实际载荷与ZIP资源逐字节匹配，ZIP解压启动通过。包内完整Electron、API、门户及NSIS配置保留通过；Nginx26项含真实实例均通过。源码d590f1a与1.12.8标签已推送；CI41056589098三个非Windows作业成功，Windows后续检查中，草稿429015519附件上传并逐个核验。
+- 1.12.8正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.8 。源码及注解标签解引用d590f1afd46e0333114b6120732863bc55117484；CI41056589098四项作业全部success。Release429015519，latest与按标签查询确认，14附件发布前后大小/SHA256全部匹配。Windows113387762、amd6493525026、ARM6488424982、独立ZIP657168字节。发行资料与包内回归日志位于artifacts/release-1.12.8。本次记录提交仅更新规划资料，不改变发行源码或标签。
