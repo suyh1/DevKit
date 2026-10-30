@@ -697,3 +697,27 @@ v1.12.7正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.7 
 - 1.12.8生产构建、191项单测、7项文档、桌面策略及发行/服务回归通过。Windows安装包已制作，Linux和独立服务继续制作；包内完整Electron回归中。提交源码以启动同源CI，最终发布等待四项CI和本地包验证。
 - 四包已制作并核对大小、SHA256和共同构建e2fe323cff8991f03baa3c1f49e03c7481b0be9541e540f336f515f0cd721154；DEB实际载荷与ZIP资源逐字节匹配，ZIP解压启动通过。包内完整Electron、API、门户及NSIS配置保留通过；Nginx26项含真实实例均通过。源码d590f1a与1.12.8标签已推送；CI41056589098三个非Windows作业成功，Windows后续检查中，草稿429015519附件上传并逐个核验。
 - 1.12.8正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.8 。源码及注解标签解引用d590f1afd46e0333114b6120732863bc55117484；CI41056589098四项作业全部success。Release429015519，latest与按标签查询确认，14附件发布前后大小/SHA256全部匹配。Windows113387762、amd6493525026、ARM6488424982、独立ZIP657168字节。发行资料与包内回归日志位于artifacts/release-1.12.8。本次记录提交仅更新规划资料，不改变发行源码或标签。
+
+## 2026-10-30 JAR 管理
+- 已读脚本、导航注册表、Electron IPC和现有Nginx运行管理。项目规划文件沿用追加。读取时两处猜测文件名不存在，已通过rg定位真实模块。
+
+- 实现server/jar-process.mjs、jar-manager.mjs及JAR桌面IPC/列表/表单/监视和日志。无新增依赖。
+- npm run test:jar 8通过（包括真实JDK21），npm test 191通过，构建通过；docs:update、test:docs通过（6通过，1因Python不可用跳过），docs:check通过。
+- 首轮真实测试因CIM中文编码误判导致测试JVM未被核实停止；已按精确测试PID和命令路径核对后清理这两个测试进程，并修复UTF-8。启动秒退旧stopped记录错误已修复。
+
+- 最终验证：真实JAR 8/8、JAR桌面端回归通过，191项单测通过，桌面策略4/4、Nginx23通过（3项真实nginx用例未配置而跳过）、发行完整性2/2。构建及README生成/检查通过，文档6通过1跳过。
+- 状态刷新错误与操作反馈分别保存，防止轮询清除启动失败信息；停止等待计入进程查询耗时。已同步README模板、专题指南和Linux/Windows CI测试入口。Windows实测通过，Linux未有实机环境；未打包、提交或发布。
+
+## JAR 运行保障扩展
+- 已实现独立守护、HTTP/TCP健康状态、大小/天数/数量轮转、公共及环境档案变量、指数退避与上限，以及Windows任务计划和Linux用户systemd两种自启。
+- 扩展设置表单与列表健康/重试显示，自启独立弹窗，启动/停止支持后台重试取消；真实Electron RUN_AS_NODE守护的启动日志与停止已通过。
+- 服务测试16通过，1项实际系统任务注册为可选；已单独运行Windows登录任务真实注册/移除通过。首次补丁把status块定位到注册表try内导致ReferenceError，已定位修复并通过原生命周期回归。
+
+- 最终：运行保障16项通过（含真实JAR守护/轮转/健康/档案/重试），可选系统任务单独执行3项通过：登录模式真实注册/查询/移除，开机模式由OS拒绝权限并确认中文错误呈现与残留清理，不宣称开机注册成功。Linux命令/生命周期用注入运行器覆盖，未有Linux实机。
+- Electron JAR回归已覆盖新设置保存、自启状态弹窗、真实Electron Node模式守护启动/日志/停止；191工具单测、4桌面策略、构建、docs:update/test:docs/docs:check通过（文档Python项跳过）。
+- 修复Windows安全模块不可自动加载时Set-Acl失败，改用.NET File.SetAccessControl并验证ACL；PowerShell显式正常退出避免不存在任务误报，清理CLIXML进度内容，查询仅忽略ObjectNotFound，不掩盖权限错误。临时自启任务全部移除。未打包、提交或发布。
+
+## 2026-10-30 发行1.13.0
+- 用户授权打包、提交、推送、发布；版本从1.12.8升为1.13.0，保留旧发行目录。
+- docs:update、7项文档检查（使用bundled Python）、191工具单测、桌面策略、发行完整性、项目、真实Nginx、JAR运行保障、HTTP和Java生成编译检查通过；Debian打包10项含1跳过、生产构建通过。
+- 已确认远端main与本地基线一致，latest1.12.8且无1.13.0发行；本轮TEMP/TMP仅指向D盘任务目录。三平台打包中。

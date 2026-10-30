@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('devkitProjects', {
 contextBridge.exposeInMainWorld('devkitNginx', {
   request: (action, payload) => ipcRenderer.invoke('devkit:nginx', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitJar', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:jar', action, payload),
+});
 contextBridge.exposeInMainWorld('devkitHttp', {
   request: (action, payload) => ipcRenderer.invoke('devkit:http', action, payload),
 });

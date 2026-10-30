@@ -5,11 +5,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、Nginx 配置与实例管理、接口设计、文档与调试一体化工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.12.8**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。
+当前版本：**v1.13.0**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。项目中心共享、手动入口检测和显式发送的 HTTP 调试请求会按用户操作使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.12.8_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.12.8/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.13.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.13.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，使用顶部工具栏的“局域网共享”统一开放模块和设置权限。
 4. 需要维护本机 Nginx 时，打开与项目中心平级的“Nginx 配置”，登记主文件、附属文件、运行目录与 nginx 程序。默认按字段编辑，也可切换全文；保存后检查配置，再启动或重载。
@@ -126,6 +126,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | HTTP 调试 | 工作台 | 可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。 |
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
 | Nginx 配置 | 工作台 | 从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 主机 Nginx，支持局域网远程填写主机实例与路径、编辑配置、查看日志与授权运行操作。 |
+| JAR 管理 | 工作台 | Windows / Linux 本机 Java 应用列表，支持 Java 检测、启动/停止/重启、进程与 CPU/内存监视、HTTP/TCP 健康检查、同目录日志轮转、环境档案、崩溃退避重启和系统自启。 |
 
 ### 经纬度处理
 
@@ -180,6 +181,16 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 接口工作台采用本项目原生组件与主题。方案调研、支持边界见 [API 工作台设计](docs/api-workspace-design.md)，本次新增依赖的许可证见 [API 第三方声明](docs/api-third-party-notices.md)。
 
+## JAR 管理
+
+与“Nginx 配置”平级的本机应用列表，支持 Windows / Linux 选择 JAR、自动获取目录与文件名、自定义显示名称、检测 Java 或指定每个应用的 Java 路径。可填写 JVM / 应用参数及公共环境变量，维护开发、测试、生产等档案并选择启动环境；档案覆盖公共变量，不修改系统环境。启动、停止、重启时校验进程身份，列表显示运行时间、PID、工作集 / RSS 内存及采样 CPU，默认每 5 秒刷新。
+
+PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可改为脚本的 `app.pid` / `app.log`；多应用禁止文件冲突。独立守护接收标准输出和错误，默认按 10 MB 轮转、归档保留 7 天且最多 10 份；仅清理本工具生成的归档。支持静默模式及最近 128 KB 日志定时查看。Linux 先 TERM 等待退出，超时可单独强制终止；Windows 终止无法保证 Java 关闭钩子执行。
+
+可配置 HTTP(S) 预期状态码或 TCP 连接检查、检测间隔、超时、启动宽限与连续失败阈值，单独展示业务健康，不把进程存活当作就绪；健康失败不自动重启。崩溃自动重启默认关闭，启用后按指数退避、次数上限和稳定时间重置执行，手动停止取消重试，正常退出不拉起。退出 DevKit 后守护仍继续健康检测、轮转与重试。
+
+“系统自启”支持 Windows 任务计划的当前用户登录 / 开机触发，以及 Linux systemd 图形会话登录 / 开机 linger；安装后显示系统实际状态，错误不伪装成成功。安装自启不立即运行，关闭自启不停止现有进程。开机模式可能要求系统权限，Linux 关闭单个应用自启不关闭其他用户服务使用的 linger。注册表保存在 `configs/jar/instances.json`（以实际配置目录为准），不开放局域网共享。Java 安装、旧脚本迁移、守护生命周期和平台限制见 [JAR 管理说明](docs/jar-manager.md)。
+
 ## 项目中心
 
 项目中心按独立档案维护不同方案的项目入口，桌面与局域网网页共用同一份主机数据。
@@ -206,7 +217,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.12.8_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.13.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -238,13 +249,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.12.8_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.12.8-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.12.8-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.13.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.13.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.13.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.12.8/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.12.8/DevKit_ProjectCenter_1.12.8_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.13.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.13.0/DevKit_ProjectCenter_1.13.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

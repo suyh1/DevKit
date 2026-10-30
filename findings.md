@@ -306,3 +306,22 @@ v1.12.7已发布为latest，包含九套深浅主题、项目中心批量删除�
 - 计划：修复 → 九套主题命中测试及现有导航回归 → 文档与构建检查。
 - 确认根因条件：玻璃主题为侧栏添加backdrop-filter，原fixed浮层嵌套其中；CSS层叠/包含块影响子层级。Linux另有禁用硬件加速分支，因此平台渲染路径不同；尚未在Linux实机复现，不将CPU架构断定为原因。
 - 1.12.8正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.8 。源码及注解标签解引用d590f1afd46e0333114b6120732863bc55117484；CI41056589098四项作业全部success。Release429015519，latest与按标签查询确认，14附件发布前后大小/SHA256全部匹配。Windows113387762、amd6493525026、ARM6488424982、独立ZIP657168字节。发行资料与包内回归日志位于artifacts/release-1.12.8。本次记录提交仅更新规划资料，不改变发行源码或标签。
+
+## 2026-10-30 JAR 管理调研
+- manage.sh仅依据PID存活判断，固定app.pid/app.log会在同目录多实例冲突；file模式会截断旧日志，silent丢弃输出。
+- 对比Jpom（GitHub约1.9k stars，MulanPSL2，Java服务/agent，有跨平台脚本）和PM2（约43.3k，AGPL-3.0，Node守护进程，跨平台进程/日志管理）。参考显式进程注册、独立参数、状态与就绪分离；不复制代码、不新增依赖。参考https://github.com/dromara/Jpom 和 https://github.com/Unitech/pm2 。PM2 issue 3672提醒环境变量刷新语义需明确；Jpom脚本文档提示Windows需从日志判断启动。
+- 本轮使用现有Electron IPC管理本机JAR；未要求远程共享，不扩张共享权限。Linux /proc与Windows CIM核对Java路径、-jar参数和创建标识，避免PID复用误杀。
+
+- 实测Java通过Node进程PATH找到D盘JDK21；PowerShell命令发现与Node环境不同，因此不依赖Get-Command判断是否安装Java。CIM默认输出编码导致中文路径失真，已显式UTF-8并由真实JAR测试覆盖。快速退出沿用旧stopped元数据问题已修复。WSL未安装，Linux实机测试不可用。
+- 真实Windows JAR生命周期8项全部通过，UI回归覆盖IPC/文件选择/参数/日志/未保存确认/深浅主题/窄屏/仅移除记录。首张截图在动画未结束时拍到空内容，已等待布局和动画稳定后重新截图核对。
+
+## JAR 扩展调研
+- 延续PM2注册/退避设计，比较Uptime Kuma（MIT，HTTP/TCP独立健康状态）与pm2-logrotate（MIT，大小/保留策略）；不复制代码或新增依赖。
+- 直接继承文件描述符的Java无法可靠跨平台在线轮转（Windows文件占用，Linux重命名后仍写旧inode），需独立轻量守护进程接收stdout/stderr并串行写盘，才能关闭DevKit后持续轮转和崩溃拉起。
+- Windows任务计划区分当前用户登录触发与开机触发（S4U可能需管理员权限）；Linux用户systemd默认随登录启动，真正开机前运行需linger。界面明确两种模式，不把登录自启描述为开机前自启。
+
+- 真实Node守护已验证环境覆盖、UTF-8/空格路径、HTTP503健康失败与恢复、1MB在线日志轮转、守护跨管理器关闭重连、崩溃退避上限、手动停止取消重试及正常退出不拉起。测试首次发现systemd路径中JS替换字符串对美元符号的转义问题，已改为函数替换；健康断言与自动检测竞争改为长周期+手动检测隔离。
+- Linux登录模式使用graphical-session.target而非default.target，避免已有linger使登录模式实际开机执行；boot模式为default.target并显式enable-linger。Windows临时登录自启任务真实安装/查询/移除已通过。
+- 守护通过随机令牌的127.0.0.1控制端口，Linux凭据文件600，Windows显式仅当前用户和SYSTEM的ACL；同目录记录核对进程创建标识以清理重启后PID复用的失效端点。
+
+- Windows S4U开机任务在当前非管理员环境返回Access is denied，已转换为明确中文权限提示；不自动提权、不降级伪装成功。任务查询区分ObjectNotFound与PermissionDenied。Linux仍待实机验证。

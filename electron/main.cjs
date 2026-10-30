@@ -15,6 +15,7 @@ let window;
 let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
+let jarManager, jarError = '';
 let httpClient;
 let apiWorkspace, apiWorkspaceError = '';
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
@@ -110,6 +111,9 @@ app.whenReady().then(async () => {
     nginxManager = await createNginxManager(projectStorage.directory);
   } catch (error) { nginxError = error.message; }
   try {
+    jarManager = await (await import('./server/jar-manager.mjs')).createJarManager(projectStorage.directory);
+  } catch (error) { jarError = error.message; }
+  try {
     apiWorkspace = await (await import('./server/api-workspace.mjs')).createApiWorkspace(projectStorage.directory);
   } catch (error) { apiWorkspaceError = error.message; }
   const root = path.join(__dirname, 'dist');
@@ -203,6 +207,21 @@ app.whenReady().then(async () => {
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
   const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
+  ipcMain.handle('devkit:jar', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 JAR 管理请求。');
+    try {
+      if (action === 'pick') {
+        if (!['jar', 'executable'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
+        const result = await dialog.showOpenDialog(window, {
+          title: value.kind === 'jar' ? '选择 JAR 文件' : '选择 Java 程序', properties: ['openFile'],
+          ...(value.kind === 'jar' ? { filters: [{ name: 'Java 应用', extensions: ['jar'] }] } : {}),
+        });
+        return { data: result.canceled ? [] : result.filePaths };
+      }
+      if (!jarManager) throw new Error(jarError || 'JAR 管理器尚未准备好。');
+      return { data: await jarManager.request(action, value) };
+    } catch (error) { return { error: error.message || 'JAR 操作失败。' }; }
+  });
   ipcMain.handle('devkit:desktop-settings', (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的桌面设置请求。');
     if (action === 'get') return desktopPreferences.get();
@@ -235,8 +254,8 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
-  if ((!projectStore && !nginxManager && !apiWorkspace) || closing) return;
+  if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

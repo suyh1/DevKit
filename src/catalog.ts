@@ -6,6 +6,7 @@ export const workspaceModules = [
   { id: 'http', name: 'HTTP 调试', description: '可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。', category: '工作台', badge: '共享' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 主机 Nginx，支持局域网远程填写主机实例与路径、编辑配置、查看日志与授权运行操作。', category: '工作台', badge: '共享' },
+  { id: 'jar', name: 'JAR 管理', description: 'Windows / Linux 本机 Java 应用列表，支持 Java 检测、启动/停止/重启、进程与 CPU/内存监视、HTTP/TCP 健康检查、同目录日志轮转、环境档案、崩溃退避重启和系统自启。', category: '工作台', badge: '本机' },
 ] as const;
 
 export const categories = [
