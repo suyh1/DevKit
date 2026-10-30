@@ -10,6 +10,7 @@ environment.DEVKIT_TEST_API_ONLY = process.argv.includes('--api-only') ? '1' : '
 environment.DEVKIT_TEST_PROJECTS_ONLY = process.argv.includes('--projects-only') ? '1' : '';
 environment.DEVKIT_TEST_HTTP_CLOSE_ONLY = process.argv.includes('--http-close-only') ? '1' : '';
 environment.DEVKIT_TEST_DESIGN_ONLY = process.argv.includes('--design-only') ? '1' : '';
+environment.DEVKIT_TEST_NAVIGATION_ONLY = process.argv.includes('--navigation-only') ? '1' : '';
 environment.DEVKIT_TEST_GEOGRAPHY_ONLY = process.argv.includes('--geography-only') ? '1' : '';
 environment.DEVKIT_TEST_FEATURES_ONLY = process.argv.includes('--features-only') ? '1' : '';
 

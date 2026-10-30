@@ -686,3 +686,12 @@ v1.12.5已正式发布并确认latest：https://github.com/suyh1/DevKit/releases
 v1.12.7正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.7 。Release426985392，最终来源及注解标签解引用ef7acb3964dfef086060ff2d2389d9a2479832d8；CI40738196721四项作业全部success。14附件发布前后逐项核对大小与SHA256一致，latest已确认。Windows113388001、amd6493520010、ARM6488428578、独立ZIP656868字节，共同构建f2502cc2df064dd911a10fc9715d27fe644669ca2166afbf9a8b63f7b078485d。发布后API检查发现草稿更新时生成的untagged标记被沿用，已显式将此Release绑定到现有1.12.7标签，并通过按标签查询、latest和14附件再次确认；未修改旧发行或附件。验证资料均在artifacts/release-1.12.7。
 
 本记录提交仅更新planning资料，不改变已验证运行时、发行来源或标签。C盘失败临时目录的可选清理被自动审批策略拦截，未执行；本次打包改用D盘临时目录后成功，用户真实configs和系统安装状态未改动。
+
+## 2026-10-30 Windows 分类浮层
+- 检查玻璃主题侧栏 backdrop-filter 与 fixed 子元素的层叠/定位关系。采用原生 manual popover 顶层，保留 DOM 顺序与窄屏内嵌列表。
+- 计划：修复 → 九套主题命中测试及现有导航回归 → 文档与构建检查。
+
+- 已确认 electron/main.cjs 仅 Linux 禁用硬件加速；不能仅据截图归因于 CPU 架构。首轮新增测试返回 DOMStringMap 导致 Electron 无法克隆，已改为 void 返回。构建通过；文档测试6通过、1因 Python 不可用跳过。
+- 完成：原生 manual popover 顶层修复；九套主题×深浅18组顶层/四角中心命中与定位、42组分类几何以及完整键盘/焦点/外部点击/窄屏导航回归通过。Windows毛玻璃截图已核对。构建通过，docs:update、test:docs和docs:check通过（文档测试6通过、Python环境项1跳过）。安装包未重建，未提交/推送。
+- 开始1.12.8发行：远端main一致，latest1.12.7，无同版本草稿。已确认GitHub权限，打包TEMP/TMP使用D盘。
+- 1.12.8生产构建、191项单测、7项文档、桌面策略及发行/服务回归通过。Windows安装包已制作，Linux和独立服务继续制作；包内完整Electron回归中。提交源码以启动同源CI，最终发布等待四项CI和本地包验证。

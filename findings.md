@@ -300,3 +300,8 @@ v1.12.5发行完成：三平台和独立Node服务已发布，14附件远端大�
 - ui-ux-pro-max design-system已运行，继续保持工具布局与本地字体。
 
 v1.12.7已发布为latest，包含九套深浅主题、项目中心批量删除及图标对齐；最终来源ef7acb3964dfef086060ff2d2389d9a2479832d8，同源CI40738196721四项success，14附件大小/SHA256全部匹配。发行地址：https://github.com/suyh1/DevKit/releases/tag/1.12.7 。
+
+## 2026-10-30 Windows 分类浮层
+- 检查玻璃主题侧栏 backdrop-filter 与 fixed 子元素的层叠/定位关系。采用原生 manual popover 顶层，保留 DOM 顺序与窄屏内嵌列表。
+- 计划：修复 → 九套主题命中测试及现有导航回归 → 文档与构建检查。
+- 确认根因条件：玻璃主题为侧栏添加backdrop-filter，原fixed浮层嵌套其中；CSS层叠/包含块影响子层级。Linux另有禁用硬件加速分支，因此平台渲染路径不同；尚未在Linux实机复现，不将CPU架构断定为原因。

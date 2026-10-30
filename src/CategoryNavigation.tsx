@@ -40,6 +40,9 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
     }
     const anchor = triggers.current.get(openKey), surface = panel.current;
     if (!anchor || !surface) return;
+    // The native top layer escapes the glass sidebar's stacking context and
+    // fixed-position containing block, while preserving DOM keyboard order.
+    if (!narrow && !surface.matches(':popover-open')) surface.showPopover();
     function place() {
       if (narrow || !anchor || !surface) return;
       const sidebar = root.current?.closest('aside')?.getBoundingClientRect();
@@ -129,7 +132,7 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
         </button>;
       })}
     </nav>
-    <MotionPresence kind="popover" present={!!(category)}>{category && <section id="category-tool-panel" className={`category-panel ${narrow ? 'category-panel-inline' : ''}`} ref={panel} aria-labelledby="category-panel-title">
+    <MotionPresence kind="popover" present={!!(category)}>{category && <section id="category-tool-panel" popover={narrow ? undefined : 'manual'} className={`category-panel ${narrow ? 'category-panel-inline' : ''}`} ref={panel} aria-labelledby="category-panel-title">
       <header className="category-panel-heading">
         {narrow && <button className="icon-button category-back" aria-label="返回工具分类" onClick={() => close(true)}><ArrowLeft size={18} /></button>}
         <div><h2 id="category-panel-title">{category.name}<small>{groupedTools.length} 个工具</small></h2><p>{category.description}</p></div>

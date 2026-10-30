@@ -15,6 +15,9 @@
 .category-trigger.is-open .category-trigger-arrow { opacity:1; }
 .sidebar .category-panel { display:flex; flex-direction:column; position:fixed; z-index:25; width:320px; max-height:min(640px, calc(100dvh - 24px)); min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); color:var(--text); box-shadow:0 12px 40px #14151824, 0 2px 8px #1415180c; }
 .category-panel-heading { display:flex; align-items:flex-start; gap:10px; flex-shrink:0; padding:18px 15px 14px; border-bottom:1px solid var(--line); }
+/* Viewport coordinates supplied by CategoryNavigation; override popover UA centering. */
+.category-panel[popover] { inset:auto; margin:0; }
+.category-panel::backdrop { background:transparent; pointer-events:none; }
 .category-panel-heading>div { flex:1; min-width:0; }
 .category-panel-heading h2 { display:flex; align-items:center; flex-wrap:wrap; gap:9px; margin:0; font-size:15px; font-weight:600; line-height:1.5; }
 .category-panel-heading h2>small { color:var(--subtle); font-size:10px; font-weight:400; }

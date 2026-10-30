@@ -27,6 +27,31 @@ module.exports = async function navigationSmoke(window, output) {
   window.setMinimumSize(360, 600);
   window.show(); window.focus(); window.webContents.focus();
   const report = [];
+  const originalStyle = await js('document.documentElement.dataset.themeStyle');
+  window.setContentSize(1440, 844);
+  await settle();
+  for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
+    for (const theme of ['light', 'dark']) {
+      await js(`void Object.assign(document.documentElement.dataset, {themeStyle:'${style}', theme:'${theme}'})`);
+      await open('data');
+      const layer = await js(`(() => {
+        const panel = document.querySelector('.category-panel'), r = panel.getBoundingClientRect();
+        const points = [[r.left+20,r.top+20], [r.right-20,r.top+20], [r.left+20,r.bottom-20], [r.right-20,r.bottom-20], [r.left+r.width/2,r.top+r.height/2]];
+        return {style:document.documentElement.dataset.themeStyle, theme:document.documentElement.dataset.theme,
+          topLayer:panel.matches(':popover-open'),
+          hit:points.every(([x,y]) => panel.contains(document.elementFromPoint(x,y))),
+          left:r.left, sidebarRight:document.querySelector('.sidebar').getBoundingClientRect().right};
+      })()`);
+      assert.equal(layer.topLayer, true, `${style} ${theme}: native top layer`);
+      assert.equal(layer.hit, true, `${style} ${theme}: the panel receives pointer input across its surface`);
+      assert.ok(Math.abs(layer.left-layer.sidebarRight-10) < 1, `${style} ${theme}: viewport positioning`);
+      report.push(layer);
+      if (style === 'glass') await fs.writeFile(path.join(output, `navigation-glass-${theme}.png`), (await window.webContents.capturePage()).toPNG());
+      await key('Escape');
+      await wait('!document.querySelector(".category-panel")');
+    }
+  }
+  await js(`document.documentElement.dataset.themeStyle = ${JSON.stringify(originalStyle ?? 'default')}`);
   for (const theme of ['light', 'dark']) {
     await js(`document.documentElement.dataset.theme = '${theme}'`);
     for (const width of [1440, 1024, 768]) {

@@ -377,3 +377,13 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - [x] 重建三平台和独立服务包，核对载荷，运行包内回归。
 - [x] 创建标签与Release，上传并校验附件，正式发布并核对latest。
 保留旧发行和本地1.12.6；本次使用1.12.7区分最终修改。
+
+## 2026-10-30 Windows 分类浮层
+- 检查玻璃主题侧栏 backdrop-filter 与 fixed 子元素的层叠/定位关系。采用原生 manual popover 顶层，保留 DOM 顺序与窄屏内嵌列表。
+- 计划：修复 → 九套主题命中测试及现有导航回归 → 文档与构建检查。
+- 修复、九套主题真实命中回归、文档与构建检查 — complete
+
+## 2026-10-30 发行 1.12.8
+- 用户授权：打包、提交、推送、发布。
+- 版本/检查与四包制作 — in_progress
+- 提交推送、同源 CI、附件校验与发布 — pending
