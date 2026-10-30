@@ -724,3 +724,8 @@ v1.12.7正式发布完成：https://github.com/suyh1/DevKit/releases/tag/1.12.7 
 
 - 发行阻断已定位：首次WindowsCI的TEMP为8.3短路径，新增测试未realpath；JDK17英文代码页不能表示中文命令参数，编译器路径转成问号。测试规范化临时目录，Windows真实JAR使用英文+空格路径，Linux保留中文路径，文档明确Java原生字符集限制；没有屏蔽JAR生命周期断言。
 - 包内完整回归发现375px新增第六导航按钮后裁切，修复为窄屏均分图标；对应375/768/1440共享/导航回归重跑。首批Linux amd64、ARM64 CI已通过，Windows待修复后同源重跑。最终安装包将全部重建，避免旧导航进入发行。
+
+- 1.13.0已正式发布为latest：https://github.com/suyh1/DevKit/releases/tag/1.13.0 。Release429158294，源码及注解标签解引用575463b5cf062a424f6b3c4ea31afa4df2853755；同源CI41076114254四项全部success。
+- Windows113417321、amd6493548642、ARM6488468306、独立ZIP688814字节；共同构建578d35e082949768b00f5b971679150435cc68bf356581bf7a8c50c80a509953。14附件发布前后大小与SHA256全部匹配。
+- 最终安装包ASAR完整桌面/JAR/项目/Nginx、API、共享、门户与NSIS配置保留全部通过；两份DEB实际ASAR与文档、独立ZIP源码资源逐字节核验及解压迁移检查通过。Windows英文Java17路径限制已文档化，窄屏导航375/768/1440回归通过。
+- 首次Node大文件上传遇HeadersTimeout，切换curl后一次连接重置，按远端摘要核对后重传成功；只对本次草稿操作，未改动旧发行。发布资料在artifacts/release-1.13.0。此后记录提交只更新规划资料，不改变发行源码和标签。

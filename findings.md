@@ -325,3 +325,5 @@ v1.12.7已发布为latest，包含九套深浅主题、项目中心批量删除�
 - 守护通过随机令牌的127.0.0.1控制端口，Linux凭据文件600，Windows显式仅当前用户和SYSTEM的ACL；同目录记录核对进程创建标识以清理重启后PID复用的失效端点。
 
 - Windows S4U开机任务在当前非管理员环境返回Access is denied，已转换为明确中文权限提示；不自动提权、不降级伪装成功。任务查询区分ObjectNotFound与PermissionDenied。Linux仍待实机验证。
+
+- 1.13.0正式发布：https://github.com/suyh1/DevKit/releases/tag/1.13.0 。Release429158294，source575463b5cf062a424f6b3c4ea31afa4df2853755，CI41076114254四项成功，14附件远端摘要与大小全部匹配，latest确认；完整包内与实际载荷验证见artifacts/release-1.13.0。

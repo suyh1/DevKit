@@ -399,6 +399,6 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - [x] 完成设置界面、状态展示、文档同步与真实进程/桌面回归。
 
 ## 2026-10-30 发行 1.13.0（用户授权打包、提交、推送、发布）
-- [ ] 版本/文档同步与发行前检查，提交推送启动同源CI。
-- [ ] 制作三平台桌面包与独立服务ZIP，校验载荷与实际ASAR回归。
-- [ ] 等待全部CI成功，发布标签与Release，核对远端全部附件。
+- [x] 版本/文档同步与发行前检查，提交推送启动同源CI。
+- [x] 制作三平台桌面包与独立服务ZIP，校验载荷与实际ASAR回归。
+- [x] 等待全部CI成功，发布标签与Release，核对远端全部附件。
