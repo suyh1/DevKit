@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -17,7 +17,7 @@ test('independent supervisor: env profiles, live log rotation, health failure, r
   if (!java.found) { context.skip('Java unavailable'); return; }
   const suffix = process.platform === 'win32' ? '.exe' : '', bin = path.dirname(java.executable);
   try { await execute(path.join(bin, `javac${suffix}`), ['-version']); } catch { context.skip('JDK unavailable'); return; }
-  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-supervisor-')), folder = path.join(directory, '中文 app'); await mkdir(folder);
+  const directory = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-supervisor-'))), folder = path.join(directory, process.platform === 'win32' ? 'java app' : '中文 app'); await mkdir(folder);
   const jar = path.join(folder, 'service.jar'), source = path.join(folder, 'DaemonFixture.java');
   await writeFile(source, `import java.nio.file.*; public class DaemonFixture { public static void main(String[] a) throws Exception { System.out.println("PROFILE:"+System.getenv("APP_MODE")); System.out.println("ARG:"+String.join("|",a)); if(a[0].equals("burst")){String line=new String(new char[1000]).replace('\\0','A');for(int i=0;i<1500;i++)System.out.println(line);System.out.println("BURST-END");} if(a[0].equals("crash")){Path file=Paths.get("crash-count");int n=Files.exists(file)?Integer.parseInt(new String(Files.readAllBytes(file),"UTF-8")):0;Files.write(file,Integer.toString(n+1).getBytes("UTF-8"));System.out.println("CRASH:"+(n+1));Thread.sleep(1200);System.exit(7);} if(a[0].equals("exit"))System.exit(0); while(true)Thread.sleep(100); } }`);
   await execute(path.join(bin, `javac${suffix}`), ['--release', '8', '-encoding', 'UTF-8', source]);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -8,10 +8,10 @@ import { promisify } from 'node:util';
 import { createJarManager, jarPaths } from './jar-manager.mjs';
 import { windowsArguments, detectJava, matchesJar } from './jar-process.mjs';
 
-async function fixture(run, dependencies = {}) {
-  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-jar-'));
-  const folder = path.join(directory, '中文 apps'); await mkdir(folder);
-  const jar = path.join(folder, '订单 服务.jar'); await writeFile(jar, 'fixture');
+async function fixture(run, dependencies = {}, { ascii = false } = {}) {
+  const directory = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-jar-')));
+  const folder = path.join(directory, ascii ? 'java apps' : '中文 apps'); await mkdir(folder);
+  const jar = path.join(folder, ascii ? 'order service.jar' : '订单 服务.jar'); await writeFile(jar, 'fixture');
   let manager = await createJarManager(directory, dependencies);
   const instance = { name: '订单服务', jar, logMode: 'file', jvmArgs: ['-Xmx64m'], appArgs: ['--label=hello world'], stopTimeout: 1 };
   const add = async (overrides = {}) => {
@@ -147,5 +147,5 @@ test('real Java lifecycle on the current OS, including manager reopen and spaced
       await assert.rejects(manager.request('command', { id: item.id, command: 'start' }), /启动/);
       assert.equal((await manager.request('statuses'))[0].state, 'exited');
     } finally { await manager.request('command', { id: item.id, command: 'force-stop' }).catch(() => {}); }
-  });
+  }, {}, { ascii: process.platform === 'win32' });
 });

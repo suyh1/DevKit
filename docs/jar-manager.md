@@ -35,6 +35,8 @@ Linux 从 `/proc` 读取进程身份与资源数据，使用 `getconf CLK_TCK` �
 
 Windows 使用系统自带 Windows PowerShell / CIM 查询进程，按 UTF-8 输出以支持中文路径。停止使用 `Stop-Process`，强制终止使用其 `-Force`，操作内再次核对进程创建时间。Windows 终止进程无法保证 Java shutdown hook 执行，界面会明确提示；需要业务级优雅关闭的应用应额外接入应用自己的关闭接口或服务机制。
 
+Windows 的 Java 启动器还受其版本和系统原生字符集影响：旧版 JDK 在英文代码页下可能将中文路径转换成 `?`，这不是 `-Dfile.encoding=UTF-8` 能修正的。若日志显示 `Unable to access jarfile` 且路径字符失真，请使用该系统字符集可表示的路径（例如英文目录与文件名），或在系统区域设置中启用 UTF-8 后重启。工具不会自动修改系统区域设置。测试始终验证空格路径；Windows JDK 17 的英文 CI 使用英文运行文件名，中文路径在 Linux 与本地支持的字符集环境中验证。
+
 ## HTTP / TCP 健康检查
 
 在 JAR 设置中选择 HTTP(S) 或 TCP，默认不检测。HTTP 使用 GET，要求精确的预期状态码（默认 200），不跟随重定向，不读取和保存响应正文；HTTPS 使用正常证书校验，不提供忽略证书选项。TCP 只测试目标主机与端口能否连接，不证明业务内容正确。
