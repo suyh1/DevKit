@@ -25,6 +25,32 @@ module.exports = async (window, output) => {
   let remote;
   try {
     await js(`document.querySelector('.sidebar [title="日志中心"]').click()`);
+    assert.equal(await js(`document.querySelector('.sidebar-shared').open`), false, 'Shared sidebar starts collapsed');
+    await js(`document.querySelector('.shared-sidebar-trigger').click()`);
+    await wait(window.webContents, `document.querySelector('.sidebar-shared').open`);
+    assert.equal(await js(`document.querySelectorAll('.sidebar-shared nav button').length`), 6);
+    await js(`document.querySelector('.sidebar-shared [title="日志中心"]').click()`);
+    await wait(window.webContents, `!document.querySelector('.sidebar-shared').open`);
+    const minimum = window.getMinimumSize(); window.setMinimumSize(360, 600);
+    for (const width of [1440, 1024, 768, 390]) {
+      window.setContentSize(width, 900); await delay(150);
+      await js(`document.querySelector('.shared-nav-trigger').click()`);
+      await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
+      const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('[role=menuitem]').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
+      assert.equal(geometry.count, 6); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
+      assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
+      if (width === 1440) { window.show(); window.focus(); await delay(200); await fs.writeFile(path.join(output, 'shared-secondary-navigation.png'), (await window.webContents.capturePage()).toPNG()); }
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+      await wait(window.webContents, `!document.querySelector('.shared-nav-panel')&&document.activeElement.classList.contains('shared-nav-trigger')`);
+    }
+    window.setMinimumSize(...minimum); window.setContentSize(1440, 900);
+    for (const name of ['HTTP 调试', '日志中心']) {
+      await js(`document.querySelector('.shared-nav-trigger').click()`);
+      await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
+      await js(`[...document.querySelectorAll('.shared-nav-panel [role=menuitem]')].find(e=>e.querySelector('strong').textContent===${JSON.stringify(name)}).click()`);
+      await wait(window.webContents, `document.querySelector('.breadcrumb strong')?.textContent===${JSON.stringify(name)}&&!document.querySelector('.shared-nav-panel')`);
+    }
     await wait(window.webContents, `document.querySelectorAll('.log-source-list>label').length===4`);
     await js(`document.querySelectorAll('.log-source-list input').forEach(e=>e.click())`);
     await wait(window.webContents, `document.querySelectorAll('.log-pane').length===4&&[...document.querySelectorAll('.log-pane pre')].every(e=>e.textContent.includes('INFO'))`);

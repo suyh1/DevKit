@@ -1,0 +1,24 @@
+.shared-navigation { display:flex; align-items:center; }
+.sidebar-shared { flex-shrink:0; min-width:0; }
+.sidebar-shared>summary { list-style:none; cursor:pointer; }
+.sidebar-shared>summary::-webkit-details-marker { display:none; }
+.sidebar-shared>summary>svg:last-child { transition:transform 140ms ease; }
+.sidebar-shared[open]>summary>svg:last-child { transform:rotate(180deg); }
+.sidebar-shared>nav { max-height:min(260px,35dvh); overflow-y:auto; overscroll-behavior:contain; padding:4px 0 6px 10px; border-left:1px solid var(--line); margin:0 0 8px 17px; }
+.sidebar-shared>nav>.nav-item { width:100%; font-size:11px; }
+.sidebar-collapsed .sidebar-shared>nav { padding-left:0; margin-left:0; border-left:0; }
+.sidebar-collapsed .shared-sidebar-trigger>svg:last-child { display:none; }
+@media(max-width:760px) { .sidebar:has(.category-panel-inline)>.sidebar-shared { display:none; } }
+.floating-navbar .floating-nav-links .shared-nav-trigger { width:auto; gap:5px; }
+.floating-navbar .floating-nav-links .shared-nav-trigger>span { display:inline; }
+@media(max-width:760px) { .floating-navbar .floating-nav-links>[aria-label="工作空间"]>span { display:none; } }
+.shared-nav-chevron { transition:transform 140ms ease; opacity:.65; }
+.shared-nav-trigger[aria-expanded=true] .shared-nav-chevron { transform:rotate(180deg); }
+.shared-nav-panel[popover] { position:fixed; inset:auto; margin:0; padding:8px; box-sizing:border-box; max-height:min(460px,calc(100dvh - 24px)); overflow:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); box-shadow:0 14px 40px #10182726; font-family:inherit; }
+.shared-nav-panel>header { display:flex; align-items:center; justify-content:space-between; padding:9px 10px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line); margin-bottom:5px; }
+.shared-nav-panel>header small { font-size:10px; color:var(--subtle); }
+.shared-nav-panel>button { display:flex; align-items:center; gap:12px; text-align:left; width:100%; padding:10px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--text); }
+.shared-nav-panel>button>svg { color:var(--muted); flex:none; }.shared-nav-panel>button strong { display:block; font-size:12px; font-weight:550; }.shared-nav-panel>button small { display:block; margin-top:4px; font-size:10px; color:var(--muted); }
+.shared-nav-panel>button:hover,.shared-nav-panel>button:focus-visible { background:var(--soft); border-color:var(--line); outline:none; }.shared-nav-panel>button[aria-current=page] { background:var(--tint); color:var(--accent); }
+.shared-nav-panel>button[aria-current=page]>svg { color:var(--accent); }
+@media(prefers-reduced-motion:reduce) { .shared-nav-chevron { transition:none; } }
