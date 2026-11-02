@@ -47,6 +47,8 @@ jobs:
       - run: npm run test:projects
       - run: npm run test:nginx
       - run: npm run test:jar
+      - run: npm run test:monitor
+      - run: npm run test:logs
       - run: npm run test:http
       - run: python scripts/test-deb-packaging.py
       - run: npm run test:java
@@ -59,6 +61,15 @@ jobs:
       - name: LAN workspaces browser integration
         if: runner.os == 'Windows'
         run: node scripts/smoke-sharing.mjs
+      - name: JAR shared application console integration
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-jar-sharing.mjs
+      - name: Monitoring desktop and shared status page
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --monitor-only
+      - name: Logs and responsive workspace navigation
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --logs-only
       - name: Portal native interaction and LAN clipboard regression
         if: runner.os == 'Windows'
         run: node scripts/smoke-portal.mjs

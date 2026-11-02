@@ -16,6 +16,8 @@ environment.DEVKIT_TEST_FEATURES_ONLY = process.argv.includes('--features-only')
 
 environment.DEVKIT_TEST_NGINX_ONLY = process.argv.includes('--nginx-only') ? '1' : '';
 environment.DEVKIT_TEST_JAR_ONLY = process.argv.includes('--jar-only') ? '1' : '';
+environment.DEVKIT_TEST_MONITOR_ONLY = process.argv.includes('--monitor-only') ? '1' : '';
+environment.DEVKIT_TEST_LOGS_ONLY = process.argv.includes('--logs-only') ? '1' : '';
 delete environment.ELECTRON_RUN_AS_NODE;
 const child = spawn(electron, [path.join(root, 'electron', 'smoke.check.cjs')], { stdio: 'inherit', windowsHide: true, env: environment });
 child.on('error', error => { console.error(error); process.exitCode = 1; });

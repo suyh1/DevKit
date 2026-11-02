@@ -1,10 +1,12 @@
 # 项目中心：项目入口、配置档案和局域网访问
 
-项目中心将入口管理、独立方案配置、导入导出和备份恢复放在同一个工作流中。局域网仅开放这个模块，离线工具及其输入不会通过此服务提供。与项目中心平级的 [Nginx 配置](nginx.md)仅限桌面本机，不向局域网或独立项目服务开放文件读写与进程控制。
+项目中心将入口管理、独立方案配置、导入导出和备份恢复放在同一个工作流中。项目中心、HTTP 调试、Nginx、JAR及监控中心可独立开放共享；离线工具及其输入不会通过此服务提供，文件读写、检测及运行操作按服务分别授权。
 
 桌面项目中心与局域网页面共用九套主题风格：默认、极简扁平、自然有机、编辑杂志、新野兽派、柔和界面、macOS 毛玻璃、现代渐变、复古怀旧，每套均支持浅色、深色与跟随系统。原有灰白/石墨灰与蓝色配色保留为默认主题；启用及检测通过保留绿色，错误使用柔红色，弹窗与输入区同步适配。网页顶部可分别选择风格和明暗模式，偏好保存在访问者当前浏览器；桌面在设置的“外观与工作台”中选择。详见[界面设计说明](interface-design.md)。
 
 ## 数据逻辑
+
+桌面与共享网页的档案区、项目区分别在可用高度内滚动。增加档案不会拉长右侧项目区，增加项目也不会撑高档案区；内容超出时各自显示滚动条。窄屏改为上下排列，仍保留两个独立滚动区。可按 Tab 聚焦“配置档案”或“当前档案项目”面板，再使用方向键或 Page Up / Page Down 滚动。
 
 ```mermaid
 flowchart LR
@@ -118,7 +120,7 @@ sudo chmod 700 /opt/devkit/configs
 
 ## 无桌面常驻的部署方式
 
-仓库还提供独立 Node 服务入口，可按选项托管项目中心、Nginx 配置及 HTTP 工作台。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
+仓库还提供独立 Node 服务入口，可按选项托管项目中心、Nginx 配置、HTTP 工作台、JAR 管理及监控中心。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
 
 ```powershell
 # 仅源码部署需要先执行：npm run build
@@ -138,7 +140,7 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' \
 DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 ```
 
-首次至少显式开放一项服务：`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，或使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，详细权限与示例见 [共享工作台](workspace-sharing.md)。
+首次至少显式开放一项服务：`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，或使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true`、`DEVKIT_SHARE_JAR=true`、`DEVKIT_SHARE_MONITOR=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，`DEVKIT_JAR_EDIT=true` / `DEVKIT_JAR_CONTROL=true` 分别授权 JAR 设置编辑与运行管理（含控制台输入和系统自启），详细权限与示例见 [共享工作台](workspace-sharing.md)。
 
 首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。项目编辑使用 `DEVKIT_PROJECT_EDIT=true`，入口检测使用 `DEVKIT_PROJECT_PROBE=true`，两者独立。后续启动复用已保存设置，环境变量逐项覆盖。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 

@@ -140,6 +140,9 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     projects: { enabled: true, edit: true, probe: true },
     nginx: { enabled: true, edit: true, control: true },
     http: { enabled: false, edit: false, send: false },
+    jar: { enabled: false, edit: false, control: false },
+    monitor: { enabled: false, edit: false, control: false },
+    logs: { enabled: false, jar: false, nginx: false, export: false },
   });
   const disabled = emptySharingServices();
   disabled.nginx = { enabled: false, edit: true, control: true };

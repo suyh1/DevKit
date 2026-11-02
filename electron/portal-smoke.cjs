@@ -17,6 +17,11 @@ app
       fixture = await (
         await import("./portal-fixture.mjs")
       ).portalFixture(process.env.DEVKIT_TEST_APP || process.cwd());
+      const scrollData = await fixture.store.get();
+      scrollData.profiles.push(...Array.from({ length: 29 }, (_, index) => ({
+        id: `scroll-profile-${index}`, name: `滚动档案 ${index}`, description: '独立滚动回归', variables: [], projects: [],
+      })));
+      await fixture.store.save(scrollData, scrollData.revision);
       window = new BrowserWindow({
         show: false,
         width: 1440,
@@ -98,14 +103,20 @@ app
             await delay(60);
             return;
           }
-          await wheel(hit.above ? -400 : 400, hit.sidebar ? hit.x : undefined);
+          const panel = await js(`(()=>{const e=(${expression})?.closest('.pc-profiles,.pc-content');if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,above:(${expression}).getBoundingClientRect().top<r.top}})()`);
+          await wheel((panel?.above ?? hit.above) ? -400 : 400, panel?.x ?? (hit.sidebar ? hit.x : undefined), panel?.y);
         }
         throw Error("Target cannot be reached by scrolling: " + expression);
       };
-      const button = (text, scope = "button") =>
-        pointer(
+      const button = async (text, scope = "button") => {
+        if (scope === '.portal-navigation button' && await js(`innerWidth<=780&&!document.querySelector('.portal-drawer[open]')`)) {
+          await pointer(`document.querySelector('[aria-label="打开共享导航"]')`);
+          await wait(`!!document.querySelector('.portal-drawer[open]')`);
+        }
+        return pointer(
           `[...document.querySelectorAll(${JSON.stringify(scope)})].find(e=>e.getClientRects().length&&e.textContent.trim()===${JSON.stringify(text)})`,
         );
+      };
       const selector = (value) =>
         pointer(`document.querySelector(${JSON.stringify(value)})`);
       const key = (keyCode, modifiers = []) => {
@@ -135,7 +146,7 @@ app
         await wait('!!document.querySelector("input[type=password]")');
         await fill("input[type=password]", fixture.options.password);
         await button("登录");
-        await wait('!!document.querySelector(".portal-bar nav")');
+        await wait('!!document.querySelector(".portal-navigation")');
       };
       if (process.argv.includes('--legacy-popover')) {
         console.log('Portal: simulating browser without native Popover');
@@ -172,7 +183,7 @@ app
       await login();
       console.log('Portal: authenticated');
       {
-        await button('Nginx 配置', '.portal-bar button');
+        await button('Nginx 配置', '.portal-navigation button');
         await wait('!!document.querySelector(".ng-editor-fieldset")');
         await wait('[...document.querySelectorAll(".ng-center button")].some(e=>e.textContent.trim()==="实例设置"&&!e.disabled)');
         await button('实例设置');
@@ -185,7 +196,7 @@ app
         key('Escape');
         await wait('!document.querySelector(".ng-help-popover:popover-open")');
         await selector('.ng-form-modal [aria-label="关闭对话框"]');
-        await button('项目中心', '.portal-bar button');
+        await button('项目中心', '.portal-navigation button');
       }
       for (const [width, height] of [
         [1440, 900],
@@ -194,9 +205,14 @@ app
       ]) {
         window.setContentSize(width, height);
         await delay(150);
-        await button("项目中心", ".portal-bar button");
+        await button("项目中心", ".portal-navigation button");
         await wait('document.querySelectorAll(".pc-card").length===24');
         await delay(350);
+        await js(`document.querySelector('.pc-profiles').scrollTop=0;document.querySelector('.pc-content').scrollTop=0`);
+        const sidebar = await js(`(()=>{const r=document.querySelector('.pc-profiles').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+        await wheel(18000, sidebar.x, sidebar.y);
+        assert.equal(await js(`(()=>{const l=document.querySelector('.pc-profiles'),r=document.querySelector('.pc-content');return l.scrollTop>0&&l.scrollTop>=l.scrollHeight-l.clientHeight-2&&r.scrollTop===0&&l.scrollHeight>l.clientHeight&&r.scrollHeight>r.clientHeight})()`), true, 'Many profiles scroll independently of the project panel');
+        const leftTop = await js(`document.querySelector('.pc-profiles').scrollTop`);
         await wheel(18000);
         console.log(
           "Project scroll",
@@ -206,8 +222,11 @@ app
           ),
         );
         await wait(
-          '(()=>{const r=document.querySelector(".portal-content");return r.scrollTop>=r.scrollHeight-r.clientHeight-2})()',
+          '(()=>{const r=document.querySelector(".pc-content");return r.scrollTop>=r.scrollHeight-r.clientHeight-2})()',
         );
+        assert.equal(await js(`document.querySelector('.pc-profiles').scrollTop`), leftTop, 'Project scrolling leaves profiles in place');
+        assert.equal(await js(`(()=>{const e=document.querySelector('.portal-content');return e.scrollHeight<=e.clientHeight+1})()`), true, 'Project overflow stays inside the two panels');
+        assert.equal(await js(`(()=>{const s=document.querySelector('.pc-shell').getBoundingClientRect();return s.bottom<=innerHeight+1&&document.querySelector('.project-center').scrollWidth<=document.querySelector('.project-center').clientWidth})()`), true, 'Both panels stay within the viewport: '+await js(`JSON.stringify([...document.querySelectorAll('.portal-content,.portal-page:not([hidden]),.project-center,.pc-shell,.pc-profiles,.pc-content')].map(e=>({c:e.className,h:e.clientHeight,sh:e.scrollHeight,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom,style:e.getAttribute('style')})))`));
         assert.equal(
           await js("document.documentElement.scrollWidth<=innerWidth"),
           true,
@@ -223,7 +242,7 @@ app
       }
       window.setContentSize(1440, 900);
       await delay(150);
-      await button("Nginx 配置", ".portal-bar button");
+      await button("Nginx 配置", ".portal-navigation button");
       await wait(
         'document.querySelector(".ng-status-connection")?.textContent.includes("状态信息已更新")',
       );
@@ -283,7 +302,7 @@ app
       await wait(
         'document.querySelector(".ng-status-connection")?.dataset.stale==="false"',
       );
-      await button("HTTP 调试", ".portal-bar button");
+      await button("HTTP 调试", ".portal-navigation button");
       await wait(
         'document.querySelector(".api-workspace")?.textContent.includes("共享接口定义")',
       );
@@ -428,7 +447,7 @@ app
       await wait(
         '!document.querySelector(".api-draft-item")&&!document.querySelector(".portal-notice")',
       );
-      await button("项目中心", ".portal-bar button");
+      await button("项目中心", ".portal-navigation button");
       await wheel(-18000);
       await button("补齐缺少的变量");
       await wait(
@@ -450,8 +469,8 @@ app
       const projectScroll = await js(
         'document.querySelector(".portal-content").scrollTop',
       );
-      await button("Nginx 配置", ".portal-bar button");
-      await button("HTTP 调试", ".portal-bar button");
+      await button("Nginx 配置", ".portal-navigation button");
+      await button("HTTP 调试", ".portal-navigation button");
       window.webContents.navigationHistory.goBack();
       await wait('location.hash==="#nginx"');
       window.webContents.navigationHistory.goBack();

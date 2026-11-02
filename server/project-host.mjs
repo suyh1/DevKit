@@ -267,7 +267,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             request.method === "GET"
           )
             return json(200, await store.get());
-          const workspaceRoute = /^\/api\/(nginx|http)\/([a-z-]+)$/.exec(url.pathname);
+          const workspaceRoute = /^\/api\/(nginx|http|jar|monitor|logs)\/([a-z-]+)$/.exec(url.pathname);
           if (workspaceRoute) {
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const payload = await body();

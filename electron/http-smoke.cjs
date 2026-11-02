@@ -62,7 +62,7 @@ module.exports = async function httpSmoke(window, output) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await js('document.querySelector(\'.floating-nav-links [aria-label="HTTP 调试"]\').click()');
+    await js('document.querySelector(\'.sidebar button[title="HTTP 调试"]\').click()');
     await click('快速请求', '.http-product-tabs');
     await wait('!!document.querySelector(\'input[aria-label="请求 URL"]\')');
     await fill('请求 URL', base + '/?tag=a&tag=b');

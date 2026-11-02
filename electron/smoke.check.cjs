@@ -72,6 +72,14 @@ app.on('browser-window-created', (_event, window) => {
         await require('./jar-smoke.cjs')(window, output);
         clearTimeout(timeout); app.exit(0); return;
       }
+      if (process.env.DEVKIT_TEST_MONITOR_ONLY === '1') {
+        await require('./monitor-smoke.cjs')(window, output);
+        clearTimeout(timeout); app.exit(0); return;
+      }
+      if (process.env.DEVKIT_TEST_LOGS_ONLY === '1') {
+        await require('./logs-smoke.cjs')(window, output);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_GEOGRAPHY_ONLY === '1') {
         window.setMinimumSize(360, 600); window.setSize(1440, 1000);
         await window.webContents.executeJavaScript('document.querySelector(\'button[aria-label="新建经纬度工具任务"]\').click()');

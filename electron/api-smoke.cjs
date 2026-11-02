@@ -96,7 +96,7 @@ module.exports = async function apiSmoke(window, output) {
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     await js(
-      `document.querySelector('.floating-nav-links [aria-label="HTTP 调试"]').click()`,
+      `document.querySelector('.sidebar button[title="HTTP 调试"]').click()`,
     );
     await wait('!!document.querySelector(".api-blank")');
     await click("新建API项目");
@@ -213,10 +213,10 @@ module.exports = async function apiSmoke(window, output) {
     // Saved examples and definitions survive reload without any hosted service.
     await window.webContents.reload();
     await wait(
-      "!!document.querySelector('.floating-nav-links [aria-label=\"HTTP 调试\"]')",
+      "!!document.querySelector('.sidebar button[title=\"HTTP 调试\"]')",
     );
     await js(
-      `document.querySelector('.floating-nav-links [aria-label="HTTP 调试"]').click()`,
+      `document.querySelector('.sidebar button[title="HTTP 调试"]').click()`,
     );
     await wait('!!document.querySelector(".http-workspace:not([hidden])")');
     await wait('!!document.querySelector(".api-endpoint-header")');

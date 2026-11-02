@@ -6,9 +6,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, FolderOpen, Server, Coffee, Activity, ScrollText, Send } from "lucide-react";
 import ProjectCenter from "./ProjectCenter";
 import NginxCenter from "./NginxCenter";
+import JarCenter from './JarCenter';
+import MonitorCenter from './MonitorCenter';
+import LogCenter from './LogCenter';
 import HttpWorkbench from "./HttpWorkbench";
 import { useConfirmation } from "./Confirmation";
 import { projectRequest } from "./project-api";
@@ -26,6 +29,9 @@ const modules = [
   { id: "projects", name: "项目中心" },
   { id: "nginx", name: "Nginx 配置" },
   { id: "http", name: "HTTP 调试" },
+  { id: 'jar', name: 'JAR 管理' },
+  { id: 'monitor', name: '监控中心' },
+  { id: 'logs', name: '日志中心' },
 ] as const;
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
@@ -194,6 +200,16 @@ function RequestCode({ source, close }: { source: string; close: () => void }) {
 }
 
 export default function SharedPortal() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (drawerOpen) drawer.current?.showModal();
+    else if (drawer.current?.open) drawer.current.close();
+  }, [drawerOpen]);
+  useEffect(() => {
+    const desktop = matchMedia('(min-width:781px)'), resize = () => { if (desktop.matches) setDrawerOpen(false); };
+    desktop.addEventListener('change', resize); return () => desktop.removeEventListener('change', resize);
+  }, []);
   const [session, setSession] = useState<Session | null>(null),
     [page, setPage] = useState<Page>(
       () =>
@@ -226,6 +242,7 @@ export default function SharedPortal() {
     }
   }
   function navigate(next: Page, push = true) {
+    setDrawerOpen(false);
     if (content.current) positions.current[page] = content.current.scrollTop;
     if (push && location.hash !== "#" + next)
       history.pushState(null, "", "#" + next);
@@ -378,12 +395,14 @@ export default function SharedPortal() {
   const summary = !active?.enabled
     ? "没有可访问的服务"
     : [
-        active.edit
+        ('edit' in active && active.edit)
           ? "可编辑"
-          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读" }[
+          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读' }[
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
+        page === 'jar' && services.jar.control ? '可管理运行与控制台输入' : '',
+        page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',
         page === "http" && services.http.send ? "可发送请求" : "",
         page === "projects" && services.projects.probe ? "可检测入口" : "",
       ]
@@ -421,23 +440,10 @@ export default function SharedPortal() {
     </form>
   );
   return (
-    <main className="workspace-portal">
+    <main className={`workspace-portal ${session?.authenticated ? 'portal-authenticated' : ''}`}>
       <header className="portal-bar" ref={bar}>
+        {session?.authenticated && <button className="portal-menu-button secondary-button" aria-label="打开共享导航" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={18} /></button>}
         <strong>DevKit 共享工作台</strong>
-        {session?.authenticated && (
-          <nav aria-label="共享模块">
-            {available.map((module) => (
-              <button
-                key={module.id}
-                className="secondary-button"
-                aria-current={page === module.id ? "page" : undefined}
-                onClick={() => navigate(module.id)}
-              >
-                {module.name}
-              </button>
-            ))}
-          </nav>
-        )}
         <div className="portal-account">
           <PortalTheme />
           {session?.authenticated && (
@@ -451,7 +457,11 @@ export default function SharedPortal() {
           )}
         </div>
       </header>
-      <div className="portal-content" ref={attachContent}>
+      {session?.authenticated && <>
+        <aside className="portal-sidebar"><span className="portal-nav-caption">共享工作台</span><PortalNavigation modules={available} page={page} navigate={navigate} /><p>内容与运行操作均来自共享主机。服务及权限由主机配置。</p></aside>
+        <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong><button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
+      </>}
+      <div className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
         {!session?.authenticated ? (
           <section className="portal-login">
             <h1>登录共享工作台</h1>
@@ -465,7 +475,7 @@ export default function SharedPortal() {
               <span>
                 {page === "projects"
                   ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
-                  : page === "nginx"
+                  : page === 'logs' ? '仅可读取已授权的日志来源；筛选与清空显示不修改主机文件。' : page === 'monitor' ? '检测由主机定时执行；故障与恢复记录、历史样本保存在共享主机。' : page === 'jar' ? 'JAR、Java 路径与进程都属于共享主机；可多人查看控制台，输入需运行权限与控制权。' : page === "nginx"
                     ? "配置、路径及运行操作均属于共享主机；导出文件下载到当前浏览器。"
                     : "接口项目保存在共享主机，请求从主机发出，localhost 指主机；快速请求集合保存在当前浏览器。"}
               </span>
@@ -491,7 +501,7 @@ export default function SharedPortal() {
             )}
             {services.projects.enabled && (
               <div
-                className="portal-page"
+                className="portal-page portal-projects-page"
                 hidden={page !== "projects"}
                 inert={page !== "projects"}
               >
@@ -510,6 +520,9 @@ export default function SharedPortal() {
                 />
               </div>
             )}
+            {services.jar.enabled && <div className="portal-page" hidden={page !== 'jar'} inert={page !== 'jar'}><JarCenter active={page === 'jar'} /></div>}
+            {services.monitor.enabled && <div className="portal-page" hidden={page !== 'monitor'} inert={page !== 'monitor'}><MonitorCenter active={page === 'monitor'} /></div>}
+            {services.logs.enabled && <div className="portal-page" hidden={page !== 'logs'} inert={page !== 'logs'}><LogCenter active={page === 'logs'} /></div>}
             {services.http.enabled && (
               <div
                 className="portal-page"
@@ -544,4 +557,11 @@ export default function SharedPortal() {
       </div>
     </main>
   );
+}
+
+function PortalNavigation({ modules, page, navigate }: { modules: { id: Page; name: string }[]; page: Page; navigate: (page: Page) => void }) {
+  return <nav className="portal-navigation" aria-label="共享模块">{modules.map(module => {
+    const Icon = module.id === 'logs' ? ScrollText : module.id === 'monitor' ? Activity : module.id === 'jar' ? Coffee : module.id === 'nginx' ? Server : module.id === 'http' ? Send : FolderOpen;
+    return <button key={module.id} aria-current={page === module.id ? 'page' : undefined} onClick={() => navigate(module.id)}><Icon size={17} /><span>{module.name}</span></button>;
+  })}</nav>;
 }

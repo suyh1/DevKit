@@ -16,6 +16,8 @@ let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let jarManager, jarError = '';
+let monitorManager, monitorError = '';
+let logCenter;
 let httpClient;
 let apiWorkspace, apiWorkspaceError = '';
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
@@ -99,7 +101,7 @@ app.whenReady().then(async () => {
     const { prepareProjectConfigs } = await import('./server/project-configs.mjs');
     projectStorage = await prepareProjectConfigs(projectStorage.directory, [path.join(app.getPath('userData'), 'project-center')]);
     projectStore = await createProjectStore(projectStorage.directory);
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace });
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -113,6 +115,10 @@ app.whenReady().then(async () => {
   try {
     jarManager = await (await import('./server/jar-manager.mjs')).createJarManager(projectStorage.directory);
   } catch (error) { jarError = error.message; }
+  try {
+    monitorManager = await (await import('./server/monitor-manager.mjs')).createMonitorManager(projectStorage.directory, { projects: () => projectStore, jar: () => jarManager });
+  } catch (error) { monitorError = error.message; }
+  logCenter = (await import('./server/log-center.mjs')).createLogCenter({ jar: () => jarManager, nginx: () => nginxManager });
   try {
     apiWorkspace = await (await import('./server/api-workspace.mjs')).createApiWorkspace(projectStorage.directory);
   } catch (error) { apiWorkspaceError = error.message; }
@@ -222,6 +228,18 @@ app.whenReady().then(async () => {
       return { data: await jarManager.request(action, value) };
     } catch (error) { return { error: error.message || 'JAR 操作失败。' }; }
   });
+  ipcMain.handle('devkit:monitor', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的监控请求。');
+    try {
+      if (!monitorManager) throw new Error(monitorError || '监控管理器尚未准备好。');
+      return { data: await monitorManager.request(action, value) };
+    } catch (error) { return { error: error.message || '监控操作失败。' }; }
+  });
+  ipcMain.handle('devkit:logs', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的日志请求。');
+    try { return { data: await logCenter.request(action, value) }; }
+    catch (error) { return { error: error.message || '日志读取失败。' }; }
+  });
   ipcMain.handle('devkit:desktop-settings', (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的桌面设置请求。');
     if (action === 'get') return desktopPreferences.get();
@@ -254,8 +272,8 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
-  if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager) || closing) return;
+  if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

@@ -108,7 +108,7 @@ module.exports = async function checkCloseBehavior(window, output) {
     const saved = JSON.parse(await fs.readFile(path.join(app.getPath('userData'), 'desktop-settings.json'), 'utf8'));
     assert.equal(saved.closeAction, 'ask');
     await js('document.documentElement.dataset.theme="light"');
-    await js('document.querySelector(\'.floating-nav-links [aria-label="工作空间"]\').click()');
+    await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
     console.log(
       'Close choice passed: tray failure stays visible, cancel/Escape/repeated close, remember, restore/menu/second instance, settings and on-disk persistence.'
     );

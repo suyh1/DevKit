@@ -62,7 +62,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await openShortcut(".global-sharing-button");
     assert.equal(
       await js('document.querySelectorAll(".sharing-service").length'),
-      3,
+      6,
     );
     assert.equal(
       await js(
@@ -223,7 +223,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       );
       assert.equal(
         await js(
-          '(()=>{const nav=document.querySelector(".floating-nav-links"),r=nav.getBoundingClientRect();return [...nav.querySelectorAll("button")].every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
+          '(()=>{const bar=document.querySelector(".floating-navbar"),r=bar.getBoundingClientRect();return !bar.querySelector(".floating-nav-links")&&[...bar.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
         ),
         true,
         `Navigation clipped at ${width}`,

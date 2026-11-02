@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile, rename, unlink, open, stat, realpath, lstat } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { acquireProjectLock } from './project-lock.mjs';
@@ -29,7 +29,7 @@ function normalize(item) {
   if (path.extname(jar).toLowerCase() !== '.jar') throw new Error('请选择 .jar 文件。');
   const stem = path.basename(jar, path.extname(jar));
   const pidName = fileName(item.pidName, `${stem}.pid`, '.pid'), logName = fileName(item.logName, `${stem}.log`, '.log');
-  if (!['file', 'silent'].includes(item.logMode)) throw new Error('请选择文件日志或静默模式。');
+  if (!['file', 'silent', 'console'].includes(item.logMode)) throw new Error('请选择文件日志、控制台或静默模式。');
   const stopTimeout = Number(item.stopTimeout ?? 15);
   if (!Number.isInteger(stopTimeout) || stopTimeout < 1 || stopTimeout > 120) throw new Error('停止等待时间为 1–120 秒。');
   return { id: item.id || randomUUID(), name: item.name.trim(), jar, executable: item.executable ? absolute(item.executable, 'Java 路径') : '', jvmArgs: argumentsList(item.jvmArgs || [], true), appArgs: argumentsList(item.appArgs || []), logMode: item.logMode, pidName, logName, stopTimeout, ...normalizePolicies(item) };
@@ -151,7 +151,7 @@ export async function createJarManager(directory, dependencies = {}) {
     const java = await runtime.detect({ executable: item.executable, env: effectiveEnvironment(item) });
     if (!java.found) throw new Error(java.output);
     const paths = jarPaths(item);
-    for (const target of [paths.pidPath, paths.identityPath, paths.logPath]) await regular(target);
+    for (const target of [paths.pidPath, paths.identityPath, ...(item.logMode === 'file' ? [paths.logPath] : [])]) await regular(target);
     // Only a PID proven absent may be cleared. Reserve with wx across managers.
     if (await optional(paths.pidPath) !== null) await unlink(paths.pidPath);
     const reservation = await open(paths.pidPath, 'wx', 0o600);
@@ -218,8 +218,30 @@ export async function createJarManager(directory, dependencies = {}) {
     }
     throw new Error(`等待 ${item.stopTimeout} 秒仍未退出；可核对日志后选择“强制终止”。`);
   }
-  async function request(action, value = {}) {
-    if (action === 'get') return snapshot();
+  const sessionKey = value => createHash('sha256').update(value || 'desktop').digest('hex');
+  async function releaseConsoleSession(session) {
+    if (!runtime.supervised) return;
+    await Promise.all(state.instances.filter(item => item.logMode === 'console').map(item => supervisorRequest(item, 'console-revoke', 3000, { session: sessionKey(session) }).catch(() => {})));
+  }
+  async function request(action, value = {}, options = {}) {
+    if (['command', 'detect', 'health-check', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予 JAR 运行管理权限。');
+    if (['upsert', 'remove'].includes(action) && options.allowEdit === false) throw new Error('未授予 JAR 编辑权限。');
+    if (action === 'get') {
+      const result = snapshot();
+      if (options.allowEdit === false) for (const item of result.instances) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
+      return result;
+    }
+    if (action.startsWith('console-')) {
+      const item = find(value.id);
+      if (item.logMode !== 'console') throw new Error('此应用未使用 console 模式。');
+      if (!['console-read', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action)) throw new Error('未知控制台操作。');
+      if (typeof value.clientId !== 'string' || !/^[a-f0-9-]{36}$/.test(value.clientId)) throw new Error('控制台客户端标识无效。');
+      const owner = `${sessionKey(options.session)}:${value.clientId}`;
+      const result = await supervisorRequest(item, action, 8000, { cursor: value.cursor, generation: value.generation, text: value.text, owner, label: `${options.session ? '共享客户端' : '本机客户端'} ${value.clientId.slice(0, 6)}`, renew: options.allowControl !== false });
+      if (!result) return { available: false, lease: null, inputOpen: false };
+      if (result.lease) { const { owner: holder, ...lease } = result.lease; result.lease = { ...lease, mine: holder === owner }; }
+      return { available: true, ...result };
+    }
     if (action === 'detect') return runtime.detect({ executable: value.executable ? absolute(value.executable, 'Java 路径') : '' });
     if (action === 'statuses') {
       const result = []; for (const item of state.instances) result.push(await status(item)); return result;
@@ -279,10 +301,12 @@ export async function createJarManager(directory, dependencies = {}) {
     throw new Error('未知 JAR 操作。');
   }
   return {
-    request(action, value) {
+    request(action, value, options) {
       if (closed) return Promise.reject(new Error('JAR 管理器已关闭。'));
-      const pending = queue.then(() => request(action, value)); queue = pending.catch(() => {}); return pending;
+      if (action.startsWith('console-')) return request(action, value, options);
+      const pending = queue.then(() => request(action, value, options)); queue = pending.catch(() => {}); return pending;
     },
-    async close() { closed = true; await queue; await unlock(); },
+    releaseConsoleSession,
+    async close() { closed = true; await queue; await releaseConsoleSession(); await unlock(); },
   };
 }

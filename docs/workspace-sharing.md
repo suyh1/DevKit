@@ -1,16 +1,19 @@
 # 局域网共享工作台
 
-项目中心、Nginx 配置及 HTTP 工作台使用同一个地址、访问口令和会话。客户端只需现代浏览器；数据、文件路径、nginx 程序和 HTTP 请求都属于共享主机。`127.0.0.1` / `localhost` 指主机，不是访问网页的电脑。
+项目中心、Nginx 配置、HTTP 工作台、JAR 管理、监控中心及日志中心使用同一个地址、访问口令和会话。客户端只需现代浏览器；数据、文件路径、程序和进程都属于共享主机。`127.0.0.1` / `localhost` 指主机，不是访问网页的电脑。
 
 ## 桌面开启
 
-在桌面顶部工具栏的 **局域网共享** 设置监听范围、端口和至少 8 位的独立口令。项目中心、Nginx 配置、HTTP 调试是三个独立服务，可任意组合开放，也可只开放其中一个；首次配置不预选服务。至少选择一个服务才能启动。每项服务的访问权限紧随开放开关显示，关闭服务会清除该项授权，再次开启从只读开始。
+在桌面顶部工具栏的 **局域网共享** 设置监听范围、端口和至少 8 位的独立口令。项目中心、Nginx 配置、HTTP 调试、JAR 管理、监控中心、日志中心是六个独立服务，可任意组合开放，也可只开放其中一个；首次配置不预选服务。至少选择一个服务才能启动。每项服务的访问权限紧随开放开关显示，关闭服务会清除该项授权，再次开启从只读开始。旧配置升级时尚未配置的 JAR 和监控中心默认关闭。
 
 | 服务 | 开放后可查看 | 独立编辑权限 | 独立执行权限 |
 | --- | --- | --- | --- |
 | 项目中心 | 当前档案、项目和入口 | 保存、导入、删除、恢复档案及项目 | 检测项目入口 |
 | Nginx 配置 | 已登记实例、配置、日志、备份 | 登记/修改/删除实例、新建配置、保存文件 | 检测主机程序、检查、启动、重载、优雅停止 |
 | HTTP 调试 | 接口项目、文档和环境 | 保存、恢复接口项目 | 从主机发送请求、取消自己的请求 |
+| 日志中心 | 已授权分类的日志及多窗对照 | 不修改日志或配置 | JAR/Nginx分类读取与日志导出分别授权 |
+| 监控中心 | 监控配置、状态、历史及故障恢复记录 | 维护暂停的监控、关联和维护窗口 | 启用、暂停、立即检测；修改/删除运行中的监控还需编辑权限 |
+| JAR 管理 | 应用列表、状态、日志、控制台输出、自启状态 | 实例、启动参数、环境档案 | Java 检测、启停重启、健康检查、控制台输入、系统自启 |
 
 编辑和执行互不附带授权。例如可只允许 HTTP 调试而禁止修改接口定义，也可只编辑 Nginx 配置而不允许运行命令。所有授权均在主机 API 校验，关闭服务后即使直接调用接口也无法访问。
 
@@ -46,6 +49,9 @@ $env:DEVKIT_SHARE_HTTP = 'true'
 $env:DEVKIT_HTTP_EDIT = 'true'
 $env:DEVKIT_HTTP_SEND = 'true'
 $env:DEVKIT_NGINX_CONTROL = 'true'
+$env:DEVKIT_SHARE_JAR = 'true'
+$env:DEVKIT_JAR_EDIT = 'true'
+$env:DEVKIT_JAR_CONTROL = 'true'
 node server/start.mjs
 ```
 
@@ -55,16 +61,20 @@ Linux 示例：
 DEVKIT_PROJECT_PASSWORD='replace-with-a-separate-password' \
 DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=true DEVKIT_PROJECT_PROBE=true \
 DEVKIT_SHARE_NGINX=true DEVKIT_NGINX_EDIT=true DEVKIT_NGINX_CONTROL=true \
-DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_EDIT=true DEVKIT_HTTP_SEND=true node server/start.mjs
+DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_EDIT=true DEVKIT_HTTP_SEND=true \
+DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/start.mjs
 ```
 
-首次配置必须通过 `DEVKIT_SHARE_PROJECTS=true`、`DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true` 选择至少一个服务，未选服务和未授予权限均关闭。后续启动复用保存的服务与权限；明确设置的环境变量逐项覆盖已有选择，值只接受 `true` / `false`。例如 HTTP 只发送不编辑：首次仅设置 `DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_SEND=true`；已有配置则显式关闭其他服务及 `DEVKIT_HTTP_EDIT`。关闭服务会清除其权限，重新启用时需重新授权。
+首次配置必须通过 `DEVKIT_SHARE_PROJECTS=true`、`DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true`、`DEVKIT_SHARE_JAR=true`、`DEVKIT_SHARE_MONITOR=true`、`DEVKIT_SHARE_LOGS=true` 选择至少一个服务，未选服务和未授予权限均关闭。后续启动复用保存的服务与权限；明确设置的环境变量逐项覆盖已有选择，值只接受 `true` / `false`。例如 HTTP 只发送不编辑：首次仅设置 `DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_SEND=true`；已有配置则显式关闭其他服务及 `DEVKIT_HTTP_EDIT`。关闭服务会清除其权限，重新启用时需重新授权。
 
 | 环境变量 | 含义 |
 | --- | --- |
 | `DEVKIT_SHARE_PROJECTS` / `DEVKIT_PROJECT_EDIT` / `DEVKIT_PROJECT_PROBE` | 项目中心开放 / 编辑 / 入口检测 |
 | `DEVKIT_SHARE_NGINX` / `DEVKIT_NGINX_EDIT` / `DEVKIT_NGINX_CONTROL` | Nginx 开放 / 编辑 / 运行管理 |
 | `DEVKIT_SHARE_HTTP` / `DEVKIT_HTTP_EDIT` / `DEVKIT_HTTP_SEND` | HTTP 开放 / 编辑 / 发送 |
+| `DEVKIT_SHARE_LOGS` / `DEVKIT_LOGS_JAR` / `DEVKIT_LOGS_NGINX` / `DEVKIT_LOGS_EXPORT` | 日志中心开放 / JAR日志 / Nginx日志 / 导出 |
+| `DEVKIT_SHARE_MONITOR` / `DEVKIT_MONITOR_EDIT` / `DEVKIT_MONITOR_CONTROL` | 监控中心开放 / 编辑 / 运行 |
+| `DEVKIT_SHARE_JAR` / `DEVKIT_JAR_EDIT` / `DEVKIT_JAR_CONTROL` | JAR 开放 / 编辑 / 运行管理（含控制台输入与系统自启） |
 
 可复用已保存的口令哈希。默认 `0.0.0.0:8765`；支持 `HOST`、`PORT`、`DEVKIT_PROJECT_DATA`。
 
@@ -81,3 +91,9 @@ DEVKIT_SHARE_HTTP=true DEVKIT_HTTP_EDIT=true DEVKIT_HTTP_SEND=true node server/s
 同端口切换“仅本机/局域网”时，系统无法同时绑定两个重叠地址，会短暂重绑；失败尝试恢复原监听，保留原授权和会话，但既有 TCP 连接可能中断。若其他进程抢占端口导致恢复失败，会报告原因并显示实际停止状态。不同端口应用先验证新监听再关闭旧监听。
 
 门户路由、滚动、复制降级、调试值隔离、运行状态过期和离线退出规则见 [共享网页版说明](portal-browser.md)。专用验证入口为 `npm run test:portal`，使用临时数据和实际 LAN HTTP，覆盖原生点击、滚轮及页面最底部可达性。
+
+JAR 共享与本机共用实例记录、PID 和进程身份校验，远程启动后再次从本机启动会提示已在运行。未授予编辑权限时隐藏环境变量值、JVM 和应用启动参数；输出及应用自身打印的信息仍可查看。控制台允许多人查看，同一时间仅一人持有输入控制权；关闭视图、退出登录或停止共享会释放输入控制权，断线后租约在 20 秒内到期，Java 继续运行。主机运行 JAR 需另装 Java。详见 [JAR 管理](jar-manager.md)。构建后运行 `node scripts/smoke-jar-sharing.mjs` 验证真实 Java、共享权限和双客户端输入。
+
+监控中心由主机定时执行，关闭共享或网页不会停止已启用的监控。关联选择遵循对应项目/JAR服务的开放状态；只读状态页仍需登录。生命周期与记录保留见[监控中心说明](monitor-center.md)。
+
+共享栏目在网页侧栏切换，窄屏通过菜单打开导航；顶部不横排所有栏目。日志中心可以独立开放，按来源分类授权，与原模块的编辑/运行权限无关。见[日志中心](log-center.md)。

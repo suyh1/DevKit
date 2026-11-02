@@ -2,6 +2,9 @@ const fields = {
   projects: ["edit", "probe"],
   nginx: ["edit", "control"],
   http: ["edit", "send"],
+  jar: ["edit", "control"],
+  monitor: ["edit", "control"],
+  logs: ["jar", "nginx", "export"],
 };
 const own = (value, key) => Object.hasOwn(value, key);
 export function emptySharingServices() {
@@ -37,7 +40,8 @@ export function sharingServices(value = {}) {
       throw new Error("共享服务设置无效。");
     const result = emptySharingServices();
     for (const [id, permissions] of Object.entries(fields)) {
-      const service = value.services[id];
+      // Existing v2 settings predate JAR sharing. Migration must never grant it.
+      const service = value.services[id] ?? (['jar', 'monitor', 'logs'].includes(id) ? result[id] : undefined);
       if (
         !service ||
         typeof service !== "object" ||

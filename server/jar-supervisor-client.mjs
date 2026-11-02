@@ -8,7 +8,7 @@ import { inspectJava } from './jar-process.mjs';
 
 export const supervisorPath = item => path.join(path.dirname(item.jar), `${item.pidName}.supervisor.json`);
 export const workerPath = fileURLToPath(new URL('./jar-supervisor-worker.mjs', import.meta.url));
-export async function supervisorRequest(item, command = 'status', timeout = 8000) {
+export async function supervisorRequest(item, command = 'status', timeout = 8000, payload = {}) {
   const file = supervisorPath(item); let raw, record;
   try {
     const info = await lstat(file);
@@ -26,7 +26,7 @@ export async function supervisorRequest(item, command = 'status', timeout = 8000
       });
       const timer = setTimeout(() => request.destroy(new Error('守护进程响应超时。')), timeout);
       request.on('close', () => clearTimeout(timer)); request.on('error', reject);
-      request.end(JSON.stringify({ command }));
+      request.end(JSON.stringify({ ...payload, command }));
     });
   } catch (error) {
     // Only absent PIDs permit removing a stale endpoint. Never signal the supervisor PID.

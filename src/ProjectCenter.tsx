@@ -529,7 +529,7 @@ export default function ProjectCenter({
         </p>
       )}
       <div className="pc-shell">
-        <aside className="pc-profiles">
+        <aside className="pc-profiles" tabIndex={0} aria-label="配置档案">
           <div className="pc-section-title">
             <strong>配置档案</strong>
             <MotionButton outcome={error ? "error" : ""} busy={busy}
@@ -634,7 +634,7 @@ export default function ProjectCenter({
             </span>
           </div>
         </aside>
-        <div className="pc-content">
+        <div className="pc-content" tabIndex={0} role="region" aria-label="当前档案项目">
           <div className="pc-environment">
             <div>
               <h2>{profile.name}</h2>

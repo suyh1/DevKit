@@ -266,7 +266,7 @@ function SharingPanel({
           ) : (
             <>
               <p>
-                统一管理项目中心、Nginx 配置和 HTTP
+                统一管理项目中心、Nginx、HTTP、JAR、监控与日志中心
                 调试的局域网访问。所有路径、文件与运行命令都属于这台主机，退出
                 DevKit 会停止共享。
               </p>
@@ -321,7 +321,7 @@ function SharingPanel({
                 </div>
                 {draft.legacyAccess && (
                   <p className="pc-hint">
-                    已按旧设置转换各服务权限。三个服务现在都可独立关闭，应用后保存为新设置。
+                    已按旧设置转换各服务权限。各服务可独立关闭，尚未配置的 JAR 和监控中心默认不开放，应用后保存为新设置。
                   </p>
                 )}
                 <div className="sharing-services">
@@ -364,6 +364,13 @@ function SharingPanel({
                         ],
                       },
                       {
+                        id: 'jar', name: 'JAR 管理', description: '主机 Java 应用、日志和共享控制台',
+                        permissions: [
+                          { key: 'edit', label: '编辑 JAR 与环境档案', detail: '允许填写主机路径、维护实例、启动参数和环境档案' },
+                          { key: 'control', label: '运行管理与控制台输入', detail: '允许 Java 检测、启动/停止/重启、输入控制及系统自启设置' },
+                        ],
+                      },
+                      {
                         id: "http",
                         name: "HTTP 调试",
                         description: "接口项目、文档与环境",
@@ -380,6 +387,21 @@ function SharingPanel({
                             detail:
                               "允许从主机发送 HTTP(S) 请求及取消自己的请求",
                           },
+                        ],
+                      },
+                      {
+                        id: 'monitor', name: '监控中心', description: '主机定时检测、状态趋势与故障恢复记录',
+                        permissions: [
+                          { key: 'edit', label: '编辑监控配置', detail: '允许维护暂停的监控与关联来源；修改运行中的配置还需运行权限' },
+                          { key: 'control', label: '启停与立即检测', detail: '允许启用、暂停、立即检测；不控制被监控的应用进程' },
+                        ],
+                      },
+                      {
+                        id: 'logs', name: '日志中心', description: '已登记的文件日志、控制台输出与多窗对照',
+                        permissions: [
+                          { key: 'jar', label: '读取 JAR 日志与控制台输出', detail: '允许查看已登记应用的文件日志和内存输出，不包含控制台输入' },
+                          { key: 'nginx', label: '读取 Nginx 日志', detail: '允许查看已登记实例生效配置中的文件日志，不开放配置编辑或运行操作' },
+                          { key: 'export', label: '导出日志', detail: '允许导出已授权来源的有界近期内容，不修改原文件' },
                         ],
                       },
                     ] as const
@@ -426,7 +448,7 @@ function SharingPanel({
                             基础权限：查看
                             {service.id === "nginx"
                               ? "配置、日志和备份"
-                              : service.id === "http"
+                              : service.id === 'logs' ? '日志中心页面；读取内容需另选下方来源分类' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态、日志及控制台输出（环境变量和启动参数不向只读访客显示）' : service.id === "http"
                                 ? "接口文档与环境"
                                 : "项目与档案"}
                             。

@@ -9,17 +9,20 @@ export const setRemoteAccess = (value: RemoteAccess | null) => {
   access = value;
 };
 export const remoteAccess = () => access;
-export const canWriteWorkspace = (module: 'nginx' | 'http') => !access || (access.services ? access.services[module].enabled && access.services[module].edit : access.role !== 'viewer');
+export const canWriteWorkspace = (module: 'nginx' | 'http' | 'jar' | 'monitor') => !access || (access.services ? access.services[module].enabled && access.services[module].edit : access.role !== 'viewer');
+export const canOperateMonitor = () => !access || !!(access.services?.monitor.enabled && access.services.monitor.control);
+export const canOperateJar = () => !access || !!(access.services?.jar.enabled && access.services.jar.control);
 export const canOperateNginx = () => !access || (access.services ? access.services.nginx.enabled && access.services.nginx.control : access.role !== 'viewer' && access.nginxControl === true);
 export const canSendHttp = () => !access || (access.services ? access.services.http.enabled && access.services.http.send : access.role !== 'viewer');
 export async function remoteRequest<T>(
-  module: "http" | "nginx",
+  module: "http" | "nginx" | "jar" | "monitor" | "logs",
   action: string,
   payload?: unknown,
 ): Promise<T> {
   const response = await fetch(`/api/${module}/${action}`, {
     method: "POST",
     credentials: "same-origin",
+    keepalive: module === 'jar' && action === 'console-release',
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload ?? {}),
   });

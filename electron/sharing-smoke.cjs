@@ -146,7 +146,7 @@ app
             `Storage.prototype.getItem=()=>{throw new Error("test blocked preferences")};Storage.prototype.setItem=()=>{throw new Error("test blocked preferences")};true`,
           );
         await click("登录");
-        await wait('!!document.querySelector(".portal-bar nav")');
+        await wait('!!document.querySelector(".portal-sidebar nav")');
       };
       await login();
       assert.equal(
@@ -170,7 +170,7 @@ app
       );
       await wait('document.documentElement.dataset.theme==="dark"');
       console.log("Portal login passed; checking shared API.");
-      await click("HTTP 调试", ".portal-bar button");
+      await click("HTTP 调试", ".portal-navigation button");
       await wait(
         'document.querySelector(".api-workspace")?.textContent.includes("共享API项目")',
       );
@@ -192,7 +192,7 @@ app
         ),
         "Schema worker runs from portal manifest assets",
       );
-      await click("Nginx 配置", ".portal-bar button");
+      await click("Nginx 配置", ".portal-navigation button");
       await wait(
         'document.querySelector(".ng-detail")?.textContent.includes("共享Nginx")',
       );
@@ -277,7 +277,7 @@ app
       );
       await host.start({ ...options, canEdit: false });
       await login();
-      await click("HTTP 调试", ".portal-bar button");
+      await click("HTTP 调试", ".portal-navigation button");
       await wait(
         'document.querySelector(".api-workspace")?.textContent.includes("共享API项目")',
       );
@@ -294,7 +294,7 @@ app
         ),
         true,
       );
-      await click("Nginx 配置", ".portal-bar button");
+      await click("Nginx 配置", ".portal-navigation button");
       await click("全文编辑");
       await wait('!!document.querySelector(".ng-source .cm-content")');
       assert.equal(
@@ -338,7 +338,7 @@ app
       console.log(
         "Portal computed colors:",
         await js(
-          'JSON.stringify({surface:getComputedStyle(document.documentElement).getPropertyValue("--surface"),button:getComputedStyle(document.querySelector(".portal-bar .secondary-button")).backgroundColor,text:getComputedStyle(document.querySelector(".ng-instance-select")).color})',
+          'JSON.stringify({surface:getComputedStyle(document.documentElement).getPropertyValue("--surface"),button:getComputedStyle(document.querySelector(".portal-navigation button")).backgroundColor,text:getComputedStyle(document.querySelector(".ng-instance-select")).color})',
         ),
       );
       // Only HTTP is open: saving definitions and sending requests are independent.
@@ -353,7 +353,7 @@ app
         await wait('!!document.querySelector(".api-workspace")');
         assert.deepEqual(
           await js(
-            '[...document.querySelectorAll(".portal-bar nav button")].map(button=>button.textContent.trim())',
+            '[...document.querySelectorAll(".portal-sidebar nav button")].map(button=>button.textContent.trim())',
           ),
           ["HTTP 调试"],
         );
@@ -420,7 +420,7 @@ app
       await click("继续编辑", ".confirm-dialog button");
       await wait('!document.querySelector("dialog[open]")');
       assert.equal(
-        await js('!!document.querySelector(".portal-bar nav")'),
+        await js('!!document.querySelector(".portal-sidebar nav")'),
         true,
       );
       await click("退出登录", ".portal-bar button");
@@ -445,7 +445,7 @@ app
         );
         assert.equal(
           await js(
-            'document.querySelectorAll(".portal-bar nav button").length',
+            'document.querySelectorAll(".portal-sidebar nav button").length',
           ),
           1,
         );

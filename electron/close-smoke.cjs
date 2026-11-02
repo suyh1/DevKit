@@ -27,7 +27,7 @@ module.exports = async function checkClose(window, output) {
   try {
     await js('window.devkitDesktop.answerClose(true)');
     await request('devkitNginx', 'get'); // Unsolicited close acknowledgements must be ignored.
-    await js('document.querySelector(\'.floating-nav-links [aria-label="Nginx 配置"]\').click()');
+    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
     await button('添加实例', '.ng-center'); await wait('!!document.querySelector(".ng-form-modal[open]")');
     await js(`{const input=document.querySelector('.ng-form-modal input');input.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'退出后仍可编辑');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
     await button('取消', '.ng-form-modal'); await wait('!!document.querySelector(".confirm-dialog[open]")');
@@ -44,8 +44,8 @@ module.exports = async function checkClose(window, output) {
     const reloaded = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
     try { await button('放弃并重新加载'); } catch (error) { if (!/context|frame|disposed/i.test(error.message)) throw error; }
     await reloaded;
-    await wait('!!document.querySelector(\'.floating-nav-links [aria-label="Nginx 配置"]\')');
-    await js('document.querySelector(\'.floating-nav-links [aria-label="Nginx 配置"]\').click()');
+    await wait('!!document.querySelector(\'.sidebar button[title="Nginx 配置"]\')');
+    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
     await wait('!document.querySelector(".ng-busy") && !!document.querySelector(".ng-empty")');
     await button('添加实例', '.ng-center');
     await js(`{const input=document.querySelector('.ng-form-modal input');input.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'重新加载后仍保护草稿');input.dispatchEvent(new Event('input',{bubbles:true}));}`);

@@ -183,13 +183,13 @@ module.exports = async function checkNginx(window, output) {
       await new Promise(resolve=>setTimeout(resolve,200));
       await fs.writeFile(path.join(output, `nginx-help-${theme}.png`), (await window.webContents.capturePage()).toPNG());
     }
-    await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
+    await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
     await wait('!document.querySelector(".ng-help-popover:popover-open")');
     await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
     assert.equal(await js('document.querySelectorAll(".ng-toolbar .ng-help-trigger,.ng-instance-heading .ng-help-trigger,.ng-operation-help,.ng-block>summary .ng-help-trigger").length'), 0, 'Actions and block headings have no question-mark hints');
     await field('server_name', 'ui.local');
     await wait('document.querySelector(".ng-center .ng-warning")?.textContent.includes("未保存")');
-    await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
+    await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
     await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
     assert.equal(await js('[...document.querySelectorAll(".ng-argument input")].find(i=>i.getAttribute("aria-label").startsWith("server_name 第")).value'), 'ui.local');
     await click('保存文件 (1)');

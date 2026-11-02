@@ -1,4 +1,5 @@
 import type { JarInstance, JarPolicies } from './jar-api';
+import { newJarClientId } from './jar-api';
 
 export type RuntimeDraft = Omit<JarPolicies, 'env' | 'profiles'> & { envText: string; profiles: { id: string; name: string; text: string }[] };
 const envText = (env: Record<string, string> = {}) => Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n');
@@ -39,7 +40,7 @@ export default function JarRuntimeSettings({ value, onChange }: { value: Runtime
       <label>公共环境变量<textarea rows={4} placeholder={'TZ=Asia/Shanghai\nAPP_NAME=order-service'} value={value.envText} onChange={event => patch({ envText: event.target.value })} /></label>
       <label>本次启动的环境档案<select value={value.profile} onChange={event => patch({ profile: event.target.value })}><option value="">仅使用公共变量</option>{value.profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name || '未命名环境'}</option>)}</select></label>
       {value.profiles.map((profile, index) => <details className="jar-profile" key={profile.id}><summary>{profile.name || '未命名环境'}{profile.id === value.profile ? ' · 当前' : ''}</summary><label>环境名称<input required maxLength={100} value={profile.name} onChange={event => patch({ profiles: value.profiles.map((old, i) => i === index ? { ...old, name: event.target.value } : old) })} /></label><label>此环境的覆盖变量<textarea rows={4} value={profile.text} placeholder={'SPRING_PROFILES_ACTIVE=test\nSERVER_PORT=8081'} onChange={event => patch({ profiles: value.profiles.map((old, i) => i === index ? { ...old, text: event.target.value } : old) })} /></label><button type="button" className="text-button jar-danger" onClick={() => patch({ profiles: value.profiles.filter((_, i) => i !== index), profile: profile.id === value.profile ? '' : value.profile })}>移除此环境</button></details>)}
-      <button type="button" className="text-button" disabled={value.profiles.length >= 20} onClick={() => patch({ profiles: [...value.profiles, { id: `env-${crypto.randomUUID().slice(0, 8)}`, name: '新环境', text: '' }] })}>添加环境档案</button>
+      <button type="button" className="text-button" disabled={value.profiles.length >= 20} onClick={() => patch({ profiles: [...value.profiles, { id: `env-${newJarClientId().slice(0, 8)}`, name: '新环境', text: '' }] })}>添加环境档案</button>
       <p className="jar-help">每行 KEY=value，值原样使用，不额外包引号；支持 # 注释。继承系统环境，再由公共变量、当前档案依次覆盖。切换环境需先停止应用。</p>
     </details>
     <details className="jar-setting-section" open={r.enabled}><summary>崩溃自动重启</summary>

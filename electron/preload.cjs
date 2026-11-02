@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('devkitNginx', {
 contextBridge.exposeInMainWorld('devkitJar', {
   request: (action, payload) => ipcRenderer.invoke('devkit:jar', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitMonitor', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:monitor', action, payload),
+});
+contextBridge.exposeInMainWorld('devkitLogs', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:logs', action, payload),
+});
 contextBridge.exposeInMainWorld('devkitHttp', {
   request: (action, payload) => ipcRenderer.invoke('devkit:http', action, payload),
 });

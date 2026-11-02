@@ -85,16 +85,22 @@ module.exports = async (window, output) => {
       const execute = require('node:util').promisify(require('node:child_process').execFile);
       const extension = process.platform === 'win32' ? '.exe' : '';
       const bin = path.dirname(java.executable), source = path.join(folder, 'ElectronJarFixture.java'), liveJar = path.join(folder, 'live.jar');
-      await fs.writeFile(source, 'public class ElectronJarFixture { public static void main(String[] args)throws Exception{System.out.println("ELECTRON-SUPERVISOR-READY");while(true)Thread.sleep(100);}}');
+      await fs.writeFile(source, 'public class ElectronJarFixture { public static void main(String[] args)throws Exception{System.setOut(new java.io.PrintStream(System.out,true,"UTF-8"));System.out.println("ELECTRON-SUPERVISOR-READY");java.io.BufferedReader in=new java.io.BufferedReader(new java.io.InputStreamReader(System.in,"UTF-8"));String line;while((line=in.readLine())!=null)System.out.println("ECHO:"+line);while(true)Thread.sleep(100);}}');
       await execute(path.join(bin, `javac${extension}`), ['--release', '8', source]);
       await execute(path.join(bin, `jar${extension}`), ['cfe', liveJar, 'ElectronJarFixture', '-C', folder, 'ElectronJarFixture.class']);
-      const result = await js(`window.devkitJar.request('get').then(r=>window.devkitJar.request('upsert',{revision:r.data.revision,instance:{name:'Electron 独立守护',jar:${JSON.stringify(liveJar)},executable:${JSON.stringify(java.executable)},logMode:'file'}}))`);
+      const result = await js(`window.devkitJar.request('get').then(r=>window.devkitJar.request('upsert',{revision:r.data.revision,instance:{name:'Electron 独立守护',jar:${JSON.stringify(liveJar)},executable:${JSON.stringify(java.executable)},logMode:'console'}}))`);
       assert.equal(result.error, undefined); const live = result.data.instances.find(item => item.jar === liveJar);
       try {
         await click('刷新'); await wait('document.querySelector(".jar-table")?.textContent.includes("Electron 独立守护")');
         await click('启动'); await wait('document.querySelector(".jar-table")?.textContent.includes("独立守护中")');
-        const log = await js(`window.devkitJar.request('log-tail',{id:${JSON.stringify(live.id)}})`);
-        assert.match(log.data.text, /ELECTRON-SUPERVISOR-READY/);
+        await wait('document.querySelector(".jar-console pre")?.textContent.includes("ELECTRON-SUPERVISOR-READY")');
+        await click('取得输入控制权'); await wait('!document.querySelector(".jar-console-input input").disabled');
+        await js(`{const input=document.querySelector('.jar-console-input input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'console 中文');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
+        await click('发送'); await wait('document.querySelector(".jar-console pre")?.textContent.includes("ECHO:console 中文")');
+        await fs.writeFile(path.join(output, 'jar-console-light.png'), (await window.webContents.capturePage()).toPNG());
+        await js('document.querySelector(\'button[aria-label="关闭控制台"]\').click()');
+        assert.equal(await js('document.querySelector(".jar-status").textContent'), '运行中');
+        await click('控制台'); await wait('document.querySelector(".jar-console pre")?.textContent.includes("ECHO:console 中文")');
         await click('停止'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止 JAR', '.confirm-dialog[open]');
         await wait('document.querySelector(".jar-status")?.textContent === "已停止"');
       } finally { await js(`window.devkitJar.request('command',{id:${JSON.stringify(live.id)},command:'force-stop'})`); }

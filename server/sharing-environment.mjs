@@ -25,6 +25,9 @@ export function sharingFromEnvironment(env, saved = {}) {
       edit: "DEVKIT_HTTP_EDIT",
       send: "DEVKIT_HTTP_SEND",
     },
+    jar: { enabled: 'DEVKIT_SHARE_JAR', edit: 'DEVKIT_JAR_EDIT', control: 'DEVKIT_JAR_CONTROL' },
+    monitor: { enabled: 'DEVKIT_SHARE_MONITOR', edit: 'DEVKIT_MONITOR_EDIT', control: 'DEVKIT_MONITOR_CONTROL' },
+    logs: { enabled: 'DEVKIT_SHARE_LOGS', jar: 'DEVKIT_LOGS_JAR', nginx: 'DEVKIT_LOGS_NGINX', export: 'DEVKIT_LOGS_EXPORT' },
   }))
     for (const [key, variable] of Object.entries(variables))
       services[id][key] = read(variable, services[id][key]);

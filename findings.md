@@ -327,3 +327,28 @@ v1.12.7已发布为latest，包含九套深浅主题、项目中心批量删除�
 - Windows S4U开机任务在当前非管理员环境返回Access is denied，已转换为明确中文权限提示；不自动提权、不降级伪装成功。任务查询区分ObjectNotFound与PermissionDenied。Linux仍待实机验证。
 
 - 1.13.0正式发布：https://github.com/suyh1/DevKit/releases/tag/1.13.0 。Release429158294，source575463b5cf062a424f6b3c4ea31afa4df2853755，CI41076114254四项成功，14附件远端摘要与大小全部匹配，latest确认；完整包内与实际载荷验证见artifacts/release-1.13.0。
+
+## 2026-10-31 console方案
+- 用户已确认工具内应用控制台：三模式silent/file/console；关闭面板、切页或断线不停止JAR。多人查看、运行授权用户单写者输入。远程和本机复用同一管理器与PID防重复启动。
+- 比较xterm.js（MIT，约21.3k stars，浏览器终端渲染）与node-pty（MIT，原生PTY/ConPTY，需跨Electron ABI/架构编译，Windows1809+）；本轮是应用标准IO行控制台，不引入PTY/系统shell或原生依赖。参考https://github.com/xtermjs/xterm.js 与 https://github.com/microsoft/node-pty 。采用有界输出缓冲、独立输出游标/运行代次与可过期输入租约；明确System.console()/全屏终端不是此控制台目标。
+
+## 2026-11-02 项目中心布局
+- pc-shell只有min-height:500px，无受限高度与内部滚动，Grid被档案或项目的固有高度撑开。桌面外层workspace和网页portal-content提供总体滚动。
+- 现有四个共享栏目：http/projects/nginx/jar；保留工作区中已有JAR共享与打包修改。
+
+- 开源对标（2026-11-02 GitHub API）：Uptime Kuma 93,177 stars / MIT；Bruno 47,986 / MIT；Dockge 24,743 / MIT；Dozzle 14,785 / MIT；CloudBeaver 5,215 / Apache-2.0，均未归档且近期有push。Jpom首页出现暂停维护链接，不作为优先对标。
+- 依赖与边界：Kuma是Node/Vue监控服务；Bruno为Electron/Node请求集合；Dockge需要Docker Compose；Dozzle为Go日志服务且不存储历史；CloudBeaver依赖Java/JDBC，整体嵌入明显增加发行体积。借鉴流程，不新增这些依赖。
+
+## 2026-11-02 监控中心实现依据
+- Uptime Kuma(MIT，约93.2k)采用常驻服务探测与状态页；Upptime(MIT，约17.2k)依赖GitHub Actions/Git记录，无法满足离线内网和秒级检测。选择现有Node主机内调度，不引入Vue/数据库或GitHub依赖。
+- 复用既有项目URL解析、JAR健康配置、目录锁与原子保存方式；新服务默认关闭，查看/编辑/运行分权。
+- 定义检测样本可用率，停止主机期间不补造样本；维护窗口暂停检测，不伪造成功。
+
+- 监控中心采用无额外依赖的Node主机调度，最多3个并发，每次完成后计算下次时间；历史与配置原子保存，配置版本和后台样本分离。
+- 共享第五服务默认关闭，编辑用户只能维护暂停项；运行中的监控改配置/删除需编辑+运行双权限。关联选择不会暴露未开放项目/JAR或环境值。
+- 1440px新增栏目导致顶部导航拥挤，已将图标导航断点扩展到1480px，实际截图核对操作按钮完整。
+
+## 2026-11-02 日志中心
+- 对比Dozzle(MIT，约14.8k，Go/Vue，实时多窗日志，不保存历史)与lnav(BSD-2-Clause，约10.8k，原生终端日志分析)。借鉴有界实时流和多窗对照，不引入Docker或原生终端依赖。
+- JAR/Nginx均已有受限日志读取；中心只聚合已登记来源，不允许访客填写任意文件路径。console模式复用既有有界输出游标。
+- gh不在当前PATH，后续使用现有Git凭据和GitHub API/本机可用CLI路径发布，绝不输出凭据。

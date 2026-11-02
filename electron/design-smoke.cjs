@@ -115,16 +115,16 @@ module.exports = async function designSmoke(window, output) {
   await js('document.querySelector(".color-story-card").click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
-  await js('document.querySelector(\'.floating-nav-links button[aria-label="项目中心"]\').click()');
+  await js('document.querySelector(\'.sidebar button[title="项目中心"]\').click()');
   await wait('!!document.querySelector(".project-workspace:not([hidden]) .pc-shell")');
   await js("document.documentElement.dataset.theme = 'dark'");
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".pc-shell")).backgroundColor'), 'rgb(28, 30, 34)');
   await fs.writeFile(path.join(output, 'design-projects-dark.png'), (await window.webContents.capturePage()).toPNG());
   await js("document.documentElement.dataset.theme = 'light'");
-  await js('document.querySelector(\'.floating-nav-links button[aria-label="收藏"]\').click()');
+  await js('document.querySelector(\'.sidebar button[title="我的收藏"]\').click()');
   await wait('document.querySelector(".collection-welcome h1")?.textContent === "你的常用工具"');
-  await js('document.querySelector(\'.floating-nav-links button[aria-label="工作空间"]\').click()');
+  await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
   await wait('!!document.querySelector(".overview-workspace:not([hidden]) .home-bento")');
   await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
   window.setSize(...size); window.setMinimumSize(...minimum);
@@ -165,7 +165,7 @@ module.exports = async function designSmoke(window, output) {
         if (width === 1440) await fs.writeFile(path.join(output, `design-theme-${style}-${mode}.png`), (await window.webContents.capturePage()).toPNG());
       }
       window.setContentSize(1440, 1000);
-      await js(`document.querySelector('.floating-nav-links button[aria-label="工作空间"]').click()`);
+      await js(`document.querySelector('.sidebar button[title="工作台"]').click()`);
       await settle();
       await fs.writeFile(path.join(output, `design-home-${style}-${mode}.png`), (await window.webContents.capturePage()).toPNG());
       await js(`document.querySelector('.sidebar button[title="设置"]').click()`);
