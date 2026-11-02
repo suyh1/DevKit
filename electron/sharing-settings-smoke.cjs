@@ -223,7 +223,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       );
       assert.equal(
         await js(
-          '(()=>{const bar=document.querySelector(".floating-navbar"),r=bar.getBoundingClientRect();return !bar.querySelector(".floating-nav-links")&&[...bar.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
+          '(()=>{const bar=document.querySelector(".floating-navbar"),r=bar.getBoundingClientRect(),nav=bar.querySelector(".floating-nav-links");return nav.querySelectorAll("button").length===2&&!!nav.querySelector("[aria-label=工作空间]")&&!!nav.querySelector("[aria-label=收藏]")&&[...bar.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
         ),
         true,
         `Navigation clipped at ${width}`,
