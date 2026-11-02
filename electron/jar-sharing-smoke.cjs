@@ -66,6 +66,8 @@ app.whenReady().then(async () => {
     await click(first, '发送'); await wait(second, 'document.querySelector(".jar-console pre")?.textContent.includes("PORTAL-ECHO:远程 console")');
     await assert.rejects(manager.request('command', { id: item.id, command: 'start' }), /已在运行/);
     await js(first, 'document.querySelector(\'button[aria-label="关闭控制台"]\').click()');
+    await wait(first, '!document.querySelector(".jar-console")');
+    await wait(second, 'document.querySelector(".jar-console-control")?.textContent.includes("当前无人控制输入")');
     await click(second, '取得输入控制权'); await wait(second, '!document.querySelector(".jar-console-input input").disabled');
     assert.equal((await manager.request('statuses'))[0].state, 'running');
     second.show(); second.focus(); await new Promise(resolve => setTimeout(resolve, 500));
