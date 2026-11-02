@@ -426,5 +426,5 @@ Build an offline cross-platform developer desktop toolkit, with Windows exe and 
 - [x] 调研、确定日志来源与权限/容量边界，核对发行基线。
 - [x] 完成日志聚合、增量追踪、搜索、多窗对照与导出；桌面侧栏及共享网页响应式侧栏。
 - [x] 文档、后端和真实UI回归，版本更新与发行检查。
-- [ ] 提交推送，制作并校验三平台桌面包/独立服务包，等待同源CI。
-- [ ] 发布GitHub Release并核对全部远端附件。
+- [x] 提交推送，制作并校验三平台桌面包/独立服务包，等待同源CI。
+- [x] 发布GitHub Release并核对全部远端附件。
