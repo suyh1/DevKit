@@ -44,6 +44,8 @@ import { useBeforeUnload, useConfirmation } from "./Confirmation";
 import { saveText } from "./files";
 import "./api-workspace.css";
 
+const folderOrder = new Intl.Collator("zh-CN-u-co-pinyin", { sensitivity: "base" });
+
 const readPreference = (key: string) => {
   try {
     return localStorage.getItem(key);
@@ -274,11 +276,12 @@ export default function ApiWorkspace({
     sendRef.current = value;
     setSending(value);
   }
+  const query = search.trim().toLowerCase();
   const visible =
     project?.endpoints.filter((item) =>
       `${item.name} ${item.method} ${item.path} ${item.group}`
         .toLowerCase()
-        .includes(search.trim().toLowerCase()),
+        .includes(query),
     ) || [];
   const unsaved = !!draft && !saved;
   return (
@@ -406,14 +409,15 @@ export default function ApiWorkspace({
                   <Search size={14} />
                   <input
                     aria-label="搜索API接口"
-                    placeholder="搜索名称、方法或路径"
+                    placeholder="搜索名称、方法、路径或目录"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                   />
                 </label>
                 {unsaved && draft && <div className="api-draft-item" role="status"><span className={'api-method method-' + draft.method.toLowerCase()}>{draft.method}</span><div><strong>{draft.name || '新接口'} · 未保存草稿</strong><small>{draft.path}</small><small>仅在当前页面，保存后进入项目目录</small></div></div>}
-                {[...new Set(["", ...project.groups])].map((group) => {
+                {[...new Set(["", ...project.groups])].sort(folderOrder.compare).map((group) => {
                   const rows = visible.filter((item) => item.group === group);
+                  if (query && !rows.length) return null;
                   return (
                     <details className="api-folder" key={group} open>
                       <summary>
@@ -447,7 +451,7 @@ export default function ApiWorkspace({
                 })}
                 {!visible.length && (
                   <p className="api-empty-note">
-                    {search ? "没有匹配的接口。" : unsaved ? "当前有未保存草稿，请在右侧继续编辑。" : "点击 + 添加第一个接口。"}
+                    {query ? "没有匹配的接口。" : unsaved ? "当前有未保存草稿，请在右侧继续编辑。" : "点击 + 添加第一个接口。"}
                   </p>
                 )}
                 <div className="api-sidebar-actions">

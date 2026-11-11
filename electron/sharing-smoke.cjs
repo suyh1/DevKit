@@ -62,9 +62,14 @@ app
               name: "共享API项目",
               description: "",
               baseUrl: `http://127.0.0.1:${target.address().port}`,
-              groups: [],
+              groups: ["zeta", "alpha", "账户", "订单", "Beta"],
               environments: [],
-              endpoints: [endpoint],
+              endpoints: [
+                endpoint,
+                { ...newApiEndpoint("lookup", "alpha"), name: "查询用户", path: "/lookup" },
+                { ...newApiEndpoint("create", "alpha"), name: "创建用户", path: "/create" },
+                { ...newApiEndpoint("status", "zeta"), name: "服务状态", path: "/status" },
+              ],
             },
           ],
         },
@@ -174,6 +179,25 @@ app
       await wait(
         'document.querySelector(".api-workspace")?.textContent.includes("共享API项目")',
       );
+      const folderNames = () => js(
+        'Array.from(document.querySelectorAll(".api-folder summary span"), item => item.textContent)',
+      );
+      const searchApi = (value) => js(`(() => {
+        const input = document.querySelector('input[aria-label="搜索API接口"]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, ${JSON.stringify(value)});
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      })()`);
+      const fullDirectory = ["未分组", "订单", "账户", "alpha", "Beta", "zeta"];
+      assert.deepEqual(await folderNames(), fullDirectory);
+      await searchApi(" LOOKUP ");
+      assert.deepEqual(await folderNames(), ["alpha"]);
+      assert.equal(await js('document.querySelector(".api-folder summary small")?.textContent'), "1");
+      assert.equal(await js('document.querySelector(".api-folder .api-tree-item strong")?.textContent'), "查询用户");
+      await searchApi("不存在的接口");
+      assert.deepEqual(await folderNames(), []);
+      assert.equal(await js('document.querySelector(".api-empty-note")?.textContent'), "没有匹配的接口。");
+      await searchApi("");
+      assert.deepEqual(await folderNames(), fullDirectory);
       await click("运行调试");
       await click("发送API请求");
       await wait('!!document.querySelector(".api-live-response")');
