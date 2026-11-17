@@ -24,6 +24,8 @@ import CodeEditor from "./CodeEditor";
 import { httpCode } from "./http-code";
 import { copyText } from "./motion-primitives";
 import { saveText } from "./files";
+import { DisplayModeProvider } from './DisplayMode';
+import type { DisplayMode } from './DisplayMode';
 
 const modules = [
   { id: "projects", name: "项目中心" },
@@ -63,7 +65,7 @@ function remember(key: string, value: string) {
   }
 }
 
-function PortalTheme() {
+function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: DisplayMode) => void }) {
   const [themeStyle, setThemeStyle] = useState(() => normalizeThemeStyle(preference("devkit:portal-theme-style", "default")));
   useEffect(() => {
     document.documentElement.dataset.themeStyle = themeStyle;
@@ -88,6 +90,10 @@ function PortalTheme() {
   }, [theme]);
   return (
     <div className="portal-appearance">
+      <select aria-label="共享页面运行模式" value={mode} onChange={event => setMode(event.target.value === 'performance' ? 'performance' : 'normal')}>
+        <option value="normal">正常模式</option>
+        <option value="performance">性能模式</option>
+      </select>
       <label className="portal-theme">
         <span className="sr-only">主题风格</span>
         <select aria-label="共享页面主题风格" value={themeStyle} onChange={event => setThemeStyle(normalizeThemeStyle(event.target.value))}>
@@ -200,6 +206,12 @@ function RequestCode({ source, close }: { source: string; close: () => void }) {
 }
 
 export default function SharedPortal() {
+  const [mode, setMode] = useState<DisplayMode>(() => preference('devkit:portal-display-mode', 'normal') === 'performance' ? 'performance' : 'normal');
+  useEffect(() => remember('devkit:portal-display-mode', mode), [mode]);
+  return <DisplayModeProvider mode={mode}><Portal mode={mode} setMode={setMode} /></DisplayModeProvider>;
+}
+
+function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: DisplayMode) => void }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -305,7 +317,9 @@ export default function SharedPortal() {
     setRemoteAccess(normalized.authenticated ? normalized : null);
     setSession(normalized);
     if (normalized.authenticated) {
-      const requested = hashPage() || page;
+      const linked = hashPage();
+      const requested = linked || page;
+      if (linked && !normalized.services?.[linked]?.enabled) setNotice(`目标主机未开放${modules.find(module => module.id === linked)?.name || '所选服务'}。`);
       const next = normalized.services?.[requested]?.enabled
         ? requested
         : modules.find((module) => normalized.services?.[module.id].enabled)
@@ -445,7 +459,7 @@ export default function SharedPortal() {
         {session?.authenticated && <button className="portal-menu-button secondary-button" aria-label="打开共享导航" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={18} /></button>}
         <strong>DevKit 共享工作台</strong>
         <div className="portal-account">
-          <PortalTheme />
+          <PortalTheme mode={mode} setMode={setMode} />
           {session?.authenticated && (
             <button
               className="text-button portal-logout"

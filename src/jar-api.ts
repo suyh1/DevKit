@@ -13,9 +13,11 @@ export type JarStatus = { id: string; state: 'running' | 'stopped' | 'exited' | 
 export type JarStartup = { enabled: boolean; mode: 'login' | 'boot'; platform: string; target?: string; installedAt?: string; error?: string };
 export type JavaDetection = { found: boolean; executable: string; version: string; output: string };
 export type JarLog = { path: string; text: string; size: number; truncated: boolean };
+export type JarConfigList = { directory: string; files: string[] };
+export type JarConfigDocument = { name: string; content: string; hash: string };
 export type JarCommand = 'start' | 'stop' | 'restart' | 'force-stop';
 export type JarConsoleSnapshot = { available: boolean; generation?: string; cursor?: number; end?: number; text?: string; reset?: boolean; truncated?: boolean; inputOpen: boolean; phase?: string; lease: { label: string; expiresAt: number; mine: boolean } | null };
-type JarAction = 'get' | 'detect' | 'statuses' | 'upsert' | 'remove' | 'command' | 'pick' | 'log-tail' | 'health-check' | 'startup-get' | 'startup-install' | 'startup-remove' | 'console-read' | 'console-claim' | 'console-input' | 'console-eof' | 'console-release';
+type JarAction = 'get' | 'detect' | 'statuses' | 'upsert' | 'remove' | 'command' | 'pick' | 'log-tail' | 'health-check' | 'startup-get' | 'startup-install' | 'startup-remove' | 'console-read' | 'console-claim' | 'console-input' | 'console-eof' | 'console-release' | 'config-list' | 'config-read' | 'config-save' | 'config-backup';
 declare global { interface Window { devkitJar?: { request: (action: JarAction, payload?: unknown) => Promise<unknown> } } }
 export async function jarRequest<T>(action: JarAction, payload?: unknown): Promise<T> {
   if (!window.devkitJar) return remoteRequest<T>('jar', action, payload);

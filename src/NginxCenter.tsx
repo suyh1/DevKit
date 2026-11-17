@@ -1,4 +1,6 @@
 import { SharingButton } from './Sharing';
+import LanHosts from './LanHosts';
+import { usePerformanceMode } from './DisplayMode';
 import { remoteAccess, canWriteWorkspace, canOperateNginx } from './workspace-remote';
 import { MotionButton, MotionGroup, MotionDetails, MotionPresence } from './Motion';
 import { buttonFeedback } from './motion-primitives';
@@ -128,6 +130,7 @@ function ConfigTree({ nodes, source, apply, add, remove, pending, query, paths, 
 }
 
 export default function NginxCenter({ active, scrollRoot }: { active: boolean; scrollRoot?: HTMLElement | null }) {
+  const performanceMode = usePerformanceMode();
   const editorHelpId = useId(), searchHelpId = useId(), snippetHelpId = useId();
   useEffect(() => {
     if (!active) document.querySelectorAll<HTMLElement>('.ng-help-popover:popover-open').forEach(popup => popup.hidePopover());
@@ -214,11 +217,11 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
     if (!active || !state) return;
     if (!locked.current && !polling.current) { polling.current = true; void refreshStatuses().catch(() => {}).finally(() => { polling.current = false; }); }
     const timer = setInterval(() => {
-      if (locked.current || polling.current) return;
+      if (locked.current || polling.current || document.hidden) return;
       polling.current = true; void refreshStatuses().catch(() => {}).finally(() => { polling.current = false; });
-    }, 15000);
+    }, performanceMode ? 45000 : 15000);
     return () => clearInterval(timer);
-  }, [active, !!state]);
+  }, [active, !!state, performanceMode]);
   useBeforeUnload(dirty);
   function changeContent(value: string) { setNotice(''); setDrafts(values => ({ ...values, [file]: value })); setOutput(null); }
   const pending = (key: number, value: boolean) => setFieldPending(values => values[key] === value ? values : { ...values, [key]: value });
@@ -247,7 +250,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   }
   if (!window.devkitNginx && !remoteAccess()) return <section className="ng-center"><header className="ng-heading"><Server /><div><h1>Nginx 配置</h1><p>可视化编辑配置文件，按主配置管理本机 Nginx 实例。</p></div></header><p className="ng-warning">请使用 DevKit Windows / Linux 桌面端打开此功能。</p></section>;
   return <section className="ng-center" aria-label="Nginx 配置工作区">
-    <header className="ng-heading"><span className="ng-heading-icon"><Server size={25} /></span><div><h1>Nginx 配置</h1><p>配置文件与运行实例，在一个工作区维护。</p></div><div className="ng-actions"><SharingButton /><MotionButton busy={busy} className="text-button"  disabled={busy} onClick={() => discardThen(() => void task(() => refresh()))}><RefreshCw size={15} />刷新</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy || dirty || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><Plus size={16} />添加实例</MotionButton></div></header>
+    <header className="ng-heading"><span className="ng-heading-icon"><Server size={25} /></span><div><h1>Nginx 配置</h1><p>{window.devkitNginx ? '本机配置文件与运行实例。' : '共享主机的配置文件与运行实例。'}</p></div><div className="ng-actions"><LanHosts module="nginx" /><SharingButton /><MotionButton busy={busy} className="text-button"  disabled={busy} onClick={() => discardThen(() => void task(() => refresh()))}><RefreshCw size={15} />刷新</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy || dirty || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><Plus size={16} />添加实例</MotionButton></div></header>
     {error && <p className="ng-error ng-message" role="alert">{error}</p>}{notice && <p className="ng-notice ng-message" role="status">{notice}</p>}
     {busy && <p className="ng-busy" role="status">正在处理…</p>}
     {!state ? <div className="ng-empty-loading" role="status">{busy ? '正在读取实例…' : '请刷新以读取实例列表。'}</div> : !state.instances.length ? <div className="ng-empty"><span className="ng-empty-icon"><Server size={28} /></span><h2>尚未添加 Nginx 实例</h2><p>每个实例使用一份主配置，可关联多份附属文件。<br />Windows 和 Linux 均支持相同的多文件配置。</p><div className="ng-empty-actions"><MotionButton busy={busy} className="run-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('create')}><Plus size={16} />新建配置</MotionButton><MotionButton busy={busy} className="secondary-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><FolderOpen size={16} />导入已有文件</MotionButton></div><small>{remoteAccess() ? "填写共享主机目录以生成配置，或登记主机已有配置。" : "可选择目录生成一套配置，或将已有配置加入工作区。"}</small></div> : <div className="ng-layout"><aside className="ng-instances" aria-label="Nginx 实例列表">{state.instances.map(instance => {

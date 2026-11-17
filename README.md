@@ -5,14 +5,14 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、Nginx 配置与实例管理、接口设计、文档与调试一体化工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.14.1**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。项目中心共享、手动入口检测、启用的定时监控和显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
+当前版本：**v1.15.0**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.14.1_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.14.1/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.15.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.15.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，使用顶部工具栏的“局域网共享”统一开放模块和设置权限。
-4. 需要维护本机 Nginx 时，打开与项目中心平级的“Nginx 配置”，登记主文件、附属文件、运行目录与 nginx 程序。默认按字段编辑，也可切换全文；保存后检查配置，再启动或重载。
+4. 打开“JAR 管理”或“Nginx 配置”维护本机实例。管理其他电脑时，点击“局域网主机”，选择 DevKit 共享或 SSH，连接后按目标主机的绝对路径登记和操作。
 5. 打开“HTTP 调试”，在“接口项目”中维护项目、目录、接口定义和环境变量，切换接口设计、文档与运行调试。接口目录按拼音或字母排列，搜索时仅显示有匹配接口的目录。支持响应 Schema 校验、OpenAPI/Swagger JSON/YAML 导入导出、Markdown 文档和完整项目备份。原来的“快速请求”保留集合、历史和代码生成流转。全部界面与数据可离线使用，只有点击发送才访问目标服务，详见 [HTTP/API 工作台说明](docs/http-workbench.md)。
 6. 点击窗口关闭按钮，选择“退出软件”或“最小化到托盘”，可勾选记住选择；在“偏好设置 → 窗口与托盘”中随时改回每次询问。托盘菜单可打开或退出，真正退出时仍检查未保存草稿。
 
@@ -127,8 +127,8 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 监控中心 | 工作台 | 主机定时 HTTP/TCP 检测、项目与 JAR 关联、响应耗时和样本可用率历史、故障恢复记录及维护窗口；支持共享查看，编辑与运行分别授权。 |
 | HTTP 调试 | 工作台 | 可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。 |
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
-| Nginx 配置 | 工作台 | 从目录创建或导入主配置与附属文件，可视化编辑并管理 Windows / Linux 主机 Nginx，支持局域网远程填写主机实例与路径、编辑配置、查看日志与授权运行操作。 |
-| JAR 管理 | 工作台 | 可共享的 Windows / Linux 主机 Java 应用列表，支持 Java 检测、启停/重启、console 交互控制台、运行与健康监视、日志轮转、环境档案、崩溃退避重启和系统自启；编辑与运行分别授权。 |
+| Nginx 配置 | 工作台 | 创建或登记主配置与附属文件，可视化编辑并管理 Windows / Linux 实例。桌面通过 DevKit 共享或 SSH 连接局域网主机，编辑、检查与重载目标机配置。 |
+| JAR 管理 | 工作台 | 管理 Windows / Linux 的 Java 应用，支持启停重启、控制台、日志、健康检查和同目录 YAML 等配置编辑。桌面通过 DevKit 共享或 SSH 登记并运行局域网主机上的 JAR。 |
 
 ### 经纬度处理
 
@@ -151,6 +151,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 - **文件输入输出**：支持拖入或选择文本文件，最多 8 MB 且不超过 2,000,000 字符，可读取 UTF-8 与带 BOM 的 UTF-16 LE/BE。桌面导出使用原生另存对话框，浏览器预览使用下载。
 - **工作区与偏好**：可主动保存、恢复文本任务；默认排除密码、JWT、HMAC，颜色任务和图片不写入工作区。主题风格提供默认、极简扁平、自然有机、编辑杂志、新野兽派、柔和界面、macOS 毛玻璃、现代渐变、复古怀旧，每套独立支持浅色、深色、跟随系统；原有深浅配色保留为默认主题。桌面设置和共享网页均可选择，另有密度、启动工具及设置 / 收藏导入导出。
 - **窗口与托盘**：关闭按钮默认询问退出或进入托盘，可记住并在设置中修改；托盘保留草稿、运行中的请求与项目共享服务。托盘创建失败时保留可见窗口；Linux 托盘显示依赖桌面环境支持。关闭偏好存放在 Electron 用户数据目录的 `desktop-settings.json`，独立于设置 / 收藏导入导出。
+- **性能模式**：在“偏好设置 → 性能”切换正常模式和性能模式。性能模式即时减少动画、背景模糊和界面自动刷新，设置随偏好保存。共享网页可独立选择运行模式。
 
 | 快捷键 | 操作 |
 | --- | --- |
@@ -169,6 +170,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 
 ## Nginx 配置
 
+- **远程主机**：桌面“局域网主机”共用主机列表。DevKit 共享连接按目标机授权开放完整工作台。SSH 可登记、编辑主配置和附属文件，运行检查及重载，目标机可仅开启 SSH 并安装 Nginx。见 [连接与权限](docs/workspace-sharing.md)。
 - **多实例与多文件**：Windows / Linux 每个实例均可登记一个主配置及多个附属文件，按 include 递归发现（包括通配符）或手动添加。没有文件时选择“新建配置”，指定目录、主/附属文件名和端口，生成已互相引用的双文件配置及运行目录，创建后直接进入编辑；已有同名配置不会覆盖。导入已有文件时仅登记，不自动改写 include。
 - **字段与全文编辑**：默认按 `http` / `server` / `location` 等层级显示字段，提供端口、域名、静态目录、代理目标、请求头、日志、PID 等说明，保留未知指令、重复指令、注释和原有布局。可新增/删除指令或配置块；主文件与附属文件的全文模式均提供 Nginx 语法高亮，区分指令、参数、变量、数字和注释，适配深浅主题，并支持行号、查找与撤销。
 - **新手填写提示**：仅在输入字段旁保留“？”，支持悬停、点击和键盘聚焦查看中文用途、示例及路径基准，点击外部或按Esc关闭；操作按钮、配置块标题及汇总说明不再额外显示提示。
@@ -186,6 +188,10 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 ## JAR 管理
 
 与“Nginx 配置”平级的主机应用列表，支持 Windows / Linux 选择 JAR、自动获取目录与文件名、自定义显示名称、检测 Java 或指定每个应用的 Java 路径。桌面与共享网页使用同一份实例和 PID；远程启动后本机再次启动会提示已在运行，后端串行校验防止重复进程。可填写 JVM / 应用参数及公共环境变量，维护开发、测试、生产等档案并选择启动环境；档案覆盖公共变量，不修改系统环境。
+
+通过“局域网主机”可以在目标 Windows / Linux 电脑上登记并启动已有的 JAR。DevKit 共享连接在独立窗口打开远程工作台。SSH 连接复用系统 OpenSSH 的主机指纹与密钥登录，提供远程启停、重启、状态及日志，目标机需要 SSH 与 Java。
+
+应用列表的“配置文件”可选择同目录下多份 UTF-8 YAML、Properties、JSON、XML、TOML、INI、CONF 或 CFG 文件，逐个编辑、预览差异和保存。保存检查磁盘版本并备份上一版；可将备份载入草稿后保存。共享访客需要 JAR 编辑权限。
 
 提供 silent、file、console 三种启动模式。console 在工具内显示实时 UTF-8 标准输出与错误，支持搜索、复制、清空本页、暂停滚动及行输入/EOF；多人同时查看，有运行权限的客户端一次只有一个可取得输入控制权，断线后租约到期。关闭控制台或共享网页不停止应用，重新打开可查看仍保留的输出；console 仅保留有界内存输出，不写标准输出日志文件，不提供 PTY 或系统 Shell。
 
@@ -237,7 +243,7 @@ PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.14.1_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.15.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -269,13 +275,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.14.1_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.14.1-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.14.1-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.15.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.15.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.15.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
 | 当前系统解压版 | `npm run bundle:host` | `artifacts/desktop-runtime/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.14.1/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.14.1/DevKit_ProjectCenter_1.14.1_node24.zip` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.15.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.15.0/DevKit_ProjectCenter_1.15.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

@@ -2,6 +2,21 @@
 
 项目中心、Nginx 配置、HTTP 工作台、JAR 管理、监控中心及日志中心使用同一个地址、访问口令和会话。客户端只需现代浏览器；数据、文件路径、程序和进程都属于共享主机。`127.0.0.1` / `localhost` 指主机，不是访问网页的电脑。
 
+## 从桌面管理多台主机
+
+在“JAR 管理”或“Nginx 配置”顶部打开“局域网主机”。两个模块使用同一个地址簿，可保存名称及连接信息。连接后填写相应主机上的绝对路径。
+
+| 连接方式 | 目标端准备 | 操作范围 |
+| --- | --- | --- |
+| DevKit 共享 | 运行 DevKit 桌面或独立共享服务，选择要开放的模块并设置口令和权限 | 在独立的 DevKit 窗口使用目标电脑的完整共享工作台 |
+| SSH | 开启 OpenSSH Server，给账号文件读写及相关程序运行权限。JAR 需要 Java，Nginx 需要 nginx | JAR 登记、启停重启、状态、日志和同目录配置；Nginx 主配置和附属文件编辑、检查及重载 |
+
+SSH 使用管理电脑上的 `ssh` 客户端，以及它现有的 SSH 配置、`known_hosts`、密钥与 `ssh-agent`。先在终端运行 `ssh -p 22 user@192.168.1.20`，核对指纹并验证密钥可登录。然后在 DevKit 选 SSH，填入相同地址、端口、用户名和目标系统。DevKit 连接会执行已知主机检查，通过非交互方式认证；需要输入密钥口令时可先将密钥加载到系统 ssh-agent。连接记录只保存地址和账号信息。
+
+Linux SSH 通过系统 `sh`、GNU coreutils、`flock` 和 `/proc` 工作。Windows SSH 使用 Windows PowerShell 5.1，JAR 启停需要账号具有本机 WMI 进程查询和创建权限。连接时脚本经 SSH 传输并执行，目标机保留配置备份、日志和 PID 数据。SSH 登记表保存在发起连接的桌面客户端。
+
+设计调研中参考了 Cockpit 15.4k Stars 的 SSH 主机列表，它曾将各主机前端置于同一上下文，后来因隔离问题弃用该方式。Portainer 38.8k Stars、Zlib 许可证的 Agent 模式提供完整远端工作区，需要在目标部署 Agent。Ansible 71.5k Stars、GPL-3.0-or-later 的 SSH 方式使用 Linux shell 或 Windows PowerShell。DevKit 共享窗口按主机隔离会话和站点数据，SSH 复用系统 OpenSSH 并调用系统工具，未引入这些项目的代码。参考 [Cockpit](https://github.com/cockpit-project/cockpit)、[Cockpit 多主机说明](https://cockpit-project.org/guide/latest/multi-host.html)、[Portainer](https://github.com/portainer/portainer)、[Portainer Agent](https://docs.portainer.io/admin/environments/add/docker/agent)、[Ansible](https://github.com/ansible/ansible) 和 [Ansible Windows SSH](https://docs.ansible.com/projects/ansible/latest/os_guide/windows_ssh.html)。
+
 ## 桌面开启
 
 在桌面顶部工具栏的 **局域网共享** 设置监听范围、端口和至少 8 位的独立口令。项目中心、Nginx 配置、HTTP 调试、JAR 管理、监控中心、日志中心是六个独立服务，可任意组合开放，也可只开放其中一个；首次配置不预选服务。至少选择一个服务才能启动。每项服务的访问权限紧随开放开关显示，关闭服务会清除该项授权，再次开启从只读开始。旧配置升级时尚未配置的 JAR 和监控中心默认关闭。
@@ -13,7 +28,7 @@
 | HTTP 调试 | 接口项目、文档和环境 | 保存、恢复接口项目 | 从主机发送请求、取消自己的请求 |
 | 日志中心 | 已授权分类的日志及多窗对照 | 不修改日志或配置 | JAR/Nginx分类读取与日志导出分别授权 |
 | 监控中心 | 监控配置、状态、历史及故障恢复记录 | 维护暂停的监控、关联和维护窗口 | 启用、暂停、立即检测；修改/删除运行中的监控还需编辑权限 |
-| JAR 管理 | 应用列表、状态、日志、控制台输出、自启状态 | 实例、启动参数、环境档案 | Java 检测、启停重启、健康检查、控制台输入、系统自启 |
+| JAR 管理 | 应用列表、状态、日志、控制台输出、自启状态 | 实例、启动参数、环境档案、同目录配置及备份 | Java 检测、启停重启、健康检查、控制台输入、系统自启 |
 
 编辑和执行互不附带授权。例如可只允许 HTTP 调试而禁止修改接口定义，也可只编辑 Nginx 配置而不允许运行命令。所有授权均在主机 API 校验，关闭服务后即使直接调用接口也无法访问。
 

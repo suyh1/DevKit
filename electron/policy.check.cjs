@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { assetPath, isAppUrl, validateSave } = require('./policy.cjs');
+const { assetPath, isAppUrl, validateSave, lanPortalUrl } = require('./policy.cjs');
 
 test('only the packaged app origin is trusted', () => {
   assert.equal(isAppUrl('devkit://app/index.html'), true);
@@ -18,4 +18,12 @@ test('the save bridge accepts text and a suggested filename, never a target path
   for (const filename of ['../../secret', 'C:\\secret', '/etc/passwd', '..', 'bad\nname', '']) assert.throws(() => validateSave({ text: 'sample', filename }));
   assert.throws(() => validateSave({ text: {}, filename: 'test.txt' }));
   assert.throws(() => validateSave({ text: 'x'.repeat(16_000_001), filename: 'test.txt' }));
+});
+test('LAN windows only open HTTP(S) shared-workspace module URLs', () => {
+  assert.equal(lanPortalUrl('http://192.168.1.20:8765', 'jar').href, 'http://192.168.1.20:8765/#jar');
+  assert.equal(lanPortalUrl('https://host.example', 'nginx').href, 'https://host.example/#nginx');
+  for (const url of ['file:///etc/passwd', 'devkit://app/', 'http://user:secret@host/', 'http://host/path', 'http://host/#jar', 'http://host/?a=b']) {
+    assert.throws(() => lanPortalUrl(url, 'jar'));
+  }
+  assert.throws(() => lanPortalUrl('http://host/', 'projects'));
 });

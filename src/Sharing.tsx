@@ -366,7 +366,7 @@ function SharingPanel({
                       {
                         id: 'jar', name: 'JAR 管理', description: '主机 Java 应用、日志和共享控制台',
                         permissions: [
-                          { key: 'edit', label: '编辑 JAR 与环境档案', detail: '允许填写主机路径、维护实例、启动参数和环境档案' },
+                          { key: 'edit', label: '编辑 JAR 与配置文件', detail: '允许维护实例、启动参数、环境档案以及 JAR 同目录配置文件和备份' },
                           { key: 'control', label: '运行管理与控制台输入', detail: '允许 Java 检测、启动/停止/重启、输入控制及系统自启设置' },
                         ],
                       },

@@ -1,9 +1,15 @@
 // UI Motion shared primitives. Visual work never schedules business callbacks.
 export const reducedMotion = () =>
   typeof window === "undefined" ||
+  window.document?.documentElement.dataset.displayMode === "performance" ||
   !window.matchMedia ||
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const running = new Set<Animation>();
+export function finishAnimations() {
+  for (const animation of running) {
+    if (animation.playState === 'running' || animation.pending) animation.finish();
+  }
+}
 let media: MediaQueryList | undefined;
 export function animate(
   element: Element,
@@ -15,7 +21,7 @@ export function animate(
   if (!media) {
     media = window.matchMedia("(prefers-reduced-motion: reduce)");
     media.addEventListener("change", () => {
-      if (media?.matches) for (const animation of running) animation.finish();
+      if (media?.matches) finishAnimations();
     });
   }
   const animation = element.animate(frames, {

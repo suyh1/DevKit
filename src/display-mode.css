@@ -1,0 +1,15 @@
+:root[data-display-mode=performance] *,
+:root[data-display-mode=performance] *::before,
+:root[data-display-mode=performance] *::after,
+:root[data-display-mode=performance] *::backdrop {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+  backdrop-filter: none !important;
+  will-change: auto !important;
+}
+:root[data-display-mode=performance][data-theme-style=glass] :is(.floating-navbar, .sidebar, .settings-section, .pc-card, .pc-shell, .welcome-card, .quick-start-card, .smart-open, .tool-card, .color-story-card) {
+  background: var(--surface);
+}
+:root[data-display-mode=performance] .motion-presence[data-state=closing] { display: none; }
+:root[data-display-mode=performance] .motion-button:active:not(:disabled) { transform: none; }

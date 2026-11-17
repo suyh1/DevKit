@@ -7,6 +7,7 @@ import { detectJava, inspectJava, launchJar, signalJava, matchesJar, pathKey } f
 import { normalizePolicies, effectiveEnvironment, probeHealth } from './jar-policies.mjs';
 import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-supervisor-client.mjs';
 import { createJarAutostart } from './jar-autostart.mjs';
+import { jarConfigs } from './jar-configs.mjs';
 
 const message = error => error.message || String(error);
 function absolute(value, label) {
@@ -247,6 +248,10 @@ export async function createJarManager(directory, dependencies = {}) {
       const result = []; for (const item of state.instances) result.push(await status(item)); return result;
     }
     if (action === 'log-tail') return log(find(value.id));
+    if (['config-list', 'config-read', 'config-save', 'config-backup'].includes(action)) {
+      if (options.allowEdit === false) throw new Error('未授予 JAR 编辑权限。');
+      return jarConfigs(folder, find(value.id), action, value);
+    }
     if (action === 'upsert' || action === 'remove') {
       if (value.revision !== state.revision) throw new Error('列表已被修改，请刷新后重试。');
       if (action === 'remove') {

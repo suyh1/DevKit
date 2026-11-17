@@ -28,6 +28,16 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
   }
   return <div className="settings-page"><div className="settings-heading"><div className="eyebrow">PREFERENCES</div><h1>让工作台适合你</h1><p>偏好设置保存在本机，任务内容默认只留在内存中。</p></div>
     <WindowCloseSetting />
+    <section className="settings-section">
+      <h2><Monitor size={17} />性能</h2>
+      <label className="setting-row">
+        <span><strong>运行模式</strong><small>性能模式减少动效与背景模糊，并降低状态和文件日志的自动刷新频率。</small></span>
+        <select value={preferences.displayMode} onChange={event => update({ displayMode: event.target.value as Preferences['displayMode'] })}>
+          <option value="normal">正常模式</option>
+          <option value="performance">性能模式</option>
+        </select>
+      </label>
+    </section>
     <section className="settings-section"><h2><Monitor size={17} />外观与工作台</h2><fieldset className="theme-picker">
       <legend>主题风格</legend>
       <p>每套风格都支持浅色、深色与跟随系统。</p>

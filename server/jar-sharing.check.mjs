@@ -44,7 +44,36 @@ test('shared console: remote/local duplicate prevention, read grants, one writer
     await host.start(settings); let a = await login(), b = await login();
     const readonly = await invoke('get', a); assert.equal(JSON.stringify(readonly).includes('test-secret'), false); assert.equal(JSON.stringify(readonly).includes('shared-env-secret'), false); assert.deepEqual(readonly.instances[0].profiles[0].env, {});
     for (const action of ['command', 'detect', 'upsert', 'console-claim', 'console-input', 'startup-install', 'pick']) assert.equal((await call(action, a, { id: item.id, command: 'start' })).status, 403);
+    const configPath = path.join(folder, 'application.yml');
+    const secondConfig = path.join(folder, 'application-test.properties');
+    await writeFile(configPath, '\uFEFFport: 8080\r\n');
+    await writeFile(secondConfig, 'port=8081\n');
+    await writeFile(path.join(folder, 'other.pid.devkit.json'), '{}');
+    for (const action of ['config-list', 'config-read', 'config-save', 'config-backup']) {
+      assert.equal((await call(action, a, { id: item.id, name: 'application.yml' })).status, 403);
+    }
+    services.jar.edit = true; await host.start(settings); a = await login();
+    const remoteJar = path.join(folder, 'remote registered.jar');
+    await writeFile(remoteJar, await readFile(jar));
+    const registry = await invoke('get', a);
+    const remote = await invoke('upsert', a, { revision: registry.revision, instance: { ...item, id: randomUUID(), name: '远程登记', jar: remoteJar, pidName: '', logName: '' } });
+    const remoteId = remote.instances.find(entry => entry.jar === remoteJar).id;
+    assert.equal((await call('command', a, { id: remoteId, command: 'start' })).status, 403);
+    const config = { id: item.id, name: 'application.yml' };
+    assert.deepEqual(new Set((await invoke('config-list', a, config)).files), new Set(['application.yml', 'application-test.properties']));
+    assert.equal((await call('config-read', a, { ...config, name: '..\\config.yml' })).status, 400);
+    const original = await invoke('config-read', a, config);
+    const saved = await invoke('config-save', a, { ...config, hash: original.hash, content: '\uFEFFport: 9000\r\n' });
+    assert.equal(await readFile(configPath, 'utf8'), saved.content);
+    assert.equal((await invoke('config-backup', a, config)).content, original.content);
+    assert.equal((await call('config-save', a, { ...config, hash: original.hash, content: 'stale: true' })).status, 400);
+    assert.equal(await readFile(secondConfig, 'utf8'), 'port=8081\n');
     services.jar.control = true; await host.start(settings); a = await login(); b = await login();
+    try {
+      const started = await invoke('command', a, { id: remoteId, command: 'start' });
+      assert.equal(started.status.state, 'running');
+      assert.equal((await manager.request('statuses')).find(entry => entry.id === remoteId).pid, started.status.pid);
+    } finally { await manager.request('command', { id: remoteId, command: 'force-stop' }).catch(() => {}); }
     await invoke('command', a, { id: item.id, command: 'start' });
     await assert.rejects(manager.request('command', { id: item.id, command: 'start' }), /已在运行/);
     const clientA = randomUUID(), clientB = randomUUID(), clientLocal = randomUUID();

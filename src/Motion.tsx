@@ -25,6 +25,7 @@ import {
   textDifference,
 } from "./motion-primitives";
 import type { LayoutSnapshot } from "./motion-primitives";
+import { usePerformanceMode } from './DisplayMode';
 
 export function MotionPresence({
   present,
@@ -555,11 +556,16 @@ export function useMotionHeight(
   ref: RefObject<HTMLElement | null>,
   identity: unknown,
 ) {
+  const performanceMode = usePerformanceMode();
   const height = useRef<number | undefined>(undefined),
     animation = useRef<Animation | undefined>(undefined);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element || !element.getClientRects().length) return;
+    if (performanceMode || !element || !element.getClientRects().length) {
+      height.current = undefined;
+      animation.current?.cancel();
+      return;
+    }
     const from = element.getBoundingClientRect().height;
     const moving = animation.current?.playState === "running";
     animation.current?.cancel();
@@ -574,7 +580,7 @@ export function useMotionHeight(
         { duration: 300 },
       );
     height.current = next;
-  }, [ref, identity]);
+  }, [ref, identity, performanceMode]);
   useEffect(() => () => animation.current?.cancel(), []);
 }
 
@@ -582,10 +588,11 @@ export function useSkeletonMorph(
   ref: RefObject<HTMLElement | null>,
   ready: boolean,
 ) {
+  const performanceMode = usePerformanceMode();
   const placeholder = useRef<{ node: HTMLElement; rect: DOMRect } | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element) return;
+    if (performanceMode || !element) { placeholder.current = null; return; }
     if (!ready) {
       const capture = () => {
         const skeleton =
@@ -643,7 +650,7 @@ export function useSkeletonMorph(
       animation?.cancel();
       ghost.remove();
     };
-  }, [ref, ready]);
+  }, [ref, ready, performanceMode]);
 }
 
 export function useMotionList(
@@ -651,12 +658,17 @@ export function useMotionList(
   signature: unknown,
   filtering = false,
 ) {
+  const performanceMode = usePerformanceMode();
   const previous = useRef<LayoutSnapshot>(new Map()),
     initialized = useRef(false),
     pending = useRef(new Map<Animation, HTMLElement | undefined>());
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element) return;
+    if (performanceMode || !element) {
+      previous.current.clear();
+      initialized.current = false;
+      return;
+    }
     previous.current = flipChildren(
       element,
       previous.current,
@@ -670,7 +682,7 @@ export function useMotionList(
       },
     );
     initialized.current = true;
-  }, [ref, signature, filtering]);
+  }, [ref, signature, filtering, performanceMode]);
   useEffect(
     () => () => {
       for (const [animation, ghost] of pending.current) {
@@ -682,6 +694,7 @@ export function useMotionList(
     [],
   );
   useEffect(() => {
+    if (performanceMode) return;
     const scrolled = (event: Event) => {
       const element = ref.current;
       if (
@@ -700,7 +713,7 @@ export function useMotionList(
       passive: true,
     });
     return () => window.removeEventListener("scroll", scrolled, true);
-  }, [ref]);
+  }, [ref, performanceMode]);
 }
 
 export function MotionReveal({
@@ -712,12 +725,13 @@ export function MotionReveal({
   className?: string;
   identity?: unknown;
 }) {
+  const performanceMode = usePerformanceMode();
   const ref = useRef<HTMLDivElement>(null),
     inner = useRef<HTMLDivElement>(null),
     previousHeight = useRef<number | undefined>(undefined);
   useLayoutEffect(() => {
     const element = ref.current;
-    if (!element) return;
+    if (performanceMode || !element) { previousHeight.current = undefined; return; }
     const resize = new ResizeObserver(() => {
       const height = inner.current?.getBoundingClientRect().height || 0,
         before = previousHeight.current;
@@ -737,7 +751,7 @@ export function MotionReveal({
       resize.disconnect();
       element.getAnimations().forEach((animation) => animation.cancel());
     };
-  }, []);
+  }, [performanceMode]);
   useLayoutEffect(() => {
     const animation = ref.current
       ? animate(ref.current, [{ opacity: 0.3 }, { opacity: 1 }], {

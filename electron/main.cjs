@@ -1,7 +1,8 @@
 const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
+const { createHash } = require('node:crypto');
 const path = require('node:path');
-const { origin, csp, isAppUrl, assetPath, validateSave } = require('./policy.cjs');
+const { origin, csp, isAppUrl, assetPath, validateSave, lanPortalUrl } = require('./policy.cjs');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'devkit', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 app.enableSandbox();
@@ -23,13 +24,27 @@ let apiWorkspace, apiWorkspaceError = '';
 let closeAllowed = false, reloadAllowed = false, closeIntent = false, pendingUnload = null;
 const desktopPreferences = require('./desktop-preferences.cjs').createDesktopPreferences(path.join(app.getPath('userData'), 'desktop-settings.json'));
 let tray, choosingClose = false, quitRequested = false, rememberQuit = false;
+const lanWindows = new Map();
+let closingLanWindows = false;
 function showWindow() {
   if (!window || window.isDestroyed()) return;
   if (window.isMinimized()) window.restore();
   window.show(); window.focus();
 }
-function requestQuit() {
+async function requestQuit() {
   if (!window || window.isDestroyed()) { app.quit(); return; }
+  if (closingLanWindows) return;
+  closingLanWindows = true;
+  try {
+    for (const remote of lanWindows.values()) {
+      const closed = await new Promise(resolve => {
+        remote.resolveClose = resolve;
+        remote.window.show();
+        remote.window.close();
+      });
+      if (!closed) { rememberQuit = false; showWindow(); return; }
+    }
+  } finally { closingLanWindows = false; }
   choosingClose = false; quitRequested = true; showWindow(); window.close();
 }
 function hideToTray() {
@@ -53,6 +68,64 @@ const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
 app.on('second-instance', showWindow);
 app.on('activate', showWindow);
+
+async function openLanWindow(address, module) {
+  if (closingLanWindows) throw new Error('正在关闭远程窗口。');
+  const url = lanPortalUrl(address, module);
+  const key = url.href;
+  const existing = lanWindows.get(key)?.window;
+  if (existing) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+    return;
+  }
+  const partition = 'devkit-lan-' + createHash('sha256').update(url.origin).digest('hex');
+  const isolated = session.fromPartition(partition);
+  const sameHost = target => {
+    try { return new URL(target).origin === url.origin; } catch { return false; }
+  };
+  isolated.setPermissionCheckHandler(() => false);
+  isolated.setPermissionRequestHandler((_contents, _permission, reply) => reply(false));
+  isolated.webRequest.onBeforeRequest((details, reply) => reply({ cancel: !sameHost(details.url) }));
+  const title = `DevKit · ${module === 'jar' ? '远程 JAR 管理' : '远程 Nginx 配置'} · ${url.host}`;
+  const remote = new BrowserWindow({
+    width: 1240, height: 820, minWidth: 480, minHeight: 540, show: false, title, autoHideMenuBar: true,
+    webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, webviewTag: false },
+  });
+  const entry = { window: remote, resolveClose: null };
+  lanWindows.set(key, entry);
+  remote.on('closed', () => { lanWindows.delete(key); entry.resolveClose?.(true); });
+  remote.on('page-title-updated', event => event.preventDefault());
+  remote.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  for (const name of ['will-frame-navigate', 'will-redirect']) {
+    remote.webContents.on(name, (event, target) => {
+      if (!sameHost(event.url ?? target)) event.preventDefault();
+    });
+  }
+  remote.webContents.on('will-prevent-unload', event => {
+    const choice = dialog.showMessageBoxSync(remote, {
+      type: 'warning', title: '有未保存的更改', message: '远程工作台有未保存的更改。',
+      buttons: ['继续编辑', '放弃并继续'], defaultId: 0, cancelId: 0,
+    });
+    if (choice === 1) event.preventDefault();
+    else {
+      entry.resolveClose?.(false);
+      entry.resolveClose = null;
+    }
+  });
+  let timer;
+  try {
+    await Promise.race([
+      remote.loadURL(key),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('连接超时。')), 10_000); }),
+    ]);
+    remote.show();
+  } catch {
+    if (!remote.isDestroyed()) remote.destroy();
+    throw new Error(`无法打开 ${url.host}。请检查主机地址、网络及 DevKit 共享状态。`);
+  } finally { clearTimeout(timer); }
+}
 
 async function createWindow() {
   httpClient = (await import('./server/http-client.mjs')).createHttpClient();
@@ -213,6 +286,16 @@ app.whenReady().then(async () => {
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
   const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
+  ipcMain.handle('devkit:lan-host', async (event, address, module) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的主机连接请求。');
+    try { await openLanWindow(address, module); return {}; }
+    catch (error) { return { error: error.message }; }
+  });
+  ipcMain.handle('devkit:ssh', async (event, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 SSH 请求。');
+    try { return { data: await (await import('./server/ssh-management.mjs')).requestSsh(value) }; }
+    catch (error) { return { error: error.message }; }
+  });
   ipcMain.handle('devkit:jar', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 JAR 管理请求。');
     try {

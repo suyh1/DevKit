@@ -28,6 +28,7 @@ import type { Preferences, Task } from './workbench';
 import { saveText } from './files';
 import packageInfo from '../package.json';
 import { ConfirmationProvider } from './Confirmation';
+import { DisplayModeProvider } from './DisplayMode';
 
 type Page = 'home' | 'favorites' | 'recent' | 'settings' | 'task' | 'projects' | 'nginx' | 'jar' | 'http' | 'monitor' | 'logs';
 type Job = { worker: Worker; timeout: ReturnType<typeof setTimeout> };
@@ -38,11 +39,11 @@ function initialPreferences(): Preferences {
 }
 
 export default function App() {
-  return <ConfirmationProvider><SharingProvider><Workbench /></SharingProvider></ConfirmationProvider>;
-}
-function Workbench() {
-  const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
   const [preferences, setPreferences] = useState(initialPreferences);
+  return <DisplayModeProvider mode={preferences.displayMode}><ConfirmationProvider><SharingProvider><Workbench preferences={preferences} setPreferences={setPreferences} /></SharingProvider></ConfirmationProvider></DisplayModeProvider>;
+}
+function Workbench({ preferences, setPreferences }: { preferences: Preferences; setPreferences: React.Dispatch<React.SetStateAction<Preferences>> }) {
+  const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);
   const [page, setPage] = useState<Page>(tasks.length ? 'task' : 'home');

@@ -5,12 +5,14 @@ import type { LogCatalog, LogSource, LogRead } from './logs-api';
 import { copyText } from './motion-primitives';
 import { saveText } from './files';
 import { SharingButton } from './Sharing';
+import { usePerformanceMode } from './DisplayMode';
 import './logs.css';
 
 type Stream = LogRead & { text: string; notice?: string };
 function mask(text: string) { return text.replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[已隐藏]').replace(/((?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s,"'}&]+/gi, '$1[已隐藏]'); }
 
 export default function LogCenter({ active = true }: { active?: boolean }) {
+  const refreshSeconds = usePerformanceMode() ? 6 : 2;
   const [catalog, setCatalog] = useState<LogCatalog>({ sources: [], warnings: [] }), [selected, setSelected] = useState<string[]>([]);
   const [streams, setStreams] = useState<Record<string, Stream>>({}), [error, setError] = useState(''), [message, setMessage] = useState('');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [regex, setRegex] = useState(false), [level, setLevel] = useState('all'), [redact, setRedact] = useState(true), [paused, setPaused] = useState(false), [loading, setLoading] = useState(false);
@@ -30,6 +32,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     let disposed = false, timer: ReturnType<typeof setTimeout>;
     async function read() {
       try {
+        if (document.hidden) return;
         const next = await logsRequest<{ results: LogRead[] }>('read', { sources: selected.map(id => ({ id, cursor: values.current[id]?.cursor })) });
         if (disposed) return;
         setStreams(previous => {
@@ -44,10 +47,10 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
         });
         setError('');
       } catch (failure) { if (!disposed) setError((failure as Error).message); }
-      finally { if (!disposed) timer = setTimeout(() => void read(), 2000); }
+      finally { if (!disposed) timer = setTimeout(() => void read(), refreshSeconds * 1000); }
     }
     void read(); return () => { disposed = true; clearTimeout(timer); };
-  }, [active, paused, selectedKey]);
+  }, [active, paused, selectedKey, refreshSeconds]);
   function toggle(id: string) {
     if (selected.includes(id)) {
       setSelected(selected.filter(value => value !== id));
@@ -65,7 +68,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   return <section className="log-center">
     <header className="log-heading"><div><ScrollText size={27} /><div><h1>日志中心</h1><p>在同一视图中追踪应用与网关日志。</p></div></div><div className="log-actions"><SharingButton /><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
     {error && <p className="pc-error" role="alert">{error}</p>}{message && <p className="pc-message" role="status">{message}</p>}
-    <div className="log-toolbar"><label className="log-query"><Search size={14} /><input aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input type="checkbox" checked={redact} onChange={event => setRedact(event.target.checked)} />显示脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : '每 2 秒增量读取'}</span></div>
+    <div className="log-toolbar"><label className="log-query"><Search size={14} /><input aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input type="checkbox" checked={redact} onChange={event => setRedact(event.target.checked)} />显示脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
     <div className="log-layout">
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><input aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
         <div className="log-source-list">{catalog.sources.filter(item => `${item.name} ${item.path}`.toLowerCase().includes(search.toLowerCase())).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}{!catalog.sources.length && <p>{loading ? '正在读取来源…' : '没有可读取的来源。请在 JAR / Nginx 登记日志，或请主机授权对应日志分类。'}</p>}</div>

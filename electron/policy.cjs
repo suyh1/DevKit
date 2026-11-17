@@ -26,4 +26,12 @@ function validateSave(value) {
   return { text: value.text, filename: value.filename };
 }
 
-module.exports = { origin, csp, isAppUrl, assetPath, validateSave };
+function lanPortalUrl(address, module) {
+  if (typeof address !== 'string' || address.length > 2048 || !['jar', 'nginx'].includes(module)) throw new Error('共享主机地址无效。');
+  const url = new URL(address);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('请填写 HTTP(S) 共享主机地址。');
+  url.hash = module;
+  return url;
+}
+
+module.exports = { origin, csp, isAppUrl, assetPath, validateSave, lanPortalUrl };

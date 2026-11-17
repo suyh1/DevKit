@@ -6,6 +6,7 @@ import { canOperateMonitor, canWriteWorkspace } from './workspace-remote';
 import { Modal, ModalCancel, Field } from './project-components';
 import { MotionButton, MotionPresence } from './Motion';
 import { SharingButton } from './Sharing';
+import { usePerformanceMode } from './DisplayMode';
 import './monitor.css';
 
 const labels: Record<string, string> = { up: '正常', down: '故障', pending: '待确认', unknown: '待检测 / 已过期', paused: '已暂停', maintenance: '维护中' };
@@ -14,6 +15,7 @@ const localDate = (at?: string) => at ? new Date(Date.parse(at) - new Date(at).g
 const empty = (): MonitorConfig => ({ id: '', name: '', type: 'http', url: '', host: '', port: 80, status: 200, interval: 60, timeout: 5, failures: 2, enabled: false, source: null, maintenance: null });
 
 export default function MonitorCenter({ active = true }: { active?: boolean }) {
+  const statusSeconds = usePerformanceMode() ? 15 : 5;
   const [data, setData] = useState<MonitorState | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState('all'), [selected, setSelected] = useState('');
   const [draft, setDraft] = useState<MonitorConfig | null>(null), [revision, setRevision] = useState(0), [remove, setRemove] = useState<Monitor | null>(null);
@@ -28,9 +30,10 @@ export default function MonitorCenter({ active = true }: { active?: boolean }) {
   }
   useEffect(() => {
     if (!active) return;
-    void refresh(); const timer = setInterval(() => { if (!working.current && !document.hidden) void refresh(); }, 5000);
+    if (!working.current) void refresh();
+    const timer = setInterval(() => { if (!working.current && !document.hidden) void refresh(); }, statusSeconds * 1000);
     return () => { generation.current++; clearInterval(timer); };
-  }, [active]);
+  }, [active, statusSeconds]);
   async function action(action: 'upsert' | 'remove' | 'toggle' | 'check', payload: unknown, success?: () => void) {
     if (working.current) return;
     generation.current++; working.current = true; setBusy(true); setError('');
@@ -49,7 +52,7 @@ export default function MonitorCenter({ active = true }: { active?: boolean }) {
   const frozen = !operate && !!draft?.enabled;
   return <section className="monitor-center">
     <header className="monitor-heading"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{edit && <button className="run-button" onClick={() => open()}><Plus size={15} />添加监控</button>}</div></header>
-    <div className="monitor-note"><ShieldCheck size={15} /><span>检测从主机发起，切换页面后继续。退出主机应用或独立服务后停止；状态每 5 秒刷新。</span></div>
+    <div className="monitor-note"><ShieldCheck size={15} /><span>检测从主机发起，切换页面后继续。退出主机应用或独立服务后停止。状态每 {statusSeconds} 秒刷新。</span></div>
     {error && !draft && !remove && <p className="pc-error" role="alert">{error}</p>}
     {data?.storageError && <p className="pc-error" role="alert">监控记录保存失败：{data.storageError}。请检查主机配置目录权限与磁盘空间。</p>}
     <div className="monitor-metrics">{[['全部监控', data?.monitors.length || 0], ['正常', data?.monitors.filter(item => item.state === 'up').length || 0], ['故障 / 待确认', data?.monitors.filter(item => ['down', 'pending'].includes(item.state)).length || 0], ['暂停 / 维护', data?.monitors.filter(item => ['paused', 'maintenance'].includes(item.state)).length || 0]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>

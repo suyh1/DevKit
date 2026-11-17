@@ -46,7 +46,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs }) {
         const manager = jar?.();
         if (!manager) fail(503, '主机 JAR 管理器不可用。');
         const reads = ['get', 'statuses', 'log-tail', 'console-read', 'startup-get'];
-        const edits = ['upsert', 'remove'];
+        const edits = ['upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'];
         const controls = ['command', 'detect', 'health-check', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'];
         if (![...reads, ...edits, ...controls].includes(action)) fail(403, '网页不提供本机文件选择器，请填写共享主机路径。');
         if (edits.includes(action) && !services.jar.edit) fail(403, '未授予 JAR 编辑权限。');

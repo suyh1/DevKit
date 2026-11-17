@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('devkitDesktop', {
+  openLanHost: (address, module) => ipcRenderer.invoke('devkit:lan-host', address, module),
+  requestSsh: value => ipcRenderer.invoke('devkit:ssh', value),
   saveText: (text, filename) => ipcRenderer.invoke('devkit:save-text', { text, filename }),
   onCloseRequest: listener => {
     const handler = (_event, intent) => listener(intent);

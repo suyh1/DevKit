@@ -3,6 +3,7 @@ import type { ThemeStyle } from './themes';
 import { defaultOptions, tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { validateGeoOptions } from './geo-config';
+import type { DisplayMode } from './DisplayMode';
 
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'cancelled';
 export type Task = {
@@ -11,9 +12,9 @@ export type Task = {
 };
 export type Preferences = {
   themeStyle: ThemeStyle; theme: 'system' | 'light' | 'dark'; fontSize: number; indent: '2' | '4'; wrap: boolean;
-  layout: 'split' | 'stack'; density: 'comfortable' | 'compact'; library: 'grid' | 'list'; startup: ToolId | 'home';
+  layout: 'split' | 'stack'; density: 'comfortable' | 'compact'; library: 'grid' | 'list'; startup: ToolId | 'home'; displayMode: DisplayMode;
 };
-export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home' };
+export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home', displayMode: 'normal' };
 export const MAX_TASKS = 12;
 export function isToolId(value: unknown): value is ToolId { return tools.some(tool => tool.id === value); }
 export function normalizeToolId(value: unknown): ToolId | undefined {
@@ -47,7 +48,7 @@ export function validatePreferences(value: unknown): Preferences {
     themeStyle: normalizeThemeStyle(source.themeStyle), theme: choose('theme', ['system', 'light', 'dark']), fontSize: choose('fontSize', [12, 13, 14, 15, 16, 17, 18]),
     indent: choose('indent', ['2', '4']), wrap: choose('wrap', [true, false]), layout: choose('layout', ['split', 'stack']),
     density: choose('density', ['comfortable', 'compact']), library: choose('library', ['grid', 'list']),
-    startup: normalizeToolId(source.startup) ?? 'home',
+    startup: normalizeToolId(source.startup) ?? 'home', displayMode: choose('displayMode', ['normal', 'performance']),
   };
 }
 export function workspaceSnapshot(tasks: Task[], activeId: string | null, includeSensitive = false): string {

@@ -1,9 +1,10 @@
-import { mkdir, readFile, writeFile, rename, unlink, realpath, stat, open, glob, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, realpath, stat, glob, readdir } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, MAX_CONFIG_SIZE } from '../shared/nginx.mjs';
 import { acquireProjectLock } from './project-lock.mjs';
+import { atomicFile as atomic } from './atomic-file.mjs';
 import { createNginxConfigSet } from './nginx-create.mjs';
 import { inspectNginx, tailNginxLog } from './nginx-inspection.mjs';
 import { prepareNginxDirectories, withDirectoryReport } from './nginx-directories.mjs';
@@ -28,20 +29,6 @@ async function readDocument(filename) {
   catch { throw new Error(`仅支持 UTF-8 配置文件，请先转换编码：${filename}`); }
   if (content.includes('\0') || content.length > MAX_CONFIG_SIZE) throw new Error(`文件不是有效的文本配置：${filename}`);
   return { path: await realpath(filename), content, hash: digest(bytes) };
-}
-async function atomic(filename, bytes, mode = 0o600) {
-  const temporary = `${filename}.${randomUUID()}.tmp`;
-  try {
-    const handle = await open(temporary, 'wx', mode);
-    try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
-    for (let attempt = 0; ; attempt++) {
-      try { await rename(temporary, filename); break; }
-      catch (error) {
-        if (!['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt >= 7) throw error;
-        await delay(Math.min(20 * 2 ** attempt, 250));
-      }
-    }
-  } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 export async function discoverIncludes(main) {
   main = await configFile(main);

@@ -6,6 +6,9 @@ import { jarRequest } from './jar-api';
 import JarRuntimeSettings, { runtimeDraft, runtimePayload } from './JarRuntimeSettings';
 import JarStartupDialog from './JarStartupDialog';
 import JarConsole from './JarConsole';
+import ConfigFilesDialog from './ConfigFilesDialog';
+import LanHosts from './LanHosts';
+import { usePerformanceMode } from './DisplayMode';
 import { canWriteWorkspace, canOperateJar, remoteAccess } from './workspace-remote';
 import type { JarInstance, JarState, JarStatus, JavaDetection, JarLog, JarCommand } from './jar-api';
 import './jar.css';
@@ -68,18 +71,23 @@ function JarForm({ instance, revision, close, saved }: { instance?: JarInstance;
 }
 
 export default function JarCenter({ active }: { active: boolean }) {
+  const performanceMode = usePerformanceMode();
+  const statusSeconds = performanceMode ? 15 : 5;
+  const logSeconds = performanceMode ? 9 : 3;
   const [state, setState] = useState<JarState | null>(null), [statuses, setStatuses] = useState<JarStatus[]>([]);
   const [form, setForm] = useState<JarInstance | 'new' | null>(null), [java, setJava] = useState<JavaDetection | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [query, setQuery] = useState('');
   const [monitorError, setMonitorError] = useState('');
   const [startup, setStartup] = useState<JarInstance | null>(null);
+  const [config, setConfig] = useState<JarInstance | null>(null);
   const [consoleId, setConsoleId] = useState('');
   const [auto, setAuto] = useState(true), [logId, setLogId] = useState(''), [log, setLog] = useState<JarLog | null>(null), [logError, setLogError] = useState('');
   const polling = useRef(false), operating = useRef(false), confirm = useConfirmation();
+  const operationVersion = useRef(0);
   const desktop = !!window.devkitJar, available = desktop || !!remoteAccess(), write = canWriteWorkspace('jar'), control = canOperateJar();
   async function refresh() { const next = await jarRequest<JarState>('get'); setState(next); setStatuses(await jarRequest<JarStatus[]>('statuses')); }
   async function task(action: () => Promise<void>) {
-    if (operating.current) return; operating.current = true; setBusy(true); setError(''); setNotice('');
+    if (operating.current) return; operating.current = true; operationVersion.current++; setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (failure) { setError((failure as Error).message); } finally { operating.current = false; setBusy(false); }
   }
   useEffect(() => { if (active && available) void task(refresh); }, [active, available]);
@@ -89,13 +97,14 @@ export default function JarCenter({ active }: { active: boolean }) {
     async function poll() {
       if (polling.current || operating.current || document.hidden) return;
       polling.current = true;
-      try { const result = await jarRequest<JarStatus[]>('statuses'); if (!disposed) { setStatuses(result); setMonitorError(''); } }
-      catch (failure) { if (!disposed) setMonitorError((failure as Error).message); }
+      const version = operationVersion.current;
+      try { const result = await jarRequest<JarStatus[]>('statuses'); if (!disposed && version === operationVersion.current) { setStatuses(result); setMonitorError(''); } }
+      catch (failure) { if (!disposed && version === operationVersion.current) setMonitorError((failure as Error).message); }
       finally { polling.current = false; }
     }
-    const timer = setInterval(() => void poll(), 5000);
+    const timer = setInterval(() => void poll(), statusSeconds * 1000);
     return () => { disposed = true; clearInterval(timer); };
-  }, [active, auto, available]);
+  }, [active, auto, available, statusSeconds]);
   useEffect(() => {
     if (!logId || !active || !available) return;
     let disposed = false, reading = false;
@@ -105,22 +114,32 @@ export default function JarCenter({ active }: { active: boolean }) {
       catch (failure) { if (!disposed) setLogError((failure as Error).message); }
       finally { reading = false; }
     }
-    void load(); const timer = auto ? setInterval(() => void load(), 3000) : undefined;
+    void load(); const timer = auto ? setInterval(() => void load(), logSeconds * 1000) : undefined;
     return () => { disposed = true; clearInterval(timer); };
-  }, [logId, active, auto, available]);
+  }, [logId, active, auto, available, logSeconds]);
   async function command(item: JarInstance, command: JarCommand) {
     if (command !== 'start' && !await confirm({ title: `${command === 'restart' ? '重启' : command === 'force-stop' ? '强制终止' : '停止'} ${item.name}？`, detail: command === 'force-stop' ? '将强制结束进程，未完成的请求或数据可能无法保存。' : state?.platform === 'win32' ? 'Windows 将终止 Java 进程，无法保证 JVM 关闭钩子执行。重启会在确认进程退出后启动。' : `先发送 TERM，最多等待 ${item.stopTimeout} 秒。超时保留进程，之后可单独强制终止。`, confirm: command === 'restart' ? '重启 JAR' : command === 'force-stop' ? '强制终止' : '停止 JAR' })) return;
-    await task(async () => { try { const result = await jarRequest<{ output: string }>('command', { id: item.id, command }); setNotice(result.output); if (item.logMode === 'console' && ['start', 'restart'].includes(command)) setConsoleId(item.id); } finally { await refresh(); } });
+    await task(async () => {
+      try {
+        const result = await jarRequest<{ output: string; status: JarStatus }>('command', { id: item.id, command });
+        setStatuses(current => [...current.filter(status => status.id !== item.id), result.status]);
+        setNotice(result.output);
+        if (item.logMode === 'console' && ['start', 'restart'].includes(command)) setConsoleId(item.id);
+      } catch (failure) {
+        await refresh().catch(() => {});
+        throw failure;
+      }
+    });
   }
   const filtered = state?.instances.filter(item => `${item.name} ${item.jar}`.toLowerCase().includes(query.toLowerCase())) || [];
   return <section className="jar-center">
-    <header className="jar-heading"><div><span className="jar-eyebrow"><Coffee size={17} />{desktop ? '主机服务 · 可共享' : '共享主机服务'}</span><h1>JAR 管理</h1><p>集中管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect')))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
+    <header className="jar-heading"><div><span className="jar-eyebrow"><Coffee size={17} />{desktop ? '本机' : '共享主机服务'}</span><h1>JAR 管理</h1><p>集中管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><LanHosts module="jar" /><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect')))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用 JAR 管理。</p>}
     {java && <div className={java.found ? 'jar-java' : 'jar-warning'}><strong>{java.found ? java.version : '未检测到 Java'}</strong><p>{java.found ? java.executable : java.output}</p></div>}
     <div className="jar-toolbar"><label className="jar-search"><Search size={16} /><input aria-label="搜索 JAR" placeholder="搜索名称或路径" value={query} onChange={event => setQuery(event.target.value)} /></label><div className="jar-actions"><label className="jar-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(async () => { await refresh(); if (logId) setLog(await jarRequest<JarLog>('log-tail', { id: logId })); })}><RefreshCw size={15} />刷新</MotionButton></div></div>
     {error && <p className="jar-error" role="alert">{error}</p>}{notice && <p className="jar-notice" role="status">{notice}</p>}
     {monitorError && <p className="jar-warning" role="alert">状态刷新失败，以下显示上次结果：{monitorError}</p>}
-    <div className="jar-summary"><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>状态每 5 秒刷新 · CPU 为采样间隔占用，可超过 100%</small></div>
+    <div className="jar-summary"><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>{auto ? `状态每 ${statusSeconds} 秒刷新` : '自动刷新已关闭'} · CPU 为采样间隔占用，可超过 100%</small></div>
     {!state && available && !error && <p className="jar-help">正在读取 JAR 列表…</p>}
     {state && !state.instances.length && <div className="jar-empty"><Coffee size={35} /><h2>添加第一个 Java 应用</h2><p>选择 JAR 文件，起一个方便辨认的名字，即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />选择 JAR 文件</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的 JAR。</p>}
@@ -142,6 +161,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
           <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
+          {write && <button className="text-button" disabled={busy} onClick={() => setConfig(item)}><FileText size={14} />配置文件</button>}
           <button className="text-button" disabled={busy} onClick={() => setStartup(item)}><Play size={14} />系统自启</button>
           <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: '只移除列表记录，保留 JAR、日志与运行文件。移除前需关闭系统自启。', confirm: '移除记录' })) await task(async () => { setState(await jarRequest<JarState>('remove', { id: item.id, revision: state?.revision })); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
         </div><details className="jar-advanced"><summary>更多运行信息</summary><p>Java：{status?.executable || item.executable || '自动检测'}</p><p>PID：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
@@ -151,10 +171,11 @@ export default function JarCenter({ active }: { active: boolean }) {
         </details></td>
       </tr>;
     })}</tbody></table></div>}
-    {logId && <section className="jar-log"><header><div><h2>{state?.instances.find(item => item.id === logId)?.name} · 日志</h2><p>{log?.path}</p></div><button className="icon-button" aria-label="关闭日志" onClick={() => setLogId('')}><X size={17} /></button></header><p className="jar-help">{state?.instances.find(item => item.id === logId)?.logMode === 'silent' ? '静默模式不会写入标准输出；已有文件可能是历史日志。' : '显示最近 128 KB，自动刷新开启时每 3 秒重新读取。'} {log?.truncated ? '前部内容已截断。' : ''}</p>{logError && <p className="jar-error" role="alert">{logError}</p>}<pre tabIndex={0} aria-label="JAR 日志内容">{log ? log.text || '暂无日志。' : '正在读取日志…'}</pre></section>}
+    {logId && <section className="jar-log"><header><div><h2>{state?.instances.find(item => item.id === logId)?.name} · 日志</h2><p>{log?.path}</p></div><button className="icon-button" aria-label="关闭日志" onClick={() => setLogId('')}><X size={17} /></button></header><p className="jar-help">{state?.instances.find(item => item.id === logId)?.logMode === 'silent' ? '静默模式不会写入标准输出；已有文件可能是历史日志。' : `显示最近 128 KB，自动刷新开启时每 ${logSeconds} 秒重新读取。`} {log?.truncated ? '前部内容已截断。' : ''}</p>{logError && <p className="jar-error" role="alert">{logError}</p>}<pre tabIndex={0} aria-label="JAR 日志内容">{log ? log.text || '暂无日志。' : '正在读取日志…'}</pre></section>}
     {consoleId && <JarConsole key={consoleId} id={consoleId} name={state?.instances.find(item => item.id === consoleId)?.name || 'JAR'} active={active} close={() => setConsoleId('')} stop={() => { const item = state?.instances.find(item => item.id === consoleId); if (item) void command(item, 'stop'); }} />}
     <p className="jar-help jar-footer">全部路径、进程和文件均属于共享主机。关闭控制台或网页不会停止 JAR；进程运行不等于业务健康。只读访客不显示环境变量值与启动参数。</p>
     {form && state && <JarForm instance={form === 'new' ? undefined : form} revision={state.revision} close={() => setForm(null)} saved={next => { setState(next); setForm(null); void task(refresh); }} />}
     {startup && <JarStartupDialog item={startup} platform={state?.platform || ''} close={() => setStartup(null)} />}
+    {config && <ConfigFilesDialog item={{ ...config, path: config.jar }} editable={write} close={() => setConfig(null)} />}
   </section>;
 }
