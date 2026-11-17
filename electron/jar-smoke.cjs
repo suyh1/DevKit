@@ -23,6 +23,8 @@ module.exports = async (window, output) => {
   const configFile = path.join(folder, 'application.yml');
   await fs.writeFile(configFile, '\uFEFFport: 9000\r\n');
   const previousDialog = dialog.showOpenDialog;
+  const previousMode = await js('document.documentElement.dataset.displayMode') || 'normal';
+  const previousThrottling = window.webContents.getBackgroundThrottling();
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [jar] });
   try {
     window.setSize(1440, 1000);
@@ -134,7 +136,18 @@ module.exports = async (window, output) => {
       await verifyLanHost(window, folder, liveJar, java.executable, click, wait);
     }
     console.log('JAR desktop smoke passed: local and remote registration, Java launch, configuration preview and backup, performance mode, logs, themes and narrow layout.');
-  } finally { dialog.showOpenDialog = previousDialog; }
+  } finally {
+    dialog.showOpenDialog = previousDialog;
+    await js(`{
+      const select = document.querySelector('.settings-page option[value="performance"]')?.parentElement;
+      if (select && select.value !== ${JSON.stringify(previousMode)}) {
+        select.value = ${JSON.stringify(previousMode)};
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }`);
+    await wait(`document.documentElement.dataset.displayMode === ${JSON.stringify(previousMode)}`);
+    window.webContents.setBackgroundThrottling(previousThrottling);
+  }
 };
 
 async function verifyLanHost(window, folder, jar, executable, click, wait) {
@@ -212,6 +225,8 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   } finally {
     find('jar')?.destroy();
     find('nginx')?.destroy();
+    await js(window, 'document.querySelector(\'dialog[open] button[aria-label="关闭局域网主机"]\')?.click()');
+    await wait('!document.querySelector("dialog[open] .lan-hosts")');
     if (id) await jvm.request('command', { id, command: 'force-stop' }).catch(() => {});
     await host.stop();
     await jvm.close();
