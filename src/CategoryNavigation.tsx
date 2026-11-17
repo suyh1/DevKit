@@ -1,8 +1,9 @@
 import { MotionPresence, useMotionHeight } from './Motion';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { ArrowLeft, Binary, Braces, CaseSensitive, ChevronRight, Clock3, Code2, Globe, Palette, ShieldCheck, X } from 'lucide-react';
-import { categories, workspaceModules } from './catalog';
+import { ArrowLeft, Binary, Braces, CaseSensitive, ChevronRight, Clock3, Code2, Globe, ListOrdered, Palette, ShieldCheck, X } from 'lucide-react';
+import { categories } from './catalog';
+import type { WorkspaceModule, WorkspaceModuleId } from './catalog';
 import { tools } from './tools';
 import type { ToolId } from './tools';
 import { toolIcons, workspaceModuleNav } from './ui';
@@ -10,13 +11,15 @@ import type { Task } from './workbench';
 
 const categoryIcons = { data: Braces, code: Code2, encode: Binary, text: CaseSensitive, utility: Clock3, security: ShieldCheck, color: Palette };
 
-export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoose, page, onChooseWorkspace, dismissKey }: {
+export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoose, page, onChooseWorkspace, dismissKey, sharedModules, onEditSharedOrder }: {
   activeToolId?: ToolId;
   tasks: Task[];
   narrow: boolean;
   onChoose: (id: ToolId) => void;
   page: string;
-  onChooseWorkspace: (id: typeof workspaceModules[number]['id']) => void;
+  onChooseWorkspace: (id: WorkspaceModuleId) => void;
+  sharedModules: WorkspaceModule[];
+  onEditSharedOrder: (trigger: HTMLButtonElement) => void;
   dismissKey?: string;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -26,7 +29,7 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
   const shared = openKey === 'shared';
   const category = categories.find(item => item.key === openKey);
   const selectedCategory = tools.find(tool => tool.id === activeToolId)?.category;
-  const selectedWorkspace = workspaceModules.find(item => item.id === page);
+  const selectedWorkspace = sharedModules.find(item => item.id === page);
   const groupedTools = category ? category.ids.map(id => tools.find(tool => tool.id === id)!) : [];
   const title = shared ? '共享栏目' : category?.name;
   useMotionHeight(panel, openKey);
@@ -130,7 +133,7 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
     <button ref={button => { if (button) triggers.current.set('shared', button); else triggers.current.delete('shared'); }}
       className={`nav-item shared-sidebar-trigger ${shared || selectedWorkspace ? 'active' : ''}`} title="共享栏目" aria-label="共享栏目"
       aria-expanded={shared} aria-controls={shared ? 'shared-sidebar-panel' : undefined} onClick={() => toggle('shared')}>
-      <Globe size={17} /><span>共享栏目</span><small>{selectedWorkspace?.name ?? workspaceModules.length}</small><ChevronRight className="category-trigger-arrow" size={14} />
+      <Globe size={17} /><span>共享栏目</span><small>{selectedWorkspace?.name ?? sharedModules.length}</small><ChevronRight className="category-trigger-arrow" size={14} />
     </button>
     <div className="nav-caption"><span>按任务分类</span><small>{categories.length} 个分组</small></div>
     <nav className="category-list" aria-label="工具分类" hidden={narrow && !!openKey} onKeyDown={event => move(event, '.category-trigger', event.currentTarget)}>
@@ -150,14 +153,18 @@ export default function CategoryNavigation({ activeToolId, tasks, narrow, onChoo
     <MotionPresence kind="popover" present={!!title}>{title && <section id={shared ? 'shared-sidebar-panel' : 'category-tool-panel'} popover={narrow ? undefined : 'manual'} className={`category-panel ${narrow ? 'category-panel-inline' : ''}`} ref={panel} aria-labelledby="category-panel-title">
       <header className="category-panel-heading">
         {narrow && <button className="icon-button category-back" aria-label={shared ? '返回侧栏导航' : '返回工具分类'} onClick={() => close(true)}><ArrowLeft size={18} /></button>}
-        <div><h2 id="category-panel-title">{title}<small>{shared ? `${workspaceModules.length} 个栏目` : `${groupedTools.length} 个工具`}</small></h2>{category && <p>{category.description}</p>}</div>
+        <div><h2 id="category-panel-title">{title}{category && <small>{groupedTools.length} 个工具</small>}</h2>{category && <p>{category.description}</p>}</div>
+        {shared && <button className="shared-sort-action" aria-haspopup="dialog" onClick={() => {
+          const anchor = triggers.current.get('shared');
+          if (anchor) { close(); onEditSharedOrder(anchor); }
+        }}><ListOrdered size={16} />排序</button>}
         {!narrow && <button className="icon-button" aria-label={shared ? '关闭共享栏目面板' : '关闭分类工具面板'} onClick={() => close(true)}><X size={17} /></button>}
       </header>
       <nav className="category-tool-list" aria-label={shared ? title : `${title}工具`} onKeyDown={event => {
         if (event.key === 'ArrowLeft') { event.preventDefault(); close(true); }
         else move(event, '.category-tool', event.currentTarget);
       }}>
-        {shared ? workspaceModules.map(item => {
+        {shared ? sharedModules.map(item => {
           const { Icon, hint } = workspaceModuleNav[item.id];
           return <button key={item.id} className={`category-tool ${item.id === page ? 'active' : ''}`} title={item.name}
             aria-current={item.id === page ? 'page' : undefined} onClick={() => { close(true); onChooseWorkspace(item.id); }}>

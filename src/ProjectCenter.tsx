@@ -488,7 +488,7 @@ export default function ProjectCenter({
       className={`project-center motion-skeleton-content ${portal ? "pc-portal" : ""} ${canEdit ? "" : "pc-viewer"}`}
     >
       <MotionPresence kind="dialog" present={!!(comparisonOpen)}>{comparisonOpen && <ProjectComparison data={data} active={active} close={() => setComparisonOpen(false)} />}</MotionPresence>
-      <header className="pc-heading">
+      <header className="pc-heading workspace-banner">
         <div className="pc-brand">
           <FolderKanban size={27} />
           <div>

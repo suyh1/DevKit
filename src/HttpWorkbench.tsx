@@ -231,7 +231,7 @@ export default function HttpWorkbench({
   }
   return (
     <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目 · 文档与调试</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
-      <div className="page-heading">
+      <div className="page-heading workspace-banner">
         <div className="page-title">
           <div className="eyebrow">HTTP CLIENT</div>
           <h1>HTTP 调试</h1>

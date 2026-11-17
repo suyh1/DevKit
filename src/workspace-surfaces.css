@@ -1,0 +1,119 @@
+/* Internal work areas share a surface hierarchy. The overview and app navigation have their own styles. */
+.workspace-banner {
+  --workspace-rule: color-mix(in srgb, var(--accent) 22%, var(--line));
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--workspace-rule);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 2px 4px #00000005;
+}
+.workspace-banner h1 { margin-block: 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
+.workspace-banner p { margin-block: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.workspace-banner :is(.eyebrow, .jar-eyebrow) { margin-block-end: 4px; color: var(--muted); font-size: 11px; letter-spacing: 0; }
+.workspace-banner :is(.pc-brand > svg, .monitor-brand > svg, .log-heading > div > svg, .ng-heading-icon) {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 10px;
+  border: 1px solid var(--workspace-rule);
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--accent);
+  stroke-width: 1.5;
+}
+.workspace-banner .ng-heading-icon svg { width: 20px; height: 20px; stroke-width: 1.5; }
+.workspace-banner :is(.pc-actions, .ng-actions, .jar-actions, .log-actions, .monitor-actions, .lan-heading-actions, .api-actions) { gap: 8px; }
+.workspace-banner :is(.pc-role, .jar-java-target) { font-variant-numeric: tabular-nums; }
+.workspace-banner.page-heading { flex-wrap: nowrap; }
+.workspace-banner.page-heading h1 { overflow-wrap: anywhere; }
+.workspace-banner .page-icon { width: 44px; height: 44px; border-radius: 10px; }
+.workspace-portal .workspace-banner { padding: 12px 16px; }
+
+/* Text tools use matching editor frames while their tool-specific layouts stay independent. */
+.task-pane :is(.editor-card, .color-panel, .toolbar) { border-radius: 12px; }
+.task-pane .workbench-controls { row-gap: 12px; }
+.task-pane .editor-title { background: var(--surface-raised); }
+.task-pane .output-card .panel-dot { background: var(--subtle); }
+.task-pane .output-card[data-result-state=success] .panel-dot { background: var(--success); }
+.task-pane .output-card[data-result-state=success] > .editor-title { background: color-mix(in srgb, var(--success-tint) 48%, var(--surface-raised)); }
+.task-pane .output-card[data-result-state=stale] .panel-dot { background: var(--warning); }
+.task-pane .output-card[data-result-state=error] .panel-dot { background: var(--error); }
+.task-pane .editor-label strong { font-size: 13px; font-weight: 600; }
+.task-pane .editor-label small { color: var(--muted); font: 11px ui-monospace, Consolas, monospace; }
+.task-pane .editor-actions { gap: 4px; }
+.task-pane .editor-actions .icon-button:hover { background: var(--soft); color: var(--text); }
+.task-pane .editor-footer { background: var(--surface-raised); font-size: 11px; font-variant-numeric: tabular-nums; }
+.task-pane .editor-card:focus-within { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.task-pane :is(.workflow-intro, .task-status) { font-size: 12px; }
+.task-pane :is(.document-tabs, .request-input-tabs) > button[aria-pressed=true] { box-shadow: inset 0 -2px var(--accent); }
+.task-pane :is(.generator-config, .focused-input) > label { font-size: 13px; line-height: 1.5; }
+.task-pane :is(.metric-grid strong, .number-result code, .conversion-summary) { font-variant-numeric: tabular-nums; }
+.task-pane .color-panel-heading { padding-block-end: 8px; border-bottom: 1px solid var(--line); }
+.task-pane .color-panel-heading h2 { font-size: 15px; font-weight: 600; }
+.geo-workbench .geo-output code { font-variant-numeric: tabular-nums; }
+.geo-workbench .geo-result-heading { padding-block-end: 8px; border-bottom: 1px solid var(--line); }
+
+/* Active resources read as a selected row across lists. Use each page's own status semantics. */
+.project-center .pc-profile.selected,
+.ng-center .ng-instance.selected,
+.api-workspace .api-tree-item.selected,
+.http-workbench .http-collection > div.selected,
+.log-center .log-source-list label.selected {
+  box-shadow: inset 2px 0 var(--accent);
+}
+.project-center .pc-content .pc-card { box-shadow: 0 2px 8px #00000008; }
+.project-center .pc-content .pc-card:hover { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); }
+.project-center :is(.pc-section-title, .pc-role) { font-size: 12px; }
+.project-center .pc-environment h2 { font-weight: 600; }
+
+.ng-center .ng-file-tabs { gap: 4px; }
+.ng-center .ng-editor-heading { background: var(--surface-raised); }
+.ng-center .ng-editor-heading > code { font-variant-numeric: tabular-nums; }
+
+.jar-center .jar-table { font-variant-numeric: tabular-nums; }
+.jar-center .jar-table th { font-size: 12px; font-weight: 600; }
+.jar-center .jar-table tbody tr:hover { background: color-mix(in srgb, var(--soft) 52%, var(--surface)); }
+.jar-center .jar-status.running { color: var(--success); background: var(--success-tint); }
+.jar-center .jar-summary { font-variant-numeric: tabular-nums; }
+
+.log-center .log-pane > header, .lan-center .lan-terminal-tabs { background: var(--surface-raised); }
+.log-center .log-pane > pre { background: var(--editor-gutter); font-variant-numeric: tabular-nums; }
+.log-center .log-pane > footer { background: var(--surface); font-variant-numeric: tabular-nums; }
+.log-center .log-live { font-size: 11px; font-variant-numeric: tabular-nums; }
+.log-center .log-live i:not([data-paused=true]) { background: var(--success); }
+
+.monitor-center .monitor-metrics strong, .monitor-center .monitor-card-stats, .monitor-center .monitor-detail dd { font-variant-numeric: tabular-nums; }
+.monitor-center .monitor-status.up { color: var(--success); background: var(--success-tint); }
+.monitor-center .monitor-beats .up { background: color-mix(in srgb, var(--success) 72%, var(--surface)); }
+.monitor-center .monitor-card-stats { padding-block-start: 8px; border-top: 1px solid var(--line); }
+.monitor-center .monitor-detail dl > div { padding-block-end: 8px; border-bottom: 1px solid var(--line); }
+.monitor-center .monitor-chart { padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+
+.lan-center .lan-search { background: var(--soft); }
+.lan-center .lan-host-list .lan-group-label { margin-top: 8px; font-size: 12px; }
+.lan-center .lan-terminal-tabs > .selected { box-shadow: inset 0 -2px var(--accent); }
+
+.api-workspace .api-section h3 { font-size: 14px; font-weight: 600; }
+.api-workspace .api-project-select { padding-block-end: 12px; border-bottom: 1px solid var(--line); }
+.api-workspace .api-live-response { font-variant-numeric: tabular-nums; }
+.http-workbench .http-collection h2 { margin-block-start: 0; font-weight: 600; }
+.http-workbench .http-response-controls { font-variant-numeric: tabular-nums; }
+
+:root[data-theme=dark] .workspace-banner { box-shadow: none; }
+
+@media (max-width: 760px) {
+  .workspace-banner { padding: 16px; }
+  .workspace-banner h1 { font-size: 22px; }
+  .workspace-banner p { font-size: 12px; }
+  .task-pane .editor-footer { font-size: 10px; }
+}
+@media (max-width: 540px) {
+  .workspace-banner.page-heading { gap: 8px; padding: 12px; }
+  .workspace-banner.page-heading h1 { font-size: 20px; }
+  .workspace-banner .page-icon { width: 36px; height: 36px; }
+}

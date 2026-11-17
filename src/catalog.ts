@@ -12,6 +12,9 @@ export const workspaceModules = [
   { id: 'lan-hosts', name: '局域网主机', description: '桌面端发现、分组和导入主机，分步诊断 DevKit／SSH 连接。支持私钥和跳板机、多会话终端及 SFTP、端口监控、Windows 远程桌面和网络唤醒。', category: '工作台' },
 ] as const;
 
+export type WorkspaceModule = typeof workspaceModules[number];
+export type WorkspaceModuleId = WorkspaceModule['id'];
+
 export const categories = [
   { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: ['json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'mock-data', 'env', 'properties'] },
   { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: ['json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status'] },

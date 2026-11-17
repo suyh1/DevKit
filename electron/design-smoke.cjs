@@ -56,6 +56,8 @@ module.exports = async function designSmoke(window, output) {
   }
   window.setContentSize(1440, 1000);
   await js("document.documentElement.dataset.theme = 'light'");
+  assert.match(await js('document.querySelector(".welcome-content h1").textContent'), /让专注发生.*让灵感成形/);
+  assert.notEqual(await js('getComputedStyle(document.querySelector(".art-code")).transform'), 'none');
   const favoriteCount = await js('Number(document.querySelector(\'.sidebar-workspace button[title="我的收藏"] small\').textContent)');
   await js('document.querySelectorAll(".library-scope button")[1].click()');
   await settle();
@@ -97,6 +99,8 @@ module.exports = async function designSmoke(window, output) {
   await js('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例")).click()');
   await js('document.querySelector(".task-pane:not([hidden]) .run-button").click()');
   await wait('!!document.querySelector(".task-pane:not([hidden]) .status-success")');
+  assert.equal(await js('document.querySelector(".task-pane:not([hidden]) .output-card").dataset.resultState'), 'success');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .workspace-banner")).borderInlineStartWidth'), '3px');
   // Resizing can leave the OS pointer over the run button; compare its base color.
   window.webContents.sendInputEvent({ type: 'mouseMove', x: 1, y: 1 });
   await settle();
@@ -115,7 +119,13 @@ module.exports = async function designSmoke(window, output) {
   await js('document.querySelector(".color-story-card").click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
-  await require('./navigation-helpers.cjs')(window).openWorkspace('项目中心');
+  const { openWorkspace } = require('./navigation-helpers.cjs')(window);
+  for (const name of ['日志中心', '监控中心', 'HTTP 调试', 'Nginx 配置', 'JAR 管理', '局域网主机', '项目中心']) {
+    await openWorkspace(name);
+    const title = JSON.stringify(name === 'HTTP 调试' ? '接口工作台' : name);
+    await wait(`[...document.querySelectorAll('.workspace-banner h1')].some(heading => heading.textContent === ${title} && heading.getClientRects().length)`);
+    assert.equal(await js(`getComputedStyle([...document.querySelectorAll('.workspace-banner h1')].find(heading => heading.textContent === ${title} && heading.getClientRects().length).closest('.workspace-banner')).borderInlineStartWidth`), '3px');
+  }
   await wait('!!document.querySelector(".project-workspace:not([hidden]) .pc-shell")');
   await js("document.documentElement.dataset.theme = 'dark'");
   await settle();

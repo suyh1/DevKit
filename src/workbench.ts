@@ -4,6 +4,8 @@ import { defaultOptions, tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { validateGeoOptions } from './geo-config';
 import type { DisplayMode } from './DisplayMode';
+import { workspaceModules } from './catalog';
+import type { WorkspaceModuleId } from './catalog';
 
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'cancelled';
 export type Task = {
@@ -13,8 +15,10 @@ export type Task = {
 export type Preferences = {
   themeStyle: ThemeStyle; theme: 'system' | 'light' | 'dark'; fontSize: number; indent: '2' | '4'; wrap: boolean;
   layout: 'split' | 'stack'; density: 'comfortable' | 'compact'; library: 'grid' | 'list'; startup: ToolId | 'home'; displayMode: DisplayMode;
+  sharedModuleOrder: WorkspaceModuleId[];
 };
-export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home', displayMode: 'normal' };
+const defaultSharedModuleOrder = workspaceModules.map(module => module.id);
+export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home', displayMode: 'normal', sharedModuleOrder: defaultSharedModuleOrder };
 export const MAX_TASKS = 12;
 export function isToolId(value: unknown): value is ToolId { return tools.some(tool => tool.id === value); }
 export function normalizeToolId(value: unknown): ToolId | undefined {
@@ -23,6 +27,10 @@ export function normalizeToolId(value: unknown): ToolId | undefined {
 }
 export function normalizeFavorites(value: unknown): ToolId[] {
   return Array.isArray(value) ? [...new Set(value.map(normalizeToolId).filter((id): id is ToolId => !!id))] : [];
+}
+function normalizeSharedModuleOrder(value: unknown): WorkspaceModuleId[] {
+  const saved = Array.isArray(value) ? value.filter((id): id is WorkspaceModuleId => defaultSharedModuleOrder.includes(id)) : [];
+  return [...new Set([...saved, ...defaultSharedModuleOrder])];
 }
 export function createTask(toolId: ToolId, indent = '2', input?: string): Task {
   return { id: crypto.randomUUID(), toolId, input: input ?? (['uuid', 'ulid'].includes(toolId) ? '5' : ''), output: '', options: { ...defaultOptions[toolId], ...(['json', 'xml', 'sql', 'code-format'].includes(toolId) ? { indent } : {}) }, error: '', elapsed: null, status: 'idle' };
@@ -49,6 +57,7 @@ export function validatePreferences(value: unknown): Preferences {
     indent: choose('indent', ['2', '4']), wrap: choose('wrap', [true, false]), layout: choose('layout', ['split', 'stack']),
     density: choose('density', ['comfortable', 'compact']), library: choose('library', ['grid', 'list']),
     startup: normalizeToolId(source.startup) ?? 'home', displayMode: choose('displayMode', ['normal', 'performance']),
+    sharedModuleOrder: normalizeSharedModuleOrder(source.sharedModuleOrder),
   };
 }
 export function workspaceSnapshot(tasks: Task[], activeId: string | null, includeSensitive = false): string {

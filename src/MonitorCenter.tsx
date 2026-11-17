@@ -57,7 +57,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
   const current = visible.find(item => item.id === selected) || visible[0];
   const frozen = !operate && !!draft?.enabled;
   return <section className="monitor-center">
-    <header className="monitor-heading"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{edit && <button className="run-button" onClick={() => open()}><Plus size={15} />添加监控</button>}</div></header>
+    <header className="monitor-heading workspace-banner"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{edit && <button className="run-button" onClick={() => open()}><Plus size={15} />添加监控</button>}</div></header>
     <div className="monitor-note"><ShieldCheck size={15} /><span>检测从主机发起，切换页面后继续。退出主机应用或独立服务后停止。状态每 {statusSeconds} 秒刷新。</span></div>
     {error && !draft && !remove && <p className="pc-error" role="alert">{error}</p>}
     {linked && data && !data.monitors.some(item => item.id === linked) && <p className="pc-notice" role="status">{missingResourceLink('监控')}</p>}

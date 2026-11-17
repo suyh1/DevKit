@@ -303,7 +303,7 @@ export default function ApiWorkspace({
   const unsaved = !!draft && !saved;
   return (
     <section className="api-workspace" aria-busy={busy}>
-      <div className="api-topline">
+      <div className="api-topline workspace-banner">
         <div>
           <div className="eyebrow">{remoteAccess() ? "SHARED API WORKSPACE" : "LOCAL API WORKSPACE"}</div>
           <h1>接口工作台</h1>

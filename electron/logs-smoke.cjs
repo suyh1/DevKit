@@ -36,7 +36,7 @@ module.exports = async (window, output) => {
       window.setContentSize(width, 900); await delay(150);
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
-      const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('[role=menuitem]').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
+      const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('.shared-nav-item').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
       assert.equal(geometry.count, 7); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
       window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
       assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
@@ -48,7 +48,7 @@ module.exports = async (window, output) => {
     for (const name of ['HTTP 调试', '日志中心']) {
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
-      await js(`[...document.querySelectorAll('.shared-nav-panel [role=menuitem]')].find(e=>e.querySelector('strong').textContent===${JSON.stringify(name)}).click()`);
+      await js(`[...document.querySelectorAll('.shared-nav-item')].find(e=>e.querySelector('strong').textContent===${JSON.stringify(name)}).click()`);
       await wait(window.webContents, `document.querySelector('.breadcrumb strong')?.textContent===${JSON.stringify(name)}&&!document.querySelector('.shared-nav-panel')`);
     }
     await wait(window.webContents, `document.querySelectorAll('.log-source-list section>label').length===4`);

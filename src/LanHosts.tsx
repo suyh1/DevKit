@@ -218,7 +218,7 @@ export default function LanHosts({ active, onOpenMonitor }: { active: boolean; o
   }
   const grouped = [...groups].sort(([a], [b]) => Number(a !== 'pinned') - Number(b !== 'pinned') || a.localeCompare(b, 'zh-CN'));
   return <section className="lan-center">
-    <header className="lan-heading"><div><h1>局域网主机</h1><p>管理远程连接、验证主机指纹，并在 SSH 终端中维护服务器。</p></div>{available && <div className="lan-heading-actions">
+    <header className="lan-heading workspace-banner"><div><h1>局域网主机</h1><p>管理远程连接、验证主机指纹，并在 SSH 终端中维护服务器。</p></div>{available && <div className="lan-heading-actions">
       <button className="secondary-button" disabled={busy} onClick={() => setDiscovering(true)}><Radar size={15} />发现主机</button>
       <button className="secondary-button" disabled={busy} onClick={() => setImporting(true)}><Upload size={15} />导入主机</button>
       <button className="run-button" disabled={busy} onClick={() => { setError(''); setSeed(undefined); setEditing('new'); }}><Plus size={16} />添加主机</button>

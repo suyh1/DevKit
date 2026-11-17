@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTask, editTask, importWorkspace, validatePreferences, workspaceSnapshot } from './workbench';
 import { searchTools } from './discovery';
-import { categories } from './catalog';
+import { categories, workspaceModules } from './catalog';
 import { tools } from './tools';
 import { diffRows, jsonTree, nodePath } from './result-model';
 import { readText } from './files';
@@ -75,6 +75,13 @@ describe('workbench workflows', () => {
     const prefs = validatePreferences({ theme: 'invalid', fontSize: 2000, indent: '4', wrap: 'false', startup: 'missing' });
     expect(prefs.theme).toBe('system'); expect(prefs.fontSize).toBe(13);
     expect(prefs.indent).toBe('4'); expect(prefs.wrap).toBe(true); expect(prefs.startup).toBe('home');
+  });
+  it('keeps the saved shared navigation order and appends missing catalog entries', () => {
+    const defaults = workspaceModules.map(module => module.id);
+    expect(validatePreferences({}).sharedModuleOrder).toEqual(defaults);
+    const preferences = validatePreferences({ sharedModuleOrder: ['jar', 'removed', 'jar', null, 'http'] });
+    expect(preferences.sharedModuleOrder).toEqual(['jar', 'http', ...defaults.filter(id => id !== 'jar' && id !== 'http')]);
+    expect(validatePreferences(JSON.parse(JSON.stringify(preferences)))).toEqual(preferences);
   });
 });
 
