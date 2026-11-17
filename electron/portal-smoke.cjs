@@ -542,6 +542,7 @@ app
       await window.loadURL(fixture.url + '?audit=visitor#jar');
       await login();
       await wait('document.querySelector(".jar-instance")?.textContent.includes("审查测试应用")');
+      await wait('[...document.querySelectorAll(".jar-instance button")].some(button => button.textContent.trim() === "设置" && !button.disabled)');
       await button('设置', '.jar-instance button');
       await wait('!!document.querySelector(".jar-dialog[open]")');
       assert.match(await js('document.querySelector(".jar-dialog textarea").value'), /audit-secret/);
