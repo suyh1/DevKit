@@ -21,6 +21,8 @@ export function Modal({
   wide = false,
   savedKey = 0,
   feedback,
+  className = "",
+  icon,
   closeLabel = "关闭项目中心窗口",
 }: {
   title: string;
@@ -31,6 +33,8 @@ export function Modal({
   wide?: boolean;
   savedKey?: number;
   feedback?: string;
+  className?: string;
+  icon?: React.ReactNode;
   closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
@@ -53,9 +57,9 @@ export function Modal({
   useEffect(() => {
     const before = document.activeElement;
     ref.current?.showModal();
-    ref.current
-      ?.querySelector<HTMLInputElement>("input:not([type=checkbox]), select")
-      ?.focus();
+    const initial = ref.current?.querySelector<HTMLElement>("[data-modal-focus]") ||
+      ref.current?.querySelector<HTMLElement>("input:not([type=checkbox]), select");
+    initial?.focus();
     return () => {
       if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus();
     };
@@ -79,7 +83,7 @@ export function Modal({
     <CloseDialog.Provider value={requestClose}>
       <dialog
         ref={ref}
-        className={`pc-dialog ${wide ? "pc-dialog-wide" : ""}`}
+        className={`pc-dialog ${wide ? "pc-dialog-wide" : ""} ${className}`}
         aria-labelledby={heading}
         aria-busy={busy}
         onCancel={(event) => {
@@ -89,6 +93,7 @@ export function Modal({
       >
         <header>
           <div>
+            {icon && <span className="pc-dialog-icon" aria-hidden="true">{icon}</span>}
             <h2 id={heading}>{title}</h2>
             {dirty && <small className="pc-draft-state">有未保存的更改</small>}
             {feedback && (

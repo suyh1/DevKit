@@ -14,6 +14,11 @@ export async function prepareDesktop(platform, arch) {
   for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) await cp(path.join(root, 'electron', name), path.join(staging, name));
   await cp(path.join(root, 'build', 'icons', '128x128.png'), path.join(staging, 'tray-icon.png'));
   for (const name of ['server', 'shared']) await cp(path.join(root, name), path.join(staging, name), { recursive: true, filter: filename => !/\.(?:check|test)\.m?[jt]s$|\.d\.mts$/.test(filename) });
+  const packages = JSON.parse(await readFile(new URL('./ssh-runtime.json', import.meta.url), 'utf8'));
+  for (const name of packages) {
+    const source = path.join(root, 'node_modules', name);
+    await cp(source, path.join(staging, 'node_modules', name), { recursive: true, filter: filename => !path.relative(source, filename).split(path.sep).some(part => ['node_modules', 'build', 'test', 'examples'].includes(part) || part.endsWith('.node')) });
+  }
   await cp(path.join(root, 'dist'), path.join(staging, 'dist'), { recursive: true });
   await writeFile(path.join(staging, 'package.json'), JSON.stringify({ name: 'devkit', productName: 'DevKit', version: manifest.version, main: 'main.cjs', description: 'Offline developer workbench with bundled Chromium', author: 'DevKit maintainers' }, null, 2));
   return { manifest, staging };

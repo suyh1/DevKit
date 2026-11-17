@@ -45,16 +45,22 @@ export async function supervisorRequest(item, command = 'status', timeout = 8000
     throw error;
   }
 }
-export async function launchSupervisor(registry, item) {
+async function spawnWorker(executable, args, options) {
+  const child = spawn(executable, args, { ...options, detached: true, windowsHide: true, stdio: 'ignore', shell: false });
+  let exited = false;
+  child.once('exit', () => { exited = true; });
+  await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
+  child.unref();
+  return () => exited;
+}
+export async function launchSupervisor(registry, item, launch = spawnWorker) {
   let created = false;
   if (!await supervisorRequest(item)) {
     created = true;
-    const child = spawn(process.execPath, [workerPath, '--registry', registry, '--id', item.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, cwd: path.dirname(item.jar), detached: true, windowsHide: true, stdio: 'ignore', shell: false });
-    let exited = false; child.once('exit', () => { exited = true; });
-    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); }); child.unref();
+    const exited = await launch(process.execPath, [workerPath, '--registry', registry, '--id', item.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, cwd: path.dirname(item.jar) });
     let ready = false;
     for (let attempt = 0; attempt < 150; attempt++) {
-      if (exited) break;
+      if (exited?.()) break;
       try { if (await supervisorRequest(item)) { ready = true; break; } } catch { /* Wait for the endpoint to finish initializing. */ }
       await delay(100);
     }

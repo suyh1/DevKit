@@ -1,0 +1,7 @@
+[
+  "ssh2",
+  "asn1",
+  "bcrypt-pbkdf",
+  "safer-buffer",
+  "tweetnacl"
+]

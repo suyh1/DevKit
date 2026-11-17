@@ -4,18 +4,22 @@
 
 ## 从桌面管理多台主机
 
-在“JAR 管理”或“Nginx 配置”顶部打开“局域网主机”。两个模块使用同一个地址簿，可保存名称及连接信息。连接后填写相应主机上的绝对路径。
+在“共享 → 局域网主机”保存、搜索、编辑和测试远程连接。为需要集中管理的主机勾选“JAR 管理”和“Nginx 配置”。两个栏目按本机和各远程主机分组，添加实例时先选目标主机，再选择文件或填写该主机上的绝对路径。开启这两个栏目的局域网共享后，授权网页与桌面看到同一批主机分组，并使用同一套实例表单和操作。
 
 | 连接方式 | 目标端准备 | 操作范围 |
 | --- | --- | --- |
-| DevKit 共享 | 运行 DevKit 桌面或独立共享服务，选择要开放的模块并设置口令和权限 | 在独立的 DevKit 窗口使用目标电脑的完整共享工作台 |
-| SSH | 开启 OpenSSH Server，给账号文件读写及相关程序运行权限。JAR 需要 Java，Nginx 需要 nginx | JAR 登记、启停重启、状态、日志和同目录配置；Nginx 主配置和附属文件编辑、检查及重载 |
+| DevKit 共享 | 开启目标 DevKit 桌面或独立服务的相应栏目，保存目标共享地址和口令 | 复用目标机的实例注册表；中心桌面和网页在目标端权限内操作，也可直接打开目标工作台 |
+| SSH | 开启 SSH 服务；集中管理还需 SFTP 和 SSH 会话 PATH 中的 Node.js 24+ | 目标账号运行随 DevKit 分发的管理程序；JAR 需要 Java，Nginx 需要 nginx，系统自启和进程控制由该账号权限决定 |
 
-SSH 使用管理电脑上的 `ssh` 客户端，以及它现有的 SSH 配置、`known_hosts`、密钥与 `ssh-agent`。先在终端运行 `ssh -p 22 user@192.168.1.20`，核对指纹并验证密钥可登录。然后在 DevKit 选 SSH，填入相同地址、端口、用户名和目标系统。DevKit 连接会执行已知主机检查，通过非交互方式认证；需要输入密钥口令时可先将密钥加载到系统 ssh-agent。连接记录只保存地址和账号信息。
+SSH 终端支持多会话标签、调整终端尺寸、交互式命令和断线重连。可以使用用户名和密码，或使用本机 SSH Agent 和 `~/.ssh/id_ed25519`、`id_ecdsa`、`id_rsa` 默认密钥。加密私钥可解锁后加载到 SSH Agent。首次测试连接或打开终端时，核对服务器提供的 SHA-256 指纹后再信任。出现指纹变化时，核对目标机后可重置信任。使用终端时，目标机只需开启 SSH 服务。
 
-Linux SSH 通过系统 `sh`、GNU coreutils、`flock` 和 `/proc` 工作。Windows SSH 使用 Windows PowerShell 5.1，JAR 启停需要账号具有本机 WMI 进程查询和创建权限。连接时脚本经 SSH 传输并执行，目标机保留配置备份、日志和 PID 数据。SSH 登记表保存在发起连接的桌面客户端。
+开启 SSH 栏目管理后，DevKit 通过 SFTP 将管理程序放到目标用户的 `~/.devkit-ssh/workspaces/`，注册表和备份位于 `~/.devkit-ssh/managed/`。Windows SSH 账号需要本机 CIM 进程查询与创建权限，后台应用可跨 SSH 会话继续运行。使用独立 Node 服务时，可在桌面配置好连接，再停掉两端并复制 `configs/lan-hosts/`。凭据以密文保存，密钥也在该目录内，请限制目录的访问权限。网页获得已启用的实例管理权限，主机档案配置和 SSH 终端在桌面端使用。
 
-设计调研中参考了 Cockpit 15.4k Stars 的 SSH 主机列表，它曾将各主机前端置于同一上下文，后来因隔离问题弃用该方式。Portainer 38.8k Stars、Zlib 许可证的 Agent 模式提供完整远端工作区，需要在目标部署 Agent。Ansible 71.5k Stars、GPL-3.0-or-later 的 SSH 方式使用 Linux shell 或 Windows PowerShell。DevKit 共享窗口按主机隔离会话和站点数据，SSH 复用系统 OpenSSH 并调用系统工具，未引入这些项目的代码。参考 [Cockpit](https://github.com/cockpit-project/cockpit)、[Cockpit 多主机说明](https://cockpit-project.org/guide/latest/multi-host.html)、[Portainer](https://github.com/portainer/portainer)、[Portainer Agent](https://docs.portainer.io/admin/environments/add/docker/agent)、[Ansible](https://github.com/ansible/ansible) 和 [Ansible Windows SSH](https://docs.ansible.com/projects/ansible/latest/os_guide/windows_ssh.html)。
+网页操作须满足中心共享的编辑或运行授权。DevKit 类型的目标主机还须授予对应权限。中心汇总各目标 DevKit 的本机实例，避免多层共享重复和循环。有编辑权限时可浏览已选择的远程目标目录。主机不可达时仍可使用本机组，当前会话已加载过的远程组会保留上次读取的列表并显示连接异常。
+
+旧版桌面地址簿会导入主机连接。启用 SSH 主机上的对应栏目并验证连接后，可从 JAR 或 Nginx 页面选择“导入旧版 SSH 登记”。已由旧版运行的 Java 应用需先停掉，成功导入后进入目标主机分组。
+
+连接档案和多标签交互参考 [Termix](https://github.com/Termix-SSH/Termix) 和 [Nexterm](https://github.com/gnmyt/Nexterm)。终端使用 [xterm.js](https://github.com/xtermjs/xterm.js)，SSH、PTY 和 SFTP 使用 [ssh2](https://github.com/mscdex/ssh2)。转发绑定档案中的目标和凭据，避免类似 [Termix 的凭据越权问题](https://github.com/Termix-SSH/Termix/security/advisories/GHSA-57gp-39c7-4g9r)。
 
 ## 桌面开启
 

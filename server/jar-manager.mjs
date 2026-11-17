@@ -144,7 +144,7 @@ export async function createJarManager(directory, dependencies = {}) {
     const current = await status(item);
     if (!['stopped', 'exited'].includes(current.state)) throw new Error(current.state === 'running' ? '此 JAR 已在运行。' : current.detail);
     if (runtime.supervised) {
-      const result = await launchSupervisor(filename, item);
+      const result = await launchSupervisor(filename, item, runtime.launchDetached);
       return { output: result.output, status: await status(item) };
     }
     const jar = await realpath(item.jar);

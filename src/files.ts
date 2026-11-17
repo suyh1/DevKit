@@ -1,7 +1,7 @@
 declare global {
   interface Window { devkitDesktop?: {
     openLanHost?: (address: string, module: 'jar' | 'nginx') => Promise<{ error?: string }>;
-    requestSsh?: (value: import('./ssh-api').SshRequest) => Promise<{ data?: unknown; error?: string }>;
+    lanHosts?: (action: string, value?: unknown) => Promise<{ data?: unknown; error?: string }>;
     saveText: (text: string, filename: string) => Promise<string>;
     onCloseRequest: (listener: (intent: 'close' | 'reload' | 'choose') => void) => () => void;
     answerClose: (allow: boolean) => void;

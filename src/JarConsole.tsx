@@ -6,12 +6,11 @@ import { canOperateJar } from './workspace-remote';
 import { copyText } from './motion-primitives';
 import { useConfirmation } from './Confirmation';
 
-export default function JarConsole({ id, name, active, close, stop }: { id: string; name: string; active: boolean; close: () => void; stop: () => void }) {
+export default function JarConsole({ id, name, active, close, stop, control = canOperateJar() }: { id: string; name: string; active: boolean; close: () => void; stop: () => void; control?: boolean }) {
   const clientId = useRef(newJarClientId()), position = useRef<{ cursor: number; generation?: string }>({ cursor: 0 });
   const [snapshot, setSnapshot] = useState<JarConsoleSnapshot | null>(null), [text, setText] = useState(''), [input, setInput] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [connectionError, setConnectionError] = useState(''), [notice, setNotice] = useState(''), [query, setQuery] = useState(''), [follow, setFollow] = useState(true);
   const output = useRef<HTMLPreElement>(null), confirm = useConfirmation();
-  const control = canOperateJar();
   const payload = () => ({ id, clientId: clientId.current, ...position.current });
   async function task(action: () => Promise<void>) { setBusy(true); setError(''); try { await action(); } catch (failure) { setError((failure as Error).message); } finally { setBusy(false); } }
   useEffect(() => {

@@ -3,7 +3,7 @@ import { MotionPresence, MotionToast, MotionText, useMotionList, MotionGroup, Mo
 import HttpWorkbench from './HttpWorkbench';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle, Server, Coffee, Activity, ScrollText, Globe, ChevronDown } from 'lucide-react';
+import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle, Server, Coffee, Activity, ScrollText, Globe, ChevronDown, Terminal } from 'lucide-react';
 import { tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { isColorTool } from './colors';
@@ -16,6 +16,8 @@ import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
 import NginxCenter from './NginxCenter';
 import JarCenter from './JarCenter';
+import LanHosts from './LanHosts';
+import { migrateLanHosts } from './lan-api';
 import MonitorCenter from './MonitorCenter';
 import LogCenter from './LogCenter';
 import SharedWorkspaceNavigation from './SharedWorkspaceNavigation';
@@ -30,7 +32,7 @@ import packageInfo from '../package.json';
 import { ConfirmationProvider } from './Confirmation';
 import { DisplayModeProvider } from './DisplayMode';
 
-type Page = 'home' | 'favorites' | 'recent' | 'settings' | 'task' | 'projects' | 'nginx' | 'jar' | 'http' | 'monitor' | 'logs';
+type Page = 'home' | 'favorites' | 'recent' | 'settings' | 'task' | typeof workspaceModules[number]['id'];
 type Job = { worker: Worker; timeout: ReturnType<typeof setTimeout> };
 function readPreference(key: string): unknown { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
 function initialPreferences(): Preferences {
@@ -40,6 +42,7 @@ function initialPreferences(): Preferences {
 
 export default function App() {
   const [preferences, setPreferences] = useState(initialPreferences);
+  useEffect(() => { void migrateLanHosts(); }, []);
   return <DisplayModeProvider mode={preferences.displayMode}><ConfirmationProvider><SharingProvider><Workbench preferences={preferences} setPreferences={setPreferences} /></SharingProvider></ConfirmationProvider></DisplayModeProvider>;
 }
 function Workbench({ preferences, setPreferences }: { preferences: Preferences; setPreferences: React.Dispatch<React.SetStateAction<Preferences>> }) {
@@ -188,7 +191,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     <aside inert={narrow && collapsed} className="sidebar" role={narrow && !collapsed ? 'dialog' : undefined} aria-modal={narrow && !collapsed ? true : undefined} aria-label="工具导航与工作台"><button className="brand" onClick={() => navigate('home')} title="工作台总览"><span className="brand-mark"><Code2 size={23} /></span><span className="brand-word"><strong>DevKit<span>.</span></strong><small>本地开发工作台</small></span><span className="brand-version">{packageInfo.version}</span></button>
       <button className="sidebar-search" aria-label="打开工具搜索" onClick={() => setSearchOpen(true)}><Search size={15} /><span>搜索工具或用途</span><kbd>Ctrl K</kbd></button>
       <div className="sidebar-workspace">{([{ id: 'home', label: '工作台', Icon: LayoutGrid, count: tools.length }, { id: 'favorites', label: '我的收藏', Icon: Star, count: favorites.length }, { id: 'recent', label: '最近使用', Icon: Clock3, count: recent.length }] as const).map(item => <button className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.label} key={item.id} onClick={() => navigate(item.id)}><item.Icon size={17} /><span>{item.label}</span><small>{item.count}</small></button>)}</div>
-      <details className="sidebar-shared" open={sharedSidebarOpen} onToggle={event => setSharedSidebarOpen(event.currentTarget.open)}><summary className={`nav-item shared-sidebar-trigger ${workspaceModules.some(item => item.id === page) ? 'active' : ''}`} title="共享栏目"><Globe size={17} /><span>共享栏目</span><small>{workspaceModules.find(item => item.id === page)?.name || workspaceModules.length}</small><ChevronDown size={12} /></summary><nav aria-label="共享栏目快捷入口">{workspaceModules.map(item => { const Icon = item.id === 'nginx' ? Server : item.id === 'jar' ? Coffee : item.id === 'monitor' ? Activity : item.id === 'logs' ? ScrollText : FolderOpen; return <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.name} onClick={() => { navigate(item.id); setSharedSidebarOpen(false); }}><Icon size={17} /><span>{item.name}</span></button>; })}</nav></details>
+      <details className="sidebar-shared" open={sharedSidebarOpen} onToggle={event => setSharedSidebarOpen(event.currentTarget.open)}><summary className={`nav-item shared-sidebar-trigger ${workspaceModules.some(item => item.id === page) ? 'active' : ''}`} title="共享栏目"><Globe size={17} /><span>共享栏目</span><small>{workspaceModules.find(item => item.id === page)?.name || workspaceModules.length}</small><ChevronDown size={12} /></summary><nav aria-label="共享栏目快捷入口">{workspaceModules.map(item => { const Icon = item.id === 'lan-hosts' ? Terminal : item.id === 'nginx' ? Server : item.id === 'jar' ? Coffee : item.id === 'monitor' ? Activity : item.id === 'logs' ? ScrollText : FolderOpen; return <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.name} onClick={() => { navigate(item.id); setSharedSidebarOpen(false); }}><Icon size={17} /><span>{item.name}</span></button>; })}</nav></details>
       <CategoryNavigation dismissKey={`${collapsed}-${searchOpen}`} activeToolId={page === 'task' ? activeTask?.toolId : undefined} tasks={tasks} narrow={narrow} onChoose={openTool} />
       <div className="sidebar-bottom"><button className={`nav-item ${page === 'settings' ? 'active' : ''}`} title="设置" onClick={() => navigate('settings')}><Settings2 size={17} /><span>偏好设置</span><small>v{packageInfo.version}</small></button><div className="local-badge"><ShieldCheck size={15} /><div><strong>离线运行 · 数据留在本机</strong><small>无需登录，无遥测</small></div></div></div>
     </aside>
@@ -204,6 +207,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>
+        <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} /></div>
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={(id, text, options) => openTool(id, true, text, options)} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>

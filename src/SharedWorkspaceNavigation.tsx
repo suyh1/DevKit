@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, ChevronDown, Activity, ScrollText, Coffee, Server, FolderOpen, Send } from 'lucide-react';
+import { Globe, ChevronDown, Activity, ScrollText, Coffee, Server, FolderOpen, Send, Terminal } from 'lucide-react';
 import { workspaceModules } from './catalog';
 import './shared-navigation.css';
 
 type ModuleId = typeof workspaceModules[number]['id'];
-const hints: Record<ModuleId, string> = { http: '接口设计与调试', projects: '项目入口与环境档案', nginx: '配置与实例管理', jar: '应用启停与控制台', monitor: '可用率与故障记录', logs: '实时日志多窗对照' };
+const hints: Record<ModuleId, string> = { http: '接口设计与调试', projects: '项目入口与环境档案', nginx: '配置与实例管理', jar: '应用启停与控制台', monitor: '可用率与故障记录', logs: '实时日志多窗对照', 'lan-hosts': '连接档案与 SSH 终端' };
 
 export default function SharedWorkspaceNavigation({ page, onChoose }: { page: string; onChoose: (id: ModuleId) => void }) {
   const [open, setOpen] = useState(false), trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);
@@ -35,7 +35,7 @@ export default function SharedWorkspaceNavigation({ page, onChoose }: { page: st
         event.preventDefault(); items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length]?.focus();
       }
     }}><header>共享工作台 <small>{workspaceModules.length} 个栏目</small></header>{workspaceModules.map(item => {
-      const Icon = item.id === 'logs' ? ScrollText : item.id === 'monitor' ? Activity : item.id === 'jar' ? Coffee : item.id === 'nginx' ? Server : item.id === 'http' ? Send : FolderOpen;
+      const Icon = item.id === 'lan-hosts' ? Terminal : item.id === 'logs' ? ScrollText : item.id === 'monitor' ? Activity : item.id === 'jar' ? Coffee : item.id === 'nginx' ? Server : item.id === 'http' ? Send : FolderOpen;
       return <button role="menuitem" key={item.id} aria-current={page === item.id ? 'page' : undefined} onClick={() => { close(true); onChoose(item.id); }}><Icon size={18} /><span><strong>{item.name}</strong><small>{hints[item.id]}</small></span></button>;
     })}</div>, document.body)}
   </div>;

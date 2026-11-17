@@ -1,23 +1,164 @@
-.lan-hosts p { color: var(--muted); font-size: 12px; line-height: 1.65; }
-.lan-host-list { list-style: none; margin: 12px 0; padding: 0; }
-.lan-host-list > li { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.lan-host-list > li > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.lan-host-list small { display: block; margin-top: 3px; color: var(--muted); }
-.lan-host-list button { flex-shrink: 0; }
-.lan-ssh-fields { display: grid; grid-template-columns: minmax(110px, 2fr) minmax(80px, 1fr) minmax(100px, 1fr); gap: 10px; }
-.ssh-target-list { list-style: none; margin: 12px 0; padding: 0; }
-.ssh-target-list > li { padding: 12px 0; border-bottom: 1px solid var(--line); }
-.ssh-target-list header { display: flex; justify-content: space-between; gap: 10px; }
-.ssh-target-list header span { color: var(--muted); font-size: 12px; }
-.ssh-target-list small, .jar-configs > p { color: var(--muted); overflow-wrap: anywhere; }
-.ssh-target-list .pc-actions, .jar-config-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.ssh-log pre { max-height: 230px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.jar-config-toolbar { justify-content: flex-end; margin: 8px 0; }
-.jar-config-toolbar > label { flex: 1 1 220px; min-width: 0; margin: 0; }
-.jar-config-toolbar select { width: 100%; }
-.jar-config-editor { height: min(42vh, 400px); }
-.jar-config-editor .motion-editor-stage { height: 100%; }
-@media (max-width: 520px) {
-  .lan-ssh-fields { grid-template-columns: 1fr; gap: 0; }
-  .lan-host-list > li { flex-wrap: wrap; }
+.lan-center { max-width: 1500px; margin-inline: auto; padding: 30px 32px 60px; color: var(--text); }
+.lan-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.lan-heading h1 { margin: 0 0 7px; font-size: 28px; letter-spacing: -.6px; }
+.lan-heading p, .lan-note, .lan-terminal-empty p { font-size: 12px; line-height: 1.65; color: var(--muted); }
+.lan-layout { display: grid; grid-template-columns: minmax(250px, 305px) minmax(0, 1fr); align-items: start; gap: 18px; }
+.lan-connections { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.lan-search, .host-directory-path { display: flex; align-items: center; gap: 7px; }
+.lan-search { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+.lan-search input { border: 0; background: transparent; min-width: 0; width: 100%; }
+.lan-host-list, .host-directory-list { list-style: none; padding: 0; margin: 0; }
+.lan-host-list > li { padding: 14px 1px; border-bottom: 1px solid var(--line); }
+.lan-host-list > li:last-child { border-bottom: 0; padding-bottom: 1px; }
+.lan-host-list header { display: flex; align-items: start; gap: 8px; }
+.lan-host-list header > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.lan-host-list header > svg { color: var(--accent); flex-shrink: 0; margin-top: 3px; }
+.lan-host-list small { display: block; margin-top: 4px; color: var(--muted); }
+.lan-host-list .pc-actions { gap: 4px; }
+.lan-host-list .pc-actions button, .lan-heading .run-button { display: inline-flex; gap: 5px; align-items: center; }
+.pc-dialog.lan-host-dialog {
+  --lan-dialog-inset: 24px;
+  --lan-selected: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  --lan-choice-border: color-mix(in srgb, var(--accent) 60%, var(--line));
+  width: min(610px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scroll-padding-block: 78px 68px;
+  box-shadow: 0 24px 80px #0005;
+}
+.pc-dialog.lan-host-dialog > header {
+  top: 0;
+  margin: 0;
+  padding: 15px var(--lan-dialog-inset);
+}
+.lan-host-dialog > header > div { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; column-gap: 12px; }
+.lan-host-dialog .pc-dialog-icon {
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  color: var(--accent);
+  background: var(--lan-selected);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+}
+.pc-dialog.lan-host-dialog h2 { grid-column: 2; grid-row: 1; font-size: 18px; font-weight: 650; line-height: 1.35; }
+.pc-dialog.lan-host-dialog h2:last-child { grid-row: 1 / span 2; }
+.lan-host-dialog .pc-draft-state { grid-column: 2; grid-row: 2; margin-top: 2px; }
+.lan-host-body { padding: 18px var(--lan-dialog-inset) 20px; }
+.lan-host-dialog > .pc-discard { margin: 10px var(--lan-dialog-inset) 0; }
+.lan-host-form .lan-host-section { min-width: 0; border: 0; padding: 0; margin: 0; }
+.lan-host-form .lan-host-section + .lan-host-section { padding-top: 8px; margin-top: 17px; }
+.lan-host-section > legend { padding: 0; font-size: 13px; line-height: 18px; font-weight: 650; color: var(--text); }
+.lan-host-section:first-child > legend { margin-bottom: 8px; }
+.lan-host-section small { font-weight: 400; font-size: 11px; color: var(--muted); }
+.lan-host-section > legend small, .lan-field small { margin-inline-start: 4px; }
+.lan-host-choices, .lan-host-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lan-host-fields { gap: 9px 12px; }
+.lan-host-fields-ssh { grid-template-columns: minmax(0, 1fr) minmax(116px, .37fr); }
+.lan-choice {
+  display: grid;
+  grid-template-columns: 29px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+  cursor: pointer;
+}
+.lan-choice:hover { border-color: var(--lan-choice-border); }
+.lan-choice:has(input:checked) { border-color: var(--lan-choice-border); background: var(--lan-selected); }
+.lan-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lan-choice :is(input[type=radio], input[type=checkbox]) { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; margin: 0; }
+.lan-choice-icon { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 7px; background: var(--surface); color: var(--muted); }
+.lan-choice:has(input:checked) .lan-choice-icon { color: var(--accent); }
+.lan-choice strong { font-size: 12px; font-weight: 650; }
+.lan-protocol-copy { display: grid; gap: 2px; line-height: 1.35; }
+.lan-choice-mark { display: grid; place-items: center; inline-size: 16px; block-size: 16px; border: 1px solid var(--line); border-radius: 4px; color: transparent; }
+.lan-protocol .lan-choice-mark { border-radius: 50%; }
+.lan-choice:has(input:checked) .lan-choice-mark { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.lan-field { display: grid; grid-template-rows: auto 37px; align-content: start; min-width: 0; gap: 5px; font-size: 12px; font-weight: 500; line-height: 16px; }
+.lan-field > span:first-child { overflow-wrap: anywhere; }
+.pc-dialog.lan-host-dialog .lan-field :is(input, select) {
+  width: 100%;
+  height: 37px;
+  min-height: 0;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 400;
+  border-radius: 7px;
+}
+.lan-field input::placeholder { color: var(--muted); opacity: .8; }
+.pc-dialog.lan-host-dialog .lan-field :is(input, select):focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.lan-select { position: relative; }
+.pc-dialog.lan-host-dialog .lan-select select { appearance: none; padding-inline-end: 30px; }
+.lan-select svg { position: absolute; top: 11px; right: 9px; color: var(--muted); pointer-events: none; }
+.lan-password-row { grid-column: 1 / -1; position: relative; }
+.pc-dialog.lan-host-dialog .lan-password input { padding-inline-end: 40px; }
+.pc-dialog.lan-host-dialog .lan-password-toggle { position: absolute; right: 4px; bottom: 3px; width: 31px; height: 31px; }
+.lan-clear-credential { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.lan-clear-credential input { margin: 0; accent-color: var(--accent); }
+.pc-dialog.lan-host-dialog :is(.lan-host-hint, .lan-host-error) { margin: 8px 0 0; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.pc-dialog.lan-host-dialog .lan-host-error { color: var(--error); }
+.pc-dialog.lan-host-dialog .lan-host-footer {
+  bottom: 0;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 12px var(--lan-dialog-inset);
+}
+.lan-host-security { display: flex; align-items: center; gap: 6px; margin-inline-end: auto; color: var(--muted); font-size: 11px; }
+.lan-host-security svg { flex-shrink: 0; color: var(--accent); }
+.lan-host-actions { display: flex; align-items: center; gap: 8px; }
+.pc-dialog.lan-host-dialog .lan-host-actions button { min-height: 34px; padding: 6px 13px; font-size: 12px; }
+.pc-dialog.lan-host-dialog .lan-host-actions .run-button { font-weight: 650; }
+.lan-terminal-area { min-width: 0; min-height: 440px; background: #101720; color: #dce5ef; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.lan-terminal-empty { min-height: 440px; display: grid; align-content: center; justify-items: center; gap: 8px; padding: 20px; text-align: center; }
+.lan-terminal-empty h2, .lan-terminal-empty p { margin: 0; }
+.lan-terminal-empty p { color: #9daec1; }
+.lan-terminal-tabs { display: flex; align-items: center; gap: 3px; padding: 6px; background: #19232f; overflow: auto; }
+.lan-terminal-tabs > div, .lan-terminal-tabs button { display: inline-flex; align-items: center; gap: 6px; }
+.lan-terminal-tabs > div { border-radius: 6px; padding-right: 4px; }
+.lan-terminal-tabs > div.selected { background: #2a394a; }
+.lan-terminal-tabs button { padding: 7px 9px; border: 0; color: inherit; background: transparent; white-space: nowrap; }
+.lan-terminal-tabs .icon-button { padding: 3px; color: #bac8d8; }
+.lan-ssh-session { min-height: 390px; }
+.lan-xterm { height: max(390px, min(60dvh, 680px)); padding: 10px; }
+.lan-terminal-message { padding: 9px 14px; display: flex; align-items: center; gap: 12px; overflow-wrap: anywhere; font-size: 12px; }
+.lan-terminal-message .text-button { color: #bac8d8; }
+.lan-terminal-message .text-button:hover:not(:disabled) { color: #f4f7fd; background: #2a394a; }
+.host-directory-path input { min-width: 0; flex: 1; }
+.host-directory-list { max-height: 42dvh; overflow: auto; margin-block: 10px; }
+.host-directory-list button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.host-directory-list svg { flex-shrink: 0; }
+.jar-table .jar-host-group th { font-weight: 650; color: var(--text); border-top: 1px solid var(--line); }
+.ng-host-group { display: grid; gap: 8px; min-width: 0; }
+.ng-host-group h3 { margin: 3px 0 0; font-size: 12px; overflow-wrap: anywhere; color: var(--muted); }
+.lan-legacy-import { margin-block: 8px 14px; }
+.lan-legacy-import button { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 760px) {
+  .lan-center { padding: 20px 14px 40px; }
+  .lan-heading h1 { font-size: 24px; }
+  .lan-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .pc-dialog.lan-host-dialog { --lan-dialog-inset: 15px; width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
+  .lan-host-body { padding-block: 15px; }
+  .lan-choice { grid-template-columns: 23px minmax(0, 1fr) 14px; padding-inline: 6px; gap: 6px; }
+  .lan-choice-icon { width: 23px; height: 25px; }
+  .lan-choice-mark { width: 14px; height: 14px; }
+  .lan-host-fields-ssh { grid-template-columns: minmax(0, 1fr) 104px; }
+  .lan-host-actions { margin-inline-start: auto; }
 }

@@ -104,7 +104,7 @@ test('checked-in README matches the actual application registry and current temp
 
 async function copyPackagingScripts(directory) {
   await mkdir(path.join(directory, 'scripts'));
-  for (const name of ['desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py']) {
+  for (const name of ['desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py', 'ssh-runtime.json']) {
     await cp(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
   }
 }
@@ -141,6 +141,9 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
   await fixture(async directory => {
     await copyPackagingScripts(directory);
     for (const folder of ['dist/.vite', 'server', 'shared']) await mkdir(path.join(directory, folder), { recursive: true });
+    for (const name of JSON.parse(await readFile(path.join(root, 'scripts/ssh-runtime.json'), 'utf8'))) {
+      await cp(path.join(root, 'node_modules', name), path.join(directory, 'node_modules', name), { recursive: true });
+    }
     await writeFile(path.join(directory, 'dist/portal.html'), '<!doctype html><title>Fixture</title>');
     await writeFile(path.join(directory, 'dist/.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
     await writeFile(path.join(directory, 'docs/project-center.md'), '# Fixture guide');
@@ -156,7 +159,7 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
       assert.equal(await readFile(path.join(release, 'README.md'), 'utf8'), expected);
       assert.equal(await readFile(path.join(release, 'docs/project-center.md'), 'utf8'), '# Fixture guide');
       const { stdout } = await execute(python, ['-c',
-        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert z.testzip() is None\nprint("ZIP verified")',
+        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert "node_modules/ssh2/lib/index.js" in z.namelist()\n assert not any(name.endswith(".node") for name in z.namelist())\n assert z.testzip() is None\nprint("ZIP verified")',
         directory, path.join(release, `DevKit_ProjectCenter_${manifest.version}_node24.zip`),
       ], { windowsHide: true });
       assert.match(stdout, /ZIP verified/);

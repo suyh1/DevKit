@@ -28,6 +28,7 @@ module.exports = async (window, output) => {
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [jar] });
   try {
     window.setSize(1440, 1000);
+    await verifyHostEditor(window, output, click, wait);
     window.webContents.setBackgroundThrottling(false);
     await js('document.documentElement.dataset.theme="light"');
     await js('document.querySelector(\'.nav-item[title="JAR 管理"]\').click()');
@@ -150,6 +151,64 @@ module.exports = async (window, output) => {
   }
 };
 
+async function verifyHostEditor(window, output, click, wait) {
+  const js = source => window.webContents.executeJavaScript(source, true);
+  const [width, height] = window.getSize(), minimum = window.getMinimumSize();
+  const theme = await js('document.documentElement.dataset.theme');
+  const painted = () => js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+  const visible = '!!document.querySelector(".lan-host-dialog[open]")';
+  async function capture(name) {
+    await js(`Promise.allSettled(document.querySelector('.lan-host-dialog').getAnimations().map(animation => animation.finished))`);
+    await painted();
+    const rectangle = await js(`{ const rect = document.querySelector('.lan-host-dialog').getBoundingClientRect();
+      ({ x: Math.floor(rect.x), y: Math.floor(rect.y), width: Math.ceil(rect.width), height: Math.ceil(rect.height) }); }`);
+    await fs.writeFile(path.join(output, name), (await window.webContents.capturePage(rectangle)).toPNG());
+  }
+  try {
+    window.show(); window.focus();
+    await js('document.querySelector(\'.nav-item[title="局域网主机"]\').click(); document.documentElement.dataset.theme="dark"');
+    await click('添加主机', '.lan-center');
+    await wait(visible);
+    assert.equal(await js(`{
+      const icon = document.querySelector('.lan-host-dialog .pc-dialog-icon').getBoundingClientRect();
+      const title = document.querySelector('.lan-host-dialog h2').getBoundingClientRect();
+      title.left > icon.right && title.height < 30;
+    }`), true, 'Host title fits on one line next to the icon');
+    assert.equal(await js(`Array.from(document.querySelectorAll('.lan-host-form .lan-field')).every(field => {
+      const label = field.firstElementChild.getBoundingClientRect(), control = field.querySelector('input,select').getBoundingClientRect();
+      return label.bottom < control.top && Math.abs(label.left - control.left) < 2;
+    })`), true, 'Host labels sit above left-aligned inputs');
+    await capture('lan-host-ssh-dark.png');
+    await js(`document.querySelector('.lan-host-form input[value="share"]').click(); document.documentElement.dataset.theme="light"`);
+    await wait('!!document.querySelector(\'.lan-address input[placeholder^="http"]\')');
+    await capture('lan-host-share-light.png');
+    await js('document.querySelector(\'.lan-host-form input[value="ssh"]\').click()');
+    window.setMinimumSize(360, 450);
+    window.setContentSize(420, 590);
+    await wait('innerWidth <= 460');
+    await painted();
+    const narrow = await js(`{ const dialog = document.querySelector('.lan-host-dialog'), footer = document.querySelector('.lan-host-footer');
+      ({ inside: footer.getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1, width: dialog.clientWidth, scrollWidth: dialog.scrollWidth, height: dialog.clientHeight, scrollHeight: dialog.scrollHeight }); }`);
+    await capture('lan-host-ssh-narrow.png');
+    assert.ok(narrow.scrollHeight > narrow.height && narrow.scrollWidth <= narrow.width && narrow.inside,
+    'Host editor scrolls vertically with the footer visible on narrow windows: ' + JSON.stringify(narrow));
+    const password = '.lan-password input';
+    await js(`{ const input = document.querySelector('${password}');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'fixture-only');
+      input.dispatchEvent(new Event('input', { bubbles: true })); }
+      document.querySelector('.lan-password-toggle').click()`);
+    await wait(`document.querySelector('${password}').type === 'text'`);
+    await click('取消', '.lan-host-footer');
+    await wait('!!document.querySelector(".lan-host-dialog .pc-discard")');
+    await click('放弃更改', '.lan-host-dialog .pc-discard');
+    await wait('!(' + visible + ')');
+  } finally {
+    window.setMinimumSize(...minimum);
+    window.setSize(width, height);
+    await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)};`);
+  }
+}
+
 async function verifyLanHost(window, folder, jar, executable, click, wait) {
   const { createProjectHost } = await import('../server/project-host.mjs');
   const { createProjectStore } = await import('../server/project-store.mjs');
@@ -169,10 +228,13 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   const port = service.address().port;
   await new Promise(resolve => service.close(resolve));
   const origin = `http://127.0.0.1:${port}`;
+  const gateway = require('node:net').createServer();
+  await new Promise(resolve => gateway.listen(0, '127.0.0.1', resolve));
+  const gatewayPort = gateway.address().port, gatewayOrigin = `http://127.0.0.1:${gatewayPort}`;
+  await new Promise(resolve => gateway.close(resolve));
   const services = emptySharingServices();
   services.jar = { enabled: true, edit: true, control: true };
   services.nginx.enabled = true;
-  const find = hash => BrowserWindow.getAllWindows().find(candidate => candidate.webContents.getURL() === origin + '/#' + hash);
   const js = (target, source) => target.webContents.executeJavaScript(source, true);
   async function when(target, expression, timeout = 12_000) {
     const deadline = Date.now() + timeout;
@@ -183,50 +245,67 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     throw new Error('Remote window condition failed: ' + expression + '\n' + await js(target, 'document.body.innerText'));
   }
   const input = (target, selector, value) => js(target, `{const field=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,${JSON.stringify(value)});field.dispatchEvent(new Event('input',{bubbles:true}));}`);
-  let id;
+  let id, gatewayWindow, gatewayStarted = false;
+  const go = name => js(window, `document.querySelector(${JSON.stringify('.nav-item[title="' + name + '"]')}).click()`);
   try {
     await host.start({ host: '127.0.0.1', port, services, password: 'devkit-lan-smoke' });
-    await click('局域网主机');
-    await wait('!!document.querySelector("dialog[open] .lan-hosts form")');
-    await input(window, '.lan-hosts input[placeholder="例如：测试服务器"]', '远程测试主机');
-    await input(window, '.lan-hosts input[placeholder="http://192.168.1.20:8765"]', origin);
-    await click('添加主机', '.lan-hosts');
-    await wait('!!document.querySelector(".lan-host-list li")');
-    await click('JAR 管理', '.lan-host-list li');
-    await wait('document.querySelector(".pc-dialog[open]")?.textContent.includes("已打开")');
-    const remoteWindow = find('jar');
-    assert.ok(remoteWindow);
-    remoteWindow.webContents.setBackgroundThrottling(false);
-    assert.equal(await js(remoteWindow, 'typeof window.devkitDesktop'), 'undefined');
-    await when(remoteWindow, '!!document.querySelector(".portal-login input[type=password]")');
-    await input(remoteWindow, '.portal-login input[type=password]', 'devkit-lan-smoke');
-    await js(remoteWindow, 'document.querySelector(".portal-login .run-button").click()');
-    await when(remoteWindow, 'document.querySelector(".jar-center button.run-button")?.disabled === false');
-    await js(remoteWindow, 'document.querySelector(".jar-center button.run-button").click()');
-    await when(remoteWindow, '!!document.querySelector(".jar-dialog[open]")');
-    await input(remoteWindow, '.jar-dialog input[placeholder^="填写共享主机"]', remoteJar);
-    await input(remoteWindow, '.jar-dialog input[placeholder^="例如"]', '远端 Java');
-    await input(remoteWindow, '.jar-dialog input[placeholder^="留空"]', executable);
-    await js(remoteWindow, 'document.querySelector(".jar-dialog button[type=submit]").click()');
-    await when(remoteWindow, 'document.querySelector(".jar-status")?.textContent === "已停止" && [...document.querySelectorAll(".jar-row-actions button")].some(b => b.textContent.trim() === "启动" && !b.disabled)');
-    id = (await jvm.request('get')).instances[0].id;
-    await js(remoteWindow, '[...document.querySelectorAll(".jar-row-actions button")].find(b=>b.textContent.trim()==="启动").click()');
-    await when(remoteWindow, 'document.querySelector(".jar-status")?.textContent === "运行中"', 35_000);
-    assert.ok((await jvm.request('statuses'))[0].pid > 1);
-    assert.equal(await js(window, `window.devkitJar.request('get').then(result => result.data.instances.some(item => item.jar === ${JSON.stringify(remoteJar)}))`), false);
-    await js(window, 'document.querySelector(\'button[aria-label="关闭局域网主机"]\').click();document.querySelector(\'.nav-item[title="Nginx 配置"]\').click()');
-    await click('局域网主机', '.ng-center');
+    await go('局域网主机');
+    await click('添加主机', '.lan-center');
+    await wait('!!document.querySelector("dialog[open] .lan-host-form")');
+    await js(window, 'document.querySelector(\'.lan-host-form input[value="share"]\').click()');
+    await input(window, '.lan-host-form input[placeholder="例如：测试服务器"]', '远程测试主机');
+    await input(window, '.lan-host-form input[placeholder="http://192.168.1.20:8765"]', origin);
+    await input(window, '.lan-host-form input[type=password]', 'devkit-lan-smoke');
+    await js(window, 'document.querySelectorAll(".lan-module-settings input").forEach(field => field.click())');
+    await click('保存连接', '.lan-host-form');
     await wait('document.querySelector(".lan-host-list")?.textContent.includes("远程测试主机")');
-    await click('Nginx 配置', '.lan-host-list li');
-    await wait('document.querySelector(".pc-dialog[open]")?.textContent.includes("已打开")');
-    const nginxWindow = find('nginx');
-    assert.ok(nginxWindow);
-    await when(nginxWindow, '!!document.querySelector(".portal-page:not([hidden]) .ng-center")');
+    await js(window, 'document.querySelector(\'.lan-host-list button[aria-label="编辑 远程测试主机"]\').click()');
+    await wait('document.querySelector(".lan-host-dialog h2")?.textContent === "编辑主机连接"');
+    assert.deepEqual(await js(window, `{
+      const input = document.querySelector('.lan-host-dialog input[type="password"]');
+      ({ value: input.value, placeholder: input.placeholder, methods: document.querySelector('.lan-host-form input[value="share"]').checked });
+    }`), { value: '', placeholder: '已保存，留空沿用', methods: true });
+    await click('取消', '.lan-host-footer');
+    await wait('!document.querySelector(".lan-host-dialog[open]")');
+    await go('JAR 管理');
+    await wait('!document.querySelector(".jar-center button.run-button")?.disabled');
+    await click('添加 JAR');
+    await js(window, '{const field=document.querySelector(".jar-dialog select");field.selectedIndex=1;field.dispatchEvent(new Event("change",{bubbles:true}));}');
+    await click('选择文件', '.jar-dialog');
+    await wait('!!document.querySelector(".host-directory-path")');
+    await when(window, '!document.querySelector(".host-directory-path .secondary-button")?.disabled');
+    await input(window, '[aria-label="远程绝对目录"]', remote);
+    await click('打开', '.host-directory');
+    await when(window, 'document.querySelector(".host-directory-list")?.textContent.includes("remote.jar")');
+    await click('remote.jar', '.host-directory-list');
+    await input(window, '.jar-dialog input[placeholder^="例如"]', '远端 Java');
+    await input(window, '.jar-dialog input[placeholder^="留空"]', executable);
+    await click('保存 JAR', '.jar-dialog');
+    await when(window, '[...document.querySelectorAll(".jar-table tbody")].some(group => group.textContent.includes("远程测试主机") && group.textContent.includes("远端 Java") && group.textContent.includes("已停止"))');
+    id = (await jvm.request('get')).instances[0].id;
+    assert.equal(await js(window, `window.devkitJar.request('get').then(result => result.data.instances.some(item => item.jar === ${JSON.stringify(remoteJar)}))`), false);
+    const started = await js(window, `window.devkitProjects.request('start', ${JSON.stringify({ host: '127.0.0.1', port: gatewayPort, services, password: 'devkit-gateway-smoke' })})`);
+    assert.ok(!started.error, started.error);
+    gatewayStarted = true;
+    gatewayWindow = new BrowserWindow({ show: false, webPreferences: { partition: 'devkit-gateway-smoke', sandbox: true, contextIsolation: true, backgroundThrottling: false } });
+    await gatewayWindow.loadURL(`${gatewayOrigin}/#jar`);
+    assert.equal(await js(gatewayWindow, 'typeof window.devkitDesktop'), 'undefined');
+    await when(gatewayWindow, '!!document.querySelector(".portal-login .run-button:enabled")');
+    await input(gatewayWindow, '.portal-login input[type=password]', 'devkit-gateway-smoke');
+    await js(gatewayWindow, 'document.querySelector(".portal-login .run-button").click()');
+    const group = 'Array.from(document.querySelectorAll(".jar-table tbody")).find(group => group.textContent.includes("远程测试主机"))';
+    await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '已停止'`);
+    await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='启动').click()`);
+    await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '运行中'`, 35_000);
+    assert.ok((await jvm.request('statuses'))[0].pid > 1);
+    await go('Nginx 配置');
+    await when(window, '!document.querySelector(".ng-center .ng-heading .run-button")?.disabled');
+    await click('添加实例', '.ng-center');
+    assert.match(await js(window, 'document.querySelector(".ng-form-modal select")?.textContent'), /远程测试主机（只读）/);
+    await js(window, 'document.querySelector(\'.ng-form-modal button[aria-label="关闭对话框"]\').click()');
   } finally {
-    find('jar')?.destroy();
-    find('nginx')?.destroy();
-    await js(window, 'document.querySelector(\'dialog[open] button[aria-label="关闭局域网主机"]\')?.click()');
-    await wait('!document.querySelector("dialog[open] .lan-hosts")');
+    gatewayWindow?.destroy();
+    if (gatewayStarted) await js(window, "window.devkitProjects.request('stop')");
     if (id) await jvm.request('command', { id, command: 'force-stop' }).catch(() => {});
     await host.stop();
     await jvm.close();

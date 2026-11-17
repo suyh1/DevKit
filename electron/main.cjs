@@ -17,6 +17,7 @@ let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let jarManager, jarError = '';
+let lan, lanError = '';
 let monitorManager, monitorError = '';
 let logCenter;
 let httpClient;
@@ -135,9 +136,11 @@ async function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) httpClient?.cancelAll(); });
+  window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) { httpClient?.cancelAll(); lan?.closeTerminals(); } });
+  window.webContents.on('render-process-gone', () => lan?.closeTerminals());
   window.on('closed', () => {
     httpClient?.close();
+    lan?.closeTerminals();
     if (rememberQuit) { try { desktopPreferences.set('quit'); } catch (error) { dialog.showErrorBox('关闭偏好未保存', error.message); } rememberQuit = false; }
   });
   window.on('close', event => {
@@ -174,7 +177,9 @@ app.whenReady().then(async () => {
     const { prepareProjectConfigs } = await import('./server/project-configs.mjs');
     projectStorage = await prepareProjectConfigs(projectStorage.directory, [path.join(app.getPath('userData'), 'project-center')]);
     projectStore = await createProjectStore(projectStorage.directory);
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter });
+    try { lan = await (await import('./server/lan-workspaces.mjs')).createLanWorkspaces(projectStorage.directory); }
+    catch (error) { lanError = error.message; }
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -282,18 +287,20 @@ app.whenReady().then(async () => {
         return { data: result.canceled ? [] : result.filePaths };
       }
       if (!nginxManager) throw new Error(nginxError || 'Nginx 管理器尚未准备好。');
-      return { data: await nginxManager.request(action, value) };
+      return { data: await (lan ? lan.request(nginxManager, 'nginx', action, value) : nginxManager.request(action, value)) };
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
   const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
+  ipcMain.handle('devkit:lan-hosts', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的局域网主机请求。');
+    try {
+      if (!lan) throw new Error(lanError || '局域网主机管理器尚未准备好。');
+      return { data: await lan.hostRequest(action, value) };
+    } catch (error) { return { error: error.message }; }
+  });
   ipcMain.handle('devkit:lan-host', async (event, address, module) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的主机连接请求。');
     try { await openLanWindow(address, module); return {}; }
-    catch (error) { return { error: error.message }; }
-  });
-  ipcMain.handle('devkit:ssh', async (event, value) => {
-    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 SSH 请求。');
-    try { return { data: await (await import('./server/ssh-management.mjs')).requestSsh(value) }; }
     catch (error) { return { error: error.message }; }
   });
   ipcMain.handle('devkit:jar', async (event, action, value) => {
@@ -308,7 +315,7 @@ app.whenReady().then(async () => {
         return { data: result.canceled ? [] : result.filePaths };
       }
       if (!jarManager) throw new Error(jarError || 'JAR 管理器尚未准备好。');
-      return { data: await jarManager.request(action, value) };
+      return { data: await (lan ? lan.request(jarManager, 'jar', action, value) : jarManager.request(action, value)) };
     } catch (error) { return { error: error.message || 'JAR 操作失败。' }; }
   });
   ipcMain.handle('devkit:monitor', async (event, action, value) => {
@@ -357,6 +364,6 @@ app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

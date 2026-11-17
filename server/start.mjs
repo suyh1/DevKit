@@ -9,15 +9,17 @@ import { createJarManager } from './jar-manager.mjs';
 import { createMonitorManager } from './monitor-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { sharingFromEnvironment } from './sharing-environment.mjs';
+import { createLanWorkspaces } from './lan-workspaces.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
-let nginx, library, jar, monitor;
+let nginx, library, jar, monitor, lan;
 const logs = createLogCenter({ nginx: () => nginx, jar: () => jar });
-const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs });
+const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan });
 try {
+  lan = await createLanWorkspaces(directory);
   const saved = await store.settings();
   const services = sharingFromEnvironment(process.env, saved);
   if (services.nginx.enabled || services.logs.nginx) nginx = await createNginxManager(directory);
@@ -38,6 +40,7 @@ try {
     result.directory,
   );
 } catch (error) {
+  lan?.close();
   await monitor?.close();
   await nginx?.close();
   await library?.close();
@@ -52,6 +55,7 @@ for (const signal of ["SIGINT", "SIGTERM"])
     if (closing) return;
     closing = true;
     await host.stop();
+    lan?.close();
     await monitor?.close();
     await nginx?.close();
     await library?.close();

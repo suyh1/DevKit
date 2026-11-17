@@ -2,6 +2,7 @@ import { readFile, mkdtemp, mkdir, writeFile, cp } from "node:fs/promises";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
+import { pathToFileURL } from 'node:url';
 import net from "node:net";
 import assert from "node:assert/strict";
 import { root } from "./desktop-files.mjs";
@@ -43,6 +44,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
   ],
   { windowsHide: true },
 );
+assert.equal(typeof (await import(pathToFileURL(path.join(installation, 'node_modules/ssh2/lib/index.js')).href)).default.Client, 'function');
 const password = "portable-check-password-only";
 async function launch(directory, reusePassword = false) {
   const port = await new Promise((resolve) => {

@@ -1,10 +1,11 @@
 import { createHttpClient } from "./http-client.mjs";
 import { sharingServices } from '../shared/sharing.mjs';
+import { managedRequest } from './managed-workspace.mjs';
 
 // Reuse the desktop's managers rather than acquiring a second directory lock.
-export function createSharedWorkspaces({ nginx, library, jar, monitor, logs }) {
+export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan }) {
   const clients = new Map();
-  const jarSessions = new Set();
+  const managedSessions = new Set();
   const fail = (status, message) => {
     throw Object.assign(new Error(message), { status });
   };
@@ -15,14 +16,18 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs }) {
     release(token) {
       clients.get(token)?.close();
       clients.delete(token);
-      jarSessions.delete(token);
+      managedSessions.delete(token);
+      lan?.()?.release(token);
       void jar?.()?.releaseConsoleSession?.(token)?.catch(() => {});
     },
     close() {
       for (const client of clients.values()) client.close();
       clients.clear();
-      for (const token of jarSessions) void jar?.()?.releaseConsoleSession?.(token)?.catch(() => {});
-      jarSessions.clear();
+      for (const token of managedSessions) {
+        lan?.()?.release(token);
+        void jar?.()?.releaseConsoleSession?.(token)?.catch(() => {});
+      }
+      managedSessions.clear();
     },
     async request(module, action, payload, { token, settings }) {
       const services = sharingServices(settings);
@@ -41,40 +46,15 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs }) {
         if (action === 'remove' && !services.monitor.control && (await manager.request('get')).monitors.find(item => item.id === payload?.id)?.enabled) fail(403, '移除运行中的监控需要运行权限。');
         return manager.request(action, payload, { allowProjects: services.projects.enabled, allowJar: services.jar.enabled, allowControl: services.monitor.control });
       }
-      if (module === 'jar') {
-        if (!services.jar.enabled) fail(404, '未开放 JAR 共享。');
-        const manager = jar?.();
-        if (!manager) fail(503, '主机 JAR 管理器不可用。');
-        const reads = ['get', 'statuses', 'log-tail', 'console-read', 'startup-get'];
-        const edits = ['upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'];
-        const controls = ['command', 'detect', 'health-check', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'];
-        if (![...reads, ...edits, ...controls].includes(action)) fail(403, '网页不提供本机文件选择器，请填写共享主机路径。');
-        if (edits.includes(action) && !services.jar.edit) fail(403, '未授予 JAR 编辑权限。');
-        if (controls.includes(action) && !services.jar.control) fail(403, '未授予 JAR 运行管理权限。');
-        if (action.startsWith('console-')) jarSessions.add(token);
-        return manager.request(action, payload, { session: token, allowEdit: services.jar.edit, allowControl: services.jar.control });
-      }
-      if (module === "nginx") {
-        if (!services.nginx.enabled) fail(404, "未开放 Nginx 共享。");
-        if (!nginx()) fail(503, "主机 Nginx 管理器不可用。");
-        const reads = [
-          "get",
-          "statuses",
-          "documents",
-          "inspect",
-          "log-tail",
-          "review",
-          "backups",
-          "backup-files",
-        ];
-        if (!reads.includes(action)) {
-          if (!["save-files", "command", "create", "upsert", "remove", "discover", "detect"].includes(action))
-            fail(403, "网页不提供本机文件选择器，请填写共享主机路径。");
-          if (["command", "detect"].includes(action)) {
-            if (!services.nginx.control) fail(403, '未授予 Nginx 运行管理权限。');
-          } else if (!services.nginx.edit) fail(403, '未授予 Nginx 配置编辑权限。');
-        }
-        return nginx().request(action, payload, { allowExecution: services.nginx.control });
+      if (module === 'jar' || module === 'nginx') {
+        const label = module === 'jar' ? 'JAR' : 'Nginx';
+        const access = services[module];
+        if (!access.enabled) fail(404, `未开放 ${label} 共享。`);
+        const manager = (module === 'jar' ? jar : nginx)?.();
+        if (!manager) fail(503, `主机 ${label} 管理器不可用。`);
+        managedSessions.add(token);
+        const coordinator = lan?.();
+        return coordinator ? coordinator.request(manager, module, action, payload, access, token) : managedRequest(manager, module, action, payload, access, token);
       }
       if (module !== "http" || !services.http.enabled)
         fail(404, "未开放 HTTP 共享。");

@@ -7,8 +7,9 @@ export const workspaceModules = [
   { id: 'monitor', name: '监控中心', description: '主机定时 HTTP/TCP 检测、项目与 JAR 关联、响应耗时和样本可用率历史、故障恢复记录及维护窗口；支持共享查看，编辑与运行分别授权。', category: '工作台', badge: '共享' },
   { id: 'http', name: 'HTTP 调试', description: '可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。', category: '工作台', badge: '共享' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
-  { id: 'nginx', name: 'Nginx 配置', description: '创建或登记主配置与附属文件，可视化编辑并管理 Windows / Linux 实例。桌面通过 DevKit 共享或 SSH 连接局域网主机，编辑、检查与重载目标机配置。', category: '工作台', badge: '共享' },
-  { id: 'jar', name: 'JAR 管理', description: '管理 Windows / Linux 的 Java 应用，支持启停重启、控制台、日志、健康检查和同目录 YAML 等配置编辑。桌面通过 DevKit 共享或 SSH 登记并运行局域网主机上的 JAR。', category: '工作台', badge: '共享' },
+  { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，统一创建、编辑、备份、检查和重载 Nginx 配置。', category: '工作台', badge: '共享' },
+  { id: 'jar', name: 'JAR 管理', description: '按主机分组管理本机和远程 Java 应用，统一设置、启停重启、控制台、日志、健康检查和配置文件编辑。', category: '工作台', badge: '共享' },
+  { id: 'lan-hosts', name: '局域网主机', description: '在桌面保存远程 DevKit 或 SSH 连接，支持用户名与密码登录、主机指纹校验和多会话 SSH 终端。', category: '工作台' },
 ] as const;
 
 export const categories = [
