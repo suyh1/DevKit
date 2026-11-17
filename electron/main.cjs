@@ -236,6 +236,13 @@ app.whenReady().then(async () => {
         if (failure) throw new Error(failure);
         return { data: true };
       }
+      if (action === 'open') {
+        if (typeof value?.url !== 'string' || value.url.length > 12000) throw new Error('入口地址无效。');
+        const url = new URL(value.url);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('仅允许打开 HTTP(S) 入口。');
+        await shell.openExternal(url.href);
+        return { data: true };
+      }
       if (!projectStore || !projectHost) throw new Error(projectError || '项目中心尚未准备好。');
       let data;
       switch (action) {
@@ -251,12 +258,6 @@ app.whenReady().then(async () => {
         case 'sharing-audit': data = await projectHost.audit(); break;
         case 'start': data = await projectHost.start(value); break;
         case 'stop': data = await projectHost.stop(true); break;
-        case 'open': {
-          if (typeof value?.url !== 'string' || value.url.length > 12000) throw new Error('入口地址无效。');
-          const url = new URL(value.url);
-          if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('仅允许打开 HTTP(S) 入口。');
-          await shell.openExternal(url.href); data = true; break;
-        }
         default: throw new Error('未知项目中心操作。');
       }
       return { data };

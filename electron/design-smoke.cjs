@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { clipboard, shell } = require('electron');
+const { version, author, homepage } = require('../package.json');
 
 module.exports = async function designSmoke(window, output) {
   window.webContents.setBackgroundThrottling(false);
@@ -143,6 +145,33 @@ module.exports = async function designSmoke(window, output) {
   await js(`document.querySelector('.sidebar button[title="设置"]').click()`);
   await wait('!!document.querySelector(".settings-page .theme-picker")');
   await settle();
+  const about = 'section[aria-labelledby="devkit-about-heading"]';
+  assert.equal(await js('document.getElementById("devkit-about-heading").textContent'), '关于 DevKit');
+  assert.deepEqual(await js(`[...document.querySelectorAll('${about} dd')].slice(0, 2).map(item => item.textContent)`), [version, author.name]);
+  assert.equal(await js('document.querySelector(".about-contact span").textContent'), author.email);
+  assert.equal(await js('document.querySelector(".about-repository").href'), homepage);
+  const previousClipboard = await clipboard.readText();
+  const openExternal = shell.openExternal;
+  let handledUrl;
+  shell.openExternal = async url => { handledUrl = url; };
+  try {
+    await window.webContents.executeJavaScript('document.querySelector(".about-contact button").click()', true);
+    await wait('document.querySelector(".app-toast")?.textContent.includes("联系邮箱已复制")');
+    assert.equal(await clipboard.readText(), author.email);
+    await js('document.querySelector(".about-repository").click()');
+    for (let attempt = 0; !handledUrl && attempt < 100; attempt++) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(handledUrl, homepage);
+    assert.equal(new URL(window.webContents.getURL()).protocol, 'devkit:');
+  } finally {
+    shell.openExternal = openExternal;
+    if (previousClipboard) await clipboard.writeText(previousClipboard);
+    else clipboard.clear();
+  }
+  window.setContentSize(375, 780);
+  await settle();
+  assert.equal(await js(`(() => { const section = document.querySelector('${about}'); return section.scrollWidth <= section.clientWidth; })()`), true);
+  await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
+  console.log('About DevKit passed: package metadata, real clipboard, desktop browser handler and narrow layout.');
   for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
     await js(`document.querySelector('input[name="theme-style"][value="${style}"]').click()`);
     for (const mode of ['light', 'dark']) {

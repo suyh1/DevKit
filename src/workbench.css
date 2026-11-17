@@ -265,6 +265,16 @@ input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; curs
 .shortcut-list>div { display:flex; justify-content:space-between; gap:24px; padding:11px 0; border-top:1px solid var(--line); }
 .shortcut-list dt { color:var(--muted); }
 .shortcut-list dd { margin:0; text-align:right; }
+.about-details { margin:12px 0 0; font-size:13px; }
+.about-details>div { display:grid; grid-template-columns:72px minmax(0,1fr); align-items:center; gap:8px; min-height:40px; padding:8px 0; border-top:1px solid var(--line); }
+.about-details>div:last-child { padding-bottom:0; }
+.about-details dt { color:var(--muted); }
+.about-details dd { min-width:0; margin:0; overflow-wrap:anywhere; }
+.about-contact { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+.about-repository { display:inline-flex; align-items:center; gap:6px; max-width:100%; color:var(--accent); text-decoration:none; border-radius:4px; }
+.about-repository svg { flex:none; }
+.about-repository:is(:hover, :focus-visible) span { text-decoration:underline; }
+.about-repository:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .app-toast { position:fixed; bottom:44px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; border:1px solid var(--line); box-shadow:0 8px 30px #0000001a; background:var(--surface-raised); color:var(--text); border-radius:9px; padding:13px 15px; font-size:12px; z-index:40; max-width:calc(100vw - 40px); }
 .app-toast>svg { color:var(--accent); flex-shrink:0; }
 .app-toast>span { overflow-wrap:anywhere; min-width:0; }

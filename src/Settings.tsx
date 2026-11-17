@@ -1,12 +1,16 @@
 import { themeStyles } from './themes';
 import { useRef } from 'react';
-import { Monitor, Download, Upload, RotateCcw, ShieldCheck, Keyboard } from 'lucide-react';
+import { Monitor, Download, Upload, RotateCcw, ShieldCheck, Keyboard, Info, Copy, Github, ArrowUpRight } from 'lucide-react';
 import { tools } from './tools';
 import { defaultPreferences, validatePreferences, normalizeFavorites } from './workbench';
 import type { Preferences } from './workbench';
 import type { ToolId } from './tools';
 import { saveText } from './files';
 import { WindowCloseSetting } from './DesktopClose';
+import { MotionButton } from './Motion';
+import { copyText } from './motion-primitives';
+import { isProjectDesktop, openProjectUrl } from './project-api';
+import packageInfo from '../package.json';
 
 export default function Settings({ preferences, onChange, favorites, onFavorites, onNotice }: { preferences: Preferences; onChange: (value: Preferences) => void; favorites: ToolId[]; onFavorites: (value: ToolId[]) => void; onNotice: (message: string, undo?: () => void) => void }) {
   const file = useRef<HTMLInputElement>(null);
@@ -52,5 +56,31 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
     <section className="settings-section"><h2>编辑器</h2><label className="setting-row"><span><strong>代码字号</strong><small>应用到所有任务和颜色代码区域</small></span><select value={preferences.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })}>{[12, 13, 14, 15, 16, 17, 18].map(size => <option key={size} value={size}>{size} px</option>)}</select></label><label className="setting-row"><span><strong>默认缩进</strong><small>Tab 缩进即时生效；格式化默认值用于新任务</small></span><select value={preferences.indent} onChange={event => update({ indent: event.target.value as Preferences['indent'] })}><option value="2">2 空格</option><option value="4">4 空格</option></select></label><label className="setting-row"><span><strong>默认布局</strong><small>任务中可以单独切换或最大化编辑区</small></span><select value={preferences.layout} onChange={event => update({ layout: event.target.value as Preferences['layout'] })}><option value="split">左右分栏</option><option value="stack">上下布局</option></select></label><label className="setting-row"><span><strong>自动换行</strong><small>长行在编辑区内折行显示</small></span><input type="checkbox" checked={preferences.wrap} onChange={event => update({ wrap: event.target.checked })} /></label></section>
     <section className="settings-section"><h2><ShieldCheck size={17} />数据与偏好</h2><p>主题、编辑器设置、共享栏目顺序和收藏会自动保存。任务需通过顶部“保存工作区”主动导出，恢复时作为新任务打开。密码和 JWT 默认从工作区文件中排除；颜色任务与图片不写入工作区文件。</p><div className="settings-buttons"><button className="secondary-button" onClick={() => void exportSettings()}><Download size={14} />导出设置与收藏</button><button className="secondary-button" onClick={() => file.current?.click()}><Upload size={14} />导入设置</button><button className="text-button" onClick={() => { const old = preferences; onChange(defaultPreferences); onNotice('偏好设置已恢复默认', () => onChange(old)); }}><RotateCcw size={14} />恢复默认偏好</button></div><input ref={file} className="sr-only" type="file" accept=".json" aria-label="导入设置文件" onChange={event => { void importSettings(event.target.files?.[0]); event.target.value = ''; }} /></section>
     <section className="settings-section"><h2><Keyboard size={17} />键盘操作</h2><dl className="shortcut-list"><div><dt>全局搜索</dt><dd>Ctrl / Cmd + K</dd></div><div><dt>执行当前任务</dt><dd>Ctrl / Cmd + Enter</dd></div><div><dt>查找文本</dt><dd>编辑器内 Ctrl / Cmd + F</dd></div><div><dt>新建同类任务</dt><dd>点击工具标题旁的 ＋</dd></div><div><dt>任务标签导航</dt><dd>方向键 / Home / End，Delete 关闭</dd></div><div><dt>离开编辑区</dt><dd>Esc，然后 Tab</dd></div></dl></section>
+    <section className="settings-section" aria-labelledby="devkit-about-heading">
+      <h2 id="devkit-about-heading"><Info size={17} aria-hidden="true" />关于 DevKit</h2>
+      <dl className="about-details">
+        <div><dt>版本</dt><dd>{packageInfo.version}</dd></div>
+        <div><dt>作者</dt><dd>{packageInfo.author.name}</dd></div>
+        <div><dt>联系邮箱</dt><dd className="about-contact">
+          <span>{packageInfo.author.email}</span>
+          <MotionButton type="button" variant="copy" className="secondary-button" onClick={async () => {
+            try { await copyText(packageInfo.author.email); onNotice('联系邮箱已复制'); }
+            catch (error) { onNotice(error instanceof Error ? error.message : '无法复制联系邮箱'); }
+          }}><Copy size={14} aria-hidden="true" />复制邮箱</MotionButton>
+        </dd></div>
+        <div><dt>项目地址</dt><dd>
+          <a className="about-repository" href={packageInfo.homepage} target="_blank" rel="noopener noreferrer"
+            aria-label="在浏览器打开 DevKit 的 GitHub 仓库" onClick={event => {
+              if (!isProjectDesktop()) return;
+              event.preventDefault();
+              void openProjectUrl(packageInfo.homepage).catch(() => onNotice('无法打开 DevKit 的 GitHub 仓库'));
+            }}>
+            <Github size={16} aria-hidden="true" />
+            <span>{packageInfo.homepage}</span>
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </a>
+        </dd></div>
+      </dl>
+    </section>
   </div>;
 }
