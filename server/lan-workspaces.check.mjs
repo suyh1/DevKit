@@ -427,13 +427,18 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
     const java = await detectJava({ executable: process.env.DEVKIT_TEST_JAVA || '' });
     const run = promisify(execFile), suffix = windows ? '.exe' : '', bin = path.dirname(java.executable || '');
     try { await run(path.join(bin, `javac${suffix}`), ['-version']); } catch { context.skip('JDK unavailable'); return; }
-    const javaFile = path.join(stdioHome, 'RemoteFixture.java');
+    // Keep the deployment home non-ASCII, but avoid JDK 17's native Windows
+    // argument decoding limitation in the independent Java lifecycle fixture.
+    const javaDirectory = path.join(folder, 'java lifecycle');
+    await mkdir(javaDirectory);
+    const javaFile = path.join(javaDirectory, 'RemoteFixture.java');
+    const runnableJar = path.join(javaDirectory, 'managed.jar');
     await writeFile(javaFile, 'public class RemoteFixture { public static void main(String[] args) throws Exception { System.out.println("REMOTE-READY"); while(true) Thread.sleep(100); }}');
-    await run(path.join(bin, `javac${suffix}`), ['--release', '8', path.basename(javaFile)], { cwd: stdioHome });
-    await run(path.join(bin, `jar${suffix}`), ['cfe', path.basename(stdioJar), 'RemoteFixture', 'RemoteFixture.class'], { cwd: stdioHome });
+    await run(path.join(bin, `javac${suffix}`), ['--release', '8', path.basename(javaFile)], { cwd: javaDirectory });
+    await run(path.join(bin, `jar${suffix}`), ['cfe', path.basename(runnableJar), 'RemoteFixture', 'RemoteFixture.class'], { cwd: javaDirectory });
     const [example] = execRegistration.instances;
     await lan.request(null, 'jar', 'upsert', { hostId: stdio.id, revision: execRegistration.revision, instance: {
-      ...example, id: example.id.split(':')[1], executable: java.executable, logMode: 'console', jvmArgs: ['-Xmx64m'],
+      ...example, id: example.id.split(':')[1], jar: runnableJar, executable: java.executable, logMode: 'console', jvmArgs: ['-Xmx64m'],
     } });
     const command = name => lan.request(null, 'jar', 'command', { id: example.id, command: name });
     const clientId = randomUUID();
