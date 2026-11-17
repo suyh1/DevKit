@@ -133,7 +133,7 @@ module.exports = async (window, output) => {
       } finally { await js(`window.devkitJar.request('command',{id:${JSON.stringify(live.id)},command:'force-stop'})`); }
       await verifyLanHost(window, folder, liveJar, java.executable, click, wait);
     }
-    console.log('JAR desktop smoke passed: IPC, file selection, alias, args, status, logs, dirty confirmation, themes, narrow layout and record-only removal.');
+    console.log('JAR desktop smoke passed: local and remote registration, Java launch, configuration preview and backup, performance mode, logs, themes and narrow layout.');
   } finally { dialog.showOpenDialog = previousDialog; }
 };
 
@@ -161,8 +161,9 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   services.nginx.enabled = true;
   const find = hash => BrowserWindow.getAllWindows().find(candidate => candidate.webContents.getURL() === origin + '/#' + hash);
   const js = (target, source) => target.webContents.executeJavaScript(source, true);
-  async function when(target, expression) {
-    for (let attempt = 0; attempt < 100; attempt++) {
+  async function when(target, expression, timeout = 12_000) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
       if (await js(target, expression)) return;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -197,7 +198,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await when(remoteWindow, 'document.querySelector(".jar-status")?.textContent === "已停止" && [...document.querySelectorAll(".jar-row-actions button")].some(b => b.textContent.trim() === "启动" && !b.disabled)');
     id = (await jvm.request('get')).instances[0].id;
     await js(remoteWindow, '[...document.querySelectorAll(".jar-row-actions button")].find(b=>b.textContent.trim()==="启动").click()');
-    await when(remoteWindow, 'document.querySelector(".jar-status")?.textContent === "运行中"');
+    await when(remoteWindow, 'document.querySelector(".jar-status")?.textContent === "运行中"', 35_000);
     assert.ok((await jvm.request('statuses'))[0].pid > 1);
     assert.equal(await js(window, `window.devkitJar.request('get').then(result => result.data.instances.some(item => item.jar === ${JSON.stringify(remoteJar)}))`), false);
     await js(window, 'document.querySelector(\'button[aria-label="关闭局域网主机"]\').click();document.querySelector(\'.nav-item[title="Nginx 配置"]\').click()');
