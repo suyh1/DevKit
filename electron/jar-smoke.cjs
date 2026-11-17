@@ -22,6 +22,7 @@ module.exports = async (window, output) => {
   await fs.writeFile(jar, 'Not executable; used only for UI registration');
   const configFile = path.join(folder, 'application.yml');
   await fs.writeFile(configFile, '\uFEFFport: 9000\r\n');
+  await fs.writeFile(path.join(folder, `application-${'example-'.repeat(18)}.yaml`), 'port: 9001\n');
   const previousDialog = dialog.showOpenDialog;
   const previousMode = await js('document.documentElement.dataset.displayMode') || 'normal';
   const previousThrottling = window.webContents.getBackgroundThrottling();
@@ -58,8 +59,35 @@ module.exports = async (window, output) => {
     assert.equal(item.env.TOKEN, 'a=b');
     await click('配置文件');
     await wait("!!document.querySelector('.jar-configs option[value=\"application.yml\"]')");
+    assert.equal(await js(`{
+      const toolbar = document.querySelector('.jar-config-source .pc-field-action');
+      const field = toolbar.querySelector('select').getBoundingClientRect();
+      const label = toolbar.querySelector('label span').getBoundingClientRect();
+      const refresh = toolbar.querySelector('button').getBoundingClientRect();
+      label.bottom < field.top && refresh.left - field.right >= 8 && Math.abs(refresh.bottom - field.bottom) <= 1;
+    }`), true, 'File label sits above the selector and refresh aligns alongside it with a gap');
     await js(`{ const field = document.querySelector('.jar-configs select'); field.value = 'application.yml'; field.dispatchEvent(new Event('change',{bubbles:true})); }`);
     await wait('!!document.querySelector(".jar-configs .cm-content")');
+    await js(`Promise.allSettled(document.querySelector('.jar-config-dialog').getAnimations().map(animation => animation.finished))`);
+    await fs.writeFile(path.join(output, 'jar-config-light.png'), (await window.webContents.capturePage()).toPNG());
+    const configWindowSize = window.getSize(), configMinimumSize = window.getMinimumSize();
+    window.setMinimumSize(360, 600);
+    window.setSize(390, 700);
+    await js('document.documentElement.dataset.theme="dark"');
+    await wait('innerWidth < 440');
+    await js('new Promise(resolve => setTimeout(resolve, 200))');
+    assert.equal(await js(`{
+      const modal = document.querySelector('.jar-config-dialog');
+      const editor = modal.querySelector('.jar-config-editor').getBoundingClientRect();
+      const footer = modal.querySelector('footer');
+      const bounds = footer.getBoundingClientRect();
+      const save = footer.querySelector('.run-button').getBoundingClientRect();
+      modal.scrollWidth <= modal.clientWidth + 1 && editor.height >= 180 && save.right <= bounds.right && save.bottom <= innerHeight;
+    }`), true, 'The configuration editor and save button remain usable in a narrow window');
+    await fs.writeFile(path.join(output, 'jar-config-dark-narrow.png'), (await window.webContents.capturePage()).toPNG());
+    window.setMinimumSize(...configMinimumSize);
+    window.setSize(...configWindowSize);
+    await js('document.documentElement.dataset.theme="light"');
     await js("document.querySelector('.jar-configs .cm-content').focus()");
     await window.webContents.insertText('name: sample\n');
     await click('预览修改', '.jar-configs');
@@ -122,6 +150,7 @@ module.exports = async (window, output) => {
       assert.equal(result.error, undefined); const live = result.data.instances.find(item => item.jar === liveJar);
       try {
         await click('刷新'); await wait('document.querySelector(".jar-table")?.textContent.includes("Electron 独立守护")');
+        await wait(`[...document.querySelectorAll('.jar-table .jar-row-actions button:enabled')].some(button => button.textContent.trim() === '启动')`);
         await click('启动'); await wait('document.querySelector(".jar-table")?.textContent.includes("独立守护中")');
         await wait('document.querySelector(".jar-console pre")?.textContent.includes("ELECTRON-SUPERVISOR-READY")');
         await click('取得输入控制权'); await wait('!document.querySelector(".jar-console-input input").disabled');
@@ -219,6 +248,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   await fs.mkdir(remote);
   const remoteJar = path.join(remote, 'remote.jar');
   await fs.copyFile(jar, remoteJar);
+  await fs.writeFile(path.join(remote, 'remote.yml'), 'port: 9002\n');
   const store = await createProjectStore(path.join(remote, 'configs'));
   const jvm = await createJarManager(path.join(remote, 'configs'));
   const nginx = await createNginxManager(path.join(remote, 'configs'));
@@ -274,7 +304,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await click('选择文件', '.jar-dialog');
     await wait('!!document.querySelector(".host-directory-path")');
     await when(window, '!document.querySelector(".host-directory-path .secondary-button")?.disabled');
-    await input(window, '[aria-label="远程绝对目录"]', remote);
+    await input(window, '.host-directory-path input', remote);
     await click('打开', '.host-directory');
     await when(window, 'document.querySelector(".host-directory-list")?.textContent.includes("remote.jar")');
     await click('remote.jar', '.host-directory-list');
@@ -295,6 +325,16 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await js(gatewayWindow, 'document.querySelector(".portal-login .run-button").click()');
     const group = 'Array.from(document.querySelectorAll(".jar-table tbody")).find(group => group.textContent.includes("远程测试主机"))';
     await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '已停止'`);
+    await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='配置文件').click()`);
+    await when(gatewayWindow, "!!document.querySelector('.jar-configs option[value=\"remote.yml\"]')");
+    await js(gatewayWindow, `{
+      const field = document.querySelector('.jar-configs select');
+      field.value = 'remote.yml';
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    }`);
+    await when(gatewayWindow, 'document.querySelector(".jar-configs .cm-content")?.textContent.includes("port: 9002")');
+    await js(gatewayWindow, 'document.querySelector(\'button[aria-label="关闭 JAR 配置文件"]\').click()');
+    await when(gatewayWindow, '!document.querySelector(".jar-config-dialog[open]")');
     await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='启动').click()`);
     await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '运行中'`, 35_000);
     assert.ok((await jvm.request('statuses'))[0].pid > 1);

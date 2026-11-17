@@ -4,7 +4,7 @@
 .lan-heading p, .lan-note, .lan-terminal-empty p { font-size: 12px; line-height: 1.65; color: var(--muted); }
 .lan-layout { display: grid; grid-template-columns: minmax(250px, 305px) minmax(0, 1fr); align-items: start; gap: 18px; }
 .lan-connections { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.lan-search, .host-directory-path { display: flex; align-items: center; gap: 7px; }
+.lan-search { display: flex; align-items: center; gap: 7px; }
 .lan-search { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
 .lan-search input { border: 0; background: transparent; min-width: 0; width: 100%; }
 .lan-host-list, .host-directory-list { list-style: none; padding: 0; margin: 0; }
@@ -139,10 +139,40 @@
 .lan-terminal-message { padding: 9px 14px; display: flex; align-items: center; gap: 12px; overflow-wrap: anywhere; font-size: 12px; }
 .lan-terminal-message .text-button { color: #bac8d8; }
 .lan-terminal-message .text-button:hover:not(:disabled) { color: #f4f7fd; background: #2a394a; }
-.host-directory-path input { min-width: 0; flex: 1; }
-.host-directory-list { max-height: 42dvh; overflow: auto; margin-block: 10px; }
-.host-directory-list button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; overflow-wrap: anywhere; }
-.host-directory-list svg { flex-shrink: 0; }
+.host-directory-actions { display: flex; gap: 7px; align-items: stretch; }
+.host-directory-results {
+  min-width: 0;
+  margin-block-start: 14px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+}
+.host-directory-results .host-directory-current {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 2px;
+  font-size: 12px;
+}
+.host-directory-current svg, .host-directory-list svg { flex-shrink: 0; color: var(--accent); }
+.host-directory-current code, .host-directory-list span { min-width: 0; overflow-wrap: anywhere; }
+.host-directory-list {
+  max-height: 42dvh;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  padding: 5px 3px;
+}
+.host-directory-list button {
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding-inline: 8px;
+  text-align: left;
+  white-space: normal;
+}
 .jar-table .jar-host-group th { font-weight: 650; color: var(--text); border-top: 1px solid var(--line); }
 .ng-host-group { display: grid; gap: 8px; min-width: 0; }
 .ng-host-group h3 { margin: 3px 0 0; font-size: 12px; overflow-wrap: anywhere; color: var(--muted); }
@@ -154,6 +184,8 @@
   .lan-layout { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
+  .host-directory-path.pc-field-action { grid-template-columns: minmax(0, 1fr); }
+  .host-directory-actions { justify-content: flex-end; }
   .pc-dialog.lan-host-dialog { --lan-dialog-inset: 15px; width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
   .lan-host-body { padding-block: 15px; }
   .lan-choice { grid-template-columns: 23px minmax(0, 1fr) 14px; padding-inline: 6px; gap: 6px; }

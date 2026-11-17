@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { ArrowUp, File, FolderOpen } from 'lucide-react';
-import { Modal } from './project-components';
+import { Field, Modal } from './project-components';
 import type { HostGroup, RemoteDirectory } from './lan-api';
 import './lan-hosts.css';
 
@@ -22,13 +22,31 @@ export default function HostPathPicker({ name, kind, request, close, select }: {
     finally { setBusy(false); }
   }
   useEffect(() => { void load(''); }, []);
-  return <Modal title={`浏览 ${name} 的文件`} closeLabel="关闭远程文件选择" close={close} wide>
+  return <Modal title="浏览远程文件" description={name} closeLabel="关闭远程文件选择" close={close} wide>
     <div className="host-directory" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
-      <div className="host-directory-path"><button type="button" className="icon-button" aria-label="返回上级目录" disabled={busy || !listing?.parent} onClick={() => void load(listing!.parent)}><ArrowUp size={16} /></button><input aria-label="远程绝对目录" placeholder="输入绝对目录" value={directory} onChange={event => setDirectory(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (!busy) void load(directory); } }} /><button type="button" className="secondary-button" disabled={busy} onClick={() => void load(directory)}>打开</button></div>
+      <div className="host-directory-path pc-field-action">
+        <Field label="远程绝对目录">
+          <input placeholder="输入绝对目录" value={directory} spellCheck={false} onChange={event => setDirectory(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (!busy) void load(directory); } }} />
+        </Field>
+        <div className="host-directory-actions">
+          <button type="button" className="text-button" aria-label="返回上级目录" disabled={busy || !listing?.parent} onClick={() => void load(listing!.parent)}><ArrowUp size={16} />上级</button>
+          <button type="button" className="secondary-button" disabled={busy} onClick={() => void load(directory)}>打开</button>
+        </div>
+      </div>
       {busy && <p role="status">正在读取目录…</p>}
       {error && <p className="pc-error" role="alert">{error}</p>}
-      {listing && <><p className="lan-note">{listing.directory}{listing.truncated ? ' · 结果已截断，可直接输入下级目录。' : ''}</p><ul className="host-directory-list">{listing.entries.map(entry => <li key={entry.path}><button type="button" className="text-button" disabled={busy} onClick={() => entry.directory ? void load(entry.path) : select(entry.path)}>{entry.directory ? <FolderOpen size={16} /> : <File size={16} />}{entry.name}</button></li>)}</ul>{!listing.entries.length && <p className="lan-note">没有匹配的文件或目录。</p>}</>}
-      {kind === 'directory' && listing && <button type="button" className="run-button" disabled={busy} onClick={() => select(listing.directory)}>选择当前目录</button>}
+      {listing && <section className="host-directory-results">
+        <p className="host-directory-current"><FolderOpen size={15} aria-hidden="true" /><code>{listing.directory}</code></p>
+        {listing.truncated && <p className="lan-note">结果已截断，可直接输入下级目录。</p>}
+        {listing.entries.length > 0
+          ? <ul className="host-directory-list">{listing.entries.map(entry => <li key={entry.path}>
+              <button type="button" className="text-button" disabled={busy} onClick={() => entry.directory ? void load(entry.path) : select(entry.path)}>
+                {entry.directory ? <FolderOpen size={16} /> : <File size={16} />}<span>{entry.name}</span>
+              </button>
+            </li>)}</ul>
+          : <p className="lan-note">没有匹配的文件或目录。</p>}
+      </section>}
+      {kind === 'directory' && listing && <footer><button type="button" className="run-button" disabled={busy} onClick={() => select(listing.directory)}>选择当前目录</button></footer>}
     </div>
   </Modal>;
 }

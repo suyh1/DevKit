@@ -14,6 +14,7 @@ import type { Profile, Project, ProjectState } from "../shared/projects.mjs";
 const CloseDialog = createContext(() => {});
 export function Modal({
   title,
+  description,
   close,
   children,
   draft,
@@ -26,6 +27,7 @@ export function Modal({
   closeLabel = "关闭项目中心窗口",
 }: {
   title: string;
+  description?: string;
   close: () => void;
   children: React.ReactNode;
   draft?: unknown;
@@ -38,7 +40,8 @@ export function Modal({
   closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
-    heading = useId();
+    heading = useId(),
+    descriptionId = useId();
   const baseline = useRef(JSON.stringify(draft));
   const [discard, setDiscard] = useState(false);
   const previousSaved = useRef(savedKey);
@@ -85,6 +88,7 @@ export function Modal({
         ref={ref}
         className={`pc-dialog ${wide ? "pc-dialog-wide" : ""} ${className}`}
         aria-labelledby={heading}
+        aria-describedby={description ? descriptionId : undefined}
         aria-busy={busy}
         onCancel={(event) => {
           event.preventDefault();
@@ -95,6 +99,7 @@ export function Modal({
           <div>
             {icon && <span className="pc-dialog-icon" aria-hidden="true">{icon}</span>}
             <h2 id={heading}>{title}</h2>
+            {description && <p className="pc-dialog-description" id={descriptionId}>{description}</p>}
             {dirty && <small className="pc-draft-state">有未保存的更改</small>}
             {feedback && (
               <small className="pc-inline-feedback" role="status">

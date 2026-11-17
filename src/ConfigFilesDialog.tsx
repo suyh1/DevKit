@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, Save } from 'lucide-react';
+import { FileCode, FolderOpen, History, RefreshCw, Save } from 'lucide-react';
 import ChangePreview from './ChangePreview';
 import CodeEditor from './CodeEditor';
 import type { EditorLanguage } from './CodeEditor';
 import { useConfirmation } from './Confirmation';
 import { jarRequest } from './jar-api';
 import type { JarConfigDocument, JarConfigList } from './jar-api';
-import { Modal } from './project-components';
+import { Field, Modal } from './project-components';
 
 const languages: Record<string, EditorLanguage> = { yml: 'yaml', yaml: 'yaml', json: 'json', xml: 'xml' };
 const editorText = (content: string) => content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
@@ -104,20 +104,25 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
 
   const files = listing?.files ?? [];
   const jar = kind === 'jar';
-  return <Modal title={`${item.name} · 配置文件`} close={close} closeLabel={`关闭 ${jar ? 'JAR' : 'Nginx'} 配置文件`} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
+  return <Modal title="配置文件" description={item.name} icon={<FileCode size={19} />} className="jar-config-dialog" close={close} closeLabel={`关闭 ${jar ? 'JAR' : 'Nginx'} 配置文件`} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
     <div className="jar-configs">
-      <p className="jar-help">{listing?.directory || item.path}</p>
-      <div className="jar-config-toolbar">
-        <label>{jar ? '同目录配置' : '已登记配置'}
-          <select value={file?.name || ''} disabled={!editable || !files.length} onChange={event => void read(event.target.value)}>
-            <option value="" disabled>选择配置文件</option>
-            {file && !files.includes(file.name) && <option value={file.name} disabled>{file.name}（已移出列表）</option>}
-            {files.map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
-        <button type="button" className="secondary-button" disabled={!editable} onClick={() => void run(async () => setListing(await request<JarConfigList>('config-list', identity)))}><RefreshCw size={14} />刷新列表</button>
+      <div className="jar-config-source">
+        <div className="jar-config-directory">
+          <FolderOpen size={16} aria-hidden="true" />
+          <div><span>{listing?.directory ? '配置目录' : '应用路径'}</span><code>{listing?.directory || item.path}</code></div>
+        </div>
+        <div className="pc-field-action">
+          <Field label={jar ? '同目录配置文件' : '已登记配置文件'}>
+            <select value={file?.name || ''} disabled={!editable || !files.length} onChange={event => void read(event.target.value)}>
+              <option value="" disabled>{busy && !listing ? '正在读取配置列表…' : '选择配置文件'}</option>
+              {file && !files.includes(file.name) && <option value={file.name} disabled>{file.name}（已移出列表）</option>}
+              {files.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </Field>
+          <button type="button" className="secondary-button" disabled={!editable} onClick={() => void run(async () => setListing(await request<JarConfigList>('config-list', identity)))}><RefreshCw size={14} />刷新列表</button>
+        </div>
+        {listing && !files.length && <p className="jar-help">此目录暂无支持的配置文件。可读取 512 KiB 以内的 UTF-8 YAML、Properties、JSON、XML、TOML、INI、CONF 和 CFG 文件。</p>}
       </div>
-      {listing && !files.length && <p className="jar-help">此目录暂无支持的配置文件。可读取 512 KiB 以内的 UTF-8 YAML、Properties、JSON、XML、TOML、INI、CONF 和 CFG 文件。</p>}
       {error && <p className="jar-error" role="alert">{error}</p>}
       {file && <>
         <div className="jar-config-editor" hidden={mode !== 'edit'}>
@@ -128,15 +133,19 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
           <p className="jar-help">左侧为已保存的版本，右侧为上一次保存前的备份。</p>
           <ChangePreview before={file.content} after={backup.content} />
         </>}
-        <div className="jar-config-toolbar">
-          <button type="button" className="text-button" disabled={!editable} onClick={() => void read(file.name)}>重新读取</button>
-          <button type="button" className="text-button" disabled={!editable} onClick={() => void loadBackup(file.name)}>查看上一版</button>
-          {mode === 'edit' && <button type="button" className="secondary-button" disabled={!dirty} onClick={() => setMode('changes')}>预览修改</button>}
-          {mode !== 'edit' && <button type="button" className="secondary-button" onClick={() => setMode('edit')}>返回编辑</button>}
-          {mode === 'backup'
-            ? <button type="button" className="run-button" disabled={!editable} onClick={() => void fillBackup()}>用上一版填入编辑器</button>
-            : <button type="button" className="run-button" disabled={!editable || !dirty} onClick={() => void save(file)}><Save size={14} />保存配置</button>}
-        </div>
+        <footer className="jar-config-actions">
+          <div className="pc-actions">
+            <button type="button" className="text-button" disabled={!editable} onClick={() => void read(file.name)}><RefreshCw size={13} />重新读取</button>
+            <button type="button" className="text-button" disabled={!editable} onClick={() => void loadBackup(file.name)}><History size={14} />查看上一版</button>
+          </div>
+          <div className="pc-actions">
+            {mode === 'edit' && <button type="button" className="secondary-button" disabled={!dirty} onClick={() => setMode('changes')}>预览修改</button>}
+            {mode !== 'edit' && <button type="button" className="secondary-button" onClick={() => setMode('edit')}>返回编辑</button>}
+            {mode === 'backup'
+              ? <button type="button" className="run-button" disabled={!editable} onClick={() => void fillBackup()}>用上一版填入编辑器</button>
+              : <button type="button" className="run-button" disabled={!editable || !dirty} onClick={() => void save(file)}><Save size={14} />保存配置</button>}
+          </div>
+        </footer>
       </>}
     </div>
   </Modal>;

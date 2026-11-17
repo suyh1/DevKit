@@ -34,7 +34,8 @@ export default function ProjectComparison({
         选择 2–4
         个独立档案，按项目编码对齐，比较项目有无、名称、分组、说明、启停、地址模板、查询参数和最终入口，以及各方案的变量。这里只读取已保存的数据。
       </p>
-      <div className="pc-compare-picks">
+      <fieldset className="pc-compare-picks">
+        <legend>参与对比的档案</legend>
         {data.profiles.map((profile) => (
           <label key={profile.id}>
             <input
@@ -49,18 +50,18 @@ export default function ProjectComparison({
                 )
               }
             />
-            {profile.name}
+            <span>{profile.name}</span>
           </label>
         ))}
-        <label>
-          <input
-            type="checkbox"
-            checked={onlyChanged}
-            onChange={(event) => setOnlyChanged(event.target.checked)}
-          />
-          只看差异
-        </label>
-      </div>
+      </fieldset>
+      <label className="pc-check pc-compare-filter">
+        <input
+          type="checkbox"
+          checked={onlyChanged}
+          onChange={(event) => setOnlyChanged(event.target.checked)}
+        />
+        只看差异
+      </label>
       {!report && <p role="status">请选择至少两个方案。</p>}
       {report && (
         <div className="pc-comparison">

@@ -895,6 +895,18 @@ body:has(.pc-login) {
   margin: -24px -24px 20px;
   border-bottom: 1px solid var(--line);
 }
+.pc-dialog > header > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pc-dialog > header > .icon-button {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+.pc-dialog > header .pc-dialog-description {
+  margin: 3px 0 0;
+  line-height: 1.45;
+}
 .pc-dialog footer {
   position: sticky;
   bottom: -24px;
@@ -952,6 +964,22 @@ body:has(.pc-login) {
 }
 .pc-dialog .pc-field {
   font-size: 13px;
+}
+.pc-field-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.pc-field-action .pc-field {
+  min-width: 0;
+  margin: 0;
+}
+.pc-field-action :is(input, select) {
+  width: 100%;
+}
+.pc-field-action .secondary-button {
+  min-height: 40px;
 }
 .pc-dialog input:not([type="checkbox"]):not([type="radio"]),
 .pc-dialog select {
