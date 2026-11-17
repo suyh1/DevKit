@@ -429,8 +429,8 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
     try { await run(path.join(bin, `javac${suffix}`), ['-version']); } catch { context.skip('JDK unavailable'); return; }
     const javaFile = path.join(stdioHome, 'RemoteFixture.java');
     await writeFile(javaFile, 'public class RemoteFixture { public static void main(String[] args) throws Exception { System.out.println("REMOTE-READY"); while(true) Thread.sleep(100); }}');
-    await run(path.join(bin, `javac${suffix}`), ['--release', '8', javaFile]);
-    await run(path.join(bin, `jar${suffix}`), ['cfe', stdioJar, 'RemoteFixture', '-C', stdioHome, 'RemoteFixture.class']);
+    await run(path.join(bin, `javac${suffix}`), ['--release', '8', path.basename(javaFile)], { cwd: stdioHome });
+    await run(path.join(bin, `jar${suffix}`), ['cfe', path.basename(stdioJar), 'RemoteFixture', 'RemoteFixture.class'], { cwd: stdioHome });
     const [example] = execRegistration.instances;
     await lan.request(null, 'jar', 'upsert', { hostId: stdio.id, revision: execRegistration.revision, instance: {
       ...example, id: example.id.split(':')[1], executable: java.executable, logMode: 'console', jvmArgs: ['-Xmx64m'],
