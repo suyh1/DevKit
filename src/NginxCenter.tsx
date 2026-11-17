@@ -50,6 +50,7 @@ function InstanceForm({ instance, platform, groups, busy, error, submit, create,
   type FileKind = 'main' | 'files' | 'prefix' | 'executable' | 'directory';
   const [hostId, setHostId] = useState(instance?.hostId || ''), [picker, setPicker] = useState<FileKind | null>(null);
   const host = targetGroup(groups, hostId), canPick = !!hostId || !!window.devkitNginx;
+  const hostName = host?.name || (remoteAccess() ? '共享主机' : '本机');
   const [warnings, setWarnings] = useState<string[]>([]), [detection, setDetection] = useState('');
   const [manualFiles, setManualFiles] = useState(instance?.files.join('\n') || '');
   const [setup, setSetup] = useState<'existing' | 'create'>(initialSetup);
@@ -88,7 +89,7 @@ function InstanceForm({ instance, platform, groups, busy, error, submit, create,
   return <Modal title={instance ? '实例设置' : '添加 Nginx 实例'} description={instance ? '管理此实例的配置文件与运行环境。' : '新建一套配置，或将已有配置加入工作区。'} className="ng-form-modal" busy={busy} close={() => void closeForm()}><form className="ng-instance-form" onSubmit={event => { event.preventDefault(); void task(() => setup === 'create' ? create({ name: draft.name || '', platform: draft.platform!, executable: draft.executable || '', directory, mainName, commonName, port: Number(port) }, hostId) : submit({ ...draft, files: manualFiles.split(/\r?\n/).map(file => file.trim()).filter(Boolean) }, hostId)); }}><div className="ng-form-scroll">
     <fieldset disabled={busy}>
       {!!(groups && groups.length > 1) && <HostSelect groups={groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ platform: (targetGroup(groups, id)?.platform ?? platform) === 'win32' ? 'win32' : 'linux', main: '', prefix: '', executable: '', files: [] }); setDirectory(''); setManualFiles(''); setWarnings([]); setDetection(''); }} />}
-      {(hostId || remoteAccess()) && <p className="ng-warning">文件、目录和程序路径均属于所选主机。</p>}
+      {(hostId || remoteAccess()) && <p className="ng-warning">文件、目录和程序路径均属于 {hostName}。</p>}
       {error && <p className="ng-error" role="alert">{error}</p>}
       {!instance && <MotionGroup className="ng-setup-tabs" role="group" aria-label="配置来源"><button type="button" aria-pressed={setup === 'existing'} className="text-button"  onClick={() => setSetup('existing')}>使用已有文件</button><button type="button" aria-pressed={setup === 'create'} className="text-button"  onClick={() => setSetup('create')}>新建配置</button></MotionGroup>}
       <h3 className="ng-form-section">基本信息</h3><div className="ng-form-grid"><label>实例名称<input required maxLength={100} aria-describedby={hintId('name')} value={draft.name} onChange={event => patch({ name: event.target.value })} />{hint('name')}</label><label>目标系统<select aria-describedby={hintId('platform')} value={draft.platform} onChange={event => patch({ platform: event.target.value as NginxInstance['platform'] })}><option value="win32">Windows</option><option value="linux">Linux</option><option value="any">跟随本机</option></select>{hint('platform')}</label></div><h3 className="ng-form-section">配置文件与运行目录</h3>
@@ -106,7 +107,7 @@ function InstanceForm({ instance, platform, groups, busy, error, submit, create,
       <button type="button" hidden={!canPick} className="text-button" onClick={() => pick('files')}><Plus size={14} />选择附属文件</button>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}</>}
     </fieldset>
-  </div><footer className="ng-form-footer"><span>保存到 {host?.name || '本机'}</span><MotionButton busy={busy} type="button" className="secondary-button"  disabled={busy} onClick={() => void closeForm()}>取消</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy} type="submit">{setup === 'create' ? '创建文件并添加实例' : '保存实例'}</MotionButton></footer></form>
+  </div><footer className="ng-form-footer"><span>保存到 {hostName}</span><MotionButton busy={busy} type="button" className="secondary-button"  disabled={busy} onClick={() => void closeForm()}>取消</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy} type="submit">{setup === 'create' ? '创建文件并添加实例' : '保存实例'}</MotionButton></footer></form>
     {picker && <HostPathPicker name={host?.name || ''} kind={pickKind} request={directory => nginxRequest<RemoteDirectory>('browse', { hostId, directory, kind: pickKind })} close={() => setPicker(null)} select={filename => { setPicker(null); void task(() => applyPaths(picker, [filename])); }} />}
   </Modal>;
 }
