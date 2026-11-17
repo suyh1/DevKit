@@ -136,7 +136,9 @@ export async function createLanWorkspaces(directory, transports = { share: share
       const fsPath = host.platform === 'win32' ? path.win32 : path.posix;
       const key = filename => host.platform === 'win32' ? fsPath.normalize(filename).toLowerCase() : fsPath.normalize(filename);
       const state = await remote(host, module, 'get', {}, fullAccess, desktopSession);
-      if (state.instances.some(item => item.id === target.id || key(module === 'jar' ? item.jar : item.main) === key(target.path))) return true;
+      if (state.instances.some(item => item.id === target.id)) return true;
+      const filename = await remote(host, module, 'resolve-legacy-path', { path: target.path }, fullAccess, desktopSession);
+      if (state.instances.some(item => key(module === 'jar' ? item.jar : item.main) === key(filename))) return true;
       if (module === 'jar') {
         const password = await store.password(host);
         const status = await requestSsh({ host, module, action: 'status', target }, (_args, command, input) => runSshCommand(host, password, command, input));

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, open, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, open, readFile, realpath, rename, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -48,6 +48,7 @@ test('LAN gateway shares local and remote registries, confines operations to the
   const [{ id: hostId }] = await gateway.lan.hostRequest('save', { ...target, name: 'Test host', mode: 'share', modules: { jar: true, nginx: true } });
   const source = path.join(folder, 'service.jar'), config = path.join(folder, 'nginx.conf');
   await writeFile(source, 'fixture');
+  const canonicalSource = await realpath(source);
   await writeFile(config, 'events {}\nhttp {}\n');
   const access = await fetch(`${gateway.address}/api/sharing/login`, { method: 'POST', headers: { Origin: gateway.address, 'Content-Type': 'application/json' }, body: JSON.stringify({ password: gateway.password }) });
   const cookie = access.headers.get('set-cookie').split(';')[0];
@@ -58,13 +59,13 @@ test('LAN gateway shares local and remote registries, confines operations to the
   const listed = await api('jar', 'get', { scope: 'inventory' });
   assert.deepEqual(listed.data.groups.map(group => [group.id, group.edit, group.control]), [['', true, true], [hostId, true, false]]);
   const browse = await api('jar', 'browse', { hostId, kind: 'jar', directory: folder });
-  assert.deepEqual(browse.data.entries.filter(item => !item.directory).map(item => item.path), [source]);
+  assert.deepEqual(browse.data.entries.filter(item => !item.directory).map(item => item.path), [canonicalSource]);
   const saved = await api('jar', 'upsert', { hostId, revision: 0, instance: { name: 'Service', jar: source, logMode: 'console', env: { PRIVATE_SETTING: 'fixture-value' } } });
   assert.equal(saved.status, 200, JSON.stringify(saved.data));
   const [instance] = saved.data.instances;
   assert.ok(instance.id.startsWith(`${hostId}:`));
   assert.equal((await gateway.jar.request('get')).instances.length, 0);
-  assert.equal((await target.jar.request('get')).instances[0].jar, source);
+  assert.equal((await target.jar.request('get')).instances[0].jar, canonicalSource);
   assert.equal((await api('jar', 'command', { id: instance.id, command: 'start' })).status, 403);
   assert.equal((await api('jar', 'get', { hostId, scope: 'local' })).status, 400);
   assert.deepEqual((await api('jar', 'statuses', { scope: 'inventory' })).data.map(status => status.id), [instance.id]);
@@ -189,10 +190,13 @@ test('SSH verifies the host before password auth, hosts a PTY, and runs the bund
   assert.equal((await lan.request(null, 'nginx', 'documents', { id: nginxId })).files[0].content, nginxConfig);
   const legacyMain = path.join(folder, 'legacy.conf');
   await writeFile(legacyMain, 'events {}\n');
-  const legacy = { id, module: 'nginx', target: { id: randomUUID(), name: 'Legacy Nginx', path: legacyMain, executable, files: [], prefix: folder } };
+  const alias = path.join(folder, 'alias');
+  await symlink(await realpath(folder), alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const legacy = { id, module: 'nginx', target: { id: randomUUID(), name: 'Legacy Nginx', path: path.join(alias, 'legacy.conf'), executable, files: [], prefix: folder } };
   await lan.hostRequest('legacy-import', legacy);
   await lan.hostRequest('legacy-import', legacy);
-  assert.equal((await lan.request(null, 'nginx', 'get', { hostId: id })).instances.filter(item => item.main === legacyMain).length, 1);
+  const canonicalMain = await realpath(legacyMain);
+  assert.equal((await lan.request(null, 'nginx', 'get', { hostId: id })).instances.filter(item => item.main === canonicalMain).length, 1);
   if (executable) {
     const command = kind => lan.request(null, 'nginx', 'command', { id: nginxId, command: kind });
     try {

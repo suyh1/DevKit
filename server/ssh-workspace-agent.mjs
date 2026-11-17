@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { createJarManager } from './jar-manager.mjs';
 import { createNginxManager } from './nginx-manager.mjs';
@@ -31,6 +32,12 @@ async function close() {
 }
 async function handle({ id, module, action, payload, access, session }) {
   try {
+    if (action === 'resolve-legacy-path') {
+      const filename = payload?.path;
+      if (!access?.edit || typeof filename !== 'string' || filename.length > 12000 || !path.isAbsolute(filename) || /[\0\r\n]/.test(filename)) throw new Error('请输入目标主机的绝对文件路径。');
+      send({ id, result: await realpath(filename) });
+      return;
+    }
     if (action === 'release') {
       await (await managers.get('jar'))?.releaseConsoleSession(session);
     } else {
