@@ -28,7 +28,8 @@ module.exports = async (window, output) => {
     assert.equal(await js(`document.querySelector('.sidebar-shared').open`), false, 'Shared sidebar starts collapsed');
     await js(`document.querySelector('.shared-sidebar-trigger').click()`);
     await wait(window.webContents, `document.querySelector('.sidebar-shared').open`);
-    assert.equal(await js(`document.querySelectorAll('.sidebar-shared nav button').length`), 6);
+    assert.equal(await js(`document.querySelectorAll('.sidebar-shared nav button').length`), 7);
+    assert.equal(await js(`!!document.querySelector('.sidebar-shared [title="局域网主机"]')`), true);
     await js(`document.querySelector('.sidebar-shared [title="日志中心"]').click()`);
     await wait(window.webContents, `!document.querySelector('.sidebar-shared').open`);
     const minimum = window.getMinimumSize(); window.setMinimumSize(360, 600);
@@ -37,7 +38,7 @@ module.exports = async (window, output) => {
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
       const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('[role=menuitem]').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
-      assert.equal(geometry.count, 6); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
+      assert.equal(geometry.count, 7); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
       window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
       assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
       if (width === 1440) { window.show(); window.focus(); await delay(200); await fs.writeFile(path.join(output, 'shared-secondary-navigation.png'), (await window.webContents.capturePage()).toPNG()); }
