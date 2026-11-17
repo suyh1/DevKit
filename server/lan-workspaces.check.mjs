@@ -259,7 +259,7 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
   const commandPath = windows ? [path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0'), path.join(systemRoot, 'System32'), systemRoot].join(path.delimiter) : path.join(folder, 'system-commands');
   if (!windows) {
     await mkdir(commandPath);
-    for (const name of ['sh', 'uname', 'cat', 'mkdir', 'sha256sum', 'chmod', 'mv', 'rm', 'ps', 'readlink', 'id']) {
+    for (const name of ['sh', 'uname', 'cat', 'mkdir', 'sha256sum', 'chmod', 'mv', 'rm', 'ps', 'readlink', 'id', 'getconf']) {
       await symlink(await realpath(`/usr/bin/${name}`), path.join(commandPath, name));
     }
   }
