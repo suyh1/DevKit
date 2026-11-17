@@ -26,6 +26,7 @@ import {
   validateApiState,
 } from "../shared/api-workspace.mjs";
 import { apiLibrary } from "./api-library";
+import { ResourceLink, useWorkspaceResource } from './workspace-links';
 import type { ApiLibrary } from "./api-library";
 import {
   newApiProject,
@@ -93,6 +94,7 @@ export default function ApiWorkspace({
   const onRequestDirty = useCallback((dirty: boolean) => { requestDirty.current = dirty; }, []);
   const [historyRequest, setHistoryRequest] = useState<ApiHistory | null>(null);
   const [requestReset, setRequestReset] = useState(0);
+  const linked = useWorkspaceResource('http'), handledLink = useRef('');
   function changeDraft(value: ApiEndpoint | null) { setDraft(value); setHistoryRequest(null); onNotice(''); }
   const state = library?.state || initialApiState(),
     project = state.projects.find((item) => item.id === projectId),
@@ -140,6 +142,21 @@ export default function ApiWorkspace({
     if (projectId)
       writePreference(`devkit:api-env:${projectId}`, environmentId);
   }, [projectId, environmentId]);
+  useEffect(() => {
+    if (!linked) { handledLink.current = ''; return; }
+    if (!library || busy || sending || handledLink.current === linked) return;
+    const [projectId, endpointId] = linked.split(':');
+    const target = library.state.projects.find(item => item.id === projectId);
+    const endpoint = target?.endpoints.find(item => item.id === endpointId);
+    handledLink.current = linked;
+    if (!target || !endpoint) { onNotice('接口已移除或不可访问。'); return; }
+    if (draft?.id === endpoint.id && project?.id === target.id) return;
+    void allowChange().then(allowed => {
+      if (!allowed) return;
+      setProjectId(target.id); setEnvironmentId(readPreference(`devkit:api-env:${target.id}`) || '');
+      changeDraft(structuredClone(endpoint)); setSearch('');
+    });
+  }, [linked, library, busy, sending]);
   function adopt(
     result: ApiLibrary,
     nextProject = projectId,
@@ -691,6 +708,7 @@ export default function ApiWorkspace({
                       </code>
                     </div>
                     <div className="api-actions">
+                      {saved && <ResourceLink page="http" id={`${project.id}:${saved.id}`} />}
                       <button
                         className="icon-button"
                         aria-label="复制API接口"

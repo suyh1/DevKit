@@ -32,11 +32,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await wait('!document.querySelector(".sharing-panel dialog[open]")');
     await wait('!document.querySelector(".sharing-panel")');
   };
-  const navigate = async (name) => {
-    await js(
-      `[...document.querySelectorAll('.sidebar .nav-item')].find(e=>e.querySelector('span')?.textContent===${JSON.stringify(name)}).click()`,
-    );
-  };
+  const { openWorkspace: navigate } = require('./navigation-helpers.cjs')(window);
   const openShortcut = async (selector) => {
     await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
     await js(`document.querySelector(${JSON.stringify(selector)}).click()`);

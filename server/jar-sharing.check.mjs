@@ -30,6 +30,7 @@ test('shared console: remote/local duplicate prevention, read grants, one writer
   const host = await createProjectHost(store, dist, { jar: () => manager });
   const server = net.createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const port = server.address().port; await new Promise(resolve => server.close(resolve));
   const origin = `http://127.0.0.1:${port}`, services = emptySharingServices(); services.jar.enabled = true;
+  services.logs = { ...services.logs, enabled: true, jar: true };
   const settings = { host: '127.0.0.1', port, password: 'jar-sharing-test', services };
   const call = (action, cookie, payload = {}, module = 'jar') => fetch(`${origin}/api/${module}/${action}`, { method: 'POST', headers: { Cookie: cookie || '', Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   async function login() { const response = await call('login', '', { password: settings.password }, 'projects'); assert.equal(response.status, 200); return response.headers.get('set-cookie').split(';')[0]; }

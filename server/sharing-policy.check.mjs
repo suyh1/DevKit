@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import https from "node:https";
+import { execFileSync } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -17,6 +19,8 @@ import { createProjectHost } from "./project-host.mjs";
 import { createNginxManager } from "./nginx-manager.mjs";
 import { emptySharingServices, sharingServices } from "../shared/sharing.mjs";
 import { sharingFromEnvironment } from "./sharing-environment.mjs";
+import { createApiWorkspace } from './api-workspace.mjs';
+import { initialApiState, newApiEndpoint } from '../shared/api-workspace.mjs';
 
 async function freePort() {
   const server = net.createServer();
@@ -25,11 +29,27 @@ async function freePort() {
   await new Promise((resolve) => server.close(resolve));
   return port;
 }
+test('TLS listens on the configured endpoint and sends a Secure cookie', { skip: !process.env.DEVKIT_TEST_OPENSSL }, async () => fixture(async ({ root, host, options }) => {
+  const key = path.join(root, 'test.key'), cert = path.join(root, 'test.crt');
+  execFileSync(process.env.DEVKIT_TEST_OPENSSL, ['req', '-x509', '-newkey', 'rsa:2048', '-noenc', '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-keyout', key, '-out', cert], { stdio: 'ignore' });
+  const services = emptySharingServices(); services.projects.enabled = true;
+  const state = await host.start({ ...options, services, tls: { cert, key, hostname: '127.0.0.1' } });
+  const [url] = state.addresses;
+  assert.match(url, /^https:\/\//);
+  const payload = JSON.stringify({ password: options.password }), ca = await readFile(cert);
+  const response = await new Promise((resolve, reject) => {
+    const req = https.request(new URL('/api/sharing/login', url), { ca, method: 'POST', headers: { Origin: url.slice(0, -1), 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, res => { res.resume(); res.once('end', () => resolve(res)); });
+    req.once('error', reject); req.end(payload);
+  });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers['set-cookie'][0], /; Secure/);
+  assert.ok(response.headers['strict-transport-security']);
+}));
 async function fixture(work) {
   const root = await realpath(
     await mkdtemp(path.join(tmpdir(), "devkit-policy-")),
   );
-  let store, host, echo;
+  let store, host, echo, library;
   try {
     const dist = path.join(root, "dist");
     await mkdir(path.join(dist, ".vite"), { recursive: true });
@@ -39,19 +59,15 @@ async function fixture(work) {
       JSON.stringify({ "portal.html": { file: "portal.html" } }),
     );
     store = await createProjectStore(path.join(root, "configs"));
-    let failSave = false;
+    let failSave = false, readLog;
     const calls = [],
       nginx = {
         request: async (action, payload, options) => {
           calls.push({ action, payload, options });
           return { action };
         },
-      },
-      library = {
-        get: async () => ({ state: { revision: 0 } }),
-        save: async () => ({ saved: true }),
-        restore: async () => ({ restored: true }),
       };
+    library = await createApiWorkspace(path.join(root, 'configs'));
     host = await createProjectHost(
       {
         ...store,
@@ -61,7 +77,11 @@ async function fixture(work) {
             : store.saveSettings(value),
       },
       dist,
-      { nginx: () => nginx, library: () => library },
+      { nginx: () => nginx, logs: () => ({ request: () => readLog() }), library: () => ({
+        get: () => library.get(),
+        save: async () => ({ saved: true }),
+        restore: async () => ({ restored: true }),
+      }) },
     );
     echo = http.createServer((_req, res) => {
       res.setHeader("Content-Type", "text/plain");
@@ -106,10 +126,12 @@ async function fixture(work) {
       root,
       store,
       host,
+      library,
       calls,
       options,
       call,
       start,
+      interceptLogRead: read => { readLog = read; },
       echoUrl: `http://127.0.0.1:${echo.address().port}`,
       failSave: (value) => {
         failSave = value;
@@ -122,11 +144,68 @@ async function fixture(work) {
       await new Promise((resolve) => echo.close(resolve));
     }
     await store?.close();
+    await library?.close();
     assert.equal(path.dirname(root), await realpath(tmpdir()));
     assert.ok(path.basename(root).startsWith("devkit-policy-"));
     await rm(root, { recursive: true, force: true });
   }
 }
+
+test('revoking a log grant discards the body of an already authorized read', () =>
+  fixture(async ({ start, call, host, options, interceptLogRead }) => {
+    const services = emptySharingServices();
+    services.logs = { ...services.logs, enabled: true, jar: true };
+    await start(services);
+    const accepted = Promise.withResolvers(), completion = Promise.withResolvers();
+    interceptLogRead(() => { accepted.resolve(); return completion.promise; });
+    const pending = call('/api/logs/read', { sources: [{ id: 'a'.repeat(64) }] });
+    try {
+      await accepted.promise;
+      services.logs.jar = false;
+      await host.start({ ...options, password: '', services });
+    } finally {
+      completion.resolve({ results: [{ text: 'revoked-pending-secret' }] });
+    }
+    const response = await pending;
+    assert.equal(response.status, 401);
+    assert.doesNotMatch(await response.text(), /revoked-pending-secret/);
+  }));
+
+test('HTTP documentation-only visitors receive a credential-free library; sending and editing preserve existing access', () =>
+  fixture(async ({ start, call, library }) => {
+    const endpoint = newApiEndpoint('protected');
+    endpoint.name = 'Protected example';
+    endpoint.path = '/users';
+    endpoint.server = 'https://user:server-secret@example.test/?access_token=query-secret&page=2';
+    endpoint.auth = { ...endpoint.auth, type: 'bearer', token: 'bearer-secret', password: 'auth-password', value: 'auth-value' };
+    endpoint.parameters = ['session', 'region'].map((name, index) => ({
+      id: name, name, location: index ? 'query' : 'cookie', type: 'string', required: false, enabled: true, description: '', example: index ? 'shanghai' : 'cookie-secret',
+    }));
+    endpoint.bodyKind = 'json';
+    endpoint.body = JSON.stringify({ password: 'escaped"body-secret', page: 2 });
+    endpoint.requestSchema = JSON.stringify({ type: 'object', properties: { password: { type: 'string', default: 'schema-secret' } } });
+    endpoint.responses = [{ id: 'ok', status: '200', description: '', contentType: 'application/json', schema: '', example: '{"token":"response-secret","cookie":{"ignored":"nested-example-secret"},"id":9223372036854775807}' }];
+    await library.save({ ...initialApiState(), projects: [{
+      id: 'project', name: 'Project', description: '', baseUrl: 'https://example.test/', groups: [], endpoints: [endpoint],
+      environments: [{ id: 'prod', name: 'Prod', baseUrl: '', variables: [{ key: 'ACCOUNT', value: 'environment-secret', enabled: true }] }],
+    }] }, 0);
+    const services = emptySharingServices(); services.http.enabled = true;
+    await start(services);
+    const view = await (await call('/api/http/get-library', {})).json();
+    const safe = view.state.projects[0].endpoints[0];
+    assert.doesNotMatch(JSON.stringify(view), /bearer-secret|auth-password|auth-value|server-secret|query-secret|cookie-secret|body-secret|schema-secret|response-secret|environment-secret|nested-example-secret/);
+    assert.match(safe.responses[0].example, /9223372036854775807/);
+    assert.match(safe.server, /page=2/);
+    assert.equal(safe.parameters[1].example, 'shanghai');
+    assert.equal(JSON.parse(safe.body).page, 2);
+    assert.equal((await call('/api/http/send', {})).status, 403);
+    for (const permission of ['edit', 'send']) {
+      services.http.edit = permission === 'edit'; services.http.send = permission === 'send';
+      await start(services);
+      const result = await (await call('/api/http/get-library', {})).json();
+      assert.equal(result.state.projects[0].endpoints[0].auth.token, 'bearer-secret');
+    }
+  }));
 
 test("fresh defaults, migration and environment overrides never grant hidden service permissions", () => {
   assert.deepEqual(sharingServices(), emptySharingServices());
@@ -142,7 +221,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     http: { enabled: false, edit: false, send: false },
     jar: { enabled: false, edit: false, control: false },
     monitor: { enabled: false, edit: false, control: false },
-    logs: { enabled: false, jar: false, nginx: false, export: false },
+    logs: { enabled: false, jar: false, nginx: false, export: false, raw: false },
   });
   const disabled = emptySharingServices();
   disabled.nginx = { enabled: false, edit: true, control: true };
@@ -182,6 +261,39 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     /布尔值/,
   );
 });
+
+test('named grants intersect publication permissions and removing one visitor revokes only that session', async () => fixture(async ({ host, store, options, call, start }) => {
+  const global = emptySharingServices();
+  global.projects.enabled = true;
+  global.http.enabled = true;
+  await start(global);
+  const project = emptySharingServices(), http = emptySharingServices();
+  project.projects = { enabled: true, edit: true, probe: true };
+  http.http = { enabled: true, edit: true, send: true };
+  const visitors = [
+    { name: '访客A', password: 'named-test-A', services: project },
+    { name: '访客B', password: 'named-test-B', services: http },
+  ];
+  await host.start({ ...options, password: '', services: global, allowDefault: false, visitors });
+  assert.equal((await call('/api/sharing/login', { password: options.password })).status, 401);
+  async function login(visitor) {
+    const response = await call('/api/sharing/login', { visitor: visitor.name, password: visitor.password }, 'POST', '');
+    assert.equal(response.status, 200);
+    return { cookie: response.headers.get('set-cookie').split(';')[0], session: await response.json() };
+  }
+  const a = await login(visitors[0]), b = await login(visitors[1]);
+  assert.equal(a.session.services.projects.edit, false);
+  assert.equal(a.session.services.http.enabled, false);
+  assert.equal(b.session.services.http.send, false);
+  assert.equal((await call('/api/projects/state', undefined, 'GET', b.cookie)).status, 404);
+  await host.start({ ...options, password: '', services: global, allowDefault: false, visitors: [{ name: visitors[1].name, services: http }] });
+  assert.equal((await call('/api/projects/state', undefined, 'GET', a.cookie)).status, 401);
+  assert.equal((await call('/api/http/get-library', {}, 'POST', b.cookie)).status, 200);
+  const records = await host.audit();
+  assert.ok(records.some(item => item.visitor === visitors[0].name && item.outcome === 'revoked'));
+  assert.ok(!JSON.stringify(records).includes(visitors[1].password));
+  assert.ok(!JSON.stringify(await store.settings()).includes(visitors[1].password));
+}));
 
 test("each service can be the only service and disabled routes remain inaccessible after login", () =>
   fixture(async ({ host, start, call, options }) => {

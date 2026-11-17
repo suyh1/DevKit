@@ -3,13 +3,13 @@ import type { ToolId } from './tools';
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
-  { id: 'logs', name: '日志中心', description: '聚合已登记的 JAR 文件日志、控制台输出及 Nginx 日志，支持增量追踪、四窗对照、关键词与正则筛选、显示脱敏和限量导出；共享按来源分类授权。', category: '工作台', badge: '共享' },
-  { id: 'monitor', name: '监控中心', description: '主机定时 HTTP/TCP 检测、项目与 JAR 关联、响应耗时和样本可用率历史、故障恢复记录及维护窗口；支持共享查看，编辑与运行分别授权。', category: '工作台', badge: '共享' },
-  { id: 'http', name: 'HTTP 调试', description: '可局域网共享的API项目、接口设计、文档与真实调试一体化；支持环境变量、响应Schema校验、OpenAPI/Swagger导入导出、Markdown文档和快速请求。', category: '工作台', badge: '共享' },
+  { id: 'logs', name: '日志中心', description: '按主机聚合 JAR 文件日志、控制台输出及 Nginx 日志，支持四窗独立追踪、筛选、主机端脱敏和限量导出。', category: '工作台', badge: '共享' },
+  { id: 'monitor', name: '监控中心', description: '定时 HTTP/TCP 检测，可关联项目、本机与远程 JAR 或局域网主机，支持维护窗口、故障恢复记录与 Webhook 通知。', category: '工作台', badge: '共享' },
+  { id: 'http', name: 'HTTP 调试', description: '可局域网共享的 API 项目、接口设计、文档与调试，支持快速请求、multipart 字段与文件上传、环境变量、响应 Schema 校验及 OpenAPI/Swagger 导入导出。', category: '工作台', badge: '共享' },
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
-  { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，统一创建、编辑、备份、检查和重载 Nginx 配置。', category: '工作台', badge: '共享' },
-  { id: 'jar', name: 'JAR 管理', description: '按主机分组管理本机和远程 Java 应用，统一设置、启停重启、控制台、日志、健康检查和配置文件编辑。', category: '工作台', badge: '共享' },
-  { id: 'lan-hosts', name: '局域网主机', description: '在桌面保存远程 DevKit 或 SSH 连接，支持用户名与密码登录、主机指纹校验和多会话 SSH 终端。', category: '工作台' },
+  { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
+  { id: 'jar', name: 'JAR 管理', description: '按主机渐进加载 Java 应用，窄屏使用卡片，SSH 自动部署便携运行时，支持启停重启、日志、健康检查、系统自启和配置编辑。', category: '工作台', badge: '共享' },
+  { id: 'lan-hosts', name: '局域网主机', description: '桌面端发现、分组和导入主机，分步诊断 DevKit／SSH 连接。支持私钥和跳板机、多会话终端及 SFTP、端口监控、Windows 远程桌面和网络唤醒。', category: '工作台' },
 ] as const;
 
 export const categories = [

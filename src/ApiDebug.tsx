@@ -1,4 +1,6 @@
 import { debugOverrides, debugRequest } from './api-debug-draft';
+import HttpMultipart, { multipartIssue, withMultipart } from './HttpMultipart';
+import type { MultipartField } from './HttpMultipart';
 import type { DebugOverrides } from './api-debug-draft';
 import { useBeforeUnload } from './Confirmation';
 import { canSendHttp, canWriteWorkspace, remoteAccess } from './workspace-remote';
@@ -72,9 +74,10 @@ export default function ApiDebug({
   onNotice: (text: string) => void;
 }) {
   const [overrides, setOverrides] = useState<DebugOverrides>({});
-  const endpoint = debugRequest(definition, overrides), hasOverrides = Object.keys(overrides).length > 0;
+  const [multipart, setMultipart] = useState<MultipartField[] | null>(null);
+  const endpoint = debugRequest(definition, overrides), hasOverrides = Object.keys(overrides).length > 0 || !!multipart;
   const changeRequest = (next: ApiEndpoint) => { setOverrides(debugOverrides(definition, next)); onNotice(''); };
-  useEffect(() => { setOverrides(initialRequest ? debugOverrides(definition, initialRequest.endpoint) : {}); }, [initialRequest?.id, resetRequest]);
+  useEffect(() => { setOverrides(initialRequest ? debugOverrides(definition, initialRequest.endpoint) : {}); setMultipart(null); }, [initialRequest?.id, resetRequest]);
   useBeforeUnload(hasOverrides);
   useEffect(() => { onDraftChange?.(hasOverrides); return () => onDraftChange?.(false); }, [hasOverrides, onDraftChange]);
   const timeout = endpoint.timeout;
@@ -94,17 +97,18 @@ export default function ApiDebug({
     endpoint,
     environment,
     baseUrl: project.baseUrl,
+    multipart: multipart?.map(row => [row.name, row.value, row.file?.name, row.file?.size, row.file?.lastModified]),
   });
   const request = useMemo(() => {
     try {
       return {
-        value: buildApiRequest(project, endpoint, environment, timeout),
+        value: buildApiRequest(project, multipart ? { ...endpoint, body: '', bodyKind: 'none' } : endpoint, environment, timeout),
         error: "",
       };
     } catch (error) {
       return { value: null, error: String(error) };
     }
-  }, [project, endpoint, environment, timeout]);
+  }, [project, endpoint, environment, timeout, multipart]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -167,7 +171,9 @@ export default function ApiDebug({
           throw new Error(`请求未通过Schema校验：${validation.detail}`);
       }
       if (live.current !== id) return;
-      const result = await sendHttp(id, input);
+      const next = await withMultipart(input, multipart);
+      if (live.current !== id) return;
+      const result = await sendHttp(id, next);
       if (!mounted.current || live.current !== id) return;
       setResponse(result);
       setTab("body");
@@ -248,7 +254,7 @@ export default function ApiDebug({
         </label>
         <button
           className="run-button"
-          disabled={!running && (!request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()))}
+          disabled={!running && (!request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()) || !!(multipart && multipartIssue(multipart)))}
           onClick={() => void (running ? cancel() : send())}
         >
           {running ? <Square size={14} /> : <Send size={14} />}{" "}
@@ -266,7 +272,7 @@ export default function ApiDebug({
           {error}
         </p>
       )}
-      <div className="api-debug-scope"><p>本次请求值仅保留在当前页面，不会改写接口定义、默认示例或共享鉴权。需要修改定义时请切换“接口设计”。</p><button type="button" className="text-button" disabled={running || !hasOverrides} onClick={() => { setOverrides({}); onNotice('已恢复接口定义中的请求值。'); }}>恢复定义值</button></div>
+      <div className="api-debug-scope"><p>本次请求值仅保留在当前页面，不会改写接口定义、默认示例或共享鉴权。需要修改定义时请切换“接口设计”。</p><button type="button" className="text-button" disabled={running || !hasOverrides} onClick={() => { setOverrides({}); setMultipart(null); onNotice('已恢复接口定义中的请求值。'); }}>恢复定义值</button></div>
       <fieldset className="api-debug-inputs" disabled={running}>
         <section className="api-section">
           <h3>请求参数</h3>
@@ -277,7 +283,8 @@ export default function ApiDebug({
           />
         </section>
         <ApiAuthEditor endpoint={endpoint} onChange={changeRequest} />
-        <ApiBodyEditor endpoint={endpoint} onChange={changeRequest} />
+        <HttpMultipart fields={multipart} change={setMultipart} disabled={running} />
+        {multipart ? <p className="preview-note">仍会校验接口参数。正文 Schema 适用于接口定义中的正文格式。</p> : <ApiBodyEditor endpoint={endpoint} onChange={changeRequest} />}
       </fieldset>
       <details className="api-section">
         <summary>查看最终请求配置</summary>
@@ -286,7 +293,7 @@ export default function ApiDebug({
             <div className="api-code-editor">
               <CodeEditor
                 label="API最终请求配置"
-                value={JSON.stringify(request.value, null, 2)}
+                value={JSON.stringify(multipart ? { ...request.value, body: 'multipart/form-data（边界由主机生成）' } : request.value, null, 2)}
                 language="json"
                 readOnly
                 wrap
@@ -294,6 +301,7 @@ export default function ApiDebug({
             </div>
             <button
               className="text-button"
+              disabled={!!multipart}
               onClick={() => {
                 const { timeout: _timeout, ...config } = request.value!;
                 onGenerate(JSON.stringify(config, null, 2));

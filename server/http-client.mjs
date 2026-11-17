@@ -3,9 +3,41 @@ import https from 'node:https';
 import { performance } from 'node:perf_hooks';
 import { gunzip, inflate, brotliDecompress } from 'node:zlib';
 import { promisify } from 'node:util';
+import { randomBytes } from 'node:crypto';
+import { multipartLimits } from '../shared/http-multipart.mjs';
 
 const MAX_BYTES = 4_000_000;
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
+function multipartBody(parts) {
+  const { rows, part: maxPart, total } = multipartLimits;
+  if (!Array.isArray(parts) || !parts.length || parts.length > rows) throw new Error(`multipart 需要 1–${rows} 个字段。`);
+  const boundary = 'devkit-' + randomBytes(24).toString('hex'), chunks = [];
+  const headerValue = value => value.replace(/["\\]/g, char => '\\' + char);
+  const invalid = value => typeof value !== 'string' || !value.trim() || value.length > 255 || /[\x00-\x1f\x7f]/.test(value);
+  let size = 0;
+  for (const part of parts) {
+    if (!plain(part) || invalid(part.name)) throw new Error('multipart 字段名无效。');
+    let header = `--${boundary}\r\nContent-Disposition: form-data; name="${headerValue(part.name)}"`, bytes;
+    if (part.file !== undefined) {
+      const file = part.file;
+      if (!plain(file) || invalid(file.name) || /[\\/]/.test(file.name) || typeof file.data !== 'string' || file.data.length > Math.ceil(maxPart / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(file.data)) throw new Error('multipart 文件名、大小或编码无效。');
+      const mime = file.type || 'application/octet-stream';
+      if (typeof mime !== 'string' || mime.length > 100 || !/^[\w!#$&^.+-]+\/[\w!#$&^.+-]+$/.test(mime)) throw new Error('multipart 文件类型无效。');
+      bytes = Buffer.from(file.data, 'base64');
+      if (bytes.toString('base64') !== file.data) throw new Error('multipart 文件编码无效。');
+      header += `; filename="${headerValue(file.name)}"\r\nContent-Type: ${mime}`;
+    } else {
+      if (typeof part.value !== 'string' || part.value.length > maxPart) throw new Error('multipart 文本值无效或过大。');
+      bytes = Buffer.from(part.value);
+    }
+    const prefix = Buffer.from(header + '\r\n\r\n');
+    size += prefix.length + bytes.length + 2;
+    if (bytes.length > maxPart || size > total - boundary.length - 6) throw new Error('multipart 每项最多 1 MB，含表单协议总计最多 2 MB。');
+    chunks.push(prefix, bytes, Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
+}
 export function validateHttpRequest(input) {
   if (!plain(input) || typeof input.url !== 'string' || input.url.length > 12000) throw new Error('请求地址无效。');
   const url = new URL(input.url);
@@ -25,9 +57,15 @@ export function validateHttpRequest(input) {
     headerBytes += Buffer.byteLength(name) + Buffer.byteLength(value);
   }
   if (headerBytes > 64000) throw new Error('请求头超过 64KB。');
-  const body = input.body ?? '';
+  let body = input.body ?? '';
   if (typeof body !== 'string' || Buffer.byteLength(body) > 2_000_000) throw new Error('请求体须为不超过 2MB 的文本。');
-  if (body && ['GET', 'HEAD'].includes(method)) throw new Error('GET/HEAD 不支持请求体。');
+  if ((body || input.multipart !== undefined) && ['GET', 'HEAD'].includes(method)) throw new Error('GET/HEAD 不支持请求体。');
+  if (input.multipart !== undefined) {
+    if (body) throw new Error('multipart 与文本正文只能提交一种。');
+    const multipart = multipartBody(input.multipart);
+    body = multipart.body;
+    headers['content-type'] = multipart.contentType;
+  }
   const timeout = input.timeout ?? 15000;
   if (!Number.isInteger(timeout) || timeout < 100 || timeout > 120000) throw new Error('超时必须是 100–120,000 毫秒。');
   if (body) headers['content-length'] = String(Buffer.byteLength(body));

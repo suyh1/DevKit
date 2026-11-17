@@ -6,14 +6,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download, Menu, X, FolderOpen, Server, Coffee, Activity, ScrollText, Send } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, FolderOpen, Server, Coffee, Activity, ScrollText, Search, Send } from "lucide-react";
+import CommandPalette from './CommandPalette';
+import { parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
 import NginxCenter from "./NginxCenter";
 import JarCenter from './JarCenter';
 import MonitorCenter from './MonitorCenter';
 import LogCenter from './LogCenter';
 import HttpWorkbench from "./HttpWorkbench";
-import { useConfirmation } from "./Confirmation";
+import { useConfirmation, useResetOverlays } from "./Confirmation";
 import { projectRequest } from "./project-api";
 import type { Session } from "./project-api";
 import { setRemoteAccess } from "./workspace-remote";
@@ -37,8 +39,7 @@ const modules = [
 ] as const;
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
-const hashPage = () =>
-  modules.find((module) => location.hash === "#" + module.id)?.id;
+const hashPage = () => modules.find(module => module.id === parseWorkspaceLink(location.hash)?.page)?.id;
 const pendingLogout = () => {
   try {
     return sessionStorage.getItem("devkit:logout-pending") === "true";
@@ -66,6 +67,15 @@ function remember(key: string, value: string) {
 }
 
 function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: DisplayMode) => void }) {
+  const details = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    function closeOutside(event: PointerEvent) {
+      const menu = details.current;
+      if (menu?.open && !event.composedPath().includes(menu)) menu.open = false;
+    }
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, []);
   const [themeStyle, setThemeStyle] = useState(() => normalizeThemeStyle(preference("devkit:portal-theme-style", "default")));
   useEffect(() => {
     document.documentElement.dataset.themeStyle = themeStyle;
@@ -89,19 +99,27 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
     return () => media.removeEventListener("change", apply);
   }, [theme]);
   return (
-    <div className="portal-appearance">
-      <select aria-label="共享页面运行模式" value={mode} onChange={event => setMode(event.target.value === 'performance' ? 'performance' : 'normal')}>
+    <details ref={details} className="portal-appearance" onKeyDown={event => {
+      if (event.key === 'Escape' && event.currentTarget.open) {
+        event.stopPropagation();
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector('summary')?.focus();
+      }
+    }}>
+      <summary className="secondary-button"><SunMoon size={16} aria-hidden="true" /><span>外观</span></summary>
+      <div className="portal-appearance-options">
+      <label className="portal-theme">运行模式<select aria-label="共享页面运行模式" value={mode} onChange={event => setMode(event.target.value === 'performance' ? 'performance' : 'normal')}>
         <option value="normal">正常模式</option>
         <option value="performance">性能模式</option>
-      </select>
+      </select></label>
       <label className="portal-theme">
-        <span className="sr-only">主题风格</span>
+        主题风格
         <select aria-label="共享页面主题风格" value={themeStyle} onChange={event => setThemeStyle(normalizeThemeStyle(event.target.value))}>
           {themeStyles.map(style => <option key={style.id} value={style.id}>{style.name}</option>)}
         </select>
       </label>
       <label className="portal-theme">
-      <SunMoon size={16} aria-hidden="true" />
+      明暗主题
       <select
         aria-label="共享页面主题"
         value={theme}
@@ -112,7 +130,8 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
         <option value="dark">深色主题</option>
       </select>
       </label>
-    </div>
+      </div>
+    </details>
   );
 }
 
@@ -223,16 +242,18 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     desktop.addEventListener('change', resize); return () => desktop.removeEventListener('change', resize);
   }, []);
   const [session, setSession] = useState<Session | null>(null),
+    [workspaceEpoch, setWorkspaceEpoch] = useState(0),
     [page, setPage] = useState<Page>(
       () =>
         hashPage() || (preference("devkit:portal-page", "projects") as Page),
     );
-  const [password, setPassword] = useState(""),
+  const [visitor, setVisitor] = useState(''), [password, setPassword] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(true),
     [reauth, setReauth] = useState(false),
     [source, setSource] = useState<string | null>(null);
   const confirm = useConfirmation();
+  const resetOverlays = useResetOverlays();
   const bar = useRef<HTMLElement>(null),
     content = useRef<HTMLDivElement | null>(null),
     positions = useRef<Partial<Record<Page, number>>>({});
@@ -240,6 +261,15 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     [notice, setNotice] = useState("");
   const needsLogout = useRef(pendingLogout());
   const notify = useCallback((text: string) => setNotice(text), []);
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    if (!session?.authenticated) { setSearchOpen(false); return; }
+    const key = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setSearchOpen(true); }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [session?.authenticated]);
   const attachContent = useCallback((node: HTMLDivElement | null) => {
     content.current = node;
     setScrollRoot(node);
@@ -256,8 +286,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   function navigate(next: Page, push = true) {
     setDrawerOpen(false);
     if (content.current) positions.current[page] = content.current.scrollTop;
-    if (push && location.hash !== "#" + next)
-      history.pushState(null, "", "#" + next);
+    if (push && location.hash !== workspaceHash(next)) location.hash = workspaceHash(next);
     setPage(next);
     remember("devkit:portal-page", next);
     setNotice("");
@@ -288,9 +317,12 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             : modules.find((module) => session.services?.[module.id].enabled)
                 ?.id;
       if (next) {
+        if (next === page && requested === next) return;
         navigate(next, false);
-        if (location.hash !== "#" + next)
+        if (requested !== next) {
+          if (requested) setNotice(`目标主机未开放${modules.find(item => item.id === requested)?.name || '所选服务'}。`);
           history.replaceState(null, "", "#" + next);
+        }
       }
     };
     window.addEventListener("popstate", changed);
@@ -314,6 +346,16 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             sharingServices({ ...value, canEdit: value.role === "editor" }),
         }
       : value;
+    const grants = (current: Session) => JSON.stringify(sharingServices({ services: current.services }));
+    if (session?.authenticated && (!normalized.authenticated || (session.visitor || '') !== (normalized.visitor || '') || grants(session) !== grants(normalized))) {
+      setWorkspaceEpoch(epoch => epoch + 1);
+      resetOverlays();
+      setSearchOpen(false);
+      setSource(null);
+      setDrawerOpen(false);
+      setNotice('');
+      positions.current = {};
+    }
     setRemoteAccess(normalized.authenticated ? normalized : null);
     setSession(normalized);
     if (normalized.authenticated) {
@@ -326,7 +368,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             ?.id;
       if (next) {
         setPage(next);
-        history.replaceState(null, "", "#" + next);
+        if (linked !== next) history.replaceState(null, "", "#" + next);
         remember("devkit:portal-page", next);
       }
     }
@@ -361,7 +403,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     setBusy(true);
     setMessage("");
     try {
-      adopt(await projectRequest<Session>("login", { password }));
+      adopt(await projectRequest<Session>("login", { visitor, password }));
       setPassword("");
       setReauth(false);
       rememberLogout(false);
@@ -415,7 +457,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
-        page === 'jar' && services.jar.control ? '可管理运行与控制台输入' : '',
+        page === 'jar' && services.jar.control ? (services.logs.enabled && services.logs.jar ? '可管理运行与控制台输入' : '可管理运行') : '',
         page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',
         page === "http" && services.http.send ? "可发送请求" : "",
         page === "projects" && services.projects.probe ? "可检测入口" : "",
@@ -424,6 +466,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         .join(" · ");
   const loginForm = (
     <form onSubmit={(event) => void login(event)}>
+      <label>访客名称（共享口令登录可留空）<input autoComplete="username" maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} /></label>
       <label>
         访问口令
         <input
@@ -457,8 +500,9 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     <main className={`workspace-portal ${session?.authenticated ? 'portal-authenticated' : ''}`}>
       <header className="portal-bar" ref={bar}>
         {session?.authenticated && <button className="portal-menu-button secondary-button" aria-label="打开共享导航" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={18} /></button>}
-        <strong>DevKit 共享工作台</strong>
+        <div className="portal-current"><strong>{session?.authenticated ? modules.find(item => item.id === page)?.name || '共享工作台' : 'DevKit 共享工作台'}</strong>{session?.authenticated && <small><span title={summary}>{summary}</span>{session.visitor && <span title={session.visitor}>{session.visitor}</span>}</small>}</div>
         <div className="portal-account">
+          {session?.authenticated && <button className="secondary-button" aria-label="搜索共享资源" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
           <PortalTheme mode={mode} setMode={setMode} />
           {session?.authenticated && (
             <button
@@ -466,16 +510,17 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               onClick={() => void logout()}
             >
               <LogOut size={15} />
-              退出登录
+              <span>退出登录</span>
             </button>
           )}
         </div>
       </header>
+      {session?.authenticated && <CommandPalette key={workspaceEpoch} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
       {session?.authenticated && <>
         <aside className="portal-sidebar"><span className="portal-nav-caption">共享工作台</span><PortalNavigation modules={available} page={page} navigate={navigate} /><p>内容与运行操作均来自共享主机。服务及权限由主机配置。</p></aside>
         <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong><button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
       </>}
-      <div className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
+      <div key={workspaceEpoch} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
         {!session?.authenticated ? (
           <section className="portal-login">
             <h1>登录共享工作台</h1>
@@ -485,7 +530,6 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         ) : (
           <>
             <div className="portal-access">
-              <strong>{summary}</strong>
               <span>
                 {page === "projects"
                   ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
@@ -558,7 +602,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 busy={busy}
               >
                 <p>
-                  会话已失效，当前草稿仍保留。可关闭此提示先导出；重新登录将按主机当前开放的服务和权限显示。
+                  会话已失效。用同一访客和权限重新登录可继续编辑。切换访客或权限后会清除当前草稿与响应。
                 </p>
                 {loginForm}
               </Modal>

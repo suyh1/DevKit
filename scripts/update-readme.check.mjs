@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { updateReadme } from './update-readme.mjs';
+import { copyReadme, updateReadme } from './update-readme.mjs';
 import { root } from './desktop-files.mjs';
 
 const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
@@ -102,9 +102,19 @@ test('checked-in README matches the actual application registry and current temp
   assert.equal(await updateReadme({ check: true }), false);
 });
 
+test('desktop documentation ships the DevKit license alongside the Electron license', async () => fixture(async directory => {
+  const destination = path.join(directory, 'runtime');
+  await mkdir(destination);
+  await writeFile(path.join(destination, 'LICENSE'), 'Electron license fixture');
+  await copyReadme(destination, 'LICENSE-DevKit');
+  assert.equal(await readFile(path.join(destination, 'LICENSE'), 'utf8'), 'Electron license fixture');
+  assert.equal(await readFile(path.join(destination, 'LICENSE-DevKit'), 'utf8'), await readFile(path.join(root, 'LICENSE'), 'utf8'));
+  assert.match(await readFile(path.join(destination, 'README.md'), 'utf8'), /\[MIT 许可证\]\(LICENSE-DevKit\)/);
+}));
+
 async function copyPackagingScripts(directory) {
   await mkdir(path.join(directory, 'scripts'));
-  for (const name of ['desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py', 'ssh-runtime.json']) {
+  for (const name of ['clean-artifacts.mjs', 'desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py', 'ssh-runtime.json']) {
     await cp(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
   }
 }
@@ -140,6 +150,7 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
   catch { context.skip('Python unavailable; set DEVKIT_PYTHON to exercise ZIP packaging'); return; }
   await fixture(async directory => {
     await copyPackagingScripts(directory);
+    await cp(path.join(root, 'LICENSE'), path.join(directory, 'LICENSE'));
     for (const folder of ['dist/.vite', 'server', 'shared']) await mkdir(path.join(directory, folder), { recursive: true });
     for (const name of JSON.parse(await readFile(path.join(root, 'scripts/ssh-runtime.json'), 'utf8'))) {
       await cp(path.join(root, 'node_modules', name), path.join(directory, 'node_modules', name), { recursive: true });
@@ -147,22 +158,43 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
     await writeFile(path.join(directory, 'dist/portal.html'), '<!doctype html><title>Fixture</title>');
     await writeFile(path.join(directory, 'dist/.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
     await writeFile(path.join(directory, 'docs/project-center.md'), '# Fixture guide');
+    await writeFile(path.join(directory, 'scripts/stage-ssh-node.mjs'), `
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+const directory = process.argv[2];
+await mkdir(directory, { recursive: true });
+for (const target of ['win32-x64', 'linux-x64', 'linux-arm64']) {
+  await writeFile(path.join(directory, target + '.gz'), target);
+  await writeFile(path.join(directory, target + '.LICENSE'), 'fixture license');
+}
+`);
     for (const [command, args] of [
       [process.execPath, ['scripts/package-project-server.mjs']],
       [python, ['scripts/package-project-server.py']],
     ]) {
+      const old = path.join(directory, 'artifacts/release-0.1.0');
+      const previous = path.join(directory, 'artifacts/release-0.2.0');
+      await mkdir(old, { recursive: true });
+      await mkdir(previous, { recursive: true });
+      await writeFile(path.join(old, 'DevKit_ProjectCenter_0.1.0_node24.zip'), 'old fixture package');
+      await writeFile(path.join(previous, 'DevKit_ProjectCenter_0.2.0_node24.zip'), 'previous fixture package');
       await writeFile(path.join(directory, 'README.md'), 'outdated');
       await execute(command, args, { cwd: directory, windowsHide: true, env: { ...process.env, DEVKIT_PYTHON: python, DEVKIT_NODE: process.execPath } });
+      await assert.rejects(readFile(path.join(old, 'DevKit_ProjectCenter_0.1.0_node24.zip')), { code: 'ENOENT' });
+      assert.equal(await readFile(path.join(previous, 'DevKit_ProjectCenter_0.2.0_node24.zip'), 'utf8'), 'previous fixture package');
       const release = path.join(directory, `artifacts/release-${manifest.version}`);
       const expected = await readFile(path.join(directory, 'README.md'), 'utf8');
       assert.match(expected, /2 个离线工具/);
       assert.equal(await readFile(path.join(release, 'README.md'), 'utf8'), expected);
+      assert.equal(await readFile(path.join(release, 'LICENSE'), 'utf8'), await readFile(path.join(root, 'LICENSE'), 'utf8'));
       assert.equal(await readFile(path.join(release, 'docs/project-center.md'), 'utf8'), '# Fixture guide');
       const { stdout } = await execute(python, ['-c',
-        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert "node_modules/ssh2/lib/index.js" in z.namelist()\n assert not any(name.endswith(".node") for name in z.namelist())\n assert z.testzip() is None\nprint("ZIP verified")',
+        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("LICENSE")== (root/"LICENSE").read_bytes()\n metadata = json.loads(z.read("package.json"))\n assert metadata["author"] == {"name": "suyh1", "email": "suyhem@163.com"}\n assert metadata["license"] == "MIT"\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert "node_modules/ssh2/lib/index.js" in z.namelist()\n assert not any(name.endswith(".node") for name in z.namelist())\n assert z.testzip() is None\nprint("ZIP verified")',
         directory, path.join(release, `DevKit_ProjectCenter_${manifest.version}_node24.zip`),
       ], { windowsHide: true });
       assert.match(stdout, /ZIP verified/);
+      const identity = JSON.parse(await readFile(path.join(release, 'project-server.json'), 'utf8'));
+      assert.deepEqual(identity.remoteNodeRuntimeTargets, ['win32-x64', 'linux-x64', 'linux-arm64']);
     }
   }, true);
 });

@@ -23,6 +23,63 @@ async function add(manager, item) {
 }
 const wait = async predicate => { for (let i = 0; i < 100; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.fail('检测未在预期时间完成'); };
 
+test('LAN monitoring follows saved targets, reports compact status and keeps the host inventory desktop-only', async t => {
+  let targets = [{ id: 'fixture-lan', name: 'Fixture', address: '127.0.0.1', port: 2222 }];
+  let target;
+  const { manager } = await fixture(t, { lan: () => ({ monitorTargets: () => targets }), async probe(value) { target = value; return 'TCP fixture'; } });
+  const [source] = await manager.request('sources');
+  assert.equal(source.source.type, 'lan');
+  assert.deepEqual(await manager.request('sources', {}, { allowLan: false }), []);
+  const monitor = await add(manager, { source: source.source });
+  assert.equal(monitor.type, 'tcp');
+  await manager.request('check', { id: monitor.id });
+  assert.deepEqual([target.type, target.host, target.port], ['tcp', '127.0.0.1', 2222]);
+  const [status] = await manager.request('lan-statuses');
+  assert.deepEqual([status.hostId, status.id, status.state], [source.source.id, monitor.id, 'up']);
+  assert.ok(status.checkedAt);
+  await assert.rejects(manager.request('upsert', { revision: 1, monitor: config({ source: source.source }) }, { allowLan: false }), /局域网主机/);
+  targets = [];
+  await manager.request('check', { id: monitor.id });
+  const state = await manager.request('get');
+  assert.equal(state.monitors[0].samples.length, 2);
+  assert.match(state.monitors[0].detail, /已移除/);
+});
+
+test('remote JAR executes on its registered host and webhook transitions retry with a stable event ID', async t => {
+  let clock = Date.now(), healthy = false;
+  const calls = [], attempts = [], source = { type: 'jar', id: 'host:instance' };
+  const { manager, directory } = await fixture(t, {
+    now: () => clock,
+    lan: () => ({ monitorJarSources: () => [{ label: 'Target / demo', source }], hostName: () => 'Target', async monitorJar(id, timeout) {
+      calls.push([id, timeout]); return { state: healthy ? 'healthy' : 'unhealthy', detail: healthy ? 'HTTP 200' : 'HTTP 503' };
+    } }),
+    probe: () => assert.fail('remote localhost must not run at the center'),
+    deliver: async (_url, options) => {
+      attempts.push({ ...JSON.parse(options.body), key: options.headers['Idempotency-Key'] });
+      return new Response(null, { status: attempts.length === 1 ? 503 : 204 });
+    },
+  });
+  assert.deepEqual(await manager.request('sources', {}, { allowRemoteJar: false }), []);
+  const item = await add(manager, { source, webhook: { url: 'http://127.0.0.1/delivery', down: true, up: true } });
+  await manager.request('check', { id: item.id });
+  assert.equal(attempts.length, 0);
+  const failure = await manager.request('check', { id: item.id });
+  assert.equal(failure.monitors[0].executionHost, 'Target');
+  await wait(() => attempts.length === 1);
+  await wait(async () => (JSON.parse(await readFile(path.join(directory, 'monitor/monitors.json'), 'utf8')).notifications[0]?.attempts || 0) === 1);
+  healthy = true; clock += 15001;
+  await manager.request('check', { id: item.id });
+  await wait(() => attempts.length === 2);
+  await wait(async () => (await manager.request('get')).monitors[0].notification?.state === 'sent');
+  await manager.tick();
+  await wait(() => attempts.length === 3);
+  assert.equal(attempts[0].id, attempts[1].id);
+  assert.ok(attempts.every(item => item.id === item.key));
+  assert.deepEqual(attempts.map(item => item.event), ['down', 'down', 'up']);
+  assert.deepEqual(calls, [[source.id, 1], [source.id, 1], [source.id, 1]]);
+  assert.equal((await manager.request('get', {}, { allowWebhook: false })).monitors[0].webhook.url, '');
+});
+
 test('real HTTP status, redirects, timeout and TCP are bounded and do not consume bodies', async t => {
   const server = http.createServer((req, res) => {
     if (req.url === '/redirect') { res.writeHead(302, { Location: '/' }); res.end(); }

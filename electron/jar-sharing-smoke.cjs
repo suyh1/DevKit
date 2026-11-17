@@ -39,6 +39,7 @@ app.whenReady().then(async () => {
     host = await createProjectHost(store, path.join(root, 'dist'), { jar: () => manager });
     const listener = require('node:net').createServer(); await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve)); const port = listener.address().port; await new Promise(resolve => listener.close(resolve));
     const services = emptySharingServices(); services.jar.enabled = true;
+    services.logs = { ...services.logs, enabled: true, jar: true };
     const settings = { host: '127.0.0.1', port, services, password: 'jar-portal-test' };
     await host.start(settings);
     async function portal() {
@@ -46,7 +47,7 @@ app.whenReady().then(async () => {
       await window.loadURL(`http://127.0.0.1:${port}/#jar`);
       await js(window, `Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true})`);
       await wait(window, '!!document.querySelector(\'.portal-login input[type="password"]\')');
-      await js(window, `{const input=document.querySelector('.portal-login input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'jar-portal-test');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
+      await js(window, `{const input=document.querySelector('.portal-login input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'jar-portal-test');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
       await js(window, 'document.querySelector(\'.portal-login button[type="submit"], .portal-login button.run-button\').click()');
       await wait(window, 'document.querySelector(".jar-table")?.textContent.includes("共享交互应用")');
       await wait(window, 'document.querySelector(".jar-status")?.textContent === "运行中" && [...document.querySelectorAll(".jar-center button")].some(b=>b.textContent.trim()==="控制台"&&!b.disabled)');

@@ -6,16 +6,20 @@ const actions = {
   jar: {
     read: ['get', 'statuses', 'log-tail', 'console-read', 'startup-get'],
     edit: ['browse', 'upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'],
-    control: ['command', 'detect', 'health-check', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'],
+    control: ['command', 'detect', 'health-check', 'monitor-probe', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'],
   },
   nginx: {
     read: ['get', 'statuses', 'documents', 'inspect', 'log-tail', 'review', 'backups', 'backup-files'],
     edit: ['browse', 'save-files', 'create', 'upsert', 'remove', 'discover'],
-    control: ['command', 'detect'],
+    control: ['command', 'detect', 'reload-restored'],
   },
 };
 export const fullAccess = { edit: true, control: true };
 export function authorizeWorkspace(module, action, access) {
+  if (module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
+    if (access.edit && access.control) return;
+    throw Object.assign(new Error('此操作需要编辑和运行管理权限。'), { status: 403 });
+  }
   const rules = Object.hasOwn(actions, module) && actions[module];
   if (rules?.read?.includes(action) || rules?.edit?.includes(action) && access.edit || rules?.control?.includes(action) && access.control) return;
   const message = rules?.edit?.includes(action) ? '未授予编辑权限。' : rules?.control?.includes(action) ? '未授予运行管理权限。' : '网页不提供本机文件选择器，请填写共享主机路径。';

@@ -50,19 +50,21 @@ module.exports = async function httpSmoke(window, output) {
     await window.webContents.insertText(text);
     await js('new Promise(resolve=>requestAnimationFrame(resolve))');
   };
-  const requests = [];
+  const requests = [], requestBodies = [];
   const server = http.createServer(async (req, res) => {
     if (req.url.startsWith('/slow')) return;
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    requests.push({ url: req.url, headers: req.headers, body: Buffer.concat(chunks).toString() });
+    const body = Buffer.concat(chunks);
+    requestBodies.push(body);
+    requests.push({ url: req.url, headers: req.headers, body: body.toString() });
     res.writeHead(201, { 'Content-Type': 'application/json', 'Set-Cookie': ['a=1', 'b=2'], 'X-Debug': 'yes' });
     res.end('{"id":9007199254740993,"ok":true,"echo":' + JSON.stringify(requests.at(-1)) + '}');
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await js('document.querySelector(\'.sidebar button[title="HTTP 调试"]\').click()');
+    await require('./navigation-helpers.cjs')(window).openWorkspace('HTTP 调试');
     await click('快速请求', '.http-product-tabs');
     await wait('!!document.querySelector(\'input[aria-label="请求 URL"]\')');
     await fill('请求 URL', base + '/?tag=a&tag=b');
@@ -157,6 +159,29 @@ module.exports = async function httpSmoke(window, output) {
     await click('保存请求');
     await click('清空历史');
     assert.equal(await js('document.querySelectorAll(".http-history>button").length'), 0);
+    const uploadUrl = base + '/multipart';
+    await edit('.http-request .request-json .cm-content', JSON.stringify({ url: uploadUrl, method: 'POST' }));
+    await js('document.querySelector(".http-multipart label input[type=checkbox]").click()');
+    await fill('表单字段名称 1', 'marker');
+    await fill('表单字段值 1', '上传测试');
+    await click('添加表单字段', '.http-multipart');
+    await fill('表单字段名称 2', 'attachment');
+    await select('表单字段类型 2', 'file');
+    await js(`(() => {
+      const input = document.querySelector('.http-multipart input[type=file]');
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([Uint8Array.of(0, 255, 128, 13, 10)], 'fixture.bin'));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await click('发送请求');
+    await wait('document.querySelector(".http-response")?.textContent.includes("201")');
+    const sent = requests.at(-1);
+    assert.equal(sent.url, '/multipart');
+    const parts = await new Response(requestBodies.at(-1), { headers: { 'content-type': sent.headers['content-type'] } }).formData();
+    assert.equal(parts.get('marker'), '上传测试');
+    assert.deepEqual(Buffer.from(await parts.get('attachment').arrayBuffer()), Buffer.from([0, 255, 128, 13, 10]));
+    await js('document.querySelector(".http-multipart label input[type=checkbox]").click()');
     console.log(
       'HTTP upgrade passed: query/header rows, enable/disable, Bearer, lossless JSON, encoded form, response formatting/duplicate headers/filter, collection sanitization, session restore, cancellation, light/dark and narrow layouts.'
     );

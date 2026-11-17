@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 import re
 import struct
 import subprocess
@@ -28,7 +29,7 @@ def add_ar(output, name, data):
         output.write(b'\n')
 
 
-def write_data_archive(archive, runtime, launcher, desktop, icon, report):
+def write_data_archive(archive, runtime, launcher, desktop, icon, report, license_text):
     sources = sorted(runtime.rglob('*'))
     if any(source.is_symlink() for source in sources):
         raise ValueError('Runtime symlinks are not supported')
@@ -37,6 +38,7 @@ def write_data_archive(archive, runtime, launcher, desktop, icon, report):
         'usr/share/applications/devkit.desktop': (desktop, 0o644),
         'usr/share/icons/hicolor/128x128/apps/devkit.png': (icon, 0o644),
         'usr/share/doc/devkit/runtime-report.json': (json.dumps(report, indent=2), 0o644),
+        'usr/share/doc/devkit/copyright': (license_text, 0o644),
     }
     directories = set()
     for source in sources:
@@ -131,6 +133,7 @@ def build_package(runtime, version, arch, root):
     destination = root / 'artifacts' / f'linux-{arch}'
     destination.mkdir(parents=True, exist_ok=True)
     report = runtime_report(runtime, arch)
+    author = json.loads((root / 'package.json').read_text(encoding='utf-8'))['author']
     installed_kib = sum(source.stat().st_size for source in runtime.rglob('*') if source.is_file()) // 1024 + 1
     dependencies = ', '.join([
         f'libc6 (>= {report["minimumGlibc"]})', 'libgtk-3-0 (>= 3.24)', 'libnss3', 'libnspr4',
@@ -141,7 +144,7 @@ def build_package(runtime, version, arch, root):
     ])
     control = '\n'.join([
         'Package: devkit', f'Version: {version}', f'Architecture: {deb_arch}',
-        'Maintainer: DevKit maintainers <devkit@localhost>', 'Section: devel', 'Priority: optional',
+        f'Maintainer: {author["name"]} <{author["email"]}>', 'Section: devel', 'Priority: optional',
         f'Installed-Size: {installed_kib}', f'Depends: {dependencies}',
         'Conflicts: devkit-kylin', 'Replaces: devkit-kylin',
         'Description: DevKit offline developer workbench with bundled Chromium',
@@ -154,7 +157,7 @@ def build_package(runtime, version, arch, root):
         temporary = Path(temporary)
         data_path = temporary / 'data.tar.xz'
         with tarfile.open(data_path, 'w:xz', preset=6) as archive:
-            write_data_archive(archive, runtime, launcher, desktop, (root / 'build/icons/128x128.png').read_bytes(), report)
+            write_data_archive(archive, runtime, launcher, desktop, (root / 'build/icons/128x128.png').read_bytes(), report, (root / 'LICENSE').read_bytes())
         control_buffer = io.BytesIO()
         with tarfile.open(fileobj=control_buffer, mode='w:gz') as archive:
             add_bytes(archive, './control', control)
@@ -174,8 +177,15 @@ def build_package(runtime, version, arch, root):
 
 
 def main():
-    package = build_package(Path(sys.argv[1]).resolve(), sys.argv[2], sys.argv[3], Path(__file__).resolve().parent.parent)
-    subprocess.run([sys.executable, str(Path(__file__).with_name('verify-deb.py')), str(package)], check=True)
+    root = Path(__file__).resolve().parent.parent
+    node = os.environ.get('DEVKIT_NODE', 'node')
+    standalone = '--defer-cleanup' not in sys.argv[4:]
+    if standalone:
+        subprocess.run([node, str(root / 'scripts/update-readme.mjs')], cwd=root, check=True)
+    package = build_package(Path(sys.argv[1]).resolve(), sys.argv[2], sys.argv[3], root)
+    subprocess.run([sys.executable, str(root / 'scripts/verify-deb.py'), str(package)], check=True)
+    if standalone:
+        subprocess.run([node, str(root / 'scripts/clean-artifacts.mjs'), '--retention-only'], cwd=root, check=True)
 
 
 if __name__ == '__main__':

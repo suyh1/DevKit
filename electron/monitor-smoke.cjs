@@ -7,6 +7,7 @@ const { BrowserWindow } = require('electron');
 
 module.exports = async (window, output) => {
   window.webContents.setBackgroundThrottling(false); window.show(); window.setSize(1440, 1000);
+  const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   const js = async source => { try { return await window.webContents.executeJavaScript(source, true); } catch (error) { console.error('Monitor UI script failed:', source, await window.webContents.executeJavaScript('document.body.innerText')); throw error; } };
   const wait = async (contents, expression) => { for (let i = 0; i < 150; i++) { if (await contents.executeJavaScript(expression, true)) return; await new Promise(resolve => setTimeout(resolve, 50)); } throw new Error('Monitor UI condition failed: ' + expression + '\n' + await contents.executeJavaScript('document.body.innerText')); };
   const ipc = async (action, payload) => { const value = await js(`window.devkitMonitor.request(${JSON.stringify(action)},${JSON.stringify(payload) ?? '{}'})`); assert.equal(value.error, undefined); return value.data; };
@@ -16,7 +17,7 @@ module.exports = async (window, output) => {
   const target = http.createServer((_req, res) => { requests++; res.writeHead(healthy ? 200 : 503); res.end('monitor fixture'); });
   await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
   try {
-    await js(`document.querySelector('.sidebar button[title="监控中心"]').click()`);
+    await openWorkspace('监控中心');
     await wait(window.webContents, `!!document.querySelector('.monitor-empty .run-button')`);
     await click('添加监控'); await fill('监控名称', '共享健康检测'); await fill('检测地址', `http://127.0.0.1:${target.address().port}/health`); await fill('检测间隔（秒）', '10');
     await click('保存监控'); await wait(window.webContents, `!document.querySelector('dialog[open]')&&document.querySelectorAll('.monitor-card').length===1`);
@@ -29,8 +30,8 @@ module.exports = async (window, output) => {
     assert.ok(requests > 0, 'Scheduled checks continue away from the monitor page');
     await ipc('check', { id }); state = await ipc('get'); assert.equal(state.monitors[0].state, 'down'); assert.equal(state.monitors[0].incidents.length, 1);
     healthy = true; await ipc('check', { id }); state = await ipc('get'); assert.equal(state.monitors[0].state, 'up'); assert.ok(state.monitors[0].incidents[0].end);
-    await js(`document.querySelector('.sidebar button[title="监控中心"]').click()`); await click('刷新'); await wait(window.webContents, `document.querySelector('.monitor-card .monitor-status')?.textContent==='正常'`);
-    await wait(window.webContents, `document.querySelector('.sidebar button[title="监控中心"]')?.getAttribute('aria-current')==='page'`);
+    await openWorkspace('监控中心'); await click('刷新'); await wait(window.webContents, `document.querySelector('.monitor-card .monitor-status')?.textContent==='正常'`);
+    await wait(window.webContents, `document.querySelector('.shared-sidebar-trigger small')?.textContent==='监控中心'`);
     await new Promise(resolve => setTimeout(resolve, 550));
     await fs.writeFile(path.join(output, 'monitor-desktop.png'), (await window.webContents.capturePage()).toPNG());
     await js(`document.querySelector('.monitor-card button[aria-label="编辑 共享健康检测"]').click()`); await fill('监控名称', '未保存修改'); await click('取消');

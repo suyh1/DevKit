@@ -81,6 +81,8 @@ function upsert<T extends { id: string }>(items: T[], value: T): T[] {
     : [...items, value];
 }
 
+import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
+
 export default function ProjectCenter({
   portal = false,
   portalSession,
@@ -96,6 +98,16 @@ export default function ProjectCenter({
     [search, setSearch] = useState(""),
     [group, setGroup] = useState(""),
     [filter, setFilter] = useState("all");
+  const linked = useWorkspaceResource('projects');
+  const [linkedProfile, linkedProject, extraLinkPart] = linked?.split(':') || [];
+  const linkedExists = extraLinkPart === undefined && !!linkedProfile && !!data?.profiles.some(profile => profile.id === linkedProfile && profile.projects.some(project => project.id === linkedProject));
+  useEffect(() => {
+    if (linkedExists) {
+      setActive(linkedProfile); setSearch(''); setGroup(''); setFilter('all');
+    }
+  }, [linkedProfile, linkedProject, linkedExists]);
+  const linkedCard = useRef<HTMLElement>(null);
+  useEffect(() => { linkedCard.current?.scrollIntoView({ block: 'center' }); }, [active, linkedProject, data]);
   const [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
@@ -487,7 +499,7 @@ export default function ProjectCenter({
         <div className="pc-actions"><MotionButton outcome={error ? "error" : ""} busy={busy} className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比方案</MotionButton>
           <span className="pc-role">
             <ShieldCheck size={13} />
-            {owner ? "主机管理" : canEdit ? "协作编辑" : "只读访问"} · 数据版本
+            {owner && '主机管理 · '}数据版本
             {data.revision}
           </span>
           <MotionButton outcome={error ? "error" : ""} busy={busy}
@@ -512,6 +524,7 @@ export default function ProjectCenter({
         </div>
       </header>
       {!modalOpen && errorBox}
+      {linked && !linkedExists && <p className="pc-notice" role="status">{missingResourceLink('项目')}</p>}
       {message && (
         <p className="pc-message" role="status">
           {message}
@@ -884,6 +897,8 @@ export default function ProjectCenter({
                 <article
                   className={`pc-card ${!result.enabled ? "disabled" : ""} ${selected.includes(project.id) ? "is-selected" : ""}`}
                   key={project.id}
+                  ref={linkedProject === project.id && linkedProfile === profile.id ? linkedCard : undefined}
+                  data-linked={linkedProject === project.id && linkedProfile === profile.id || undefined}
                   data-motion-key={project.id}
                 >
                   <div className="pc-card-top">
@@ -965,6 +980,7 @@ export default function ProjectCenter({
                     </small>
                   )}
                   <div className="pc-card-actions">
+                    <ResourceLink page="projects" id={`${profile.id}:${project.id}`} />
                     {canProbe && <button className="secondary-button"
                       aria-label={`探活 ${project.name}`} disabled={busy || !project.enabled || !!result.error}
                       title={result.error || (!project.enabled ? "项目已停用" : "由主机检测当前档案的项目入口")}

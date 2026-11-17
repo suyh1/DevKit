@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Men
 const { readFile, writeFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { origin, csp, isAppUrl, assetPath, validateSave, lanPortalUrl } = require('./policy.cjs');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'devkit', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
@@ -194,9 +195,9 @@ app.whenReady().then(async () => {
     jarManager = await (await import('./server/jar-manager.mjs')).createJarManager(projectStorage.directory);
   } catch (error) { jarError = error.message; }
   try {
-    monitorManager = await (await import('./server/monitor-manager.mjs')).createMonitorManager(projectStorage.directory, { projects: () => projectStore, jar: () => jarManager });
+    monitorManager = await (await import('./server/monitor-manager.mjs')).createMonitorManager(projectStorage.directory, { projects: () => projectStore, jar: () => jarManager, lan: () => lan });
   } catch (error) { monitorError = error.message; }
-  logCenter = (await import('./server/log-center.mjs')).createLogCenter({ jar: () => jarManager, nginx: () => nginxManager });
+  logCenter = (await import('./server/log-center.mjs')).createLogCenter({ jar: () => jarManager, nginx: () => nginxManager, lan: () => lan });
   try {
     apiWorkspace = await (await import('./server/api-workspace.mjs')).createApiWorkspace(projectStorage.directory);
   } catch (error) { apiWorkspaceError = error.message; }
@@ -247,6 +248,7 @@ app.whenReady().then(async () => {
         case 'restore': data = await projectStore.restore(value?.id, value?.revision); break;
         case 'probe': data = await (await import('./server/project-probe.mjs')).probeProjects(projectStore, value); break;
         case 'sharing': data = projectHost.status(); break;
+        case 'sharing-audit': data = await projectHost.audit(); break;
         case 'start': data = await projectHost.start(value); break;
         case 'stop': data = await projectHost.stop(true); break;
         case 'open': {
@@ -295,7 +297,35 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的局域网主机请求。');
     try {
       if (!lan) throw new Error(lanError || '局域网主机管理器尚未准备好。');
-      return { data: await lan.hostRequest(action, value) };
+      if (action === 'pick-ssh-key') {
+        const result = await dialog.showOpenDialog(window, { title: '选择 SSH 私钥', properties: ['openFile', 'showHiddenFiles'] });
+        return { data: result.canceled ? null : result.filePaths[0] };
+      }
+      if (action === 'open-rdp') {
+        if (process.platform !== 'win32') throw new Error('在 Windows 桌面端可打开系统远程桌面。');
+        const endpoint = await lan.hostRequest('rdp-target', value);
+        const executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
+        await new Promise((resolve, reject) => {
+          const child = spawn(executable, [`/v:${endpoint}`], { detached: true, stdio: 'ignore' });
+          child.once('error', error => reject(new Error(`无法打开 Windows 远程桌面：${error.message}`)));
+          child.once('spawn', () => { child.unref(); resolve(); });
+        });
+        return { data: true };
+      }
+      let localFile;
+      if (action === 'file-upload') {
+        const result = await dialog.showOpenDialog(window, { title: '选择要上传的文件', properties: ['openFile'] });
+        if (result.canceled) return { data: null };
+        [localFile] = result.filePaths;
+      } else if (action === 'file-download') {
+        const remote = value?.path;
+        if (typeof remote !== 'string' || !remote.trim() || remote.length > 4096) throw new Error('远程文件路径无效。');
+        const defaultPath = remote.split(/[\\/]/).at(-1).replace(/[\x00-\x1f<>:"|?*]/g, '_');
+        const result = await dialog.showSaveDialog(window, { title: '保存远程文件', defaultPath: ['.', '..'].includes(defaultPath) ? '' : defaultPath });
+        if (result.canceled) return { data: null };
+        localFile = result.filePath;
+      }
+      return { data: await lan.hostRequest(action, value, localFile) };
     } catch (error) { return { error: error.message }; }
   });
   ipcMain.handle('devkit:lan-host', async (event, address, module) => {

@@ -9,6 +9,8 @@ import { CloseChoice } from './DesktopClose';
 type Options = { title: string; detail: string; confirm: string; cancel?: string; context?: string };
 type Request = (options: Options) => Promise<boolean>;
 const ConfirmationContext = createContext<Request | null>(null);
+const ResetOverlayContext = createContext(() => {});
+export const useResetOverlays = () => useContext(ResetOverlayContext);
 
 export function useConfirmation() {
   const request = useContext(ConfirmationContext);
@@ -41,6 +43,7 @@ function ConfirmationDialog({ options, settle }: { options: Options & { sequence
 export function ConfirmationProvider({ children }: { children: ReactNode }) {
   const [choosingClose, setChoosingClose] = useState(false);
   const [options, setOptions] = useState<(Options & { sequence: number }) | null>(null);
+  const [copyEpoch, setCopyEpoch] = useState(0);
   const pending = useRef<((allow: boolean) => void) | null>(null), sequence = useRef(0);
   const request = useCallback<Request>(next => new Promise(resolve => {
     // A close-app request replaces a local discard request in the same layer.
@@ -51,6 +54,10 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
     const resolve = pending.current; pending.current = null;
     setOptions(null); resolve?.(allow);
   }, []);
+  const resetOverlays = useCallback(() => {
+    settle(false);
+    setCopyEpoch(value => value + 1);
+  }, [settle]);
   useEffect(() => () => { pending.current?.(false); pending.current = null; }, []);
   useEffect(() => window.devkitDesktop?.onCloseRequest(intent => {
     if (intent === 'choose') { settle(false); setChoosingClose(true); return; }
@@ -58,5 +65,5 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
     const reload = intent === 'reload';
     void request({ context: '未保存的更改', title: reload ? '重新加载工作台？' : '关闭 DevKit？', detail: reload ? '当前还有未保存的更改。重新加载会放弃这些更改，已保存的文件不会受到影响。' : '当前还有未保存的更改。关闭后这些更改将被放弃，已保存的文件不会受到影响。', confirm: reload ? '放弃并重新加载' : '放弃并关闭' }).then(allow => window.devkitDesktop?.answerClose(allow));
   }), [request, settle]);
-  return <ConfirmationContext.Provider value={request}>{children}<ManualCopy />{choosingClose ? <CloseChoice onDone={() => setChoosingClose(false)} /> : <MotionPresence kind="dialog" present={!!(options)}>{options && <ConfirmationDialog options={options} settle={settle} />}</MotionPresence>}</ConfirmationContext.Provider>;
+  return <ResetOverlayContext.Provider value={resetOverlays}><ConfirmationContext.Provider value={request}>{children}<ManualCopy key={copyEpoch} />{choosingClose ? <CloseChoice onDone={() => setChoosingClose(false)} /> : <MotionPresence kind="dialog" present={!!(options)}>{options && <ConfirmationDialog options={options} settle={settle} />}</MotionPresence>}</ConfirmationContext.Provider></ResetOverlayContext.Provider>;
 }

@@ -68,9 +68,7 @@ module.exports = async function checkProjects(window, output, staging) {
       ],
     },
   });
-  await js(
-    `document.querySelector('.sidebar button[title="项目中心"]').click()`,
-  );
+  await require('./navigation-helpers.cjs')(window).openWorkspace('项目中心');
   await wait(
     window.webContents,
     '!!document.querySelector(".project-workspace .pc-heading")',

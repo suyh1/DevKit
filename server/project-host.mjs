@@ -1,11 +1,26 @@
 import http from "node:http";
+import https from "node:https";
+import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { probeProjects } from "./project-probe.mjs";
 import { createSharedWorkspaces } from './shared-workspaces.mjs';
 import { sharingServices, sharingAliases, hasLegacySharing } from '../shared/sharing.mjs';
+import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors, visitorServices } from './sharing-visitors.mjs';
+
+const auditActions = new Set(['command', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
+const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+const visitorsFor = settings => settings.visitors || [];
+const tlsFor = settings => settings.tls || null;
+function normalizeTls(tls) {
+  if (!tls) return null;
+  if (![tls.cert, tls.key].every(value => typeof value === 'string' && value.length <= 4096 && !/[\x00-\x1f]/.test(value) && path.isAbsolute(value))) throw new Error('请填写 PEM 证书及私钥的绝对路径。');
+  const hostname = typeof tls.hostname === 'string' ? tls.hostname.trim().toLowerCase() : '';
+  if (hostname && !(isIP(hostname) === 4 || /^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/.test(hostname))) throw new Error('HTTPS 域名必须为有效的主机名或 IPv4 地址。');
+  return { cert: tls.cert, key: tls.key, hostname };
+}
 
 const csp =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -27,6 +42,7 @@ const localAddresses = () => [
 ];
 export async function createProjectHost(store, dist, managers = { nginx: () => null, library: () => null }) {
   const workspaces = createSharedWorkspaces(managers);
+  const audit = createSharingAudit(store.directory);
   let server, activeContext,
     settings = await store.settings();
   const sessions = new Map(),
@@ -40,9 +56,12 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
     legacyAccess: hasLegacySharing(settings),
     autoStart: settings.autoStart === true,
     hasPassword: !!settings.hash,
+    allowDefault: settings.allowDefault !== false,
+    tls: tlsFor(settings),
+    visitors: visitorsFor(settings).map(({ name, services }) => ({ name, services, hasPassword: true })),
     addresses: server?.listening
-      ? (settings.host === "127.0.0.1" ? ["127.0.0.1"] : localAddresses()).map(
-          (ip) => `http://${ip}:${server.address().port}/`,
+      ? (settings.tls?.hostname ? [settings.tls.hostname] : settings.host === "127.0.0.1" ? ["127.0.0.1"] : localAddresses()).map(
+          (ip) => `${settings.tls ? 'https' : 'http'}://${ip}:${server.address().port}/`,
         )
       : [],
     directory: store.directory,
@@ -54,7 +73,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
     workspaces.close();
     attempts.clear();
     if (previous) {
-      previous.closeAllConnections();
+      previous.disconnectSockets();
       await new Promise((resolve, reject) =>
         previous.close((error) =>
           error && error.code !== "ERR_SERVER_NOT_RUNNING"
@@ -67,6 +86,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       settings = { ...settings, autoStart: false };
       await store.saveSettings(settings);
     }
+    await audit.flush();
     return status();
   }
   async function start(input) {
@@ -87,22 +107,15 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       ...sharingAliases(services),
       services, accessVersion: 2,
       autoStart: input.autoStart === true,
+      allowDefault: input.allowDefault === undefined ? settings.allowDefault !== false : input.allowDefault === true,
+      tls: normalizeTls(input.tls === undefined ? settings.tls : input.tls),
+      visitors: updateVisitors(input.visitors, visitorsFor(settings)),
     };
-    if (input.password) {
-      if (
-        typeof input.password !== "string" ||
-        input.password.length < 8 ||
-        input.password.length > 128
-      )
-        throw new Error("访问口令需为 8–128 字符。");
-      const salt = randomBytes(16).toString("hex");
-      next = {
-        ...next,
-        salt,
-        hash: scryptSync(input.password, salt, 32).toString("hex"),
-      };
-    }
-    if (!next.hash) throw new Error("首次开启共享时请设置至少 8 位访问口令。");
+    if (input.password) next = { ...next, ...passwordRecord(input.password) };
+    if (next.allowDefault && !next.hash) throw new Error("首次开启共享时请设置至少 8 位访问口令。");
+    if (!next.allowDefault && !next.visitors.some(visitor => Object.values(visitorServices(services, visitor.services)).some(service => service.enabled))) throw new Error('请给至少一名访客开放一个已启用的共享服务。');
+    const tls = next.tls && { cert: await readFile(next.tls.cert), key: await readFile(next.tls.key), minVersion: 'TLSv1.2' };
+    const tlsVersion = tls && createHash('sha256').update(tls.cert).update(tls.key).digest('hex');
     const manifest = JSON.parse(
       await readFile(path.join(dist, ".vite", "manifest.json"), "utf8"),
     );
@@ -123,15 +136,19 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       throw new Error("缺少共享工作台网页构建，请先构建应用。");
     include("portal.html");
     allowed.delete("/portal.html");
-    const hosts = new Set(["localhost", ...localAddresses()]);
-    if (server?.listening && settings.host === next.host && server.address().port === next.port) {
+    const hosts = new Set(["localhost", ...localAddresses(), ...(next.tls?.hostname ? [next.tls.hostname] : [])]);
+    if (server?.listening && settings.host === next.host && server.address().port === next.port && tlsVersion === activeContext.tlsVersion) {
       await store.saveSettings(next);
+      const globalChanged = settings.hash !== next.hash || (settings.allowDefault !== false) !== next.allowDefault || JSON.stringify(sharingServices(settings)) !== JSON.stringify(next.services);
+      const updated = new Map(next.visitors.map(visitor => [visitor.name, visitor]));
+      const revoked = new Set(visitorsFor(settings).filter(visitor => JSON.stringify(visitor) !== JSON.stringify(updated.get(visitor.name))).map(visitor => visitor.name));
+      for (const [token, session] of sessions) if (globalChanged || revoked.has(session.visitor)) { sessions.delete(token); workspaces.release(token); }
+      for (const name of revoked) audit.record(name, 'visitor.update', 'revoked');
       settings = next; activeContext.settings = next; activeContext.allowed = allowed; activeContext.hosts = hosts;
-      sessions.clear(); workspaces.close(); attempts.clear();
       return status();
     }
-    const context = { settings: next, allowed, hosts, ready: false };
-    const listener = http.createServer(async (request, response) => {
+    const context = { settings: next, allowed, hosts, ready: false, tlsVersion };
+    const handler = async (request, response) => {
       const json = (code, value) => {
         response.writeHead(code, {
           "Content-Type": "application/json; charset=utf-8",
@@ -145,10 +162,12 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       response.setHeader("X-Frame-Options", "DENY");
       try {
         if (!context.ready) return json(503, { error: "共享设置正在应用，请稍后重试。" });
-        const next = context.settings;
+        const publication = context.settings;
+        const secure = !!publication.tls;
+        if (secure) response.setHeader('Strict-Transport-Security', 'max-age=86400');
         const sessionPath = urlPath => urlPath.replace(/^\/api\/sharing\//, "/api/projects/");
         if (!request.headers.host) return json(403, { error: "Host required" });
-        const origin = `http://${request.headers.host}`,
+        const origin = `${secure ? 'https' : 'http'}://${request.headers.host}`,
           url = new URL(request.url, origin);
         if (!context.hosts.has(new URL(origin).hostname) || url.origin !== origin)
           return json(403, {
@@ -164,9 +183,15 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             request.headers.cookie || "",
           )?.[1];
         const session = sessions.get(token);
-        const authorized = !!session && session.expires > Date.now();
-        const capabilities = authorized ? { ...sharingAliases(next.services), services: next.services } : {};
+        const visitor = session?.visitor ? visitorsFor(publication).find(item => item.name === session.visitor) : undefined;
+        const authorized = !!session && session.expires > Date.now() && (session.visitor ? !!visitor : publication.allowDefault !== false);
+        const services = visitor ? visitorServices(publication.services, visitor.services) : publication.services;
+        const next = { services, ...sharingAliases(services) };
+        const capabilities = authorized ? { ...next, visitor: session.visitor } : {};
         if (session && !authorized) { workspaces.release(token); sessions.delete(token); }
+        function ensureCurrentSession() {
+          if (!authorized || sessions.get(token) !== session || session.expires <= Date.now()) throw Object.assign(new Error('请先登录共享工作台。'), { status: 401 });
+        }
         if (
           sessionPath(url.pathname) === "/api/projects/session" &&
           request.method === "GET"
@@ -217,16 +242,15 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             return json(429, { error: "口令尝试过多，请一分钟后重试。" });
           attempt.count++;
           attempts.set(ip, attempt);
-          const { password } = await body();
-          if (
-            typeof password !== "string" ||
-            password.length > 128 ||
-            !timingSafeEqual(
-              scryptSync(password, next.salt, 32),
-              Buffer.from(next.hash, "hex"),
-            )
-          )
-            return json(401, { error: "访问口令不正确。" });
+          const { password, visitor: entered } = await body();
+          if (publication !== context.settings || context !== activeContext) return json(409, { error: '共享设置已变化，请重新提交登录。' });
+          const name = typeof entered === 'string' && entered.length <= 48 ? entered.normalize('NFC').trim() : '';
+          const account = name ? visitorsFor(publication).find(item => item.name === name) : publication.allowDefault !== false && publication.hash ? publication : undefined;
+          if (!matchesPassword(password, account)) {
+            audit.record(name && account ? name : '', 'session.login', 'denied');
+            return json(401, { error: "访客名称或访问口令不正确。" });
+          }
+          if (session) { sessions.delete(token); workspaces.release(token); }
           attempts.delete(ip);
           for (const [key, value] of sessions)
             if (value.expires <= now) { workspaces.release(key); sessions.delete(key); }
@@ -235,15 +259,17 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             workspaces.release(oldest); sessions.delete(oldest);
           }
           const created = randomBytes(32).toString("hex");
-          sessions.set(created, { expires: now + 8 * 60 * 60 * 1000 });
+          sessions.set(created, { visitor: name, expires: now + 8 * 60 * 60 * 1000 });
+          const granted = name ? visitorServices(publication.services, account.services) : publication.services;
+          audit.record(name, 'session.login', 'ok');
           response.setHeader(
             "Set-Cookie",
-            `devkit_project_session=${created}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`,
+            sessionCookie(created, 28800, secure),
           );
           return json(200, {
             authenticated: true,
-            ...sharingAliases(next.services), services: next.services,
-            role: next.canEdit ? "editor" : "viewer",
+            ...sharingAliases(granted), services: granted, visitor: name,
+            role: granted.projects.edit ? "editor" : "viewer",
           });
         }
         if (url.pathname.startsWith("/api/")) {
@@ -253,9 +279,10 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           ) {
             sessions.delete(token);
             workspaces.release(token);
+            if (authorized) audit.record(session.visitor, 'session.logout', 'ok');
             response.setHeader(
               "Set-Cookie",
-              "devkit_project_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+              sessionCookie('', 0, secure),
             );
             return json(200, {});
           }
@@ -271,13 +298,27 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           if (workspaceRoute) {
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const payload = await body();
+            ensureCurrentSession();
             if (workspaceRoute[1] === 'http' && workspaceRoute[2] === 'send')
               response.once('close', () => { if (!response.writableFinished) workspaces.cancel(token, payload?.id); });
-            return json(200, await workspaces.request(workspaceRoute[1], workspaceRoute[2], payload, { token, settings: next }));
+            const key = `${workspaceRoute[1]}.${workspaceRoute[2]}`;
+            const audited = auditActions.has(workspaceRoute[2]) || key === 'logs.read' && payload?.raw === true;
+            let result;
+            try {
+              result = await workspaces.request(workspaceRoute[1], workspaceRoute[2], payload, { token, settings: next });
+            } catch (error) {
+              if (audited) audit.record(session.visitor, key, error.status === 403 || error.status === 404 ? 'denied' : 'failed');
+              throw error;
+            }
+            if (audited) audit.record(session.visitor, key, result?.ok === false ? 'failed' : 'ok');
+            ensureCurrentSession();
+            return json(200, result);
           }
           if (url.pathname === "/api/projects/probe" && request.method === "POST") {
             if (!next.services.projects.probe) return json(403, { error: "未授予项目探活权限。" });
-            return json(200, await probeProjects(store, await body()));
+            const payload = await body();
+            ensureCurrentSession();
+            return json(200, await probeProjects(store, payload));
           }
           if (!next.services.projects.edit)
             return json(403, { error: "当前共享为只读模式。" });
@@ -286,26 +327,40 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             request.method === "PUT"
           ) {
             const value = await body();
-            return json(200, await store.save(value.data, value.revision));
+            ensureCurrentSession();
+            const saved = await store.save(value.data, value.revision);
+            audit.record(session.visitor, 'projects.save', 'ok');
+            return json(200, saved);
           }
           if (
             url.pathname === "/api/projects/snapshots" &&
             request.method === "GET"
           )
             return json(200, await store.snapshots());
-          if (url.pathname === '/api/projects/snapshot' && request.method === 'POST')
-            return json(200, await store.snapshot((await body()).id));
+          if (url.pathname === '/api/projects/snapshot' && request.method === 'POST') {
+            const value = await body();
+            ensureCurrentSession();
+            return json(200, await store.snapshot(value.id));
+          }
           if (
             url.pathname === "/api/projects/backup" &&
             request.method === "POST"
-          )
-            return json(200, { id: await store.backup((await body()).name) });
+          ) {
+            const value = await body();
+            ensureCurrentSession();
+            const id = await store.backup(value.name);
+            audit.record(session.visitor, 'projects.backup', 'ok');
+            return json(200, { id });
+          }
           if (
             url.pathname === "/api/projects/restore" &&
             request.method === "POST"
           ) {
             const value = await body();
-            return json(200, await store.restore(value.id, value.revision));
+            ensureCurrentSession();
+            const restored = await store.restore(value.id, value.revision);
+            audit.record(session.visitor, 'projects.restore', 'ok');
+            return json(200, restored);
           }
           return json(404, { error: "接口不存在。" });
         }
@@ -334,7 +389,11 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           json(error.status || 400, { error: error.message || "请求失败。" });
         else response.end();
       }
-    });
+    };
+    const listener = tls ? https.createServer(tls, handler) : http.createServer(handler);
+    const sockets = new Set();
+    listener.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+    listener.disconnectSockets = () => { for (const socket of sockets) socket.destroy(); };
     listener.requestTimeout = 15_000;
     listener.headersTimeout = 10_000;
     listener.maxRequestsPerSocket = 100;
@@ -349,7 +408,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
       target.listen(config.port, config.host);
     });
     const closeListener = async target => {
-      target.closeAllConnections();
+      target.disconnectSockets();
       await new Promise(resolve => target.close(resolve));
     };
     if (scopeChange) await closeListener(previous);
@@ -371,5 +430,5 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
   }
   let lifecycle = Promise.resolve();
   const serialized = work => { const result = lifecycle.then(work); lifecycle = result.catch(() => {}); return result; };
-  return { status, start: input => serialized(() => start(input)), stop: disable => serialized(() => stop(disable)) };
+  return { status, audit: audit.recent, start: input => serialized(() => start(input)), stop: disable => serialized(() => stop(disable)) };
 }

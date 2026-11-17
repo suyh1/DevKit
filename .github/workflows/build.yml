@@ -74,6 +74,8 @@ jobs:
         if: runner.os == 'Windows'
         run: node scripts/smoke-portal.mjs
       - run: npm run ${{ matrix.command }}
+        env:
+          DEVKIT_KEEP_PACKAGE_RUNTIME: ${{ runner.os == 'Windows' && '1' || '0' }}
       - name: Verify packaged Electron app
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --packaged
@@ -89,6 +91,9 @@ jobs:
       - name: Verify configs preservation in NSIS cleanup
         if: runner.os == 'Windows'
         run: node scripts/check-configs-installer.mjs
+      - name: Remove packaging work directories
+        if: runner.os == 'Windows'
+        run: npm run clean:artifacts
       - name: Verify Debian package
         if: runner.os == 'Linux'
         shell: bash

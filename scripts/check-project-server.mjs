@@ -1,4 +1,5 @@
-import { readFile, mkdtemp, mkdir, writeFile, cp } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, writeFile, cp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
@@ -7,6 +8,11 @@ import net from "node:net";
 import assert from "node:assert/strict";
 import { root } from "./desktop-files.mjs";
 import { sha256 } from "./release-integrity.mjs";
+import { sshNodeRuntimes } from '../server/ssh-node-runtimes.mjs';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
 const manifest = JSON.parse(
   await readFile(path.join(root, "package.json"), "utf8"),
 );
@@ -18,33 +24,39 @@ assert.equal(
   sha256(await readFile(path.join(release, identity.name))),
   identity.sha256,
 );
-const folder = await mkdtemp(
-  path.join(root, "artifacts/project-server-check-"),
-);
+const temporary = await realpath(tmpdir());
+const folder = await mkdtemp(path.join(temporary, 'devkit-project-server-check-'));
 const installation = path.join(folder, "first");
-await mkdir(installation);
-const python =
-  process.env.DEVKIT_PYTHON ||
-  (process.platform === "win32" ? "python" : "python3");
-execFileSync(
-  python,
-  [
-    "-c",
-    `import sys,zipfile
+async function extractFixture() {
+  await mkdir(installation);
+  const python =
+    process.env.DEVKIT_PYTHON ||
+    (process.platform === "win32" ? "python" : "python3");
+  execFileSync(
+    python,
+    [
+      "-c",
+      `import sys,zipfile
 from pathlib import Path
 target=Path(sys.argv[2]).resolve()
 with zipfile.ZipFile(sys.argv[1]) as z:
  assert z.testzip() is None
  for name in z.namelist():
   assert chr(92) not in name and (target/name).resolve().is_relative_to(target)
- z.extractall(target)
-`,
-    path.join(release, identity.name),
-    installation,
-  ],
-  { windowsHide: true },
-);
-assert.equal(typeof (await import(pathToFileURL(path.join(installation, 'node_modules/ssh2/lib/index.js')).href)).default.Client, 'function');
+ z.extractall(target)`,
+      path.join(release, identity.name),
+      installation,
+    ],
+    { windowsHide: true },
+  );
+  assert.equal(typeof (await import(pathToFileURL(path.join(installation, 'node_modules/ssh2/lib/index.js')).href)).default.Client, 'function');
+  for (const [target, runtime] of Object.entries(sshNodeRuntimes)) {
+    const hash = createHash('sha256');
+    await pipeline(createReadStream(path.join(installation, 'ssh-node', `${target}.gz`)), createGunzip(), hash);
+    assert.equal(hash.digest('hex'), runtime.sha256);
+    assert.equal(sha256(await readFile(path.join(installation, 'ssh-node', `${target}.LICENSE`))), runtime.licenseHash);
+  }
+}
 const password = "portable-check-password-only";
 async function launch(directory, reusePassword = false) {
   const port = await new Promise((resolve) => {
@@ -133,6 +145,7 @@ async function stop(host) {
 }
 let host;
 try {
+  await extractFixture();
   host = await launch(installation);
   let state = await host.request("state");
   state.profiles[0].projects.push({
@@ -205,5 +218,11 @@ try {
   );
   console.log(JSON.stringify(proof, null, 2));
 } finally {
-  if (host) await stop(host);
+  try {
+    if (host) await stop(host);
+  } finally {
+    const resolved = await realpath(folder);
+    if (path.relative(temporary, path.dirname(resolved)) || !path.basename(resolved).startsWith('devkit-project-server-check-')) throw new Error('Unsafe shared service verification directory');
+    await rm(folder, { recursive: true, force: true, maxRetries: 2 });
+  }
 }

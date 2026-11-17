@@ -119,7 +119,7 @@ module.exports = async function checkNginx(window, output) {
   const oldSize = window.getSize(), oldMinimum = window.getMinimumSize();
   try {
     window.setMinimumSize(360, 600); window.setSize(1440, 1000);
-    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()'); await idle();
+    await require('./navigation-helpers.cjs')(window).openWorkspace('Nginx 配置'); await idle();
     await wait('!!document.querySelector(".ng-heading")');
     await wait('document.querySelector(".ng-empty h2")?.textContent === "尚未添加 Nginx 实例"');
     assert.equal(await js('document.querySelector(".ng-empty").textContent.includes("Windows 和 Linux 均支持相同的多文件配置")'), true);
@@ -185,12 +185,12 @@ module.exports = async function checkNginx(window, output) {
     }
     await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
     await wait('!document.querySelector(".ng-help-popover:popover-open")');
-    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
+    await require('./navigation-helpers.cjs')(window).openWorkspace('Nginx 配置');
     assert.equal(await js('document.querySelectorAll(".ng-toolbar .ng-help-trigger,.ng-instance-heading .ng-help-trigger,.ng-operation-help,.ng-block>summary .ng-help-trigger").length'), 0, 'Actions and block headings have no question-mark hints');
     await field('server_name', 'ui.local');
     await wait('document.querySelector(".ng-center .ng-warning")?.textContent.includes("未保存")');
     await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
-    await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()');
+    await require('./navigation-helpers.cjs')(window).openWorkspace('Nginx 配置');
     assert.equal(await js('[...document.querySelectorAll(".ng-argument input")].find(i=>i.getAttribute("aria-label").startsWith("server_name 第")).value'), 'ui.local');
     await click('保存文件 (1)');
     assert.equal(await fs.readFile(main, 'utf8'), original.replace('localhost', 'ui.local'));
@@ -228,6 +228,17 @@ module.exports = async function checkNginx(window, output) {
       let body;
       for (let index = 0; index < 30; index++) { body = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(); if (body === 'after') break; await new Promise(resolve => setTimeout(resolve, 100)); }
       assert.equal(body, 'after');
+      await idle();
+      await click('备份');
+      await js(`[...document.querySelectorAll('.ng-modal[open] button')].find(button => button.textContent.trim() === '恢复磁盘文件').click()`);
+      await wait('document.querySelector(".confirm-dialog[open] h2")?.textContent.includes("第 1 步")');
+      await click('恢复磁盘文件', '.confirm-dialog[open]');
+      assert.match(await fs.readFile(main, 'utf8'), /return 200 "before"/);
+      assert.equal(await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(), 'after');
+      await js(`[...document.querySelectorAll('.ng-center button')].find(button => button.textContent.includes('第 2 步')).click()`);
+      await wait('document.querySelector(".confirm-dialog[open] h2")?.textContent.includes("第 2 步") && document.querySelector(".confirm-dialog[open] p")?.textContent.includes("PID")');
+      await click('确认并重载', '.confirm-dialog[open]');
+      assert.equal(await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(), 'before');
       await click('停止'); await click('停止 Nginx', '.confirm-dialog[open]');
       await wait('document.querySelector(".ng-instance-heading .ng-status")?.textContent.includes("已停止")');
     }

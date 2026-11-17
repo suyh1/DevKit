@@ -42,5 +42,13 @@ module.exports = function navigationHelpers(window) {
     await wait(`document.querySelector('.task-pane:not([hidden]) h1')?.textContent === ${JSON.stringify(name)}`);
     await wait('!document.querySelector(".category-panel")');
   }
-  return { catalog, openTool };
+  async function openWorkspace(name) {
+    await expand();
+    const selector = `#shared-sidebar-panel [title="${name}"]`;
+    await js('document.querySelector(".shared-sidebar-trigger").click()');
+    await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
+    await js(`document.querySelector(${JSON.stringify(selector)}).click()`);
+    await wait('!document.querySelector("#shared-sidebar-panel")');
+  }
+  return { catalog, openTool, openWorkspace };
 };

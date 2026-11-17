@@ -41,7 +41,7 @@ module.exports = async function checkDeletion(window, output, { instanceId, crea
     await wait('document.querySelector(".ng-empty h2")?.textContent==="尚未添加 Nginx 实例"');assert.equal((await ipc('get')).instances.length,0);
     await fs.writeFile(path.join(output,'nginx-deleted-empty.png'),(await window.webContents.capturePage()).toPNG());
     await click('添加实例','.ng-heading');await wait('!!document.querySelector(".ng-form-modal[open]")');
-    assert.equal(await js('document.querySelector(".ng-form-modal select").value'),process.platform==='win32'?'win32':'linux','Deleting the last instance retains the host-platform default');
+    assert.equal(await js('[...document.querySelectorAll(".ng-form-modal select")].find(select=>select.labels[0]?.firstChild?.textContent==="目标系统").value'),process.platform==='win32'?'win32':'linux','Deleting the last instance retains the host-platform default');
     await click('取消','.ng-form-modal');await wait('!document.querySelector(".ng-form-modal[open]")');
     console.log('Nginx deletion passed: visible list/header actions, dirty cancel, nonselected deletion retains draft, selected deletion switches neighbor, final empty state, files/backups preserved and running nginx stays alive.');
   }finally{

@@ -13,19 +13,23 @@ export async function portalFixture(root) {
     { createNginxManager },
     { createApiWorkspace },
     { initialApiState, newApiEndpoint },
+    { createJarManager },
+    { createLogCenter },
   ] = await Promise.all([
     load("server/project-store.mjs"),
     load("server/project-host.mjs"),
     load("server/nginx-manager.mjs"),
     load("server/api-workspace.mjs"),
     load("shared/api-workspace.mjs"),
+    load("server/jar-manager.mjs"),
+    load("server/log-center.mjs"),
   ]);
   const directory = await realpath(
     await mkdtemp(path.join(tmpdir(), "devkit-portal-")),
   );
-  let store, nginx, library, host;
-  const faults = { statuses: false },
-    calls = { commands: 0 };
+  let store, nginx, library, host, jar;
+  const faults = { statuses: false, logGate: null },
+    calls = { commands: 0, remoteLogReads: 0 };
   try {
     store = await createProjectStore(directory);
     const data = await store.get();
@@ -83,6 +87,23 @@ export async function portalFixture(root) {
       },
     });
     await nginx.request("statuses");
+    jar = await createJarManager(directory);
+    const jarPath = path.join(directory, 'audit.jar'), localLog = path.join(directory, 'audit.log');
+    await writeFile(jarPath, 'fixture');
+    await writeFile(localLog, 'local-first-line\n');
+    const jarState = await jar.request('upsert', { revision: 0, instance: {
+      name: '审查测试应用', jar: jarPath, logMode: 'file', logName: 'audit.log', stopTimeout: 15, jvmArgs: ['-Dpassword=audit-secret'],
+    } });
+    const remoteHost = 'a'.repeat(36), remoteId = 'b'.repeat(64);
+    const logs = createLogCenter({ jar: () => jar, nginx: () => nginx, lan: () => ({
+      logTargets: () => [{ id: remoteHost, name: '慢速目标', modules: { jar: true, nginx: false } }],
+      async logs(_hostId, action) {
+        if (action === 'sources') return { warnings: [], sources: [{ id: remoteId, instanceId: jarState.instances[0].id, kind: 'jar', name: '远程延迟日志', path: '/srv/audit.log', mode: 'file' }] };
+        calls.remoteLogReads++;
+        await faults.logGate;
+        return { results: [{ id: remoteId, text: 'remote-ready-line\n', reset: true }] };
+      },
+    }) });
     library = await createApiWorkspace(directory);
     const endpoint = newApiEndpoint("fixture-endpoint");
     endpoint.name = "共享接口定义";
@@ -125,6 +146,8 @@ export async function portalFixture(root) {
             : nginx.request(action, ...args),
       }),
       library: () => library,
+      jar: () => jar,
+      logs: () => logs,
     });
     const portServer = createServer();
     await new Promise((resolve) => portServer.listen(0, "127.0.0.1", resolve));
@@ -151,16 +174,18 @@ export async function portalFixture(root) {
       await host.stop();
       await library.close();
       await nginx.close();
+      await jar.close();
       await store.close();
       assert.equal(path.dirname(directory), await realpath(tmpdir()));
       assert.ok(path.basename(directory).startsWith("devkit-portal-"));
       await rm(directory, { recursive: true, force: true });
     }
-    return { url, options, host, store, nginx, library, faults, calls, close };
+    return { url, options, host, store, nginx, library, faults, calls, localLog, close };
   } catch (error) {
     await host?.stop();
     await library?.close();
     await nginx?.close();
+    await jar?.close();
     await store?.close();
     throw error;
   }

@@ -1,14 +1,4 @@
 .shared-navigation { display:flex; align-items:center; }
-.sidebar-shared { flex-shrink:0; min-width:0; }
-.sidebar-shared>summary { list-style:none; cursor:pointer; }
-.sidebar-shared>summary::-webkit-details-marker { display:none; }
-.sidebar-shared>summary>svg:last-child { transition:transform 140ms ease; }
-.sidebar-shared[open]>summary>svg:last-child { transform:rotate(180deg); }
-.sidebar-shared>nav { max-height:min(260px,35dvh); overflow-y:auto; overscroll-behavior:contain; padding:4px 0 6px 10px; border-left:1px solid var(--line); margin:0 0 8px 17px; }
-.sidebar-shared>nav>.nav-item { width:100%; font-size:11px; }
-.sidebar-collapsed .sidebar-shared>nav { padding-left:0; margin-left:0; border-left:0; }
-.sidebar-collapsed .shared-sidebar-trigger>svg:last-child { display:none; }
-@media(max-width:760px) { .sidebar:has(.category-panel-inline)>.sidebar-shared { display:none; } }
 .floating-navbar .floating-nav-links .shared-nav-trigger { width:auto; gap:5px; }
 .floating-navbar .floating-nav-links .shared-nav-trigger>span { display:inline; }
 @media(max-width:760px) { .floating-navbar .floating-nav-links>[aria-label="工作空间"]>span { display:none; } }

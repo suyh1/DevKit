@@ -1,4 +1,5 @@
 import contextlib
+import json
 import importlib.util
 import io
 import struct
@@ -122,6 +123,8 @@ class DebPackagingTests(unittest.TestCase):
                 (runtime / 'resources/app.asar').write_bytes(b'asar fixture')
                 (root / 'build/icons').mkdir(parents=True)
                 (root / 'build/icons/128x128.png').write_bytes(b'icon fixture')
+                (root / 'package.json').write_text(json.dumps({'author': {'name': 'fixture', 'email': 'fixture@example.test'}}), encoding='utf-8')
+                (root / 'LICENSE').write_text('MIT fixture license', encoding='utf-8')
                 with contextlib.redirect_stdout(io.StringIO()) as output:
                     package = builder.build_package(runtime, '1.1.0', arch, root)
                     verifier.verify(package)
@@ -129,7 +132,7 @@ class DebPackagingTests(unittest.TestCase):
                 self.assertIn('"emptyRootExtraction": true', output.getvalue())
                 buffer = io.BytesIO()
                 with tarfile.open(fileobj=buffer, mode='w') as archive:
-                    builder.write_data_archive(archive, runtime, 'launcher', 'desktop', b'icon', {})
+                    builder.write_data_archive(archive, runtime, 'launcher', 'desktop', b'icon', {}, b'MIT fixture license')
                 buffer.seek(0)
                 with tarfile.open(fileobj=buffer, mode='r') as archive:
                     destination = root / 'extracted'
@@ -139,6 +142,7 @@ class DebPackagingTests(unittest.TestCase):
                 self.assertEqual((destination / 'opt/devkit/resources/app.asar').read_bytes(), b'asar fixture')
                 self.assertEqual((destination / 'usr/bin/devkit').read_text(), 'launcher')
                 self.assertTrue((destination / 'usr/share/icons/hicolor/128x128/apps/devkit.png').is_file())
+                self.assertEqual((destination / 'usr/share/doc/devkit/copyright').read_bytes(), b'MIT fixture license')
 
     def test_invalid_version_rejected(self):
         for version in ['1.1.0-0', '1.1.0-../bad', '1.1', '1.1.0\n']:

@@ -129,6 +129,40 @@ module.exports = async function navigationSmoke(window, output) {
   await key('K', ['control']);
   await wait('!!document.querySelector(".command-dialog[open]") && !document.querySelector(".category-panel")');
   await key('Escape');
+
+  const sharedTrigger = '.shared-sidebar-trigger';
+  const sharedPanel = '#shared-sidebar-panel';
+  const categoryPositions = '[...document.querySelectorAll(".category-trigger")].map(button => button.getBoundingClientRect().top)';
+  const beforeShared = await js(categoryPositions);
+  await js(`document.querySelector('${sharedTrigger}').click()`);
+  await wait(`!!document.querySelector('${sharedPanel}:popover-open')`);
+  await settle();
+  assert.deepEqual(await js(categoryPositions), beforeShared, 'Opening shared navigation keeps category entrances fixed');
+  assert.equal(await js(`(() => {
+    const panel = document.querySelector('${sharedPanel}').getBoundingClientRect();
+    const sidebar = document.querySelector('.sidebar').getBoundingClientRect();
+    return Math.abs(panel.left - sidebar.right - 10) < 1 && panel.bottom <= innerHeight;
+  })()`), true, 'The shared panel fits to the right of the sidebar');
+  await open('data');
+  assert.equal(await js(`document.querySelector('${sharedPanel}')`), null, 'Selecting a category replaces the shared panel');
+  await js(`document.querySelector('${sharedTrigger}').click()`);
+  await wait(`!!document.querySelector('${sharedPanel}:popover-open')`);
+  await key('Escape');
+  await wait(`!document.querySelector('${sharedPanel}')`);
+  assert.equal(await js(`document.activeElement.matches('${sharedTrigger}')`), true);
+  await key('Enter');
+  await wait(`!!document.querySelector('${sharedPanel}:popover-open')`);
+  await key('End');
+  assert.equal(await js('document.activeElement.title'), '局域网主机');
+  await key('Enter');
+  await wait('document.querySelector(".workspace:not([hidden]) .lan-heading h1")?.textContent === "局域网主机"');
+  await wait(`!document.querySelector('${sharedPanel}')`);
+  await js(`document.querySelector('${sharedTrigger}').click()`);
+  await wait(`document.querySelector('${sharedPanel}')?.contains(document.activeElement)`);
+  assert.equal(await js('document.activeElement.getAttribute("aria-current")'), 'page');
+  await key('Escape');
+  await wait(`!document.querySelector('${sharedPanel}')`);
+
   await js('document.querySelector(\'.topbar button[aria-label="收起导航"]\').click()');
   await settle();
   assert.equal(await js('document.querySelectorAll(".category-trigger").length'), 7);
@@ -143,6 +177,13 @@ module.exports = async function navigationSmoke(window, output) {
     await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
     await js('document.querySelector(\'.topbar button[aria-label="展开导航"]\')?.click()');
     await settle();
+    await js(`document.querySelector('${sharedTrigger}').click()`);
+    await wait(`!!document.querySelector('${sharedPanel}.category-panel-inline')`);
+    assert.equal(await js(`document.querySelector('${sharedTrigger}').getClientRects().length`), 0);
+    assert.equal(await js('document.querySelector(".category-list").getClientRects().length'), 0);
+    await js('document.querySelector(\'button[aria-label="返回侧栏导航"]\').click()');
+    await wait(`!document.querySelector('${sharedPanel}')`);
+    assert.equal(await js(`document.activeElement.matches('${sharedTrigger}')`), true);
     await open('data');
     assert.equal(await js('getComputedStyle(document.querySelector(".category-list")).display'), 'none');
     const fits = await js(`(() => {const p=document.querySelector('.category-panel').getBoundingClientRect(),s=document.querySelector('.sidebar').getBoundingClientRect(); return p.left>=s.left && p.right<=s.right && p.bottom<=s.bottom && !document.documentElement.scrollLeft;})()`);

@@ -19,7 +19,7 @@ export function createJarConsole({ capacity = 1024 * 1024, leaseMs = 20000, now 
       const reset = requested !== generation || !Number.isSafeInteger(cursor) || cursor < 0 || cursor > end;
       const from = reset ? base : Math.max(base, cursor);
       const to = Math.min(end, from + 65536);
-      return { generation, text: text.slice(from - base, to - base), cursor: to, end, reset, truncated: reset ? from > 0 : cursor < base, lease: active ? { ...active } : null };
+      return { generation, text: text.slice(from - base, to - base), cursor: to, end, reset, startsMidline: from > 0 && (from === base || text[from - base - 1] !== '\n'), truncated: reset ? from > 0 : cursor < base, lease: active ? { ...active } : null };
     },
     claim({ owner, label, generation: requested }) {
       sameGeneration(requested);

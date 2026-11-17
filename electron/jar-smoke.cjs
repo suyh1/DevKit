@@ -3,6 +3,13 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { BrowserWindow, dialog } = require('electron');
 
+async function openShared(window, name, wait) {
+  const selector = `#shared-sidebar-panel [title="${name}"]`;
+  await window.webContents.executeJavaScript('document.querySelector(".shared-sidebar-trigger").click()');
+  await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
+  await window.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).click()`);
+}
+
 module.exports = async (window, output) => {
   const js = source => window.webContents.executeJavaScript(source, true);
   async function wait(expression) {
@@ -32,7 +39,7 @@ module.exports = async (window, output) => {
     await verifyHostEditor(window, output, click, wait);
     window.webContents.setBackgroundThrottling(false);
     await js('document.documentElement.dataset.theme="light"');
-    await js('document.querySelector(\'.nav-item[title="JAR 管理"]\').click()');
+    await openShared(window, 'JAR 管理', wait);
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
     await click('添加 JAR'); await wait('!!document.querySelector(".jar-dialog[open]")');
     await click('选择文件'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
@@ -57,6 +64,18 @@ module.exports = async (window, output) => {
     assert.equal(item.restart.enabled, true); assert.equal(item.restart.maxRetries, 3);
     assert.equal(item.profile, 'test'); assert.equal(item.profiles.find(profile => profile.id === 'test').env.APP_MODE, 'test');
     assert.equal(item.env.TOKEN, 'a=b');
+    const cardSize = window.getSize(), cardMinimum = window.getMinimumSize();
+    window.setMinimumSize(360, 600); window.setSize(391, 830);
+    await wait('innerWidth < 430 && getComputedStyle(document.querySelector(".jar-instance")).display === "grid" && document.querySelector(".sidebar").getBoundingClientRect().right <= 0');
+    assert.equal(await js(`(() => {
+      const row = document.querySelector('.jar-instance'), bounds = row.getBoundingClientRect();
+      const actions = [...row.querySelectorAll('.jar-row-actions button')].slice(0, 3);
+      return bounds.right <= innerWidth && actions.every(button => button.getBoundingClientRect().right <= bounds.right) && !row.querySelector('details').open;
+    })()`), true, 'Narrow JAR cards expose start, stop and logs without horizontal scrolling');
+    await js('document.querySelector(".jar-instance").scrollIntoView({ block: "center", behavior: "instant" })');
+    await fs.writeFile(path.join(output, 'jar-mobile-card.png'), (await window.webContents.capturePage()).toPNG());
+    window.setMinimumSize(...cardMinimum); window.setSize(...cardSize);
+    await wait('innerWidth > 920');
     await click('配置文件');
     await wait("!!document.querySelector('.jar-configs option[value=\"application.yml\"]')");
     assert.equal(await js(`{
@@ -133,7 +152,7 @@ module.exports = async (window, output) => {
     await js(`{const select=document.querySelector('.settings-page option[value="performance"]').parentElement; select.value='performance'; select.dispatchEvent(new Event('change',{bubbles:true}));}`);
     await wait('document.documentElement.dataset.displayMode === "performance"');
     assert.equal(await js('JSON.parse(localStorage.getItem("devkit:preferences")).displayMode'), 'performance');
-    await js('document.querySelector(\'.nav-item[title="JAR 管理"]\').click()');
+    await openShared(window, 'JAR 管理', wait);
     await wait('document.querySelector(".jar-summary").textContent.includes("每 15 秒")');
     window.show();
     window.focus();
@@ -195,7 +214,8 @@ async function verifyHostEditor(window, output, click, wait) {
   }
   try {
     window.show(); window.focus();
-    await js('document.querySelector(\'.nav-item[title="局域网主机"]\').click(); document.documentElement.dataset.theme="dark"');
+    await openShared(window, '局域网主机', wait);
+    await js('document.documentElement.dataset.theme="dark"');
     await click('添加主机', '.lan-center');
     await wait(visible);
     assert.equal(await js(`{
@@ -276,7 +296,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   }
   const input = (target, selector, value) => js(target, `{const field=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,${JSON.stringify(value)});field.dispatchEvent(new Event('input',{bubbles:true}));}`);
   let id, gatewayWindow, gatewayStarted = false;
-  const go = name => js(window, `document.querySelector(${JSON.stringify('.nav-item[title="' + name + '"]')}).click()`);
+  const go = name => openShared(window, name, wait);
   try {
     await host.start({ host: '127.0.0.1', port, services, password: 'devkit-lan-smoke' });
     await go('局域网主机');
@@ -297,6 +317,27 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     }`), { value: '', placeholder: '已保存，留空沿用', methods: true });
     await click('取消', '.lan-host-footer');
     await wait('!document.querySelector(".lan-host-dialog[open]")');
+    await click('测试连接', '.lan-host-list');
+    await when(window, 'document.querySelector(".lan-diagnostic")?.textContent.includes("共享口令有效")');
+    await js(window, `document.querySelector('button[aria-label="关闭连接诊断"]').click()`);
+    await click('启用端口监控', '.lan-host-list');
+    await when(window, 'document.querySelector(".workspace:not([hidden]) .monitor-detail h2")?.textContent === "远程测试主机"');
+    await go('局域网主机');
+    await when(window, 'document.querySelector(".lan-monitor-status")?.textContent.includes("端口可达")', 22_000);
+    await click('导入主机', '.lan-heading');
+    await when(window, '!!document.querySelector("dialog[open] textarea")');
+    const csv = `name,address,user,port,group,tags\n测试档案,192.0.2.5,ops,22,测试,demo|ssh\n重复档案,192.0.2.5,ops,22,测试,demo`;
+    await js(window, `{ const field = document.querySelector('dialog[open] textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, ${JSON.stringify(csv)}); field.dispatchEvent(new Event('input', { bubbles: true })); }`);
+    await click('预览导入', 'dialog[open]');
+    await when(window, 'document.querySelector(".lan-import-results")?.textContent.includes("重复连接")');
+    await click('导入选中的 1 条', 'dialog[open]');
+    await when(window, 'document.querySelector(".lan-host-tags")?.textContent.includes("demo")');
+    await js(window, `document.querySelector('[aria-label="置顶 测试档案"]').click()`);
+    await when(window, 'document.querySelector(".lan-group-label")?.textContent === "置顶"');
+    await click('发现主机', '.lan-heading');
+    await when(window, '!!document.querySelector(".lan-scan-fields")');
+    await js(window, `document.querySelector('[aria-label="关闭主机扫描"]').click()`);
+    await when(window, '!document.querySelector(".lan-scan-fields")');
     await go('JAR 管理');
     await wait('!document.querySelector(".jar-center button.run-button")?.disabled');
     await click('添加 JAR');

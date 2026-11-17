@@ -1,5 +1,6 @@
 declare global {
   interface Window { devkitDesktop?: {
+    platform?: string;
     openLanHost?: (address: string, module: 'jar' | 'nginx') => Promise<{ error?: string }>;
     lanHosts?: (action: string, value?: unknown) => Promise<{ data?: unknown; error?: string }>;
     saveText: (text: string, filename: string) => Promise<string>;

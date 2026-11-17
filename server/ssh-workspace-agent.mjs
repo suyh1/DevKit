@@ -6,6 +6,7 @@ import { createNginxManager } from './nginx-manager.mjs';
 import { managedRequest } from './managed-workspace.mjs';
 import { readJsonLines } from './ssh-lines.mjs';
 import { launchOutsideSshJob } from './ssh-windows-process.mjs';
+import { createLogCenter } from './log-center.mjs';
 
 const folder = path.join(homedir(), '.devkit-ssh', 'managed');
 const managers = new Map();
@@ -13,6 +14,7 @@ const pending = new Set();
 const send = value => process.stdout.write(`${JSON.stringify(value)}\n`);
 let closing = false;
 const windows = process.platform === 'win32';
+const logs = createLogCenter({ jar: () => manager('jar'), nginx: () => manager('nginx') });
 function manager(module) {
   if (!['jar', 'nginx'].includes(module)) throw new Error('未知远程管理栏目。');
   if (!managers.has(module)) {
@@ -32,6 +34,12 @@ async function close() {
 }
 async function handle({ id, module, action, payload, access, session }) {
   try {
+    if (module === 'logs') {
+      const limits = payload?.logAccess;
+      if (!limits) throw new Error('日志权限缺失。');
+      send({ id, result: await logs.request(action, { ...payload, scope: 'local' }, { jar: limits.jar === true, nginx: limits.nginx === true, export: limits.export === true, raw: limits.raw === true }) });
+      return;
+    }
     if (action === 'resolve-legacy-path') {
       const filename = payload?.path;
       if (!access?.edit || typeof filename !== 'string' || filename.length > 12000 || !path.isAbsolute(filename) || /[\0\r\n]/.test(filename)) throw new Error('请输入目标主机的绝对文件路径。');

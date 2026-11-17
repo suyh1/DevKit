@@ -23,8 +23,15 @@
 .sharing-empty-hint { padding: 12px; background: var(--tint); color: var(--accent); border-radius: 8px; font-size: 12px; line-height: 1.7; }
 @media(max-width:600px) { .sharing-service-toggle { padding: 12px; gap: 10px; } .sharing-service-permissions { padding-left: 36px; padding-right: 12px; } }
 .http-workspace-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-@media(max-width: 1080px) { .global-sharing-button>span { display: none; } .global-sharing-button { padding: 7px; gap: 4px; } }
+@media(max-width: 1080px) { .global-sharing-button { padding: 7px; gap: 4px; } }
 @media(max-width: 760px) { .app .floating-nav-links button>span { display: none; } }
 
 .sharing-service-permissions[hidden] { display: none; }
 @media(min-width:601px) { .sharing-service-permissions { grid-template-columns: 1fr 1fr; gap: 10px 20px; } .sharing-service-permissions p { grid-column: 1 / -1; } }
+.sharing-production { padding:11px; border:1px solid var(--line); border-radius:8px; }
+.sharing-production > summary { cursor:pointer; font-weight:650; }
+.sharing-production > :not(summary) { margin-top:9px; }
+.sharing-visitor { border:1px solid var(--line); border-radius:7px; padding:8px; min-width:0; }
+.sharing-visitor-service { display:flex; flex-wrap:wrap; gap:5px 12px; margin:5px 0; }
+.sharing-visitor-service label { display:inline-flex; align-items:center; gap:4px; }
+.sharing-audit { max-height:190px; overflow:auto; padding-inline-start:17px; font-size:12px; overflow-wrap:anywhere; }

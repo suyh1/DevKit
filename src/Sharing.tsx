@@ -7,9 +7,10 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { Globe, RefreshCw } from "lucide-react";
+import { Radio, RefreshCw, Plus } from "lucide-react";
 import { isProjectDesktop, projectRequest } from "./project-api";
-import type { Sharing } from "./project-api";
+import type { Sharing, SharingAudit } from "./project-api";
+import { workspaceModules } from './catalog';
 import { emptySharingServices } from "../shared/sharing.mjs";
 import type { SharingServices } from "../shared/sharing.mjs";
 import { Modal, Field } from "./project-components";
@@ -23,6 +24,7 @@ type SharingContextValue = {
   open: () => void;
 };
 const SharingContext = createContext<SharingContextValue | null>(null);
+export const useSharingStatus = () => useContext(SharingContext)?.status;
 
 export function SharingProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Sharing | null>(null),
@@ -118,12 +120,12 @@ export function SharingButton({ global = false }: { global?: boolean }) {
       title={`局域网共享 · ${description}${status?.running ? "\n" + status.addresses.join("\n") : ""}`}
       onClick={open}
     >
-      <Globe size={15} />
+      <Radio size={15} />
       <span>
         {global
           ? status?.running && !error
             ? "共享中"
-            : "局域网共享"
+            : error ? "状态未知" : !status ? "读取中" : "未开启"
           : "共享设置"}
       </span>
       {global && <i aria-hidden="true" />}
@@ -146,6 +148,7 @@ function SharingPanel({
   const [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [saved, setSaved] = useState(0);
+  const [audit, setAudit] = useState<SharingAudit[] | null>(null);
   const locked = useRef(false);
   const panel = useRef<HTMLDivElement>(null),
     ready = draft !== null;
@@ -160,6 +163,9 @@ function SharingPanel({
         services: draft.services,
         autoStart: draft.autoStart,
         password,
+        allowDefault: draft.allowDefault !== false,
+        visitors: draft.visitors,
+        tls: draft.tls,
       }
     : undefined;
   useEffect(() => {
@@ -198,7 +204,7 @@ function SharingPanel({
       setSaved((value) => value + 1);
       setMessage(
         action === "start"
-          ? "工作台共享已启动，原有访客需重新登录。"
+          ? draft.running ? "共享设置已应用。" : "工作台共享已启动。"
           : "共享已停止，自动启动已关闭。",
       );
     } catch (failure) {
@@ -296,7 +302,8 @@ function SharingPanel({
                     />
                   </Field>
                 </div>
-                <Field
+                <label><input type="checkbox" checked={draft.allowDefault !== false} onChange={event => setDraft({ ...draft, allowDefault: event.target.checked })} />允许使用通用共享口令</label>
+                {draft.allowDefault !== false && <Field
                   label={
                     draft.hasPassword
                       ? "更换访问口令（留空保留）"
@@ -312,7 +319,47 @@ function SharingPanel({
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
-                </Field>
+                </Field>}
+                <details className="sharing-production">
+                  <summary>HTTPS 与证书</summary>
+                  <label><input type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
+                  {draft.tls && <div className="pc-form-grid">
+                    <Field label="PEM 证书绝对路径"><input required value={draft.tls.cert} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, cert: event.target.value } })} /></Field>
+                    <Field label="PEM 私钥绝对路径"><input required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
+                    <Field label="证书对应域名或 IPv4"><input placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
+                  </div>}
+                </details>
+                <details className="sharing-production">
+                  <summary>独立访客权限{draft.visitors?.length ? `（${draft.visitors.length}）` : ''}</summary>
+                  <p>每名访客使用自己的名称和口令。共享服务设置限定访客可获得的权限。</p>
+                  {(draft.visitors || []).map((visitor, index) => {
+                    const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
+                    const existing = visitor.hasPassword === true;
+                    const labels: Record<string, string> = { edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: 'JAR 日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志' };
+                    return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
+                      <div className="pc-form-grid">
+                        <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
+                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /></Field>
+                      </div>
+                      {workspaceModules.filter(item => item.id !== 'lan-hosts').map(item => {
+                        const name = item.id as keyof SharingServices, service = visitor.services[name];
+                        const patch = (key: string, value: boolean) => change({ ...visitor, services: { ...visitor.services, [name]: { ...service, [key]: value } } });
+                        return <div className="sharing-visitor-service" key={name}><label><input type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
+                          {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
+                        </div>;
+                      })}
+                      <button type="button" className="text-button" onClick={() => setDraft({ ...draft, visitors: draft.visitors!.filter((_, position) => position !== index) })}>移除访客</button>
+                    </fieldset>;
+                  })}
+                  <button type="button" className="secondary-button" disabled={(draft.visitors?.length || 0) >= 30} onClick={() => setDraft({ ...draft, visitors: [...(draft.visitors || []), { name: '', password: '', services: emptySharingServices() }] })}><Plus size={14} />添加访客</button>
+                </details>
+                <details className="sharing-production" onToggle={event => {
+                  if (!event.currentTarget.open) return;
+                  void projectRequest<SharingAudit[]>('sharing-audit').then(setAudit).catch(failure => setError(failure.message));
+                }}><summary>访问审计</summary>
+                  {audit ? <ul className="sharing-audit">{audit.map((item, index) => <li key={index}><time>{new Date(item.at).toLocaleString()}</time> · {item.visitor || '通用口令'} · {item.action} · {({ ok: '成功', failed: '失败', denied: '拒绝', revoked: '会话撤销' })[item.outcome] || item.outcome}</li>)}</ul> : <p>正在读取审计记录…</p>}
+                  {audit?.length === 0 && <p>暂无访问记录。</p>}
+                </details>
                 <div className="sharing-services-heading">
                   <h3>共享服务与访问权限</h3>
                   <p className="pc-hint">
@@ -399,9 +446,10 @@ function SharingPanel({
                       {
                         id: 'logs', name: '日志中心', description: '已登记的文件日志、控制台输出与多窗对照',
                         permissions: [
-                          { key: 'jar', label: '读取 JAR 日志与控制台输出', detail: '允许查看已登记应用的文件日志和内存输出，不包含控制台输入' },
-                          { key: 'nginx', label: '读取 Nginx 日志', detail: '允许查看已登记实例生效配置中的文件日志，不开放配置编辑或运行操作' },
+                          { key: 'jar', label: '读取 JAR 日志与控制台输出', detail: '用于日志中心和 JAR 页面，可读取文件日志及内存输出。控制台输入另需运行权限。' },
+                          { key: 'nginx', label: '读取 Nginx 日志', detail: '用于日志中心和 Nginx 页面，可读取实例配置中登记的文件日志。' },
                           { key: 'export', label: '导出日志', detail: '允许导出已授权来源的有界近期内容，不修改原文件' },
+                          { key: 'raw', label: '允许读取原始日志', detail: '访客可在日志中心主动关闭主机脱敏，原始内容可能包含凭据' },
                         ],
                       },
                     ] as const
@@ -447,8 +495,8 @@ function SharingPanel({
                           <p>
                             基础权限：查看
                             {service.id === "nginx"
-                              ? "配置、日志和备份"
-                              : service.id === 'logs' ? '日志中心页面；读取内容需另选下方来源分类' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态、日志及控制台输出（环境变量和启动参数不向只读访客显示）' : service.id === "http"
+                              ? "配置和备份，日志在日志中心授权"
+                              : service.id === 'logs' ? '日志中心及原页面的日志读取权限，按下方类别授权' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态和自启状态，日志和控制台输出在日志中心授权' : service.id === "http"
                                 ? "接口文档与环境"
                                 : "项目与档案"}
                             。
@@ -505,8 +553,7 @@ function SharingPanel({
                 </label>
               </fieldset>
               <p className="pc-hint">
-                默认只读。仅用于可信局域网，HTTP
-                不加密；访问口令请单独设置。系统防火墙需允许所选端口入站。
+                {draft.tls ? '已配置 HTTPS，请使用客户端信任且名称匹配的证书。' : 'HTTP 使用明文连接，仅用于可信局域网。'}系统防火墙需允许所选端口入站。
               </p>
               <div className="pc-sharing-state">
                 <strong>{draft.running ? "共享正在运行" : "共享已停止"}</strong>

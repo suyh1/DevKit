@@ -16,7 +16,7 @@ const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
 let nginx, library, jar, monitor, lan;
-const logs = createLogCenter({ nginx: () => nginx, jar: () => jar });
+const logs = createLogCenter({ nginx: () => nginx, jar: () => jar, lan: () => lan });
 const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan });
 try {
   lan = await createLanWorkspaces(directory);
@@ -25,11 +25,12 @@ try {
   if (services.nginx.enabled || services.logs.nginx) nginx = await createNginxManager(directory);
   if (services.http.enabled) library = await createApiWorkspace(directory);
   jar = await createJarManager(directory);
-  monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar });
+  monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar, lan: () => lan });
   const result = await host.start({
     host: process.env.HOST || "0.0.0.0",
     port: Number(process.env.PORT || 8765),
     services,
+    ...(process.env.DEVKIT_SHARE_CERT || process.env.DEVKIT_SHARE_KEY ? { tls: { cert: process.env.DEVKIT_SHARE_CERT, key: process.env.DEVKIT_SHARE_KEY, hostname: process.env.DEVKIT_SHARE_HOSTNAME } } : {}),
     password:
       process.env.DEVKIT_PROJECT_PASSWORD || (saved.hash ? "" : undefined),
   });

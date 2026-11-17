@@ -1,6 +1,6 @@
 import { jsonObjectFields } from './result-model';
 
-export type HttpInput = { url: string; method: string; headers: Record<string, string>; body: string; timeout: number };
+export type HttpInput = { url: string; method: string; headers: Record<string, string>; body: string; timeout: number; multipart?: { name: string; value?: string; file?: { name: string; type: string; data: string } }[] };
 export type HttpResponse = { url: string; method: string; status: number; statusText: string; headers: [string, string][]; body: string; binary: boolean; bytes: number; transferredBytes: number; elapsed: number; redirected: boolean };
 export type HttpEntry = { id: string; name: string; config: string; timeout: number; sensitive: boolean };
 export function parseHttpConfig(text: string, timeout = 15000): HttpInput {

@@ -490,7 +490,7 @@ app
           await js('(()=>{const input=document.querySelector("dialog[open] input[type=password]");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"sharing-ui-test");input.dispatchEvent(new Event("input",{bubbles:true}));})()');
           await click('登录','dialog[open] button');
           await wait('!document.querySelector("dialog[open]")');
-          await wait('document.querySelector(".portal-access")?.textContent.includes("只读")');
+          await wait('document.querySelector(".portal-current small")?.textContent.includes("只读")');
           await wait('![...document.querySelectorAll(".project-center button")].some(e=>e.textContent.trim()==="添加项目"&&e.getClientRects().length>0&&!e.disabled)');
         }
       }

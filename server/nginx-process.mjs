@@ -69,6 +69,25 @@ export async function inspectNginxProcess(pid) {
     return { pid, unknown: true };
   }
 }
+export async function inspectNginxWorkers(pid, executable) {
+  if (!Number.isSafeInteger(pid) || pid <= 1) return null;
+  try {
+    if (process.platform === 'win32') {
+      const script = `$children = @(Get-CimInstance Win32_Process -Filter 'ParentProcessId=${pid}' | Select-Object ProcessId, ExecutablePath); ConvertTo-Json -InputObject $children -Compress`;
+      const { stdout } = await execute(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, timeout: 3500, maxBuffer: 65536 });
+      return JSON.parse(stdout.replace(/^\uFEFF/, '')).filter(item => item.ExecutablePath && pathKey(item.ExecutablePath) === pathKey(executable)).map(item => item.ProcessId);
+    }
+    if (process.platform === 'linux') {
+      const children = (await readFile(`/proc/${pid}/task/${pid}/children`, 'utf8')).trim().split(/\s+/).filter(id => /^\d+$/.test(id));
+      const workers = await Promise.all(children.map(async id => {
+        const line = await readFile(`/proc/${id}/cmdline`, 'utf8').catch(() => '');
+        return /^nginx: worker process(?:\s|\0|$)/.test(line) ? Number(id) : null;
+      }));
+      return workers.filter(Boolean);
+    }
+  } catch { /* An unavailable process listing cannot verify a reload. */ }
+  return null;
+}
 export function processMatches(instance, info) {
   if (!info?.executable || !info.commandLine || pathKey(info.executable) !== pathKey(instance.executable)) return false;
   const command = process.platform === 'win32' ? info.commandLine.replaceAll('\\', '/').toLowerCase() : info.commandLine;

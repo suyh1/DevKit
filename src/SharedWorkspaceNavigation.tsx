@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, ChevronDown, Activity, ScrollText, Coffee, Server, FolderOpen, Send, Terminal } from 'lucide-react';
+import { LayoutGrid, ChevronDown } from 'lucide-react';
 import { workspaceModules } from './catalog';
+import { workspaceModuleNav } from './ui';
 import './shared-navigation.css';
 
 type ModuleId = typeof workspaceModules[number]['id'];
-const hints: Record<ModuleId, string> = { http: '接口设计与调试', projects: '项目入口与环境档案', nginx: '配置与实例管理', jar: '应用启停与控制台', monitor: '可用率与故障记录', logs: '实时日志多窗对照', 'lan-hosts': '连接档案与 SSH 终端' };
 
 export default function SharedWorkspaceNavigation({ page, onChoose }: { page: string; onChoose: (id: ModuleId) => void }) {
   const [open, setOpen] = useState(false), trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);
@@ -24,7 +24,7 @@ export default function SharedWorkspaceNavigation({ page, onChoose }: { page: st
     (surface.querySelector<HTMLButtonElement>('[aria-current=page]') || surface.querySelector<HTMLButtonElement>('[role=menuitem]'))?.focus({ preventScroll: true });
     return () => { observer.disconnect(); window.removeEventListener('resize', place); };
   }, [open]);
-  return <div className="shared-navigation"><button ref={trigger} className="shared-nav-trigger" aria-label="共享" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? 'shared-workspace-menu' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } }}><Globe size={14} /><span>共享</span><ChevronDown className="shared-nav-chevron" size={12} /></button>
+  return <div className="shared-navigation"><button ref={trigger} className="shared-nav-trigger" aria-label="共享" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? 'shared-workspace-menu' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } }}><LayoutGrid size={14} /><span>共享</span><ChevronDown className="shared-nav-chevron" size={12} /></button>
     {open && createPortal(<div ref={panel} id="shared-workspace-menu" className="shared-nav-panel" popover="auto" role="menu" aria-label="共享栏目" onToggle={event => { if ((event.nativeEvent as ToggleEvent).newState === 'closed') close(); }} onKeyDown={event => {
       const items = [...panel.current!.querySelectorAll<HTMLButtonElement>('[role=menuitem]')], index = items.indexOf(document.activeElement as HTMLButtonElement);
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); }
@@ -35,8 +35,8 @@ export default function SharedWorkspaceNavigation({ page, onChoose }: { page: st
         event.preventDefault(); items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length]?.focus();
       }
     }}><header>共享工作台 <small>{workspaceModules.length} 个栏目</small></header>{workspaceModules.map(item => {
-      const Icon = item.id === 'lan-hosts' ? Terminal : item.id === 'logs' ? ScrollText : item.id === 'monitor' ? Activity : item.id === 'jar' ? Coffee : item.id === 'nginx' ? Server : item.id === 'http' ? Send : FolderOpen;
-      return <button role="menuitem" key={item.id} aria-current={page === item.id ? 'page' : undefined} onClick={() => { close(true); onChoose(item.id); }}><Icon size={18} /><span><strong>{item.name}</strong><small>{hints[item.id]}</small></span></button>;
+      const { Icon, hint } = workspaceModuleNav[item.id];
+      return <button role="menuitem" key={item.id} aria-current={page === item.id ? 'page' : undefined} onClick={() => { close(true); onChoose(item.id); }}><Icon size={18} /><span><strong>{item.name}</strong><small>{hint}</small></span></button>;
     })}</div>, document.body)}
   </div>;
 }

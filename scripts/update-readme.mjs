@@ -51,7 +51,7 @@ export function renderReadme(template, { manifest, tools, categories, workspaceM
   const packageRows = releaseTargets(manifest.version).map((target, index) => [labels[index], commands[index], `artifacts/${target.folder}/${target.name}`]);
   packageRows.push(
     ['麒麟 ARM64（命令别名）', 'bundle:kylin', '同 Linux ARM64'],
-    ['当前系统解压版', 'bundle:host', 'artifacts/desktop-runtime/DevKit-<platform>-<arch>/'],
+    ['当前系统解压版', 'bundle:host', `artifacts/release-${manifest.version}/DevKit-<platform>-<arch>/`],
     ['三平台安装包合集', 'bundle:all', `artifacts/release-${manifest.version}/`],
     ['独立项目中心服务', 'bundle:project-server', `artifacts/release-${manifest.version}/DevKit_ProjectCenter_${manifest.version}_node24.zip`],
   );
@@ -60,6 +60,9 @@ export function renderReadme(template, { manifest, tools, categories, workspaceM
   }
   const values = {
     VERSION: manifest.version, ELECTRON_VERSION: manifest.devDependencies.electron,
+    PROJECT_AUTHOR: manifest.author?.name || '',
+    PROJECT_EMAIL: manifest.author?.email || '',
+    PROJECT_LICENSE: manifest.license || '',
     TOOL_COUNT: tools.length, CATEGORY_COUNT: categories.length, MAX_TASKS: maxTasks,
     TOOL_CATALOG: catalog,
     WORKSPACE_MODULES: ['| 模块 | 分类 | 功能 |', '| --- | --- | --- |', ...workspaceModules.map(item => {
@@ -92,8 +95,10 @@ export async function updateReadme({ directory = root, check = false } = {}) {
   return true;
 }
 
-export async function copyReadme(destination) {
-  await copyFile(path.join(root, 'README.md'), path.join(destination, 'README.md'));
+export async function copyReadme(destination, licenseFilename = 'LICENSE') {
+  const readme = await readFile(path.join(root, 'README.md'), 'utf8');
+  await writeFile(path.join(destination, 'README.md'), readme.replace('](LICENSE)', `](${licenseFilename})`));
+  await copyFile(path.join(root, 'LICENSE'), path.join(destination, licenseFilename));
   // Preserve relative links to the usage and deployment guides in shipped copies.
   await cp(path.join(root, 'docs'), path.join(destination, 'docs'), {
     recursive: true, filter: filename => path.basename(filename) !== 'README.template.md',

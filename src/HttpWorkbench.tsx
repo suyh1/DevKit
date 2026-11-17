@@ -7,6 +7,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, Square, Save, Plus, Trash2, Download, Upload, Copy } from 'lucide-react';
 import ApiWorkspace from './ApiWorkspace';
 import HttpRequestInput from './HttpRequestInput';
+import HttpMultipart, { multipartIssue, withMultipart } from './HttpMultipart';
+import type { MultipartField } from './HttpMultipart';
+import { useWorkspaceResource } from './workspace-links';
 import CodeEditor from './CodeEditor';
 import { parseHttpConfig, savedHttpConfig, readHttpCollection, collectionText } from './http-model';
 import type { HttpEntry, HttpResponse } from './http-model';
@@ -36,6 +39,9 @@ export default function HttpWorkbench({
   onGenerate: (config: string) => void;
 }) {
   const [workspaceMode, setWorkspaceMode] = useState<'api'|'quick'>('api');
+  const linked = useWorkspaceResource('http');
+  useEffect(() => { if (linked) setWorkspaceMode('api'); }, [linked]);
+  const [multipart, setMultipart] = useState<MultipartField[] | null>(null);
   const [apiBusy, setApiBusy] = useState(false);
   const [loaded] = useState(initialCollection);
   const [entries, setEntries] = useState(loaded.entries),
@@ -74,7 +80,7 @@ export default function HttpWorkbench({
   useMotionList(collection, entries.map((entry) => entry.id).join('|'));
   const confirm = useConfirmation();
   const dirty =
-    invalidDraft ||
+    invalidDraft || !!multipart ||
     config !== baseline.config ||
     name !== baseline.name ||
     timeout !== baseline.timeout ||
@@ -88,6 +94,7 @@ export default function HttpWorkbench({
     };
   }, []);
   function reset(config: string, name = '新请求', timeout = 15000, id = '', sensitive = false) {
+    setMultipart(null);
     setEditorKey((key) => key + 1);
     setInvalidDraft(false);
     setConfig(config);
@@ -164,7 +171,9 @@ export default function HttpWorkbench({
     setResponse(null);
     setStale(false);
     try {
-      const result = await sendHttp(id, request);
+      const next = await withMultipart(request, multipart);
+      if (liveRequest.current !== id) return;
+      const result = await sendHttp(id, next);
       if (mounted.current && liveRequest.current === id) {
         setResponse(result);
         record(String(result.status));
@@ -388,7 +397,7 @@ export default function HttpWorkbench({
             </MotionButton>
             <button
               className="secondary-button"
-              disabled={!!running || invalidDraft}
+              disabled={!!running || invalidDraft || !!multipart}
               onClick={() => {
                 try {
                   parseHttpConfig(config);
@@ -405,7 +414,7 @@ export default function HttpWorkbench({
               className="run-button"
               busy={!!running}
               outcome={error ? 'error' : response ? 'success' : ''}
-              disabled={!running && (!canSendHttp() || (!window.devkitHttp && !remoteAccess()) || invalidDraft)}
+              disabled={!running && (!canSendHttp() || (!window.devkitHttp && !remoteAccess()) || invalidDraft || !!(multipart && multipartIssue(multipart)))}
               onClick={() => {
                 if (running) void cancelHttp(running).catch((error) => setError(String(error)));
                 else void send();
@@ -427,6 +436,7 @@ export default function HttpWorkbench({
           {dirty && <p className="preview-note">请求草稿尚未保存。</p>}
           {!window.devkitHttp && !remoteAccess() && <p>请在桌面端或已登录的共享工作台发送请求。</p>}
           <div className="http-request">
+            <HttpMultipart fields={multipart} change={rows => { setMultipart(rows); if (response) setStale(true); }} disabled={!!running} />
             <HttpRequestInput
               advanced
               key={editorKey}

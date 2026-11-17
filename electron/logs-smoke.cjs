@@ -24,14 +24,13 @@ module.exports = async (window, output) => {
   const nginx = await ipc('devkitNginx', 'get'); await ipc('devkitNginx', 'upsert', { revision: nginx.revision, instance: { name: '网关', main, files: [], prefix: path.resolve(folder), executable: '', platform: process.platform } });
   let remote;
   try {
-    await js(`document.querySelector('.sidebar [title="日志中心"]').click()`);
-    assert.equal(await js(`document.querySelector('.sidebar-shared').open`), false, 'Shared sidebar starts collapsed');
+    assert.equal(await js(`document.querySelector('.shared-sidebar-trigger').getAttribute('aria-expanded')`), 'false', 'Shared sidebar starts collapsed');
     await js(`document.querySelector('.shared-sidebar-trigger').click()`);
-    await wait(window.webContents, `document.querySelector('.sidebar-shared').open`);
-    assert.equal(await js(`document.querySelectorAll('.sidebar-shared nav button').length`), 7);
-    assert.equal(await js(`!!document.querySelector('.sidebar-shared [title="局域网主机"]')`), true);
-    await js(`document.querySelector('.sidebar-shared [title="日志中心"]').click()`);
-    await wait(window.webContents, `!document.querySelector('.sidebar-shared').open`);
+    await wait(window.webContents, `!!document.querySelector('#shared-sidebar-panel:popover-open')`);
+    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 7);
+    assert.equal(await js(`!!document.querySelector('#shared-sidebar-panel [title="局域网主机"]')`), true);
+    await js(`document.querySelector('#shared-sidebar-panel [title="日志中心"]').click()`);
+    await wait(window.webContents, `!document.querySelector('#shared-sidebar-panel:popover-open')`);
     const minimum = window.getMinimumSize(); window.setMinimumSize(360, 600);
     for (const width of [1440, 1024, 768, 390]) {
       window.setContentSize(width, 900); await delay(150);
@@ -52,7 +51,7 @@ module.exports = async (window, output) => {
       await js(`[...document.querySelectorAll('.shared-nav-panel [role=menuitem]')].find(e=>e.querySelector('strong').textContent===${JSON.stringify(name)}).click()`);
       await wait(window.webContents, `document.querySelector('.breadcrumb strong')?.textContent===${JSON.stringify(name)}&&!document.querySelector('.shared-nav-panel')`);
     }
-    await wait(window.webContents, `document.querySelectorAll('.log-source-list>label').length===4`);
+    await wait(window.webContents, `document.querySelectorAll('.log-source-list section>label').length===4`);
     await js(`document.querySelectorAll('.log-source-list input').forEach(e=>e.click())`);
     await wait(window.webContents, `document.querySelectorAll('.log-pane').length===4&&[...document.querySelectorAll('.log-pane pre')].every(e=>e.textContent.includes('INFO'))`);
     assert.equal(await js(`document.querySelector('.log-panels').textContent.includes('private-value')`), false, 'Display masking is on by default');
@@ -79,7 +78,7 @@ module.exports = async (window, output) => {
     remote = new BrowserWindow({ width: 1440, height: 900, show: true, webPreferences: { partition: `logs-${Date.now()}`, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     await remote.loadURL(`http://127.0.0.1:${port}/#logs`); await wait(remote.webContents, `!!document.querySelector('.portal-login .run-button')&&!document.querySelector('.portal-login .run-button').disabled`);
     await remote.webContents.executeJavaScript(`(()=>{const e=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'logs-smoke-only');e.dispatchEvent(new Event('input',{bubbles:true}))})()`, true); await delay(100); await remote.webContents.executeJavaScript(`document.querySelector('.portal-login .run-button').click()`, true);
-    await wait(remote.webContents, `document.querySelectorAll('.log-source-list>label').length===4`);
+    await wait(remote.webContents, `document.querySelectorAll('.log-source-list section>label').length===4`);
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-bar .portal-navigation').length`), 0);
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar .portal-navigation button').length`), 6);
     await remote.webContents.executeJavaScript(`document.querySelector('.log-source-list input').click()`, true); await wait(remote.webContents, `document.querySelector('.log-pane pre')?.textContent.includes('rotated-marker')`);

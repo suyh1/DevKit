@@ -4,27 +4,55 @@ import { Search, ArrowUp, ArrowDown, CornerDownLeft, X, SearchX } from 'lucide-r
 import type { ToolId } from './tools';
 import { toolIcons, categoryMeta } from './ui';
 import { searchTools } from './discovery';
+import { openWorkspaceLink, parseWorkspaceLink, workspaceSearch } from './workspace-links';
+import type { WorkspacePage, WorkspaceResult } from './workspace-links';
+import { workspaceModuleNav } from './ui';
 
-export default function CommandPalette({ open, onClose, onChoose, favorites, recent }: { open: boolean; onClose: () => void; onChoose: (id: ToolId, fresh?: boolean) => void; favorites: ToolId[]; recent: ToolId[] }) {
+export default function CommandPalette({ open, onClose, onChoose, favorites = [], recent = [], pages = [] }: { open: boolean; onClose: () => void; onChoose?: (id: ToolId, fresh?: boolean) => void; favorites?: ToolId[]; recent?: ToolId[]; pages?: WorkspacePage[] }) {
   const dialog = useRef<HTMLDialogElement>(null), input = useRef<HTMLInputElement>(null), results = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState(''), [index, setIndex] = useState(0);
-  const matches = searchTools(query, favorites, recent);
-  const visible = matches;
+  const [resources, setResources] = useState<WorkspaceResult[]>([]);
+  const pageKey = pages.join(',');
+  useEffect(() => {
+    setResources([]);
+    if (!open) return;
+    let live = true;
+    void workspaceSearch(pages, next => { if (live) setResources(previous => [...previous, ...next]); });
+    return () => { live = false; };
+  }, [open, pageKey]);
+  const matches = onChoose ? searchTools(query, favorites, recent) : [];
+  const terms = query.trim().toLowerCase().split(/\s+/);
+  const hashAt = query.indexOf('#');
+  const pasted = hashAt >= 0 ? parseWorkspaceLink(query.slice(hashAt).trim()) : undefined;
+  const shared = pasted && pages.includes(pasted.page) ? [{ ...pasted, label: '打开资源链接', detail: pasted.page }] : resources.filter(item => (query || !item.id) && terms.every(term => `${item.label} ${item.detail} ${item.page}`.toLowerCase().includes(term))).slice(0, 70);
+  const total = matches.length + shared.length;
   useEffect(() => {
     const element = dialog.current;
     if (open) { setQuery(''); setIndex(0); if (element && !element.open) element.showModal(); input.current?.focus(); }
     else if (element?.open) element.close();
   }, [open]);
   useEffect(() => { if (dialog.current?.open) results.current?.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' }); }, [index, query]);
-  function choose(id: ToolId, fresh = false) { onClose(); onChoose(id, fresh); }
+  function choose(position: number, fresh = false) {
+    onClose();
+    const match = matches[position], resource = shared[position - matches.length];
+    if (match) onChoose?.(match.id, fresh);
+    else if (resource) openWorkspaceLink(resource.page, resource.id);
+  }
   return <dialog ref={dialog} className="command-dialog motion-native" aria-label="搜索工具" onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="command-search"><Search size={21} /><input ref={input} aria-label="搜索全部工具" role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={visible[index] ? `command-${visible[index].id}` : undefined} autoComplete="off" placeholder="搜索工具、颜色或转换功能…" value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} onKeyDown={event => {
-      if (event.key === 'ArrowDown') { event.preventDefault(); setIndex(old => Math.max(0, Math.min(old + 1, visible.length - 1))); }
+    <div className="command-search"><Search size={21} /><input ref={input} aria-label={onChoose ? '搜索全部工具' : '搜索共享资源'} role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={index < total ? `command-${index}` : undefined} autoComplete="off" placeholder={onChoose ? '搜索工具、共享栏目或资源…' : '搜索栏目、实例、接口或监控…'} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} onKeyDown={event => {
+      if (event.key === 'ArrowDown') { event.preventDefault(); setIndex(old => Math.max(0, Math.min(old + 1, total - 1))); }
       if (event.key === 'ArrowUp') { event.preventDefault(); setIndex(old => Math.max(old - 1, 0)); }
-      if (event.key === 'Enter' && visible[index]) { event.preventDefault(); choose(visible[index].id, event.shiftKey); }
+      if (event.key === 'Enter' && index < total) { event.preventDefault(); choose(index, event.shiftKey); }
     }} /><button className="icon-button" aria-label="关闭搜索" onClick={onClose}><X size={17} /></button></div>
-    <div className="command-section-label">{query ? `找到 ${matches.length} 个工具` : '快速打开 · 收藏与最近使用优先'} · Shift + Enter 新建任务</div>
-<MotionReveal><MotionGroup groupRef={results} className="command-results" id="command-results" role="listbox" aria-label="工具搜索结果">{visible.length ? visible.map((tool, position) => { const Icon = toolIcons[tool.id]; return <button key={tool.id} id={`command-${tool.id}`} role="option" aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(tool.id)}><span className={`tool-icon category-${categoryMeta[tool.category].key}`}><Icon size={19} /></span><span><strong>{tool.name}</strong><small>{tool.english}</small></span><span className="command-category">{tool.category}</span><CornerDownLeft size={15} /></button>; }) : <div className="command-empty"><SearchX size={30} /><strong>暂时没有匹配的工具</strong><span>试试“JSON”“颜色”或“编码”。</span></div>}</MotionGroup></MotionReveal>
-    <div className="command-footer"><span><ArrowUp size={12} /><ArrowDown size={12} />选择</span><span><CornerDownLeft size={12} />打开工具</span><span><kbd>Esc</kbd>关闭</span><small>所有工具都在本地运行</small></div>
+    <div className="command-section-label">{query ? `找到 ${total} 项` : '快速打开'}{onChoose && ' · Shift + Enter 新建任务'}</div>
+    <MotionReveal><MotionGroup groupRef={results} className="command-results" id="command-results" role="listbox" aria-label="搜索结果">
+      {!total && <div className="command-empty"><SearchX size={30} /><strong>暂时没有匹配结果</strong></div>}
+      {matches.map((tool, position) => { const Icon = toolIcons[tool.id]; return <button key={tool.id} id={`command-${position}`} role="option" aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className={`tool-icon category-${categoryMeta[tool.category].key}`}><Icon size={19} /></span><span><strong>{tool.name}</strong><small>{tool.english}</small></span><span className="command-category">{tool.category}</span><CornerDownLeft size={15} /></button>; })}
+      {shared.map((resource, offset) => {
+        const position = matches.length + offset, { Icon } = workspaceModuleNav[resource.page];
+        return <button key={`${resource.page}/${resource.id || ''}`} id={`command-${position}`} role="option" aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className="tool-icon"><Icon size={19} /></span><span><strong>{resource.label}</strong><small>{resource.detail}</small></span><CornerDownLeft size={15} /></button>;
+      })}
+    </MotionGroup></MotionReveal>
+    <div className="command-footer"><span><ArrowUp size={12} /><ArrowDown size={12} />选择</span><span><CornerDownLeft size={12} />打开</span><span><kbd>Esc</kbd>关闭</span></div>
   </dialog>;
 }

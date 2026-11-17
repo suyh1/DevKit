@@ -10,7 +10,7 @@
 
 ## 带到离线电脑的文件
 
-从 artifacts/linux-arm64/ 复制：
+单独打包时从 `artifacts/linux-arm64/` 复制。三平台合集在对应的 `artifacts/release-版本/` 目录，运行时报告也随 `.deb` 安装：
 
 - DevKit_1.6.0-1_arm64.deb
 - SHA256SUMS
@@ -68,7 +68,9 @@ ldd /opt/devkit/devkit
 
 ## 开发者重新构建
 
-联网构建机安装 Node.js 24 与 Python 3.10+。在 Windows 也可以生成 ARM64 deb，因为没有需要在目标机器上编译的 Node 原生扩展。运行：
+联网构建机准备 Node.js 24、Python 3.10+ 和 `tar`。在 Linux 构建时还需要 `unzip`。在 Windows 也可以生成 ARM64 deb，因为没有需要在目标机器上编译的 Node 原生扩展。发行包包含 SSH 远程管理所需的三种便携 Node.js。用麒麟 ARM64 作 SSH 目标时，官方 Node.js 24 运行时要求 glibc 2.28 及匹配的系统库。见 [Node.js 支持的平台](https://github.com/nodejs/node/blob/v24.x/BUILDING.md#platform-list)。
+
+构建命令如下。
 
 ```sh
 npm ci

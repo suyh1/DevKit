@@ -2,6 +2,8 @@
 .sidebar .brand { padding-bottom:18px; }
 .sidebar .sidebar-workspace { padding:10px 0; }
 .category-navigation { display:flex; flex:1; flex-direction:column; min-height:0; position:relative; }
+.shared-sidebar-trigger { flex-shrink:0; }
+.sidebar-collapsed .shared-sidebar-trigger>.category-trigger-arrow { display:none; }
 .category-navigation .nav-caption { flex-shrink:0; padding:14px 10px 10px; }
 .sidebar .category-list { display:flex; flex-direction:column; gap:5px; padding:2px 3px 4px; overflow-y:auto; }
 .category-trigger { display:flex; align-items:center; gap:9px; width:100%; min-height:44px; flex-shrink:0; padding:6px 9px; border:1px solid transparent; border-radius:11px; background:transparent; color:var(--muted); text-align:left; }
@@ -42,6 +44,7 @@
   .sidebar:has(.category-panel-inline)>.sidebar-workspace,
   .sidebar:has(.category-panel-inline)>.nav-item,
   .sidebar:has(.category-panel-inline)>.sidebar-bottom,
+  .category-navigation.has-open-category>.shared-sidebar-trigger,
   .category-navigation.has-open-category>.nav-caption { display:none; }
   .sidebar .category-panel-inline { position:static; width:100%; max-height:none; flex:1; border:0; border-radius:0; box-shadow:none; background:transparent; }
   .category-panel-inline .category-panel-heading { padding:6px 2px 13px; }

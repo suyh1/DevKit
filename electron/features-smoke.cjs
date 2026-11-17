@@ -35,7 +35,7 @@ module.exports = async function featuresSmoke(window, output) {
   const snap = async name => { await js('new Promise(resolve=>setTimeout(resolve,240))'); await fs.writeFile(path.join(output, name + '.png'), (await window.webContents.capturePage()).toPNG()); };
   await js('document.documentElement.dataset.theme="light"');
   const size = window.getSize(), minimum = window.getMinimumSize(); window.setMinimumSize(360, 600); window.setSize(1440, 1000);
-  const { openTool } = require('./navigation-helpers.cjs')(window);
+  const { openTool, openWorkspace } = require('./navigation-helpers.cjs')(window);
   const pane = '.task-pane:not([hidden])';
   await openTool('文本与 JSON 差异');
   await select(`${pane} .field-mode select`, 'json'); await wait(`!!document.querySelector('${pane} .field-arrayKey')`);
@@ -59,7 +59,7 @@ module.exports = async function featuresSmoke(window, output) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
-    await js('document.querySelector(\'.sidebar button[title="HTTP 调试"]\').click()');
+    await openWorkspace('HTTP 调试');
     await click('快速请求', '.http-product-tabs');
     await wait('!!document.querySelector(\'.http-workspace:not([hidden])\')');
     await click('配置 JSON', '.http-request');
@@ -92,7 +92,7 @@ module.exports = async function featuresSmoke(window, output) {
   const a = { id: 'feature-dev', name: '功能测试开发', description: '', variables: [{ key: 'host', value: 'localhost' }], projects: [] };
   const b = { id: 'feature-prod', name: '功能测试生产', description: '', variables: [{ key: 'host', value: 'example.com' }], projects: [] };
   const updated = await js(`window.devkitProjects.request('save',${JSON.stringify({ revision: data.revision, data: { ...data, profiles: [...data.profiles, a, b] } })})`); assert.equal(updated.error, undefined);
-  await js('document.querySelector(\'.sidebar button[title="项目中心"]\').click()');
+  await openWorkspace('项目中心');
   await click('刷新', '.project-workspace'); await click('对比方案', '.project-workspace');
   await wait('!!document.querySelector(".pc-comparison table")'); await snap('features-environment-comparison');
   await click('关闭', '.pc-dialog[open]');
@@ -106,7 +106,7 @@ module.exports = async function featuresSmoke(window, output) {
     const main = path.join(root, name + '.conf'); await fs.writeFile(main, `error_log error.log; events {} http { server { listen 8080; server_name ${name}; include common.conf; } }`);
     state = await ipc('upsert', { revision: state.revision, instance: { name, main, files: [common], prefix: root, executable: '', platform: 'any' } });
   }
-  await js('document.querySelector(\'.sidebar button[title="Nginx 配置"]\').click()'); await click('刷新', '.ng-heading');
+  await openWorkspace('Nginx 配置'); await click('刷新', '.ng-heading');
   const id = state.instances.find(item => item.name === 'feature-a').id;
   await wait(`!!document.querySelector('.ng-instance[data-instance-id="${id}"] .ng-instance-select')`);
   await js(`document.querySelector('.ng-instance[data-instance-id="${id}"] .ng-instance-select').click()`);

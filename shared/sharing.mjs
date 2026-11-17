@@ -4,7 +4,7 @@ const fields = {
   http: ["edit", "send"],
   jar: ["edit", "control"],
   monitor: ["edit", "control"],
-  logs: ["jar", "nginx", "export"],
+  logs: ["jar", "nginx", "export", "raw"],
 };
 const own = (value, key) => Object.hasOwn(value, key);
 export function emptySharingServices() {

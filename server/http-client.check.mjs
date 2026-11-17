@@ -4,6 +4,36 @@ import http from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { createHttpClient, validateHttpRequest } from './http-client.mjs';
 
+test('multipart keeps repeated fields and byte-exact files, and rejects malformed or oversized input', async () => {
+  const bytes = Buffer.from([0, 255, 13, 10, 128, 11]);
+  const parts = [{ name: 'tag', value: '中文' }, { name: 'tag', value: 'second' }, { name: 'file', file: { name: 'data.bin', data: bytes.toString('base64') } }];
+  const server = http.createServer(async (req, res) => {
+    try {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const body = Buffer.concat(chunks);
+      assert.equal(Number(req.headers['content-length']), body.length);
+      const form = await new Response(body, { headers: { 'content-type': req.headers['content-type'] } }).formData();
+      assert.deepEqual(form.getAll('tag'), ['中文', 'second']);
+      assert.equal(form.get('file').name, 'data.bin');
+      assert.deepEqual(Buffer.from(await form.get('file').arrayBuffer()), bytes);
+      res.end('multipart received');
+    } catch (error) { res.writeHead(500); res.end(error.message); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${server.address().port}`, client = createHttpClient();
+  try {
+    const reply = await client.send('multipart', { url, method: 'POST', multipart: parts, headers: { 'Content-Type': 'text/plain' } });
+    assert.equal(reply.body, 'multipart received');
+    for (const form of [[], [{ name: 'bad\r\nheader', value: 'x' }], [{ name: 'tooBig', value: '汉'.repeat(400000) }], [{ name: 'file', file: { name: '../x', data: '' } }], [{ name: 'file', file: { name: 'x', data: 'A' } }]]) {
+      assert.throws(() => validateHttpRequest({ url, method: 'POST', multipart: form }), /multipart/);
+    }
+    assert.throws(() => validateHttpRequest({ url, multipart: parts }), /GET\/HEAD/);
+  } finally {
+    client.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('HTTP methods, raw JSON, headers, no redirects, binary and compressed responses', async () => {
   let redirectHit = 0;
   const server = http.createServer(async (req, res) => {

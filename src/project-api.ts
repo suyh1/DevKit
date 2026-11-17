@@ -1,5 +1,6 @@
 import type { ProjectState } from "../shared/projects.mjs";
 import type { SharingServices } from '../shared/sharing.mjs';
+import { remoteAccess } from './workspace-remote';
 
 export type ProjectAction =
   | "session"
@@ -15,6 +16,7 @@ export type ProjectAction =
   | "login"
   | "logout"
   | "sharing"
+  | "sharing-audit"
   | "start"
   | "stop"
   | "open";
@@ -38,9 +40,14 @@ export type Sharing = {
   canEdit: boolean;
   autoStart: boolean;
   hasPassword: boolean;
+  allowDefault?: boolean;
+  tls?: { cert: string; key: string; hostname: string } | null;
+  visitors?: SharingVisitor[];
   addresses: string[];
   directory: string;
 };
+export type SharingVisitor = { name: string; services: SharingServices; password?: string; hasPassword?: boolean };
+export type SharingAudit = { at: string; visitor: string; action: string; outcome: string };
 export type ProjectStorage = {
   directory: string;
   portable: boolean;
@@ -54,6 +61,7 @@ export type Session = {
   shareHttp?: boolean;
   nginxControl?: boolean;
   authenticated: boolean;
+  visitor?: string;
   role: "owner" | "editor" | "viewer";
 };
 export type Health = {
@@ -102,6 +110,7 @@ export async function projectRequest<T>(
   };
   const route = routes[action];
   if (!route) throw new Error("此操作仅可在主机桌面端进行。");
+  const requestAccess = remoteAccess();
   const response = await fetch(`/api/${['session', 'login', 'logout'].includes(action) ? 'sharing' : 'projects'}/${route[0]}`, {
     method: route[1],
     credentials: "same-origin",
@@ -112,7 +121,7 @@ export async function projectRequest<T>(
     body: payload === undefined ? undefined : JSON.stringify(payload),
   });
   const result = await response.json();
-  if (response.status === 401 && !['session', 'login', 'logout'].includes(action)) window.dispatchEvent(new Event('devkit:session-required'));
+  if (response.status === 401 && requestAccess === remoteAccess() && !['session', 'login', 'logout'].includes(action)) window.dispatchEvent(new Event('devkit:session-required'));
   if (!response.ok)
     throw new Error(result.error || `请求失败（${response.status}）`);
   return result as T;

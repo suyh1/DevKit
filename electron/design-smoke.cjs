@@ -115,7 +115,7 @@ module.exports = async function designSmoke(window, output) {
   await js('document.querySelector(".color-story-card").click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
-  await js('document.querySelector(\'.sidebar button[title="项目中心"]\').click()');
+  await require('./navigation-helpers.cjs')(window).openWorkspace('项目中心');
   await wait('!!document.querySelector(".project-workspace:not([hidden]) .pc-shell")');
   await js("document.documentElement.dataset.theme = 'dark'");
   await settle();

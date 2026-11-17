@@ -4,7 +4,7 @@ export type SharingServices = {
   http: { enabled: boolean; edit: boolean; send: boolean };
   jar: { enabled: boolean; edit: boolean; control: boolean };
   monitor: { enabled: boolean; edit: boolean; control: boolean };
-  logs: { enabled: boolean; jar: boolean; nginx: boolean; export: boolean };
+  logs: { enabled: boolean; jar: boolean; nginx: boolean; export: boolean; raw: boolean };
 };
 export function emptySharingServices(): SharingServices;
 export function hasLegacySharing(value?: unknown): boolean;

@@ -2,6 +2,7 @@ import { open } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { jarPaths } from './jar-manager.mjs';
+import { redactLogResult } from './log-redaction.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 const sourceId = (kind, id, filename) => digest(`${kind}\0${id}\0${filename}`);
@@ -22,6 +23,8 @@ export async function readLogFile(filename, cursor, { initial = 128 * 1024, chun
     }
     let offset = reset ? Math.max(0, info.size - initial) : cursor.offset;
     const truncated = reset && offset > 0;
+    const previousByte = Buffer.alloc(1);
+    const startsMidline = !reset && offset > 0 && ((await handle.read(previousByte, 0, 1, offset - 1)).bytesRead !== 1 || previousByte[0] !== 10);
     const buffer = Buffer.alloc(Math.min(reset ? initial : chunk, Math.max(0, info.size - offset)));
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, offset);
     let end = bytesRead;
@@ -35,18 +38,18 @@ export async function readLogFile(filename, cursor, { initial = 128 * 1024, chun
     if (truncated) { const newline = bytes.indexOf(10); bytes = newline < 0 ? Buffer.alloc(0) : bytes.subarray(newline + 1); }
     offset += end;
     const anchor = Buffer.alloc(Math.min(64, offset)), checked = await handle.read(anchor, 0, anchor.length, offset - anchor.length);
-    return { text: bytes.toString('utf8'), cursor: { kind: 'file', identity, offset, anchor: digest(anchor.subarray(0, checked.bytesRead)) }, reset, truncated, size: info.size, more: info.size > offset, checkedAt: new Date().toISOString() };
+    return { text: bytes.toString('utf8'), cursor: { kind: 'file', identity, offset, anchor: digest(anchor.subarray(0, checked.bytesRead)) }, reset, truncated, startsMidline, size: info.size, more: info.size > offset, checkedAt: new Date().toISOString() };
   } finally { await handle.close(); }
 }
 
-export function createLogCenter({ jar, nginx }) {
+export function createLogCenter({ jar, nginx, lan }) {
   const clientId = randomUUID();
-  let active = 0;
+  const active = { local: 0, remote: 0 };
   async function discover(access = {}) {
     const sources = [], warnings = [];
     if (access.jar !== false) {
       try {
-        const state = await jar?.()?.request('get', {}, { allowEdit: false, allowControl: false });
+        const state = await (await jar?.())?.request('get', {}, { allowEdit: false, allowControl: false });
         for (const item of state?.instances || []) {
           if (item.logMode === 'silent') continue;
           const console = item.logMode === 'console', filename = console ? '' : jarPaths(item).logPath;
@@ -56,7 +59,7 @@ export function createLogCenter({ jar, nginx }) {
     }
     if (access.nginx !== false) {
       try {
-        const manager = nginx?.(), state = await manager?.request('get');
+        const manager = await nginx?.(), state = await manager?.request('get');
         for (const item of state?.instances || []) {
           try {
             const scan = await manager.request('inspect', { id: item.id }, { allowExecution: false });
@@ -74,36 +77,62 @@ export function createLogCenter({ jar, nginx }) {
   }
   async function read(source, cursor, exporting = false) {
     if (source.mode === 'file') return readLogFile(source.path, exporting ? null : cursor, exporting ? { initial: 1024 * 1024 } : {});
-    let result, text = '', count = 0;
+    let result, text = '', count = 0, startsMidline = false, reset = false, truncated = false;
     do {
-      result = await jar().request('console-read', { id: source.instanceId, clientId, cursor: cursor?.offset, generation: cursor?.identity }, { allowEdit: false, allowControl: false });
+      result = await (await jar()).request('console-read', { id: source.instanceId, clientId, cursor: cursor?.offset, generation: cursor?.identity }, { allowEdit: false, allowControl: false });
       if (!result.available) return { text: '', cursor: null, reset: true, truncated: false, available: false, checkedAt: new Date().toISOString() };
+      if (!count || result.reset) { text = ''; ({ startsMidline, reset, truncated } = result); }
       text += result.text; cursor = { kind: 'console', identity: result.generation, offset: result.cursor };
       count++;
     } while (exporting && result.cursor < result.end && count < 16);
-    return { text, cursor, reset: result.reset, truncated: result.truncated, available: true, more: result.cursor < result.end, checkedAt: new Date().toISOString() };
+    return { text, cursor, reset, truncated, startsMidline, available: true, more: result.cursor < result.end, checkedAt: new Date().toISOString() };
   }
   return {
-    async request(action, payload = {}, access = {}) {
-      if (active >= 4) throw Object.assign(new Error('日志读取繁忙，请稍后重试。'), { status: 429 });
-      active++;
-      try {
+    async request(action, payload = {}, access = { raw: true }, session) {
       if (!['sources', 'read', 'export'].includes(action)) fail('未知日志中心操作。');
+      const remote = action === 'sources' ? !!payload.hostId : Array.isArray(payload.sources) && payload.sources.some(item => typeof item?.id === 'string' && item.id.includes(':'));
+      const lane = remote ? 'remote' : 'local';
+      if (active[lane] >= 4) throw Object.assign(new Error('日志读取繁忙，请稍后重试。'), { status: 429 });
+      active[lane]++;
+      try {
       if (action === 'export' && access.export === false) fail('未授予日志导出权限。');
-      const catalog = await discover(access);
-      if (action === 'sources') return catalog;
-      const requested = payload.sources;
-      if (!Array.isArray(requested) || requested.length < 1 || requested.length > 4 || requested.some(item => !item || typeof item.id !== 'string' || !/^[a-f0-9]{64}$/.test(item.id)) || new Set(requested.map(item => item.id)).size !== requested.length) fail('每次请选择 1–4 个不同的已登记日志来源。');
-      const results = [];
-      // A fixed bound protects the host even when several visitors track the same files.
-      for (const value of requested) {
-        const source = catalog.sources.find(item => item.id === value.id);
-        if (!source) { results.push({ id: value.id, error: '来源已移除、变更或未授权，请刷新来源列表。' }); continue; }
-        try { results.push({ id: source.id, ...await read(source, value.cursor, action === 'export') }); }
-        catch (error) { results.push({ id: source.id, error: error.code === 'ENOENT' ? '日志文件尚未生成或已被移走。' : error.message }); }
+      const coordinator = payload.scope === 'local' ? undefined : lan?.();
+      const hosts = (coordinator?.logTargets() || []).filter(host => host.modules.jar && access.jar !== false || host.modules.nginx && access.nginx !== false);
+      if (action === 'sources') {
+        if (payload.hostId) {
+          const host = hosts.find(item => item.id === payload.hostId);
+          if (!host) fail('日志来源主机已移除。');
+          const result = await coordinator.logs(host.id, action, {}, access, session);
+          return { warnings: result.warnings, sources: result.sources.map(source => ({
+            ...source, id: `${host.id}:${source.id}`, instanceId: `${host.id}:${source.instanceId}`, hostId: host.id, hostName: host.name,
+          })) };
+        }
+        const local = await discover(access);
+        return payload.scope === 'inventory-local' ? { ...local, hosts } : local;
       }
+      const requested = payload.sources;
+      if (!Array.isArray(requested) || requested.length < 1 || requested.length > 4 || requested.some(item => !item || typeof item.id !== 'string' || !/^(?:[a-f0-9-]{36}:)?[a-f0-9]{64}$/.test(item.id)) || new Set(requested.map(item => item.id)).size !== requested.length) fail('每次请选择 1–4 个不同的已登记日志来源。');
+      const catalog = requested.some(value => !value.id.includes(':')) ? await discover(access) : { sources: [] };
+      const raw = access.raw === true && payload.raw === true;
+      // A fixed bound protects the host even when several visitors track the same files.
+      const results = await Promise.all(requested.map(async value => {
+        const [hostId, id] = value.id.split(':');
+        if (id) {
+          try {
+            if (!hosts.some(item => item.id === hostId)) fail('日志来源主机已移除。');
+            const result = await coordinator.logs(hostId, action, { raw, sources: [{ id, cursor: value.cursor }] }, access, session);
+            return { ...result.results[0], id: value.id };
+          } catch (error) { return { id: value.id, error: error.message }; }
+        }
+        const source = catalog.sources.find(item => item.id === value.id);
+        if (!source) return { id: value.id, error: '来源已移除、变更或未授权，请刷新来源列表。' };
+        try {
+          const result = await read(source, value.cursor, action === 'export');
+          return { id: source.id, ...(raw ? result : redactLogResult(result)) };
+        } catch (error) { return { id: source.id, error: error.code === 'ENOENT' ? '日志文件尚未生成或已被移走。' : error.message }; }
+      }));
       return { results };
-      } finally { active--; }
+      } finally { active[lane]--; }
     },
   };
 }

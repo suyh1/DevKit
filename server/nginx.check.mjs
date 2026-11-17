@@ -7,7 +7,7 @@ import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseNginx, flattenNginx, editNginxArgs, insertNginx } from '../shared/nginx.mjs';
 import { createNginxManager, discoverIncludes } from './nginx-manager.mjs';
-import { detectNginx, nginxArgs, processMatches } from './nginx-process.mjs';
+import { detectNginx, nginxArgs, processMatches, runNginx } from './nginx-process.mjs';
 import { createNginxConfigSet, nginxStarter } from './nginx-create.mjs';
 import { prepareNginxDirectories } from './nginx-directories.mjs';
 
@@ -40,6 +40,40 @@ test('span editing preserves BOM, CRLF, comments, repeated directives, quoted de
   assert.equal(nodes.find(node => node.name === 'location').values[1], '^/a{2}#b;');
   assert.throws(() => editNginxArgs(original, target, 'http://safe; include /tmp/other'), /字段只填写参数/);
   assert.throws(() => editNginxArgs(original, target, 'http://safe # discarded'), /字段只填写参数|分号/);
+});
+test('draft apply validates staged includes, preserves originals on rejection and can restore a confirmed backup', async () => {
+  let rejectDraft = true;
+  await fixture(async ({ dir, common, main, manager, add }) => {
+    const id = (await add()).instances[0].id;
+    const initial = await manager.request('documents', { id });
+    const doc = initial.files.find(item => item.path === common);
+    const files = [{ ...doc, content: doc.content.replace(':9000', ':9081') }];
+    const rejected = await manager.request('apply-draft', { id, files });
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.phase, '检查草稿');
+    assert.equal(await readFile(common, 'utf8'), doc.content);
+    rejectDraft = false;
+    const checked = await manager.request('apply-draft', { id, files });
+    assert.equal(checked.ok, true, checked.output);
+    assert.equal(checked.affected[0].state, 'stopped');
+    assert.equal(await readFile(common, 'utf8'), doc.content);
+    const applied = await manager.request('apply-draft', { id, files, confirmed: true, affected: checked.affected });
+    assert.equal(applied.ok, true, applied.output);
+    assert.equal(await readFile(common, 'utf8'), files[0].content);
+    assert.equal(await readFile(main, 'utf8'), initial.files[0].content);
+    assert.ok(!(await readdir(path.join(dir, 'configs/nginx'))).some(name => name.startsWith('draft-')));
+    const restored = await manager.request('restore-backup', { id, backupId: applied.backupId, confirmed: true, affected: checked.affected });
+    assert.equal(restored.ok, true, restored.output);
+    assert.equal(await readFile(common, 'utf8'), doc.content);
+  }, {
+    run: async (_executable, args) => {
+      assert.ok(args.includes('-t'));
+      const staged = await readFile(args[args.indexOf('-c') + 1], 'utf8'), filename = /include "([^"]+)";/.exec(staged)?.[1];
+      assert.ok(filename && filename.includes('draft-'));
+      assert.match(await readFile(filename, 'utf8'), /:(?:9000|9081)/);
+      return { ok: !rejectDraft, output: rejectDraft ? 'fixture rejected draft' : 'ok' };
+    },
+  });
 });
 test('nested insertion and deletion retain unrelated syntax; malformed syntax never enters field mode', () => {
   const source = 'http {\n    server { listen 80; }\n}\n';
@@ -290,8 +324,13 @@ test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and
     const start = await manager.request('command', { id, command: 'start' }); assert.equal(start.ok, true, JSON.stringify(start));
     assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), 'before');
     const doc = (await manager.request('documents', { id })).files[0];
-    await manager.request('save-files', { id, files: [{ ...doc, content: original.replace('before', 'after') }] });
-    const reload = await manager.request('command', { id, command: 'reload' }); assert.equal(reload.ok, true, JSON.stringify(reload));
+    const files = [{ ...doc, content: original.replace('before', 'after') }];
+    const staged = await manager.request('apply-draft', { id, files });
+    assert.equal(staged.ok, true, staged.output);
+    assert.equal(await readFile(main, 'utf8'), original);
+    const reload = await manager.request('apply-draft', { id, files, confirmed: true, affected: staged.affected });
+    assert.equal(reload.ok, true, reload.output);
+    assert.deepEqual(reload.reloaded, ['real']);
     let text;
     for (let index = 0; index < 40; index++) { text = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text(); if (text === 'after') break; await delay(100); }
     assert.equal(text, 'after');
@@ -299,6 +338,73 @@ test('real nginx: isolated prefix, syntax test, start, HTTP response, reload and
     assert.equal((await manager.request('statuses'))[0].state, 'stopped');
   } finally {
     if (id && (await manager.request('statuses'))[0]?.state === 'running') await manager.request('command', { id, command: 'stop' });
+    await manager.close(); assert.equal(path.dirname(dir), await realpath(tmpdir())); await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('real nginx: bind failure stays unconfirmed, then disk recovery and reload can be performed separately', { skip: !process.env.DEVKIT_NGINX_TEST_EXECUTABLE, timeout: 60000 }, async () => {
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-nginx-recovery-')));
+  const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE;
+  const port = await unusedPort(), blocked = await unusedPort();
+  const main = path.join(dir, 'nginx.conf'), pidPath = path.join(dir, 'logs/master.pid');
+  const original = `worker_processes 1; pid logs/master.pid; error_log logs/error.log; events {} http { access_log off; server { listen 127.0.0.1:${port}; return 200 "before"; } }\n`;
+  await writeFile(main, original);
+  const blocker = createServer();
+  let blockReload = true, id, pid;
+  const manager = await createNginxManager(path.join(dir, 'configs'), { run: async (exe, args, prefix) => {
+    if (blockReload && args.includes('reload') && !blocker.listening) {
+      await new Promise((resolve, reject) => { blocker.once('error', reject); blocker.listen(blocked, '127.0.0.1', resolve); });
+    }
+    return runNginx(exe, args, prefix);
+  } });
+  const serving = async () => (await fetch(`http://127.0.0.1:${port}/`, { headers: { Connection: 'close' } })).text();
+  try {
+    const state = await manager.request('upsert', { revision: 0, instance: { name: 'recovery', main, prefix: dir, files: [], executable, platform: process.platform } });
+    id = state.instances[0].id;
+    const started = await manager.request('command', { id, command: 'start' });
+    assert.equal(started.ok, true, started.output);
+    pid = await readFile(pidPath, 'utf8');
+    const doc = (await manager.request('documents', { id })).files[0];
+    const files = [{ ...doc, content: original.replace(`:${port};`, `:${blocked};`).replace('before', 'rejected') }];
+    const checked = await manager.request('apply-draft', { id, files });
+    assert.equal(checked.ok, true, checked.output);
+    const applied = await manager.request('apply-draft', { id, files, confirmed: true, affected: checked.affected });
+    assert.equal(applied.ok, false, applied.output);
+    assert.equal(applied.reloadState, 'unconfirmed');
+    assert.deepEqual(applied.reloaded, []);
+    assert.equal(await readFile(main, 'utf8'), files[0].content);
+    assert.equal(await serving(), 'before');
+    assert.match(await readFile(path.join(dir, 'logs/error.log'), 'utf8'), /bind\(\)/);
+    await writeFile(pidPath, 'unreadable-pid');
+    assert.equal((await manager.request('statuses'))[0].state, 'unknown');
+    const preview = await manager.request('restore-disk', { id, backupId: applied.backupId });
+    assert.equal(preview.ok, true, preview.output);
+    assert.equal(await readFile(main, 'utf8'), files[0].content);
+    const disk = await manager.request('restore-disk', { id, backupId: applied.backupId, confirmed: true });
+    assert.equal(disk.ok, true, disk.output);
+    assert.equal(await readFile(main, 'utf8'), original);
+    assert.equal(await readFile(pidPath, 'utf8'), 'unreadable-pid');
+    assert.equal(await serving(), 'before');
+    const recovery = { id, backupId: disk.recoveryId };
+    assert.equal((await manager.request('reload-restored', recovery)).ok, false);
+    await writeFile(pidPath, pid);
+    blockReload = false;
+    const confirmed = await manager.request('reload-restored', recovery);
+    assert.equal(confirmed.ok, true, confirmed.output);
+    assert.equal(confirmed.affected[0].pid, Number(pid.trim()));
+    await writeFile(main, original + '# concurrent change\n');
+    assert.equal((await manager.request('reload-restored', { ...recovery, confirmed: true, affected: confirmed.affected })).ok, false);
+    await writeFile(main, original);
+    const done = await manager.request('reload-restored', { ...recovery, confirmed: true, affected: confirmed.affected });
+    assert.equal(done.ok, true, done.output);
+    assert.deepEqual(done.reloaded, ['recovery']);
+    assert.equal(await serving(), 'before');
+  } finally {
+    if (blocker.listening) await new Promise(resolve => blocker.close(resolve));
+    if (pid && id) {
+      await writeFile(pidPath, pid);
+      await manager.request('command', { id, command: 'stop' });
+    }
     await manager.close(); assert.equal(path.dirname(dir), await realpath(tmpdir())); await rm(dir, { recursive: true, force: true });
   }
 });

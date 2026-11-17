@@ -133,7 +133,9 @@ app
       };
       const fill = async (css, text) => {
         await selector(css);
+        await wait(`document.activeElement === document.querySelector(${JSON.stringify(css)})`);
         key("A", ["control"]);
+        await wait(`(()=>{const input=document.querySelector(${JSON.stringify(css)});return input.selectionStart===0 && input.selectionEnd===input.value.length})()`);
         await window.webContents.insertText(text);
         await delay(40);
       };
@@ -182,6 +184,12 @@ app
       window.webContents.focus();
       await login();
       console.log('Portal: authenticated');
+      await selector('[aria-label="搜索共享资源"]');
+      await fill('.command-dialog input', '共享接口定义');
+      await wait('[...document.querySelectorAll(".command-dialog button[role=option]")].some(button => button.textContent.includes("共享接口定义"))');
+      key('Return');
+      await wait('location.hash === "#http/fixture-project%3Afixture-endpoint" && document.querySelector(".api-endpoint-header h2")?.textContent.includes("共享接口定义")');
+      await button('项目中心', '.portal-navigation button');
       {
         await button('Nginx 配置', '.portal-navigation button');
         await wait('!!document.querySelector(".ng-editor-fieldset")');
@@ -307,6 +315,7 @@ app
         'document.querySelector(".api-workspace")?.textContent.includes("共享接口定义")',
       );
       await button("接口设计", ".api-tabs button");
+      await selector('.portal-appearance summary');
       await selector('select[aria-label="共享页面主题"]');
       key("End");
       key("Return");
@@ -322,6 +331,8 @@ app
         }
       }
       await js(`{ const select = document.querySelector('select[aria-label="共享页面主题风格"]'); select.value = 'default'; select.dispatchEvent(new Event('change', { bubbles: true })); }`);
+      await selector('.portal-appearance summary');
+      assert.equal(await js('document.querySelector(".portal-bar").getBoundingClientRect().height <= 90'), true);
       for (const [width, height, zoom] of [
         [1920, 1080, 1],
         [1366, 768, 1.25],
@@ -352,9 +363,11 @@ app
       window.setContentSize(1440, 900);
       await delay(150);
       await wheel(-18000);
+      await selector('.portal-appearance summary');
       await selector('select[aria-label="共享页面主题"]');
       key("Home");
       key("Return");
+      await selector('.portal-appearance summary');
       await button("运行调试", ".api-tabs button");
       await fill('input[aria-label="参数1示例"]', "temporary-request");
       await selector('button[aria-label="新增API接口"]');
@@ -510,6 +523,98 @@ app
       assert.deepEqual(errors, []);
       await require('./project-probe-smoke.cjs')(window, fixture, output);
       assert.deepEqual(errors, []);
+      console.log('Portal: validating visitor changes, narrow header, resource links and isolated log streams');
+      window.setContentSize(1440, 900);
+      await wait('innerWidth >= 1300');
+      const global = {
+        ...fixture.options.services,
+        jar: { enabled: true, edit: true, control: false },
+        logs: { enabled: true, jar: true, nginx: true },
+      };
+      const mobileVisitor = 'mobile-' + 'viewer'.repeat(6);
+      const visitorServices = {
+        projects: { enabled: false }, http: { enabled: false }, monitor: { enabled: false },
+        jar: { enabled: true }, nginx: { enabled: true }, logs: { enabled: true },
+      };
+      const visitorPassword = 'mobile-visitor-test';
+      const shared = { ...fixture.options, services: global, visitors: [{ name: mobileVisitor, password: visitorPassword, services: visitorServices }] };
+      await fixture.host.start(shared);
+      await window.loadURL(fixture.url + '?audit=visitor#jar');
+      await login();
+      await wait('document.querySelector(".jar-instance")?.textContent.includes("审查测试应用")');
+      await button('设置', '.jar-instance button');
+      await wait('!!document.querySelector(".jar-dialog[open]")');
+      assert.match(await js('document.querySelector(".jar-dialog textarea").value'), /audit-secret/);
+      await fill('.jar-dialog textarea', '-Dpassword=unsaved-audit-secret');
+      const getJar = `fetch('/api/jar/get', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status)`;
+      const expire = async () => {
+        await fixture.host.start(shared);
+        assert.equal(await js(getJar), 401);
+        await js("window.dispatchEvent(new Event('devkit:session-required'))");
+        await wait('!!document.querySelector("[aria-label=关闭重新登录提示]")');
+      };
+      await expire();
+      await fill('dialog[open] input[type=password]', fixture.options.password);
+      await button('登录', 'dialog[open] button');
+      await wait('!document.querySelector("[aria-label=关闭重新登录提示]")');
+      assert.match(await js('document.querySelector(".jar-dialog textarea").value'), /unsaved-audit-secret/);
+      await expire();
+      await fill('dialog[open] input[autocomplete=username]', mobileVisitor);
+      await fill('dialog[open] input[type=password]', visitorPassword);
+      await button('登录', 'dialog[open] button');
+      await wait('!document.querySelector(".jar-dialog") && !!document.querySelector(".jar-instance")');
+      assert.ok(!await js('document.body.innerText.includes("unsaved-audit-secret") || [...document.querySelectorAll("textarea")].some(e=>e.value.includes("audit-secret"))'));
+      assert.ok(!await js('[...document.querySelectorAll(".jar-instance button")].some(e=>e.textContent.trim()==="日志"||e.textContent.trim()==="控制台")'));
+      for (const [page, resource] of [['jar', 'JAR 实例'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
+        await js(`location.hash=${JSON.stringify('#'+page+'/not-a-resource')}`);
+        await wait(`[...document.querySelectorAll('[role=status]')].some(e=>e.textContent.includes(${JSON.stringify(resource+'已移除或当前访客无权访问')}))`);
+      }
+      await js("location.hash='#nginx'");
+      await wait('!!document.querySelector(".ng-detail")');
+      assert.ok(!await js('[...document.querySelectorAll(".ng-center button")].some(e=>e.textContent.trim()==="查看日志")'));
+      for (const width of [390, 321]) {
+        window.setContentSize(width, 810);
+        await wait(`Math.abs(innerWidth-${width})<=1`);
+        const header = await js(`(() => {
+          const bar = document.querySelector('.portal-bar'), title = document.querySelector('.portal-current strong');
+          const text = document.createRange(); text.selectNodeContents(title);
+          return { height: bar.getBoundingClientRect().height, title: title.getBoundingClientRect().width,
+            text: text.getBoundingClientRect().width, duplicatedPermission: !!document.querySelector('.portal-access strong') };
+        })()`);
+        assert.ok(header.height < 68 && header.title >= header.text && !header.duplicatedPermission, `Mobile header at ${width}px: ${JSON.stringify(header)}`);
+        assert.equal(await js(`document.querySelector('.portal-current small span:last-child').title`), mobileVisitor);
+        await selector('.portal-appearance summary');
+        await wait('!!document.querySelector(".portal-appearance[open]")');
+        await selector('.portal-current strong');
+        await wait('!document.querySelector(".portal-appearance[open]")');
+        await selector('.portal-appearance summary');
+        key('Escape');
+        await wait('!document.querySelector(".portal-appearance[open]")');
+      }
+      window.setContentSize(1440, 900);
+      await fixture.host.start(fixture.options);
+      await fixture.host.start(shared);
+      await window.loadURL(fixture.url + '?audit=streams#logs');
+      await login();
+      const gate = Promise.withResolvers();
+      fixture.faults.logGate = gate.promise;
+      try {
+        await wait('document.querySelector(".log-source-list")?.textContent.includes("远程延迟日志")');
+        const clickSource = label => pointer(`[...document.querySelectorAll(".log-source-list label")].find(e=>e.textContent.includes(${JSON.stringify(label)})).querySelector("input")`);
+        await clickSource('远程延迟日志');
+        await clickSource('审查测试应用');
+        await wait('document.querySelector(".log-panels")?.textContent.includes("local-first-line")');
+        assert.ok(fixture.calls.remoteLogReads > 0);
+        await fs.appendFile(fixture.localLog, 'local-second-line\n');
+        await wait('document.querySelector(".log-panels")?.textContent.includes("local-second-line")');
+        assert.ok(!await js('document.querySelector(".log-panels")?.textContent.includes("remote-ready-line")'));
+        gate.resolve();
+        await wait('document.querySelector(".log-panels")?.textContent.includes("remote-ready-line")');
+      } finally {
+        gate.resolve();
+        fixture.faults.logGate = null;
+      }
+      assert.deepEqual(errors, []);
       await fs.writeFile(
         path.join(output, "results.json"),
         JSON.stringify(
@@ -529,6 +634,10 @@ app
             variableDraftOnly: true,
             hashHistoryAndScroll: true,
             expiredAndOfflineLogout: true,
+            visitorDraftIsolation: true,
+            compactHeader: true,
+            brokenResourceLinks: true,
+            independentLogStreams: true,
             commandsExecuted: 0,
           },
           null,

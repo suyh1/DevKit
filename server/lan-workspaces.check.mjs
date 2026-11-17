@@ -1,20 +1,26 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { once } from 'node:events';
-import { mkdtemp, mkdir, open, readFile, realpath, rename, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
+import { EventEmitter, once } from 'node:events';
+import { lstat, mkdtemp, mkdir, open, readFile, readdir, realpath, rename, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
+import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
 import test from 'node:test';
 import ssh from 'ssh2';
 import { createLanWorkspaces } from './lan-workspaces.mjs';
 import { createJarManager } from './jar-manager.mjs';
+import { detectJava } from './jar-process.mjs';
 import { createNginxManager } from './nginx-manager.mjs';
 import { createProjectHost } from './project-host.mjs';
 import { createProjectStore } from './project-store.mjs';
 import { emptySharingServices } from '../shared/sharing.mjs';
+import { discoverHosts, lanInterfaces, scanRange } from './lan-discovery.mjs';
+import { localBroadcast, magicPacket } from './lan-power.mjs';
+import { detectSshTarget } from './ssh-workspace-deploy.mjs';
+import { createLogCenter } from './log-center.mjs';
 
 async function port() {
   const socket = createServer().listen(0, '127.0.0.1');
@@ -23,6 +29,99 @@ async function port() {
   await new Promise(resolve => socket.close(resolve));
   return result;
 }
+
+test('SSH discovers Linux x64 and ARM64 from the target even with a Windows host preference', async () => {
+  function target(machine) {
+    return { exec(command, callback) {
+      const channel = new EventEmitter();
+      channel.stderr = new EventEmitter();
+      channel.destroy = () => { channel.destroyed = true; };
+      channel.end = () => queueMicrotask(() => {
+        if (command.startsWith('sh ')) {
+          channel.emit('data', Buffer.from(`DEVKIT_ARCH ${machine}\nDEVKIT_HOME /home/测试 用户\n`));
+          channel.emit('close', 0);
+        } else channel.emit('close', 1);
+      });
+      callback(null, channel);
+    } };
+  }
+  assert.deepEqual(await detectSshTarget(target('aarch64'), 'win32'), {
+    platform: 'linux', arch: 'arm64', home: '/home/测试 用户', key: 'linux-arm64',
+  });
+  assert.equal((await detectSshTarget(target('x86_64'))).key, 'linux-x64');
+});
+
+test('local inventory and a fast host remain accessible while another host is deploying', async t => {
+  const folder = await mkdtemp(path.join(tmpdir(), 'devkit-inventory-'));
+  const gate = Promise.withResolvers(), entered = Promise.withResolvers();
+  const state = { revision: 0, platform: process.platform, instances: [] };
+  const lan = await createLanWorkspaces(folder, { share: async host => ({
+    request: async () => {
+      if (host.name === 'slow') { entered.resolve(); await gate.promise; }
+      return state;
+    },
+    close() {},
+  }) });
+  t.after(async () => { gate.resolve(); lan.close(); await rm(folder, { recursive: true, force: true }); });
+  const draft = { mode: 'share', modules: { jar: true }, password: 'test-passphrase' };
+  const [slow] = await lan.hostRequest('save', { ...draft, name: 'slow', address: 'http://127.0.0.1:8770' });
+  const fast = (await lan.hostRequest('save', { ...draft, name: 'fast', address: 'http://127.0.0.1:8771' }))[1];
+  const manager = { request: async () => state };
+  const slowRead = lan.request(manager, 'jar', 'get', { scope: 'inventory-host', hostId: slow.id });
+  await entered.promise;
+  const [local, available] = await Promise.all([
+    lan.request(manager, 'jar', 'get', { scope: 'inventory-local' }),
+    lan.request(manager, 'jar', 'get', { scope: 'inventory-host', hostId: fast.id }),
+  ]);
+  assert.equal(local.groups[0].name, '本机');
+  assert.equal(available.groups[0].phase, 'ready');
+  assert.equal((await lan.request(manager, 'jar', 'get', { scope: 'inventory-progress' })).find(group => group.id === slow.id).phase, 'reading');
+  gate.resolve();
+  assert.equal((await slowRead).groups[0].phase, 'ready');
+});
+
+test('host import previews duplicates and invalid rows, stores metadata and uses the configured RDP endpoint', async t => {
+  const folder = await mkdtemp(path.join(tmpdir(), 'devkit-lan-import-'));
+  const lan = await createLanWorkspaces(folder);
+  t.after(async () => { lan.close(); await rm(folder, { recursive: true, force: true }); });
+  const ssh = { mode: 'ssh', address: '192.0.2.5', user: 'ops', port: 22, platform: 'win32', name: 'Test host', group: 'Test', tags: ['api', 'api'], pinned: true, mac: '02-AB-34-56-78-90' };
+  const rows = [ssh, { ...ssh, name: 'Duplicate' }, { ...ssh, port: 65536 }];
+  const preview = await lan.hostRequest('import-preview', rows);
+  assert.deepEqual(preview.map(item => !!item.error), [false, true, true]);
+  assert.deepEqual(await lan.hostRequest('list'), []);
+  const [host] = await lan.hostRequest('import-connections', rows);
+  assert.deepEqual([host.group, host.tags, host.pinned, host.mac], ['Test', ['api'], true, '02:ab:34:56:78:90']);
+  assert.equal(await lan.hostRequest('rdp-target', { id: host.id }), '192.0.2.5:3389');
+  await lan.hostRequest('save', { ...host, rdpPort: 33899 });
+  assert.equal(await lan.hostRequest('rdp-target', { id: host.id }), '192.0.2.5:33899');
+  await assert.rejects(lan.hostRequest('save', { ...host, mac: 'ff:ff:ff:ff:ff:ff' }), /MAC/);
+  const [restored] = await lan.hostRequest('list');
+  assert.equal(restored.mac, host.mac);
+});
+
+test('scanning stays on the selected interface and distinguishes TCP responses from neighbor cache; WOL uses the subnet broadcast', async () => {
+  const [source] = lanInterfaces({ Test: [{ family: 'IPv4', internal: false, cidr: '192.0.2.130/25', address: '192.0.2.130' }] });
+  assert.deepEqual(scanRange(source, '192.0.2.255/30'), ['192.0.2.252', '192.0.2.253', '192.0.2.254']);
+  assert.throws(() => scanRange(source, '192.0.2.127-192.0.2.131'), /直连/);
+  assert.throws(() => scanRange(source, '192.0.0.0/16'), /256/);
+  const signal = new AbortController().signal;
+  const result = await discoverHosts(source, '192.0.2.131-192.0.2.134', 2222, signal, {
+    async probe(address, port, options) {
+      assert.equal(port, 2222);
+      assert.equal(options.localAddress, source.address);
+      if (address.endsWith('.131')) return { ok: true, elapsed: 20 };
+      if (address.endsWith('.132')) return { ok: false, code: 'ECONNREFUSED' };
+      return { ok: false, code: 'ETIMEDOUT' };
+    },
+    async neighbors() { return new Map([['192.0.2.133', '02:00:00:00:00:01']]); },
+    resolveNames: false,
+  });
+  assert.equal(result.scanned, 4);
+  assert.deepEqual(result.devices.map(item => item.response), ['open', 'refused', 'neighbor']);
+  assert.deepEqual(localBroadcast(['192.0.2.135'], [source]), { address: '192.0.2.130', broadcast: '192.0.2.255' });
+  assert.throws(() => localBroadcast(['192.0.2.30'], [source]), /直连/);
+  assert.equal(magicPacket('02:ab:34:56:78:90').toString('hex'), 'ff'.repeat(6) + '02ab34567890'.repeat(16));
+});
 
 test('LAN gateway shares local and remote registries, confines operations to the selected host and intersects browser permissions', async t => {
   const folder = await mkdtemp(path.join(tmpdir(), 'devkit-lan-gateway-'));
@@ -35,10 +134,12 @@ test('LAN gateway shares local and remote registries, confines operations to the
     const directory = path.join(folder, name);
     const store = await createProjectStore(directory), jar = await createJarManager(directory), nginx = await createNginxManager(directory);
     const lan = await createLanWorkspaces(directory);
-    const host = await createProjectHost(store, folder, { jar: () => jar, nginx: () => nginx, lan: () => lan });
+    const logs = createLogCenter({ jar: () => jar, nginx: () => nginx, lan: () => lan });
+    const host = await createProjectHost(store, folder, { jar: () => jar, nginx: () => nginx, lan: () => lan, logs: () => logs });
     cleanup.push(async () => { await host.stop(); lan.close(); await nginx.close(); await jar.close(); await store.close(); });
     const services = emptySharingServices();
     for (const module of ['jar', 'nginx']) services[module] = { enabled: true, ...grants };
+    services.logs = { enabled: true, jar: true, nginx: false, export: name === 'gateway', raw: name === 'gateway' };
     const listening = await port(), password = `${name}-workspaces-fixture`;
     await host.start({ host: '127.0.0.1', port: listening, password, services });
     return { directory, lan, jar, nginx, address: `http://127.0.0.1:${listening}`, password };
@@ -46,6 +147,9 @@ test('LAN gateway shares local and remote registries, confines operations to the
   const target = await endpoint('target', { edit: true, control: false });
   const gateway = await endpoint('gateway', { edit: true, control: true });
   const [{ id: hostId }] = await gateway.lan.hostRequest('save', { ...target, name: 'Test host', mode: 'share', modules: { jar: true, nginx: true } });
+  const diagnostics = await gateway.lan.hostRequest('diagnose', { id: hostId });
+  assert.deepEqual(diagnostics.checks.map(item => item.state), Array(5).fill('pass'));
+  assert.equal(diagnostics.checks[3].detail, '查看、编辑');
   const source = path.join(folder, 'service.jar'), config = path.join(folder, 'nginx.conf');
   await writeFile(source, 'fixture');
   const canonicalSource = await realpath(source);
@@ -58,6 +162,9 @@ test('LAN gateway shares local and remote registries, confines operations to the
   }
   const listed = await api('jar', 'get', { scope: 'inventory' });
   assert.deepEqual(listed.data.groups.map(group => [group.id, group.edit, group.control]), [['', true, true], [hostId, true, false]]);
+  const initial = await api('jar', 'get', { scope: 'inventory-local' });
+  assert.deepEqual(initial.data.instances, []);
+  assert.equal(initial.data.groups.find(group => group.id === hostId).edit, false);
   const browse = await api('jar', 'browse', { hostId, kind: 'jar', directory: folder });
   assert.deepEqual(browse.data.entries.filter(item => !item.directory).map(item => item.path), [canonicalSource]);
   const saved = await api('jar', 'upsert', { hostId, revision: 0, instance: { name: 'Service', jar: source, logMode: 'console', env: { PRIVATE_SETTING: 'fixture-value' } } });
@@ -74,6 +181,13 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.equal((await api('lan-hosts', 'list')).status, 403);
   assert.equal((await gateway.lan.hostRequest('list'))[0].password, undefined);
   assert.equal((await readFile(path.join(gateway.directory, 'lan-hosts', 'connections.json'), 'utf8')).includes(target.password), false);
+  const group = (await api('jar', 'get', { scope: 'inventory-host', hostId })).data;
+  assert.deepEqual(group.instances.map(item => item.id), [instance.id]);
+  assert.ok(group.groups[0].checkedAt);
+  const logSources = (await api('logs', 'sources', { hostId })).data.sources;
+  assert.equal(logSources[0].instanceId, instance.id);
+  const exported = (await api('logs', 'export', { raw: true, sources: [{ id: logSources[0].id }] })).data.results[0];
+  assert.match(exported.error, /导出权限/);
 
   const installed = await api('nginx', 'upsert', { hostId, revision: 0, instance: { name: 'Proxy', platform: 'any', main: config, prefix: folder, files: [] } });
   assert.equal(installed.status, 200, JSON.stringify(installed.data));
@@ -89,60 +203,126 @@ test('LAN gateway shares local and remote registries, confines operations to the
   finally { reopened.close(); }
 });
 
-function sftpFixture(stream, folder) {
+function sftpFixture(stream, folder, onWrite) {
   const { STATUS_CODE, OPEN_MODE } = ssh.utils.sftp;
   const handles = new Map();
   let counter = 0;
   const target = filename => {
-    assert.match(filename, /^\.devkit-ssh(?:\/[a-z0-9_.-]+)*$/i);
+    const mounted = folder.replaceAll('\\', '/');
+    const rooted = `${mounted.startsWith('/') ? '' : '/'}${mounted}/`;
+    if (filename.startsWith(rooted)) filename = filename.slice(rooted.length);
+    assert.match(filename, /^(?:\.devkit-ssh|\/files)(?:\/[a-z0-9_.-]+)*$/i);
     assert.ok(filename.split('/').every(part => part !== '..'));
     return path.join(folder, filename);
   };
   const status = (id, action) => action.then(() => stream.status(id, STATUS_CODE.OK), error => stream.status(id, error.code === 'ENOENT' ? STATUS_CODE.NO_SUCH_FILE : STATUS_CODE.FAILURE));
   stream.on('STAT', (id, file) => void stat(target(file)).then(info => stream.attrs(id, { mode: info.mode, size: info.size }), () => stream.status(id, STATUS_CODE.NO_SUCH_FILE)));
+  stream.on('LSTAT', (id, file) => void lstat(target(file)).then(info => stream.attrs(id, { mode: info.mode, size: info.size }), () => stream.status(id, STATUS_CODE.NO_SUCH_FILE)));
+  stream.on('REALPATH', (id, file) => stream.name(id, [{ filename: file === '.' ? '/files' : file }]));
+  stream.on('OPENDIR', (id, directory) => {
+    const token = Buffer.from(String(++counter)); handles.set(token.toString(), { directory }); stream.handle(id, token);
+  });
+  stream.on('READDIR', (id, token) => {
+    const handle = handles.get(token.toString());
+    if (handle.done) { stream.status(id, STATUS_CODE.EOF); return; }
+    handle.done = true;
+    void readdir(target(handle.directory)).then(names => Promise.all(names.map(async filename => {
+      const info = await stat(target(`${handle.directory}/${filename}`));
+      return { filename, attrs: { mode: info.mode, size: info.size } };
+    }))).then(entries => stream.name(id, entries), () => stream.status(id, STATUS_CODE.FAILURE));
+  });
   stream.on('MKDIR', (id, file) => void status(id, mkdir(target(file))));
   stream.on('RENAME', (id, from, to) => void status(id, rename(target(from), target(to))));
   stream.on('REMOVE', (id, file) => void status(id, unlink(target(file))));
-  stream.on('OPEN', (id, file, flags) => void open(target(file), flags & OPEN_MODE.EXCL ? 'wx' : 'w').then(handle => {
+  stream.on('OPEN', (id, file, flags) => void open(target(file), flags & OPEN_MODE.EXCL ? 'wx' : flags & OPEN_MODE.WRITE ? 'w' : 'r').then(handle => {
+    if (flags & OPEN_MODE.WRITE) onWrite?.(file);
     const token = Buffer.from(String(++counter)); handles.set(token.toString(), handle); stream.handle(id, token);
   }, () => stream.status(id, STATUS_CODE.FAILURE)));
   stream.on('WRITE', (id, token, offset, data) => void status(id, handles.get(token.toString()).write(data, 0, data.length, offset)));
-  stream.on('CLOSE', (id, token) => { const handle = handles.get(token.toString()); handles.delete(token.toString()); void status(id, handle.close()); });
+  stream.on('READ', (id, token, offset, length) => {
+    const buffer = Buffer.alloc(length);
+    void handles.get(token.toString()).read(buffer, 0, length, offset).then(({ bytesRead }) => {
+      if (bytesRead) stream.data(id, buffer.subarray(0, bytesRead)); else stream.status(id, STATUS_CODE.EOF);
+    }, () => stream.status(id, STATUS_CODE.FAILURE));
+  });
+  stream.on('CLOSE', (id, token) => { const handle = handles.get(token.toString()); handles.delete(token.toString()); void status(id, handle.close?.() || Promise.resolve()); });
 }
 
-test('SSH verifies the host before password auth, hosts a PTY, and runs the bundled managers over SFTP and stdio', { timeout: 50000 }, async t => {
+test('SSH verifies host identity, runs a PTY, and deploys portable Node through SFTP and SSH exec', { timeout: 150000 }, async t => {
   const folder = await mkdtemp(path.join(tmpdir(), 'devkit-lan-ssh-'));
   const lan = await createLanWorkspaces(path.join(folder, 'coordinator'));
   const clients = new Set(), processes = new Set();
-  let authentication = 0, resized = false;
+  const stdioHome = path.join(folder, 'no sftp 测试');
+  await mkdir(stdioHome);
+  const windows = process.platform === 'win32';
+  const systemRoot = process.env.SystemRoot || 'C:\\Windows';
+  const commandPath = windows ? [path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0'), path.join(systemRoot, 'System32'), systemRoot].join(path.delimiter) : path.join(folder, 'system-commands');
+  if (!windows) {
+    await mkdir(commandPath);
+    for (const name of ['sh', 'uname', 'cat', 'mkdir', 'sha256sum', 'chmod', 'mv', 'rm', 'ps', 'readlink', 'id']) {
+      await symlink(await realpath(`/usr/bin/${name}`), path.join(commandPath, name));
+    }
+  }
+  let authentication = 0, resized = false, forwarded = 0, sftpRuntimeUploads = 0, execRuntimeUploads = 0;
   const hostKey = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { format: 'pem', type: 'pkcs1' }, publicKeyEncoding: { format: 'pem', type: 'spki' } }).privateKey;
+  const keyPassphrase = 'secret-fixture-unlock';
+  const privateKey = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { format: 'pem', type: 'pkcs1', cipher: 'aes-256-cbc', passphrase: keyPassphrase }, publicKeyEncoding: { format: 'pem', type: 'spki' } }).privateKey;
+  const key = ssh.utils.parseKey(privateKey, keyPassphrase), keyPath = path.join(folder, 'test-key');
+  await writeFile(keyPath, privateKey);
   const server = new ssh.Server({ hostKeys: [hostKey] }, client => {
+    let execOnly = false;
     clients.add(client);
     client.on('error', () => {});
     client.on('close', () => clients.delete(client));
     client.on('authentication', context => {
       authentication++;
-      if (context.method === 'password' && context.username === 'operator' && context.password === 'ssh-password-fixture') context.accept();
+      if (context.method === 'password' && ['operator', 'stdio-operator'].includes(context.username) && context.password === 'ssh-password-fixture') {
+        execOnly = context.username === 'stdio-operator'; context.accept();
+      }
+      else if (context.method === 'publickey' && context.username === 'key-user' && context.key.data.equals(key.getPublicSSH()) && (!context.signature || key.verify(context.blob, context.signature, context.hashAlgo) === true)) context.accept();
       else context.reject(['password']);
+    });
+    client.on('tcpip', (accept, reject, info) => {
+      if (info.destIP !== 'inside.fixture.invalid' || info.destPort !== server.address().port) { reject(); return; }
+      const socket = connect(info.destPort, '127.0.0.1');
+      socket.once('error', () => socket.destroy());
+      socket.once('connect', () => { forwarded++; const tunnel = accept(); tunnel.on('close', () => socket.destroy()); tunnel.pipe(socket).pipe(tunnel); });
     });
     client.on('session', accept => {
       const session = accept();
       session.on('pty', (accept, _reject, info) => { assert.equal(info.term, 'xterm-256color'); accept(); });
       session.on('window-change', (_accept, _reject, info) => { resized = info.cols === 100; });
       session.on('shell', accept => { const stream = accept(); stream.write('fixture shell$ '); stream.on('data', bytes => stream.write(bytes)); });
-      session.on('sftp', accept => sftpFixture(accept(), folder));
+      session.on('sftp', (accept, reject) => {
+        if (execOnly) { reject(); return; }
+        const channel = accept();
+        session.once('close', () => channel.end());
+        sftpFixture(channel, folder, file => { if (file.includes('/runtimes/')) sftpRuntimeUploads++; });
+      });
       session.on('exec', (accept, _reject, info) => {
-        const match = /^node (\.devkit-ssh\/workspaces\/[a-f0-9]+\/server\/ssh-workspace-agent\.mjs)$/.exec(info.command);
-        assert.ok(match, info.command);
-        const stream = accept(), child = spawn(process.execPath, [match[1]], { cwd: folder, env: { ...process.env, HOME: folder, USERPROFILE: folder }, windowsHide: true });
+        if (['java -version', 'nginx -v'].includes(info.command)) {
+          const stream = accept(), available = info.command === 'java -version';
+          stream.write(available ? 'Java 21\n' : 'nginx unavailable\n');
+          stream.exit(available ? 0 : 1); stream.end(); return;
+        }
+        const encoded = /-EncodedCommand ([\w+/=]+)$/.exec(info.command)?.[1];
+        const script = encoded ? Buffer.from(encoded, 'base64').toString('utf16le') : info.command;
+        if (/runtimes\/.+\.tmp/.test(script) && /OpenStandardInput|cat >/.test(script)) execRuntimeUploads++;
+        const home = execOnly ? stdioHome : folder;
+        const environment = { ...process.env, HOME: home, USERPROFILE: home, PATH: commandPath };
+        if (windows) delete environment.PSModulePath;
+        const stream = accept(), child = spawn(windows ? path.join(systemRoot, 'System32/cmd.exe') : '/bin/sh', windows ? ['/d', '/c', info.command] : ['-c', info.command], {
+          cwd: home, env: environment, windowsHide: true,
+        });
         processes.add(child);
         const ended = once(child, 'close');
         child.stdin.on('error', () => {});
+        stream.on('error', () => {});
         stream.pipe(child.stdin);
         child.stdout.pipe(stream, { end: false });
         child.stderr.pipe(stream.stderr, { end: false });
         stream.on('close', () => child.stdin.end());
-        void ended.then(([code]) => { processes.delete(child); stream.exit(code || 0); stream.end(); });
+        void ended.then(([code]) => { processes.delete(child); stream.exit(code ?? 1); stream.end(); }, () => { processes.delete(child); stream.exit(1); stream.end(); });
       });
     });
   }).listen(0, '127.0.0.1');
@@ -155,12 +335,22 @@ test('SSH verifies the host before password auth, hosts a PTY, and runs the bund
     await rm(folder, { recursive: true, force: true });
   });
   await once(server, 'listening');
-  const [{ id }] = await lan.hostRequest('save', { mode: 'ssh', name: 'SSH fixture', address: '127.0.0.1', port: server.address().port, user: 'operator', platform: process.platform, auth: 'password', password: 'ssh-password-fixture', modules: { jar: true, nginx: true } });
+  const wrongPlatform = windows ? 'linux' : 'win32';
+  const hostDraft = { mode: 'ssh', name: 'SSH fixture', address: '127.0.0.1', port: server.address().port, user: 'operator', platform: wrongPlatform, auth: 'password', password: 'ssh-password-fixture', modules: { jar: true, nginx: true } };
+  const [{ id }] = await lan.hostRequest('save', hostDraft);
   const { fingerprint } = await lan.hostRequest('test', { id });
   assert.match(fingerprint, /^SHA256:/);
   assert.equal(authentication, 0);
+  const firstDiagnosis = await lan.hostRequest('diagnose', { id });
+  assert.equal(firstDiagnosis.fingerprint, fingerprint);
+  assert.equal(authentication, 0);
   await lan.hostRequest('test', { id, fingerprint });
   assert.ok(authentication > 0);
+  const diagnosis = await lan.hostRequest('diagnose', { id });
+  assert.deepEqual(diagnosis.checks.map(item => [item.name, item.state]), [
+    ['地址解析', 'pass'], ['TCP 端口', 'pass'], ['SSH 主机指纹', 'pass'], ['SSH 登录', 'pass'], ['部署通道', 'pass'], ['远程运行时', 'pass'], ['Java', 'pass'], ['Nginx', 'fail'],
+  ]);
+  assert.match(diagnosis.checks[5].detail, new RegExp(`${process.platform}-${process.arch}`));
   const shell = await lan.hostRequest('terminal-open', { id, cols: 80, rows: 24 });
   await lan.hostRequest('terminal-resize', { id: shell.id, cols: 100, rows: 33 });
   await lan.hostRequest('terminal-input', { id: shell.id, text: '你好\r' });
@@ -172,7 +362,30 @@ test('SSH verifies the host before password auth, hosts a PTY, and runs the bund
   }
   assert.match(output, /fixture shell\$ 你好/);
   assert.equal(resized, true);
+  const payload = Buffer.from([0, 1, 2, 255]);
+  const upload = path.join(folder, 'upload.bin'), download = path.join(folder, 'download.bin');
+  await mkdir(path.join(folder, 'files'));
+  await writeFile(upload, payload);
+  await lan.hostRequest('file-upload', { id: shell.id, path: '.' }, upload);
+  await assert.rejects(lan.hostRequest('file-upload', { id: shell.id, path: '.' }, upload), /同名/);
+  const listing = await lan.hostRequest('file-list', { id: shell.id, path: '.' });
+  assert.deepEqual(listing.entries.map(item => [item.name, item.kind, item.size]), [['upload.bin', 'file', payload.length]]);
+  await lan.hostRequest('file-download', { id: shell.id, path: listing.entries[0].path }, download);
+  assert.deepEqual(await readFile(download), payload);
   await lan.hostRequest('terminal-close', shell);
+  await assert.rejects(lan.hostRequest('file-list', { id: shell.id }), /断开/);
+
+  const [jump, privateHost] = await lan.hostRequest('save', {
+    mode: 'ssh', address: 'inside.fixture.invalid', port: server.address().port, user: 'key-user', name: 'Private key fixture',
+    platform: process.platform, auth: 'key', keyPath, password: keyPassphrase, jumpHostId: id,
+  });
+  await assert.rejects(lan.hostRequest('save', { ...jump, jumpHostId: privateHost.id }), /循环/);
+  const targetTrust = await lan.hostRequest('test', { id: privateHost.id });
+  await lan.hostRequest('test', { id: privateHost.id, fingerprint: targetTrust.fingerprint });
+  const keyShell = await lan.hostRequest('terminal-open', { id: privateHost.id });
+  assert.ok(forwarded >= 3);
+  await lan.hostRequest('terminal-close', keyShell);
+  assert.ok(!(await readFile(path.join(folder, 'coordinator/lan-hosts/connections.json'), 'utf8')).includes(keyPassphrase));
   const jar = path.join(folder, 'target.jar');
   await writeFile(jar, 'fixture');
   const registration = await lan.request(null, 'jar', 'upsert', { hostId: id, revision: 0, instance: { name: 'SSH Java', jar, logMode: 'file', jvmArgs: ['-Xmx128m'] } });
@@ -180,6 +393,72 @@ test('SSH verifies the host before password auth, hosts a PTY, and runs the bund
   assert.ok(application.id.startsWith(`${id}:`));
   assert.deepEqual(application.jvmArgs, ['-Xmx128m']);
   assert.deepEqual((await lan.request(null, 'jar', 'get', { hostId: id })).instances, [application]);
+  assert.equal(sftpRuntimeUploads, 1);
+  assert.equal(execRuntimeUploads, 0);
+  const logCenter = createLogCenter({ lan: () => lan });
+  await writeFile(path.join(folder, 'target.log'), 'INFO SSH log token=fixture-secret\n');
+  const remoteLogs = await logCenter.request('sources', { hostId: id });
+  assert.equal(remoteLogs.sources[0].instanceId, application.id);
+  const batch = await logCenter.request('read', { sources: [{ id: remoteLogs.sources[0].id }] });
+  assert.match(batch.results[0].text, /INFO SSH log token=\[已隐藏\]/);
+  const healthSocket = createServer(socket => socket.end()).listen(0, '127.0.0.1');
+  await once(healthSocket, 'listening');
+  try {
+    await lan.request(null, 'jar', 'upsert', { hostId: id, revision: registration.revision, instance: { ...application, health: { type: 'tcp', host: '127.0.0.1', port: healthSocket.address().port } } });
+    assert.ok((await lan.monitorJarSources()).some(item => item.source.id === application.id));
+    assert.equal((await lan.monitorJar(application.id, 5)).state, 'healthy');
+  } finally { await new Promise(resolve => healthSocket.close(resolve)); }
+
+  const stdio = (await lan.hostRequest('save', { ...hostDraft, name: 'SSH exec fixture', user: 'stdio-operator', modules: { jar: true } })).at(-1);
+  const stdioTrust = await lan.hostRequest('test', { id: stdio.id });
+  await lan.hostRequest('test', { id: stdio.id, fingerprint: stdioTrust.fingerprint });
+  const stdioDiagnosis = await lan.hostRequest('diagnose', { id: stdio.id });
+  assert.match(stdioDiagnosis.checks[4].detail, /SSH 命令通道/);
+  const stdioJar = path.join(stdioHome, 'managed.jar');
+  await writeFile(stdioJar, 'exec fixture');
+  const execRegistration = await lan.request(null, 'jar', 'upsert', { hostId: stdio.id, revision: 0, instance: { name: 'SSH exec JAR', jar: stdioJar, logMode: 'file' } });
+  assert.equal(execRegistration.platform, process.platform);
+  assert.equal(execRegistration.instances[0].name, 'SSH exec JAR');
+  assert.equal(execRuntimeUploads, 1);
+  lan.close();
+  assert.equal((await lan.request(null, 'jar', 'get', { hostId: stdio.id })).instances[0].name, 'SSH exec JAR');
+  assert.equal(execRuntimeUploads, 1, 'a reconnect reuses the verified target runtime');
+  await t.test('the JAR and its portable-Node supervisor survive an SSH disconnection', async context => {
+    const java = await detectJava({ executable: process.env.DEVKIT_TEST_JAVA || '' });
+    const run = promisify(execFile), suffix = windows ? '.exe' : '', bin = path.dirname(java.executable || '');
+    try { await run(path.join(bin, `javac${suffix}`), ['-version']); } catch { context.skip('JDK unavailable'); return; }
+    const javaFile = path.join(stdioHome, 'RemoteFixture.java');
+    await writeFile(javaFile, 'public class RemoteFixture { public static void main(String[] args) throws Exception { System.out.println("REMOTE-READY"); while(true) Thread.sleep(100); }}');
+    await run(path.join(bin, `javac${suffix}`), ['--release', '8', javaFile]);
+    await run(path.join(bin, `jar${suffix}`), ['cfe', stdioJar, 'RemoteFixture', '-C', stdioHome, 'RemoteFixture.class']);
+    const [example] = execRegistration.instances;
+    await lan.request(null, 'jar', 'upsert', { hostId: stdio.id, revision: execRegistration.revision, instance: {
+      ...example, id: example.id.split(':')[1], executable: java.executable, logMode: 'console', jvmArgs: ['-Xmx64m'],
+    } });
+    const command = name => lan.request(null, 'jar', 'command', { id: example.id, command: name });
+    const clientId = randomUUID();
+    try {
+      const started = await command('start');
+      assert.equal(started.status.state, 'running');
+      const waitForOutput = async () => {
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const result = await lan.request(null, 'jar', 'console-read', { id: example.id, clientId });
+          if (result.text?.includes('REMOTE-READY')) return;
+          await delay(100);
+        }
+        assert.fail('The remote Java console did not report readiness');
+      };
+      await waitForOutput();
+      const exits = [...processes].map(child => once(child, 'close'));
+      lan.close();
+      for (const client of clients) client.destroy?.();
+      await Promise.all(exits);
+      const [restored] = await lan.request(null, 'jar', 'statuses', { hostId: stdio.id });
+      assert.equal(restored.pid, started.status.pid);
+      assert.equal(restored.state, 'running');
+      await waitForOutput();
+    } finally { await command('stop'); }
+  });
   const main = path.join(folder, 'nginx.conf');
   const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE || '';
   const listener = await port();

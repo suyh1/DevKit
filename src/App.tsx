@@ -3,7 +3,7 @@ import { MotionPresence, MotionToast, MotionText, useMotionList, MotionGroup, Mo
 import HttpWorkbench from './HttpWorkbench';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle, Server, Coffee, Activity, ScrollText, Globe, ChevronDown, Terminal } from 'lucide-react';
+import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle } from 'lucide-react';
 import { tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { isColorTool } from './colors';
@@ -23,6 +23,7 @@ import LogCenter from './LogCenter';
 import SharedWorkspaceNavigation from './SharedWorkspaceNavigation';
 import { workspaceModules } from './catalog';
 import CommandPalette from './CommandPalette';
+import { parseWorkspaceLink } from './workspace-links';
 import CategoryNavigation from './CategoryNavigation';
 import { toolIcons, categoryMeta } from './ui';
 import { createTask, defaultPreferences, editTask, importWorkspace, normalizeFavorites, MAX_TASKS, validatePreferences, workspaceSnapshot } from './workbench';
@@ -50,7 +51,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);
   const [page, setPage] = useState<Page>(tasks.length ? 'task' : 'home');
-  const [sharedSidebarOpen, setSharedSidebarOpen] = useState(false);
+  const [monitorFocus, setMonitorFocus] = useState<{ id: string }>();
   const [favorites, setFavorites] = useState<ToolId[]>(() => { const saved = readPreference('devkit:favorites'); return Array.isArray(saved) ? normalizeFavorites(saved) : ['json', 'timestamp']; });
   const [recent, setRecent] = useState<ToolId[]>([]);
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
@@ -121,7 +122,20 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       setTasks(current => [...current.slice(0, index), { ...task, status: task.status === 'running' ? 'cancelled' : task.status }, ...current.slice(index)]); focusTask(id);
     });
   }
-  function navigate(next: Page) { setPage(next); if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }
+  function navigate(next: Page, fromLink = false) {
+    if (!fromLink && parseWorkspaceLink(location.hash)) {
+      history.replaceState(null, '', location.pathname + location.search);
+      window.dispatchEvent(new Event('hashchange'));
+    }
+    setPage(next);
+    if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true);
+  }
+  useEffect(() => {
+    const follow = () => { const link = parseWorkspaceLink(location.hash); if (link) navigate(link.page, true); };
+    follow();
+    window.addEventListener('hashchange', follow);
+    return () => window.removeEventListener('hashchange', follow);
+  }, []);
   function toggleFavorite(id: ToolId) { setFavorites(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]); }
   async function restoreWorkspace(file?: File) {
     if (!file) return;
@@ -191,8 +205,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     <aside inert={narrow && collapsed} className="sidebar" role={narrow && !collapsed ? 'dialog' : undefined} aria-modal={narrow && !collapsed ? true : undefined} aria-label="工具导航与工作台"><button className="brand" onClick={() => navigate('home')} title="工作台总览"><span className="brand-mark"><Code2 size={23} /></span><span className="brand-word"><strong>DevKit<span>.</span></strong><small>本地开发工作台</small></span><span className="brand-version">{packageInfo.version}</span></button>
       <button className="sidebar-search" aria-label="打开工具搜索" onClick={() => setSearchOpen(true)}><Search size={15} /><span>搜索工具或用途</span><kbd>Ctrl K</kbd></button>
       <div className="sidebar-workspace">{([{ id: 'home', label: '工作台', Icon: LayoutGrid, count: tools.length }, { id: 'favorites', label: '我的收藏', Icon: Star, count: favorites.length }, { id: 'recent', label: '最近使用', Icon: Clock3, count: recent.length }] as const).map(item => <button className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.label} key={item.id} onClick={() => navigate(item.id)}><item.Icon size={17} /><span>{item.label}</span><small>{item.count}</small></button>)}</div>
-      <details className="sidebar-shared" open={sharedSidebarOpen} onToggle={event => setSharedSidebarOpen(event.currentTarget.open)}><summary className={`nav-item shared-sidebar-trigger ${workspaceModules.some(item => item.id === page) ? 'active' : ''}`} title="共享栏目"><Globe size={17} /><span>共享栏目</span><small>{workspaceModules.find(item => item.id === page)?.name || workspaceModules.length}</small><ChevronDown size={12} /></summary><nav aria-label="共享栏目快捷入口">{workspaceModules.map(item => { const Icon = item.id === 'lan-hosts' ? Terminal : item.id === 'nginx' ? Server : item.id === 'jar' ? Coffee : item.id === 'monitor' ? Activity : item.id === 'logs' ? ScrollText : FolderOpen; return <button key={item.id} className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.name} onClick={() => { navigate(item.id); setSharedSidebarOpen(false); }}><Icon size={17} /><span>{item.name}</span></button>; })}</nav></details>
-      <CategoryNavigation dismissKey={`${collapsed}-${searchOpen}`} activeToolId={page === 'task' ? activeTask?.toolId : undefined} tasks={tasks} narrow={narrow} onChoose={openTool} />
+      <CategoryNavigation dismissKey={`${collapsed}-${searchOpen}-${page}`} activeToolId={page === 'task' ? activeTask?.toolId : undefined} tasks={tasks} narrow={narrow} onChoose={openTool} page={page} onChooseWorkspace={navigate} />
       <div className="sidebar-bottom"><button className={`nav-item ${page === 'settings' ? 'active' : ''}`} title="设置" onClick={() => navigate('settings')}><Settings2 size={17} /><span>偏好设置</span><small>v{packageInfo.version}</small></button><div className="local-badge"><ShieldCheck size={15} /><div><strong>离线运行 · 数据留在本机</strong><small>无需登录，无遥测</small></div></div></div>
     </aside>
     <main inert={narrow && !collapsed}><header className="topbar floating-navbar">
@@ -207,8 +220,8 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>
-        <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} /></div>
-        <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} /></div>
+        <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
+        <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={(id, text, options) => openTool(id, true, text, options)} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>
 {tasks.map(task => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId]; return <div data-motion-page inert={page !== 'task' || task.id !== activeId} key={task.id} id={`task-${task.id}`} role="tabpanel" aria-labelledby={`tab-${task.id}`} hidden={page !== 'task' || task.id !== activeId} className={`workspace task-pane ${isColorTool(task.toolId) ? 'color-workspace-shell' : 'text-workspace-shell'}`}><div className="page-heading"><span className={`tool-icon page-icon category-${categoryMeta[tool.category].key}`}><Icon size={23} /></span><div className="page-title"><div className="eyebrow">{tool.english}</div><h1>{tool.name}</h1></div><button className="secondary-button" title="新建同类独立任务" onClick={() => openTool(task.toolId, true)}><CopyPlus size={14} /><span>新任务</span></button><button className={`icon-button ${favorites.includes(task.toolId) ? 'is-favorite' : ''}`} title="收藏工具" aria-label={`${favorites.includes(task.toolId) ? '取消收藏' : '收藏'}${tool.name}`} aria-pressed={favorites.includes(task.toolId)} onClick={() => toggleFavorite(task.toolId)}><Star size={17} fill={favorites.includes(task.toolId) ? 'currentColor' : 'none'} /></button></div>{isColorTool(task.toolId) ? <ColorWorkbench mode={task.toolId} primary={sharedColor} onPrimary={setSharedColor} favorites={colorFavorites} onFavorites={setColorFavorites} /> : task.toolId === 'geo-coordinates' ? <GeoWorkbench task={task} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} /> : <ToolWorkspace onDebug={config => { setHttpInitial({ config, key: Date.now() }); navigate('http'); }} task={task} preferences={preferences} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} onSend={(toolId, text, options) => openTool(toolId, true, text, options)} />}</div>; })}
@@ -216,7 +229,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       <footer className="app-statusbar"><span><ShieldCheck size={12} />输入与结果仅保留在内存，主动保存除外</span><span>{tasks.length} / {MAX_TASKS} 个任务 · DevKit {packageInfo.version}</span></footer>
     </main>
     <input ref={workspaceFile} type="file" className="sr-only" aria-label="恢复工作区文件" accept=".json" onChange={event => { void restoreWorkspace(event.target.files?.[0]); event.target.value = ''; }} />
-    <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} onChoose={openTool} favorites={favorites} recent={recent} />
+    <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} onChoose={openTool} favorites={favorites} recent={recent} pages={workspaceModules.map(item => item.id)} />
     <dialog className="save-dialog motion-native" ref={saveDialog} aria-labelledby="save-title" onCancel={() => setSaveOpen(false)}><div className="dialog-heading"><h2 id="save-title">保存当前工作区</h2><button className="icon-button" aria-label="关闭保存窗口" onClick={() => setSaveOpen(false)}><X size={17} /></button></div><p>文件将包含文本任务的输入、参数和结果。请妥善保管，文件未加密。</p><div className="snapshot-summary"><strong>{tasks.filter(task => !isColorTool(task.toolId) && (includeSensitive || !['jwt', 'password', 'hmac'].includes(task.toolId))).length}</strong> 个文本任务将被保存</div><label className="sensitive-toggle"><input type="checkbox" checked={includeSensitive} onChange={event => setIncludeSensitive(event.target.checked)} />同时包含密码、JWT 和 HMAC 任务（可能含敏感信息）</label><p className="preview-note">颜色任务、图片和正在执行的任务状态不保存。恢复后请重新运行验证结果。</p><MotionButton className="run-button" onClick={async () => { try { const snapshot = workspaceSnapshot(tasksRef.current, activeId, includeSensitive); setSaveOpen(false); notice(await saveText(snapshot, 'devkit-workspace.json')); } catch (error) { notice(`保存失败：${String(error)}`); } }}><Save size={15} />选择位置并保存</MotionButton></dialog>
     <MotionPresence kind="toast" present={!!toast}>{toast && <MotionToast onClose={() => setToast(null)}><Check size={16} /><MotionText text={toast.message} />{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}><Undo2 size={14} />撤销</button>}<button aria-label="关闭通知" onClick={() => setToast(null)}><X size={14} /></button></MotionToast>}</MotionPresence>
   </div>;

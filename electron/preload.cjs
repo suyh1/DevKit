@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('devkitDesktop', {
+  platform: process.platform,
   openLanHost: (address, module) => ipcRenderer.invoke('devkit:lan-host', address, module),
   lanHosts: (action, value) => ipcRenderer.invoke('devkit:lan-hosts', action, value),
   saveText: (text, filename) => ipcRenderer.invoke('devkit:save-text', { text, filename }),

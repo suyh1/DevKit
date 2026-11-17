@@ -57,7 +57,7 @@ flowchart LR
 
 共享服务使用 Electron 内置的 Node 能力，主机不需要另装 Node。关闭 DevKit 会停止服务；点击“停止共享”也会关闭下次自动共享。共享端口被占用时应换端口，应用不会自动结束占用端口的进程。
 
-访问口令仅以加盐 scrypt 结果保存，会话使用 HttpOnly/SameSite Cookie。共享使用 HTTP，连接不加密，仅用于可信局域网。变量/项目地址会导出和共享，不应在这里存放登录密码或密钥。
+访问口令以加盐 scrypt 结果保存，会话使用 HttpOnly/SameSite Cookie。发布面板可启用 HTTPS、分配独立访客权限，并查看近期审计。复制项目资源链接后，访客登录并取得项目中心权限即可跳转到相应档案与卡片。见 [共享工作台](workspace-sharing.md)。
 
 ## 防火墙与连接排查
 

@@ -225,7 +225,7 @@ export async function createJarManager(directory, dependencies = {}) {
     await Promise.all(state.instances.filter(item => item.logMode === 'console').map(item => supervisorRequest(item, 'console-revoke', 3000, { session: sessionKey(session) }).catch(() => {})));
   }
   async function request(action, value = {}, options = {}) {
-    if (['command', 'detect', 'health-check', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予 JAR 运行管理权限。');
+    if (['command', 'detect', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予 JAR 运行管理权限。');
     if (['upsert', 'remove'].includes(action) && options.allowEdit === false) throw new Error('未授予 JAR 编辑权限。');
     if (action === 'get') {
       const result = snapshot();
@@ -293,6 +293,12 @@ export async function createJarManager(directory, dependencies = {}) {
         if (result) return result.health;
       }
       return current.state === 'running' ? probeHealth(item.health) : { state: 'stopped', detail: 'Java 进程未运行' };
+    }
+    if (action === 'monitor-probe') {
+      const { health } = find(value.id);
+      if (health.type === 'none') throw new Error('请先为关联 JAR 配置 HTTP/TCP 健康检查。');
+      const timeout = Number.isInteger(value.timeout) ? Math.max(1, Math.min(60, value.timeout)) : health.timeout;
+      return probeHealth({ ...health, timeout });
     }
     if (action === 'startup-get') return autostart.get(find(value.id));
     if (action === 'startup-install') {
