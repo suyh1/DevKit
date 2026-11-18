@@ -32,6 +32,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci --ignore-scripts
+      - run: npm exec -- tsc --noEmit
       - run: npm run test:docs
       - run: npm test
       - run: npm run test:projects
@@ -50,7 +51,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts --no-audit
-      - run: npm run build
+      - run: npm exec -- vite build
       - uses: actions/upload-artifact@v4
         if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
         with:
@@ -252,16 +253,12 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
       - uses: actions/download-artifact@v4
         with:
-          name: frontend
-          path: dist
-      - uses: actions/download-artifact@v4
-        with:
           path: artifacts
-          pattern: '*-*'
       - name: Collect and verify release assets
         env:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
+          mv artifacts/frontend dist
           node scripts/package-all.mjs --collect-only
           npm run verify:release
           release="artifacts/release-$VERSION"
@@ -274,15 +271,14 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           cd "artifacts/release-$VERSION"
+          assets=(*.exe *.deb *.zip SHA256SUMS PROJECT-SERVER-SHA256SUMS release.json project-server.json project-server-verification.json)
           if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
             if [[ "$is_draft" != true ]]; then
               echo "Release $GITHUB_REF_NAME is already published" >&2
               exit 1
             fi
+            gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "DevKit $VERSION" --notes-from-tag
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest --title "DevKit $VERSION" --notes-from-tag "${assets[@]}"
           fi
-          gh release upload "$GITHUB_REF_NAME" --clobber \
-            *.exe *.deb *.zip SHA256SUMS PROJECT-SERVER-SHA256SUMS \
-            release.json project-server.json project-server-verification.json
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
