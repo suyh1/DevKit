@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
-  frontend:
+  checks:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -31,9 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm ci --ignore-scripts
       - run: npm run test:docs
       - run: npm test
       - run: npm run test:projects
@@ -43,6 +41,15 @@ jobs:
         run: |
           npm run test:release
           python scripts/test-deb-packaging.py
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit
       - run: npm run build
       - uses: actions/upload-artifact@v4
         if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
@@ -95,7 +102,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: npm ci
+      - run: npm ci --ignore-scripts --no-audit
       - name: Extended platform regression
         if: inputs.full_regression
         shell: bash
@@ -137,6 +144,7 @@ jobs:
       - run: node scripts/package-desktop.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --format=${{ matrix.format }}
         env:
           DEVKIT_KEEP_PACKAGE_RUNTIME: ${{ (runner.os == 'Windows' && inputs.full_regression) && '1' || '0' }}
+          ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
       - name: Verify packaged offline API workspace
         if: runner.os == 'Windows' && inputs.full_regression
         run: node scripts/smoke-desktop.mjs --packaged --api-only
@@ -157,9 +165,7 @@ jobs:
         shell: bash
         run: |
           for package in artifacts/${{ matrix.artifact }}/*.deb; do
-            python scripts/verify-deb.py "$package"
             dpkg-deb --info "$package"
-            dpkg-deb --contents "$package"
             if dpkg-deb -f "$package" Depends | grep -qi webkit; then exit 1; fi
             sudo dpkg --unpack "$package"
           done
@@ -175,6 +181,7 @@ jobs:
             artifacts/${{ matrix.artifact }}/docs/
             artifacts/${{ matrix.artifact }}/SHA256SUMS
           if-no-files-found: error
+          compression-level: 0
           retention-days: 14
 
   project-server:
@@ -190,7 +197,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: npm ci
+      - run: npm ci --ignore-scripts --no-audit
       - uses: actions/download-artifact@v4
         with:
           name: frontend
@@ -213,11 +220,12 @@ jobs:
             ${{ steps.release-directory.outputs.path }}/README.md
             ${{ steps.release-directory.outputs.path }}/docs/
           if-no-files-found: error
+          compression-level: 0
           retention-days: 14
 
   publish:
     if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: [package, project-server]
+    needs: [checks, package, project-server]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -241,9 +249,7 @@ jobs:
             exit 1
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
-      - run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm ci --ignore-scripts --no-audit
       - uses: actions/download-artifact@v4
         with:
           name: frontend

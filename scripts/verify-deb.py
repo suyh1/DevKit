@@ -74,7 +74,8 @@ def verify(source):
         assert not re.search(r'(?m)^\s*chown\s+-[^\n]*R', postinst)
         assert 'Package: devkit\n' in control
         architecture = re.search(r'^Architecture: (.+)$', control, re.MULTILINE)[1]
-    with tarfile.open(fileobj=io.BytesIO(members['data.tar.xz']), mode='r:xz') as archive:
+    compression = 'gz' if 'data.tar.gz' in members else 'xz'
+    with tarfile.open(fileobj=io.BytesIO(members[f'data.tar.{compression}']), mode=f'r:{compression}') as archive:
         with tempfile.TemporaryDirectory(prefix='devkit-deb-verify-') as temporary:
             entries = extract_data_archive(archive, Path(temporary))
         sandbox = archive.getmember('./opt/devkit/chrome-sandbox')

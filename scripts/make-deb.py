@@ -155,8 +155,8 @@ def build_package(runtime, version, arch, root):
     preinst = f'#!/bin/sh\nset -eu\nif [ "$(dpkg --print-architecture)" != {deb_arch} ]; then\n  echo "DevKit requires {deb_arch}." >&2\n  exit 1\nfi\ncurrent=$(getconf GNU_LIBC_VERSION | cut -d " " -f 2)\nif ! dpkg --compare-versions "$current" ge "{report["minimumGlibc"]}"; then\n  echo "DevKit requires glibc >= {report["minimumGlibc"]}; OS libraries will not be changed." >&2\n  exit 1\nfi\n'
     with tempfile.TemporaryDirectory(prefix='devkit-deb-') as temporary:
         temporary = Path(temporary)
-        data_path = temporary / 'data.tar.xz'
-        with tarfile.open(data_path, 'w:xz', preset=6) as archive:
+        data_path = temporary / 'data.tar.gz'
+        with tarfile.open(data_path, 'w:gz', compresslevel=1) as archive:
             write_data_archive(archive, runtime, launcher, desktop, (root / 'build/icons/128x128.png').read_bytes(), report, (root / 'LICENSE').read_bytes())
         control_buffer = io.BytesIO()
         with tarfile.open(fileobj=control_buffer, mode='w:gz') as archive:
@@ -168,7 +168,7 @@ def build_package(runtime, version, arch, root):
             output.write(b'!<arch>\n')
             add_ar(output, 'debian-binary', b'2.0\n')
             add_ar(output, 'control.tar.gz', control_buffer.getvalue())
-            add_ar(output, 'data.tar.xz', data_path.read_bytes())
+            add_ar(output, data_path.name, data_path.read_bytes())
     (destination / 'runtime-report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     digest = hashlib.sha256(package.read_bytes()).hexdigest()
     (destination / 'SHA256SUMS').write_text(f'{digest}  {package.name}\n', encoding='ascii')
