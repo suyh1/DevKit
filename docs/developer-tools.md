@@ -60,6 +60,8 @@ GitHub 提交旁的检查状态来自 `.github/workflows/build.yml`。公共检�
 
 正式发行由 GitHub Actions 完成。推送与 `package.json` 一致的附注版本标签后，工作流汇总三份安装包和独立服务 ZIP，核对构建凭据和 SHA-256，再上传并公开 [GitHub Release](https://github.com/suyh1/DevKit/releases)。Windows NSIS 构建继续使用 `publish: 'never'`，发布凭据仅提供给 Actions 的发布任务。
 
+发行耗时目标为 5 分钟以内，以 Actions 的版本标签触发时间和 Release 公开时间核对。
+
 若下载暂时失败，可完成相应的独立打包命令后执行 `node scripts/package-all.mjs --collect-only` 汇总已生成的当前版本文件。该选项不重新编译，请先确认三个独立包均来自当前源码；任一文件缺失仍会报错。
 
 Windows 使用安装包或完整 `artifacts/desktop-runtime/DevKit-win32-x64/` 解压目录，不能单独拷贝 exe。Linux 包已包含 Chromium，无需系统 WebKitGTK；真实麒麟安装和启动仍需在目标机验证。参见 [麒麟离线安装](kylin-offline-install.md)。

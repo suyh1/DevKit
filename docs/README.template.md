@@ -191,6 +191,8 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
 
+正式发行目标为 **5 分钟以内**，从版本标签触发 Actions 开始计时，直到 GitHub Release 的安装包可下载。排查耗时时可在 Actions 查看各阶段记录。
+
 普通提交和拉取请求只运行一轮无窗口检查和前端构建。推送版本标签后，工作流额外构建并校验 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP，全部通过后自动发布。安装包和 SHA-256 校验清单可在 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载。
 
 发行时，无窗口检查与前端构建并行，各平台复用同一份前端产物。Linux 安装包使用兼容 `dpkg` 的快速 gzip 压缩，Windows 安装包使用 NSIS 的 ZIP 压缩，云端会并行准备 Windows 发行所需的运行时和构建依赖。下载文件可能因快速压缩而略大。
