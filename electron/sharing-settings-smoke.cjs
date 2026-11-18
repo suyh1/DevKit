@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const net = require("node:net");
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { clipboard } = require("electron");
+const { clipboard, dialog, shell } = require("electron");
 
 module.exports = async function sharingSettingsSmoke(window, output) {
   const js = (code) => window.webContents.executeJavaScript(code, true);
@@ -56,10 +56,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       'document.querySelector(".global-sharing-button")?.dataset.sharingState==="stopped"',
     );
     await openShortcut(".global-sharing-button");
-    assert.equal(
-      await js('document.querySelectorAll(".sharing-service").length'),
-      7,
-    );
+    assert.deepEqual(await js('[...document.querySelectorAll(".sharing-service")].map(service => service.dataset.service).sort()'),
+      ['file-shares', 'http', 'jar', 'lan-hosts', 'logs', 'monitor', 'nginx', 'project-todos', 'projects']);
     assert.equal(
       await js(
         '[...document.querySelectorAll(".sharing-service-toggle input")].every(input=>!input.checked)',
@@ -239,6 +237,54 @@ module.exports = async function sharingSettingsSmoke(window, output) {
         (await window.webContents.capturePage()).toPNG(),
       );
       await close();
+    }
+    const sample = path.join(await fs.mkdtemp(path.join(output, 'file-share-')), 'sample.txt');
+    const originalPicker = dialog.showOpenDialog, originalOpen = shell.openExternal;
+    let opened, selected;
+    dialog.showOpenDialog = async (_window, options) => {
+      selected = options.properties;
+      return { canceled: false, filePaths: [sample] };
+    };
+    shell.openExternal = async url => { opened = url; };
+    try {
+      await fs.writeFile(sample, 'Desktop file share');
+      await navigate('本机文件共享管理');
+      await click('新建共享', '.workspace:not([hidden]) .planning-workspace button');
+      await wait('document.querySelector("dialog[open] .planning-form input") !== null');
+      await js(`(() => {
+        const [name, port] = document.querySelectorAll("dialog[open] .planning-form-grid input");
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        for (const [input, value] of [[name, '文件共享测试'], [port, '${port}']]) {
+          set.call(input, value);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      })()`);
+      await click('添加文件', 'dialog[open] button');
+      assert.deepEqual(selected, ['openFile', 'multiSelections']);
+      await click('保存共享', 'dialog[open] button');
+      await click('打开网页', '.workspace:not([hidden]) .planning-workspace button');
+      await wait('document.querySelector(".file-share-list").textContent.includes("运行中")');
+      const status = await js('window.devkitFileShares.request("get").then(result => result.data.shares[0])');
+      assert.equal(opened, status.links[0]);
+      assert.equal(await (await fetch(opened + '0')).text(), 'Desktop file share');
+      await click('停止', '.workspace:not([hidden]) .planning-workspace button');
+      await wait('document.querySelector(".file-share-list").textContent.includes("已停止")');
+      await navigate('项目与待办');
+      await click('新建项目', '.workspace:not([hidden]) .planning-workspace button');
+      await wait('document.querySelector("dialog[open] .planning-form input") !== null');
+      await js(`(() => {
+        const input = document.querySelector("dialog[open] .planning-form input");
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '本机项目');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await click('保存', 'dialog[open] button');
+      await wait('document.querySelector(".todo-project-detail")?.textContent.includes("本机项目")');
+      assert.equal(await js('window.devkitProjectTodos.request("get").then(result => result.data.projects[0].published)'), false);
+    } finally {
+      dialog.showOpenDialog = originalPicker;
+      shell.openExternal = originalOpen;
+      await fs.unlink(sample);
+      await fs.rmdir(path.dirname(sample));
     }
     console.log(
       "Global sharing settings passed: home entry, one panel across modules, draft protection, start/stop state, address copy, port-conflict draft preservation and responsive themes.",

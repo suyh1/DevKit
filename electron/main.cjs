@@ -19,6 +19,7 @@ let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let jarManager, jarError = '';
 let lan, lanError = '';
+let fileShares, fileSharesError = '', projectTodos, projectTodosError = '';
 let monitorManager, monitorError = '';
 let logCenter;
 let httpClient;
@@ -180,7 +181,11 @@ app.whenReady().then(async () => {
     projectStore = await createProjectStore(projectStorage.directory);
     try { lan = await (await import('./server/lan-workspaces.mjs')).createLanWorkspaces(projectStorage.directory); }
     catch (error) { lanError = error.message; }
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan });
+    try { fileShares = await (await import('./server/file-shares.mjs')).createFileShares(projectStorage.directory); }
+    catch (error) { fileSharesError = error.message; }
+    try { projectTodos = await (await import('./server/project-todos.mjs')).createProjectTodos(projectStorage.directory); }
+    catch (error) { projectTodosError = error.message; }
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -294,6 +299,32 @@ app.whenReady().then(async () => {
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
   const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
+  ipcMain.handle('devkit:file-shares', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的文件共享请求。');
+    try {
+      if (!fileShares) throw new Error(fileSharesError || projectError || '本机文件共享尚未准备好。');
+      if (action === 'choose-files' || action === 'choose-directory') {
+        const result = await dialog.showOpenDialog(window, action === 'choose-files'
+          ? { title: '选择要共享的文件', properties: ['openFile', 'multiSelections'] }
+          : { title: '选择要共享的文件夹', properties: ['openDirectory'] });
+        return { data: result.canceled ? [] : result.filePaths };
+      }
+      if (action === 'open') {
+        const share = fileShares.get(false).shares.find(item => item.id === value?.id);
+        if (!share?.links[0]) throw new Error('请先启动此共享。');
+        await shell.openExternal(share.links[0]);
+        return { data: true };
+      }
+      return { data: await fileShares.request(action, value) };
+    } catch (error) { return { error: error.message, status: error.status }; }
+  });
+  ipcMain.handle('devkit:project-todos', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的项目与待办请求。');
+    try {
+      if (!projectTodos) throw new Error(projectTodosError || projectError || '项目与待办尚未准备好。');
+      return { data: await projectTodos.request(action, value) };
+    } catch (error) { return { error: error.message, status: error.status }; }
+  });
   ipcMain.handle('devkit:lan-hosts', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的局域网主机请求。');
     try {
@@ -395,6 +426,6 @@ app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await fileShares?.close(); await projectTodos?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

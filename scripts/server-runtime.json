@@ -3,5 +3,7 @@
   "asn1",
   "bcrypt-pbkdf",
   "safer-buffer",
-  "tweetnacl"
+  "tweetnacl",
+  "yazl",
+  "buffer-crc32"
 ]

@@ -32,7 +32,7 @@ export function updateVisitors(input, previous = []) {
 export function visitorServices(global, visitor) {
   const result = emptySharingServices();
   for (const [module, permissions] of Object.entries(result)) {
-    for (const key of Object.keys(permissions)) permissions[key] = global[module][key] && visitor[module][key];
+    for (const key of Object.keys(permissions)) permissions[key] = global[module]?.[key] === true && visitor[module]?.[key] === true;
   }
   return result;
 }

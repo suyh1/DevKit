@@ -120,7 +120,7 @@ sudo chmod 700 /opt/devkit/configs
 
 ## 无桌面常驻的部署方式
 
-仓库还提供独立 Node 服务入口，可按选项开放共享工作台的七个栏目。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
+仓库还提供独立 Node 服务入口，可按选项开放共享工作台栏目。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用独立服务发行 ZIP 时解压即可，不需要安装 npm 依赖或重新构建：
 
 ```powershell
 # 仅源码部署需要先执行：npm run build
@@ -145,6 +145,16 @@ DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。项目编辑使用 `DEVKIT_PROJECT_EDIT=true`，入口检测使用 `DEVKIT_PROJECT_PROBE=true`，两者独立。后续启动复用已保存设置，环境变量逐项覆盖。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 
 默认直接使用解压根目录的 `configs`，不受终端当前工作目录影响。如部署者明确需要其他位置，可自行设置绝对路径 `DEVKIT_PROJECT_DATA`；这属于显式覆盖，桌面安装版仍使用安装目录的 `configs`。
+
+## 项目与待办
+
+“项目与待办”在共享栏目中独立管理项目及其任务。创建项目后添加待办，可填写负责人、优先级和截止日期。待办可在“待开始”“进行中”“已完成”之间切换。项目进度随任务状态更新。可按状态筛选，也可搜索标题、说明和负责人，清单与看板使用同一份任务数据。
+
+桌面新建的项目默认仅本机可见。编辑项目时勾选“发布此项目到共享工作台”，再从顶部“局域网共享”开放“项目与待办”。有该栏目权限的访客可读已发布的项目，授予编辑权限后可创建共享项目、维护任务及删除项目。网页新建项目会发布到共享工作台。多人编辑同一项目时，较晚提交如果基于旧版本，会提示刷新后重新操作。
+
+数据保存在运行 DevKit 的主机的 `configs/project-todos.json`。迁移到独立服务时，可在两端关闭后复制到目标配置目录。独立服务通过 `DEVKIT_SHARE_PROJECT_TODOS=true` 开放，使用 `DEVKIT_PROJECT_TODOS_EDIT=true` 授予编辑。
+
+清单和看板的并列视图参考采用 Go 与 Vue 的 Vikunja。任务状态和项目进度也参考基于 PHP、处于维护模式的 Kanboard。DevKit 使用现有 React 界面和主机存储实现。[Vikunja（AGPL-3.0-or-later）](https://github.com/go-vikunja/vikunja) · [Kanboard（MIT）](https://github.com/kanboard/kanboard)
 
 ## 实现边界与验证
 

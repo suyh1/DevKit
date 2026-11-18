@@ -47,10 +47,10 @@ def write_bundle(bundle):
         for source in sorted((root / folder).iterdir()):
             if source.suffix in {'.mjs', '.sh', '.ps1'} and not source.name.endswith(('.check.mjs', '.test.mjs')):
                 bundle.write(source, f'{folder}/{source.name}')
-    for name in json.loads((root / 'scripts/ssh-runtime.json').read_text(encoding='utf-8')):
+    for name in json.loads((root / 'scripts/server-runtime.json').read_text(encoding='utf-8')):
         source_folder = root / 'node_modules' / name
         if not (source_folder / 'package.json').is_file():
-            raise FileNotFoundError(f'Missing SSH dependency: {source_folder}')
+            raise FileNotFoundError(f'Missing server dependency: {source_folder}')
         for source in sorted(source_folder.rglob('*')):
             parts = source.relative_to(source_folder).parts
             if source.is_file() and not {'node_modules', 'build', 'test', 'examples'}.intersection(parts) and source.suffix != '.node':

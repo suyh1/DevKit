@@ -1,0 +1,145 @@
+.planning-workspace {
+  container-type: inline-size;
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  align-content: start;
+}
+.planning-heading, .planning-actions, .planning-card-title, .todo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.planning-heading { align-items: flex-start; justify-content: space-between; gap: 14px; }
+.planning-heading > div:first-child, .planning-card-title > h2 { min-width: 0; }
+.planning-heading h1, .planning-heading h2, .planning-card h2, .todo-task h3 { margin: 0; overflow-wrap: anywhere; }
+.planning-heading h1 { font-size: 25px; line-height: 1.3; }
+.planning-heading h2, .planning-card h2 { font-size: 17px; }
+.planning-heading p, .planning-meta { color: var(--muted); margin: 5px 0 0; line-height: 1.55; font-size: 12px; }
+.planning-card, .planning-empty {
+  min-width: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.planning-empty { margin: 0; color: var(--muted); }
+.planning-notice { margin: 0; color: var(--accent); }
+.planning-card-title > svg { color: var(--accent); flex-shrink: 0; }
+.planning-card-title > h2 { flex: 1 1 110px; }
+.planning-badge {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.planning-badge[data-kind=high] { color: var(--warning, var(--text)); border-color: currentColor; }
+.planning-badge[data-kind=doing] { color: var(--accent); border-color: currentColor; }
+.planning-badge[data-kind=done] { color: var(--success, var(--accent)); border-color: currentColor; }
+.file-share-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start; }
+.file-share-list .planning-card { display: grid; align-content: start; gap: 10px; }
+.file-share-list .planning-meta { margin: 0; }
+.file-share-browse { justify-self: start; text-decoration: none; }
+.file-share-roots { display: grid; list-style: none; margin: 0; padding: 0; }
+.file-share-roots:not(:empty) { border-top: 1px solid var(--line); }
+.file-share-roots > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  line-height: 1.45;
+}
+.file-share-roots > li > svg { flex-shrink: 0; }
+.file-share-roots > li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.file-share-paths { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.file-share-paths legend { padding-inline: 4px; }
+.planning-form { display: grid; gap: 14px; padding: 2px; }
+.planning-form label:not(.planning-check) { display: grid; gap: 6px; min-width: 0; }
+.planning-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.planning-form :is(input:not([type=checkbox]), textarea, select), .planning-select, .todo-search {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+.planning-form textarea { resize: vertical; }
+.planning-check { display: flex; align-items: flex-start; gap: 7px; line-height: 1.5; }
+.planning-check input { margin-top: 3px; }
+.planning-form-footer { justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--line); }
+.todo-workspace { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 14px; }
+.todo-projects h2 { display: flex; gap: 7px; align-items: center; }
+.todo-projects nav { display: grid; gap: 5px; margin-top: 13px; }
+.todo-projects nav button {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.todo-projects nav button[aria-current=page], .todo-layout button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
+.todo-projects nav small, .todo-task-meta { color: var(--muted); }
+.todo-content, .todo-task-list { display: grid; gap: 10px; min-width: 0; }
+.todo-project-detail { display: grid; gap: 12px; }
+.todo-project-detail .planning-badge { margin-top: 5px; }
+.todo-description, .todo-task p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+.todo-progress { display: grid; gap: 5px; max-width: 360px; color: var(--muted); }
+.todo-progress strong { color: var(--text); margin-left: 4px; }
+.todo-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
+.todo-search { display: flex; gap: 7px; align-items: center; flex: 1 1 190px; }
+.todo-search svg { color: var(--muted); flex-shrink: 0; }
+.todo-search input { width: 100%; min-width: 0; padding: 0; border: 0; color: var(--text); background: transparent; }
+.planning-select { width: auto; max-width: 100%; }
+.planning-form select { width: 100%; }
+.todo-layout { display: flex; gap: 5px; }
+.todo-task {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.todo-task-main { display: flex; gap: 8px; align-items: start; flex: 1 1 160px; min-width: 0; }
+.todo-task-main > div { min-width: 0; }
+.todo-task h3 { font-size: 14px; padding-top: 3px; }
+.todo-task p { margin-top: 5px; }
+.todo-task-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.todo-complete[aria-pressed=false] svg { opacity: .35; }
+.todo-complete[aria-pressed=true] { color: var(--success, var(--accent)); }
+.todo-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; align-items: start; }
+.todo-board-column { display: grid; gap: 7px; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 10px; }
+.todo-board-column > h3 { display: flex; justify-content: space-between; margin: 0; font-size: 13px; padding: 5px 2px; }
+.todo-board-column > h3 small { color: var(--muted); }
+.todo-board .todo-task-actions { padding-left: 0; }
+@container (max-width: 850px) {
+  .todo-workspace { grid-template-columns: minmax(0, 1fr); }
+  .todo-projects nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); }
+}
+@container (max-width: 570px) {
+  .todo-board { grid-template-columns: minmax(0, 1fr); }
+  .planning-heading h1 { font-size: 21px; }
+}
+@media (max-width: 450px) {
+  .planning-form-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -114,7 +114,7 @@ test('desktop documentation ships the DevKit license alongside the Electron lice
 
 async function copyPackagingScripts(directory) {
   await mkdir(path.join(directory, 'scripts'));
-  for (const name of ['clean-artifacts.mjs', 'desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py', 'ssh-runtime.json']) {
+  for (const name of ['clean-artifacts.mjs', 'desktop-files.mjs', 'release-integrity.mjs', 'update-readme.mjs', 'package-desktop.mjs', 'package-all.mjs', 'package-project-server.mjs', 'package-project-server.py', 'server-runtime.json']) {
     await cp(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
   }
 }
@@ -152,7 +152,7 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
     await copyPackagingScripts(directory);
     await cp(path.join(root, 'LICENSE'), path.join(directory, 'LICENSE'));
     for (const folder of ['dist/.vite', 'server', 'shared']) await mkdir(path.join(directory, folder), { recursive: true });
-    for (const name of JSON.parse(await readFile(path.join(root, 'scripts/ssh-runtime.json'), 'utf8'))) {
+    for (const name of JSON.parse(await readFile(path.join(root, 'scripts/server-runtime.json'), 'utf8'))) {
       await cp(path.join(root, 'node_modules', name), path.join(directory, 'node_modules', name), { recursive: true });
     }
     await writeFile(path.join(directory, 'dist/portal.html'), '<!doctype html><title>Fixture</title>');

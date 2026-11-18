@@ -14,6 +14,8 @@ import { mergeGeoOutput } from './geography';
 import Overview from './Overview';
 import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
+import ProjectTodos from './ProjectTodos';
+import FileShares from './FileShares';
 import NginxCenter from './NginxCenter';
 import JarCenter from './JarCenter';
 import LanHosts from './LanHosts';
@@ -222,6 +224,8 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'logs'} hidden={page !== 'logs'} className="workspace"><LogCenter active={page === 'logs'} /></div>
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter /></div>
+        <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><ProjectTodos active={page === 'project-todos'} /></div>
+        <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>
         <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>

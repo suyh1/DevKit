@@ -50,6 +50,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     { windowsHide: true },
   );
   assert.equal(typeof (await import(pathToFileURL(path.join(installation, 'node_modules/ssh2/lib/index.js')).href)).default.Client, 'function');
+  assert.equal(typeof (await import(pathToFileURL(path.join(installation, 'node_modules/yazl/index.js')).href)).default.ZipFile, 'function');
   for (const [target, runtime] of Object.entries(sshNodeRuntimes)) {
     const hash = createHash('sha256');
     await pipeline(createReadStream(path.join(installation, 'ssh-node', `${target}.gz`)), createGunzip(), hash);

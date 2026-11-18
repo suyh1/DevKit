@@ -272,7 +272,7 @@ function SharingPanel({
           ) : (
             <>
               <p>
-                统一管理项目中心、Nginx、HTTP、JAR、监控与日志中心
+                设置访问地址、登录方式与各栏目的访客权限
                 调试的局域网访问。所有路径、文件与运行命令都属于这台主机，退出
                 DevKit 会停止共享。
               </p>
@@ -389,6 +389,16 @@ function SharingPanel({
                             label: "检测项目入口",
                             detail: "允许由主机探测项目地址的可达性",
                           },
+                        ],
+                      },
+                      {
+                        id: 'file-shares', name: '本机文件共享管理', description: '浏览主机已发布的共享，下载文件与文件夹 ZIP',
+                        permissions: [],
+                      },
+                      {
+                        id: 'project-todos', name: '项目与待办', description: '查看已发布的项目、进度和待办',
+                        permissions: [
+                          { key: 'edit', label: '编辑项目与待办', detail: '允许在网页创建共享项目，以及编辑、删除已共享的项目和待办。' },
                         ],
                       },
                       {
@@ -509,7 +519,9 @@ function SharingPanel({
                               ? "配置和备份，日志在日志中心授权"
                               : service.id === 'logs' ? '日志中心及原页面的日志读取权限，按下方类别授权' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态和自启状态，日志和控制台输出在日志中心授权' : service.id === "http"
                                 ? "接口文档与环境"
-                                : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签' : "项目与档案"}
+                                : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签'
+                                : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
+                                : service.id === 'project-todos' ? '已发布的项目、进度和待办' : "项目与档案"}
                             。
                           </p>
                           {service.permissions.map((permission) => (

@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('devkitDesktop', {
 contextBridge.exposeInMainWorld('devkitProjects', {
   request: (action, payload) => ipcRenderer.invoke('devkit:projects', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitFileShares', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:file-shares', action, payload),
+});
+contextBridge.exposeInMainWorld('devkitProjectTodos', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:project-todos', action, payload),
+});
 contextBridge.exposeInMainWorld('devkitNginx', {
   request: (action, payload) => ipcRenderer.invoke('devkit:nginx', action, payload),
 });

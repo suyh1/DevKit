@@ -1,5 +1,7 @@
 const fields = {
   projects: ["edit", "probe"],
+  'project-todos': ['edit'],
+  'file-shares': [],
   nginx: ["edit", "control"],
   http: ["edit", "send"],
   jar: ["edit", "control"],
@@ -42,7 +44,7 @@ export function sharingServices(value = {}) {
     const result = emptySharingServices();
     for (const [id, permissions] of Object.entries(fields)) {
       // Services added after v2 remain disabled in older settings.
-      const service = value.services[id] ?? (['jar', 'monitor', 'logs', 'lan-hosts'].includes(id) ? result[id] : undefined);
+      const service = value.services[id] ?? (['projects', 'nginx', 'http'].includes(id) ? undefined : result[id]);
       if (
         !service ||
         typeof service !== "object" ||

@@ -6,10 +6,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download, Menu, X, FolderOpen, Server, Coffee, Activity, ScrollText, Search, Send } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, Search } from "lucide-react";
+import { workspaceModuleNav } from './ui';
+import { workspaceModules } from './catalog';
 import CommandPalette from './CommandPalette';
 import { openWorkspaceLink, parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
+import ProjectTodos from './ProjectTodos';
+import { PublishedFileShares } from './FileShares';
 import NginxCenter from "./NginxCenter";
 import JarCenter from './JarCenter';
 import MonitorCenter from './MonitorCenter';
@@ -30,15 +34,8 @@ import { saveText } from "./files";
 import { DisplayModeProvider } from './DisplayMode';
 import type { DisplayMode } from './DisplayMode';
 
-const modules = [
-  { id: "projects", name: "项目中心" },
-  { id: "nginx", name: "Nginx 配置" },
-  { id: "http", name: "HTTP 调试" },
-  { id: 'jar', name: 'JAR 管理' },
-  { id: 'monitor', name: '监控中心' },
-  { id: 'logs', name: '日志中心' },
-  { id: 'lan-hosts', name: '局域网主机' },
-] as const;
+const portalOrder = ['projects', 'project-todos', 'file-shares', 'nginx', 'http', 'jar', 'monitor', 'logs', 'lan-hosts'] as const satisfies readonly Page[];
+const modules = portalOrder.map(id => workspaceModules.find(item => item.id === id)!);
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
 const hashPage = () => modules.find(module => module.id === parseWorkspaceLink(location.hash)?.page)?.id;
@@ -455,7 +452,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     : [
         ('edit' in active && active.edit)
           ? "可编辑"
-          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
+          : { projects: "项目只读", 'project-todos': '任务只读', 'file-shares': '可下载', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
@@ -537,6 +534,8 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               <span>
                 {page === "projects"
                   ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
+                  : page === 'project-todos' ? '查看主机已发布的项目和待办。编辑权限由主机授予。'
+                  : page === 'file-shares' ? '共享文件从主机下载到当前浏览器。'
                   : page === 'lan-hosts' ? 'SSH 连接和端口检测由共享主机发起，连接凭据保存在共享主机。' : page === 'logs' ? '仅可读取已授权的日志来源；筛选与清空显示不修改主机文件。' : page === 'monitor' ? '检测由主机定时执行；故障与恢复记录、历史样本保存在共享主机。' : page === 'jar' ? '路径和进程属于各应用所在的主机。多人可查看控制台，输入需运行权限和控制权。' : page === "nginx"
                     ? "配置、路径和运行操作指向实例所在的主机。导出文件下载到当前浏览器。"
                     : "接口项目保存在共享主机，请求从主机发出，localhost 指主机；快速请求集合保存在当前浏览器。"}
@@ -570,6 +569,8 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 <ProjectCenter portal portalSession={session} />
               </div>
             )}
+            {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><ProjectTodos portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
+            {services['file-shares'].enabled && <div className="portal-page" hidden={page !== 'file-shares'} inert={page !== 'file-shares'}><PublishedFileShares active={page === 'file-shares'} /></div>}
             {services.nginx.enabled && (
               <div
                 className="portal-page"
@@ -624,7 +625,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
 
 function PortalNavigation({ modules, page, navigate }: { modules: { id: Page; name: string }[]; page: Page; navigate: (page: Page) => void }) {
   return <nav className="portal-navigation" aria-label="共享模块">{modules.map(module => {
-    const Icon = module.id === 'logs' ? ScrollText : module.id === 'monitor' ? Activity : module.id === 'jar' ? Coffee : module.id === 'nginx' ? Server : module.id === 'http' ? Send : FolderOpen;
+    const { Icon } = workspaceModuleNav[module.id];
     return <button key={module.id} aria-current={page === module.id ? 'page' : undefined} onClick={() => navigate(module.id)}><Icon size={17} /><span>{module.name}</span></button>;
   })}</nav>;
 }

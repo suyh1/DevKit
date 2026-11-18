@@ -10,14 +10,16 @@ import { createMonitorManager } from './monitor-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { sharingFromEnvironment } from './sharing-environment.mjs';
 import { createLanWorkspaces } from './lan-workspaces.mjs';
+import { createFileShares } from './file-shares.mjs';
+import { createProjectTodos } from './project-todos.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
-let nginx, library, jar, monitor, lan;
+let nginx, library, jar, monitor, lan, fileShares, projectTodos;
 const logs = createLogCenter({ nginx: () => nginx, jar: () => jar, lan: () => lan });
-const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan });
+const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos });
 try {
   lan = await createLanWorkspaces(directory);
   const saved = await store.settings();
@@ -26,6 +28,9 @@ try {
   if (services.http.enabled) library = await createApiWorkspace(directory);
   jar = await createJarManager(directory);
   monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar, lan: () => lan });
+  fileShares = await createFileShares(directory).catch(error => console.error(`文件共享配置：${error.message}`));
+  if (services['project-todos'].enabled)
+    projectTodos = await createProjectTodos(directory).catch(error => console.error(`项目与待办配置：${error.message}`));
   const result = await host.start({
     host: process.env.HOST || "0.0.0.0",
     port: Number(process.env.PORT || 8765),
@@ -41,6 +46,8 @@ try {
     result.directory,
   );
 } catch (error) {
+  await fileShares?.close();
+  await projectTodos?.close();
   lan?.close();
   await monitor?.close();
   await nginx?.close();
@@ -56,6 +63,8 @@ for (const signal of ["SIGINT", "SIGTERM"])
     if (closing) return;
     closing = true;
     await host.stop();
+    await fileShares?.close();
+    await projectTodos?.close();
     lan?.close();
     await monitor?.close();
     await nginx?.close();

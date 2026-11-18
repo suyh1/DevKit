@@ -217,6 +217,8 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
   });
   assert.deepEqual(old, {
     projects: { enabled: true, edit: true, probe: true },
+    'project-todos': { enabled: false, edit: false },
+    'file-shares': { enabled: false },
     nginx: { enabled: true, edit: true, control: true },
     http: { enabled: false, edit: false, send: false },
     jar: { enabled: false, edit: false, control: false },
@@ -243,12 +245,17 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
       DEVKIT_HTTP_SEND: "true",
       DEVKIT_HTTP_EDIT: "false",
       DEVKIT_SHARE_LAN_HOSTS: "true",
+      DEVKIT_SHARE_FILE_SHARES: "true",
+      DEVKIT_SHARE_PROJECT_TODOS: "true",
+      DEVKIT_PROJECT_TODOS_EDIT: "true",
     },
     { services: old },
   );
   assert.deepEqual(cli.projects, { enabled: false, edit: false, probe: false });
   assert.deepEqual(cli.http, { enabled: true, edit: false, send: true });
   assert.deepEqual(cli['lan-hosts'], { ...old['lan-hosts'], enabled: true });
+  assert.deepEqual(cli['file-shares'], { enabled: true });
+  assert.deepEqual(cli['project-todos'], { enabled: true, edit: true });
   assert.throws(
     () => sharingFromEnvironment({ DEVKIT_HTTP_SEND: "yes" }),
     /true.*false/,
