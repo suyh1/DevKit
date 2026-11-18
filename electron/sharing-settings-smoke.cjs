@@ -165,7 +165,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       ),
       String(port),
     );
-    occupied = net.createServer();
+    // Reserve the port without retaining connections from the browser or the runner.
+    occupied = net.createServer(connection => connection.destroy());
     await new Promise((resolve) => occupied.listen(0, "127.0.0.1", resolve));
     await fill("端口", occupied.address().port);
     await click("开启共享");
@@ -182,6 +183,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       ),
       "stopped",
     );
+    await new Promise((resolve) => occupied.close(resolve));
+    occupied = undefined;
     await js(
       'document.querySelector(".sharing-panel button[aria-label=关闭共享设置]").click()',
     );
@@ -545,11 +548,11 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await Promise.all([sample, exportedFile, downloadedFile].map(file => fs.rm(file, { force: true })));
       await fs.rmdir(path.dirname(sample));
     }
-    console.log(
-      "Global sharing settings, file downloads, Todo shortcuts, extended syntax and desktop/browser Todo import and export passed.",
-    );
   } finally {
     if (occupied) await new Promise((resolve) => occupied.close(resolve));
     await js('window.devkitProjects.request("stop")');
   }
+  console.log(
+    "Global sharing settings, file downloads, Todo shortcuts, extended syntax and desktop/browser Todo import and export passed.",
+  );
 };

@@ -90,7 +90,7 @@ app.on('browser-window-created', (_event, window) => {
         await require('./geography-smoke.cjs')(window, output);
         clearTimeout(timeout); app.exit(0); return;
       }
-      await require('./sharing-settings-smoke.cjs')(window, output);
+      if (process.env.DEVKIT_TEST_WITHOUT_SHARING_SETTINGS !== '1') await require('./sharing-settings-smoke.cjs')(window, output);
       await require('./design-smoke.cjs')(window, output);
       if (process.env.DEVKIT_TEST_DESIGN_ONLY === '1') { clearTimeout(timeout); app.exit(0); return; }
       await window.webContents.executeJavaScript(`{

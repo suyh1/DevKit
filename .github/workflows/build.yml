@@ -87,9 +87,12 @@ jobs:
         with:
           name: frontend
           path: dist
+      - name: LAN sharing settings, file downloads and Todo integration
+        if: runner.os == 'Windows'
+        run: node scripts/smoke-desktop.mjs --sharing-settings-only
       - name: Electron integration smoke
         if: runner.os == 'Windows'
-        run: node scripts/smoke-desktop.mjs
+        run: node scripts/smoke-desktop.mjs --without-sharing-settings
       - name: Offline API workspace integration
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --api-only
