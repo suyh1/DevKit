@@ -58,7 +58,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await openShortcut(".global-sharing-button");
     assert.equal(
       await js('document.querySelectorAll(".sharing-service").length'),
-      6,
+      7,
     );
     assert.equal(
       await js(
@@ -95,7 +95,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await fill("端口", port);
     await fill("首次访问口令（至少 8 位）", "global-sharing-test-only");
     await js(
-      `for(const id of ['nginx','http']) document.querySelector('.sharing-service[data-service='+id+'] .sharing-service-toggle input').click()`,
+      `for(const id of ['nginx','http','lan-hosts']) document.querySelector('.sharing-service[data-service='+id+'] .sharing-service-toggle input').click()`,
     );
     await js(
       'document.querySelector(".sharing-panel button[aria-label=关闭共享设置]").click()',
@@ -115,6 +115,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await wait(
       'document.querySelector(".sharing-panel .pc-inline-feedback")?.textContent.includes("已启动")',
     );
+    assert.equal(await js('window.devkitProjects.request("sharing").then(result => result.data.services["lan-hosts"].enabled)'), true);
     const address = `http://127.0.0.1:${port}/`;
     assert.ok(
       await js(

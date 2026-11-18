@@ -335,14 +335,14 @@ function SharingPanel({
                   {(draft.visitors || []).map((visitor, index) => {
                     const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
                     const existing = visitor.hasPassword === true;
-                    const labels: Record<string, string> = { edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: 'JAR 日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志' };
+                    const labels: Record<string, string> = { edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: 'JAR 日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
                     return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
                       <div className="pc-form-grid">
                         <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
                         <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /></Field>
                       </div>
-                      {workspaceModules.filter(item => item.id !== 'lan-hosts').map(item => {
-                        const name = item.id as keyof SharingServices, service = visitor.services[name];
+                      {workspaceModules.map(item => {
+                        const name = item.id, service = visitor.services[name];
                         const patch = (key: string, value: boolean) => change({ ...visitor, services: { ...visitor.services, [name]: { ...service, [key]: value } } });
                         return <div className="sharing-visitor-service" key={name}><label><input type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
                           {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
@@ -452,6 +452,17 @@ function SharingPanel({
                           { key: 'raw', label: '允许读取原始日志', detail: '访客可在日志中心主动关闭主机脱敏，原始内容可能包含凭据' },
                         ],
                       },
+                      {
+                        id: 'lan-hosts', name: '局域网主机', description: '主机清单、连接档案和远程会话', permissions: [
+                          { key: 'edit', label: '管理主机档案', detail: '添加、编辑、移除、置顶和导入主机。可提交连接凭据，已保存的凭据留在共享主机。' },
+                          { key: 'diagnose', label: '测试与诊断连接', detail: '验证目标地址、端口和已保存的登录。确认或重置 SSH 指纹还需管理主机档案权限。' },
+                          { key: 'terminal', label: '使用 SSH 终端', detail: '使用主机保存的凭据连接已验证指纹的目标，在目标机交互操作。' },
+                          { key: 'files', label: 'SFTP 文件', detail: '通过已打开的 SSH 终端浏览、上传和下载远程文件。' },
+                          { key: 'discover', label: '发现主机', detail: '从共享主机选定的网卡检测直连网段。' },
+                          { key: 'wake', label: '网络唤醒', detail: '从共享主机唤醒配置了 MAC 地址的设备。' },
+                          { key: 'rdp', label: '远程桌面连接', detail: '通过共享主机配置的 guacd，在工作台内连接已登记的远程桌面。' },
+                        ],
+                      },
                     ] as const
                   ).map((service) => {
                     const policy = draft.services[service.id];
@@ -498,7 +509,7 @@ function SharingPanel({
                               ? "配置和备份，日志在日志中心授权"
                               : service.id === 'logs' ? '日志中心及原页面的日志读取权限，按下方类别授权' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态和自启状态，日志和控制台输出在日志中心授权' : service.id === "http"
                                 ? "接口文档与环境"
-                                : "项目与档案"}
+                                : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签' : "项目与档案"}
                             。
                           </p>
                           {service.permissions.map((permission) => (

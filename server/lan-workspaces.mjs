@@ -26,13 +26,25 @@ export async function createLanWorkspaces(directory, transports = { share: share
   const store = await createLanHostStore(directory);
   const connections = new Map(), cache = new Map(), terminals = new Map();
   const desktopSession = randomUUID();
-  let terminalGeneration = 0, scan;
+  let terminalGeneration = 0, openingTerminals = 0, scan, closed = false;
   const find = id => store.list().find(item => item.id === id);
   function sameSshHost(host) {
     const current = find(host.id);
-    return current?.mode === 'ssh' && ['address', 'port', 'user', 'platform', 'fingerprint', 'auth', 'keyPath', 'secret', 'jumpHostId'].every(key => current[key] === host[key]);
+    return current?.mode === 'ssh' && ['address', 'port', 'user', 'platform', 'fingerprint', 'auth', 'keyPath', 'secret', 'encryptedKey', 'explicitKeyOnly', 'jumpHostId'].every(key => current[key] === host[key]);
   }
   const routeCurrent = route => route.every(sameSshHost);
+  function rdpTarget(id) {
+    const host = find(id);
+    const port = host?.rdpPort || (host?.platform === 'win32' ? 3389 : null);
+    if (!port) throw Object.assign(new Error('请选择已配置远程桌面的主机。'), { status: 404 });
+    const { address } = hostTarget(host);
+    return { address, port };
+  }
+  async function connectSaved(host, options) {
+    if (options.verifyOnly) return connectSsh(host, '', options);
+    const [password, privateKey] = await Promise.all([store.password(host), store.privateKey(host)]);
+    return connectSsh(host, password, { ...options, privateKey });
+  }
   async function openHost(host, { verifyOnly = false } = {}, route = jumpRoute(host, find)) {
     const clients = [];
     let socket, target = host;
@@ -41,14 +53,14 @@ export async function createLanWorkspaces(directory, transports = { share: share
       for (const [index, jump] of route.entries()) {
         target = jump;
         if (!jump.fingerprint) throw new Error('请先测试该跳板机并确认它的指纹。');
-        const client = await connectSsh(jump, await store.password(jump), { socket });
+        const client = await connectSaved(jump, { socket });
         clients.push(client);
         const next = route[index + 1] || host;
         socket = await withDeadline(sshCall(client, 'forwardOut', '127.0.0.1', 0, next.address, next.port), 12000, '跳板机连接下一级地址超时。');
         socket.on('error', () => {});
       }
       target = host;
-      const client = await connectSsh(host, verifyOnly ? '' : await store.password(host), { verifyOnly, socket });
+      const client = await connectSaved(host, { verifyOnly, socket });
       client.once('close', cleanup);
       return client;
     } catch (error) {
@@ -74,6 +86,8 @@ export async function createLanWorkspaces(directory, transports = { share: share
     return entry.open;
   }
   function release(session) {
+    if (scan?.owner === session) scan.controller.abort();
+    for (const [id, entry] of terminals) if (entry.owner === session) closeTerminal(id);
     for (const [key, entry] of cache) if (entry.session === session) cache.delete(key);
     for (const [key, entry] of connections) {
       if (entry.host.mode === 'share' && entry.session === session) {
@@ -162,31 +176,48 @@ export async function createLanWorkspaces(directory, transports = { share: share
 
   function closeTerminal(id) {
     const entry = terminals.get(id);
-    if (entry) { terminals.delete(id); entry.client.destroy(); }
+    if (entry) { terminals.delete(id); clearTimeout(entry.idle); entry.client.destroy(); }
+  }
+  function ownedTerminal(id, owner) {
+    const entry = terminals.get(id);
+    if (!entry || entry.owner !== owner) throw Object.assign(new Error('SSH 会话已断开或不可用，请重新连接。'), { status: 404 });
+    bumpIdle(id, entry);
+    return entry;
+  }
+  function bumpIdle(id, entry) {
+    if (entry.owner === desktopSession) return;
+    clearTimeout(entry.idle);
+    entry.idle = setTimeout(() => closeTerminal(id), 45_000);
+    entry.idle.unref();
   }
   function terminalCurrent(host, route) {
     return sameSshHost(host) && routeCurrent(route);
   }
   const dimensions = value => ({ cols: Math.max(2, Math.min(500, Math.trunc(Number(value?.cols)) || 80)), rows: Math.max(2, Math.min(300, Math.trunc(Number(value?.rows)) || 24)) });
-  async function hostRequest(action, value, localFile) {
+  async function hostRequest(action, value, localFile, web) {
+    const owner = web?.token || desktopSession;
+    web?.ensureCurrent();
     if (action === 'list') return store.list().map(publicHost);
     if (action === 'scan-interfaces') return lanInterfaces();
-    if (action === 'scan-cancel') { if (scan?.id === value?.id) scan.controller.abort(); return true; }
+    if (action === 'scan-cancel') { if (scan?.owner === owner && scan.id === value?.id) scan.controller.abort(); return true; }
     if (action === 'scan-start') {
       if (scan) throw new Error('已有扫描正在运行。');
       const source = lanInterfaces().find(item => item.address === value?.address && item.name === value?.name);
       if (!source || !identity.test(value?.id || '')) throw new Error('所选网卡已不可用。');
-      scan = { id: value.id, controller: new AbortController() };
+      scan = { id: value.id, owner, controller: new AbortController() };
       try { return await discoverHosts(source, value.range, value.port, scan.controller.signal); }
       finally { scan = undefined; }
     }
-    if (action === 'import-preview') return store.previewImport(value);
-    if (action === 'import-connections') { const result = await store.importConnections(value); invalidate(); return result; }
-    if (['save', 'import', 'remove'].includes(action)) { const result = await store[action](value); invalidate(); return result; }
-    if (action === 'terminal-close') { closeTerminal(value?.id); return true; }
+    if (action === 'import-preview') return store.previewImport(value, !!web);
+    if (action === 'import-connections') { const result = await store.importConnections(value, web); invalidate(); return result; }
+    if (['save', 'import', 'remove'].includes(action)) { const result = await store[action](value, web); invalidate(); return result; }
+    if (action === 'terminal-close') {
+      if (terminals.get(value?.id)?.owner === owner) closeTerminal(value.id);
+      return true;
+    }
     if (['file-list', 'file-upload', 'file-download'].includes(action)) {
-      const terminal = terminals.get(value?.id);
-      if (!terminal || terminal.closed) throw new Error('SSH 会话已断开，请重新连接。');
+      const terminal = ownedTerminal(value?.id, owner);
+      if (terminal.closed) throw new Error('SSH 会话已断开，请重新连接。');
       if (action === 'file-list') return useSftp(terminal.client, action, value, terminal.host, localFile);
       if (terminal.fileBusy) throw new Error('当前会话正在传输文件。');
       terminal.fileBusy = true;
@@ -194,8 +225,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       finally { terminal.fileBusy = false; }
     }
     if (['terminal-read', 'terminal-input', 'terminal-resize'].includes(action)) {
-      const terminal = terminals.get(value?.id);
-      if (!terminal) throw new Error('终端会话已关闭。');
+      const terminal = ownedTerminal(value?.id, owner);
       if (action === 'terminal-read') {
         const data = Buffer.concat(terminal.output).toString('base64');
         terminal.output = []; terminal.bytes = 0; if (!terminal.closed) terminal.stream.resume();
@@ -210,14 +240,12 @@ export async function createLanWorkspaces(directory, transports = { share: share
     if (!host) throw new Error('找不到已保存的主机连接。');
     if (action === 'wake') return wakeHost(host);
     if (action === 'rdp-target') {
-      const port = host.rdpPort || (host.platform === 'win32' ? 3389 : null);
-      if (!port) throw new Error('请在主机档案配置远程桌面端口。');
-      const { address } = hostTarget(host);
+      const { address, port } = rdpTarget(host.id);
       return `${address.includes(':') ? `[${address}]` : address}:${port}`;
     }
     if (action === 'diagnose') return diagnoseHost(host, {
       openSsh: options => openHost(host, options),
-      openShare: () => connection(host, desktopSession),
+      openShare: () => connection(host, owner),
     });
     if (action === 'legacy-import' && host.mode === 'ssh') {
       const { module, target } = value;
@@ -240,10 +268,10 @@ export async function createLanWorkspaces(directory, transports = { share: share
       await remote(host, module, 'upsert', { revision: state.revision, instance }, fullAccess, desktopSession);
       return true;
     }
-    if (action === 'reset-trust' && host.mode === 'ssh') { const result = await store.trust(host, '', true); invalidate(); return result; }
+    if (action === 'reset-trust' && host.mode === 'ssh') { const result = await store.trust(host, '', true, web?.ensureCurrent); invalidate(); return result; }
     if (action === 'test') {
       if (host.mode === 'share') {
-        const transport = await connection(host, desktopSession);
+        const transport = await connection(host, owner);
         const module = host.modules.jar ? 'jar' : host.modules.nginx ? 'nginx' : null;
         if (module) await transport.request(module, 'get', {});
         else await transport.capabilities('jar');
@@ -255,7 +283,8 @@ export async function createLanWorkspaces(directory, transports = { share: share
           try { await openHost(host, { verifyOnly: true }); } catch (error) { if (!error.fingerprint || error.jump) throw error; offered = error.fingerprint; }
           if (!value.fingerprint) return { fingerprint: offered };
           if (value.fingerprint !== offered) throw new Error('SSH 主机指纹在验证期间发生变化。');
-          await store.trust(host, offered); invalidate();
+          web?.ensureCurrent();
+          await store.trust(host, offered, false, web?.ensureCurrent); invalidate();
         }
         const client = await openHost(find(host.id));
         client.end();
@@ -264,22 +293,41 @@ export async function createLanWorkspaces(directory, transports = { share: share
     }
     if (action === 'terminal-open' && host.mode === 'ssh') {
       if (!host.fingerprint) throw new Error('请先测试连接并确认 SSH 主机指纹。');
-      if (terminals.size >= 16) throw new Error('最多同时打开 16 个终端。');
+      if (terminals.size + openingTerminals >= 16) throw new Error('最多同时打开 16 个终端。');
       const generation = terminalGeneration;
       const route = jumpRoute(host, find);
-      const { client, stream } = await openSshShell(await openHost(host, {}, route), dimensions(value));
-      if (terminalGeneration !== generation || !terminalCurrent(host, route)) { client.destroy(); throw new Error('终端已关闭或连接档案已更新。'); }
-      const id = randomUUID(), terminal = { host, route, client, stream, output: [], bytes: 0, closed: false };
+      openingTerminals++;
+      let opened;
+      try {
+        opened = await openSshShell(await openHost(host, {}, route), dimensions(value));
+        web?.ensureCurrent();
+        if (closed || owner === desktopSession && terminalGeneration !== generation || !terminalCurrent(host, route)) throw new Error('终端已关闭或连接档案已更新。');
+      } catch (error) { opened?.client.destroy(); throw error; }
+      finally { openingTerminals--; }
+      const { client, stream } = opened;
+      const id = randomUUID(), terminal = { owner, host, route, client, stream, output: [], bytes: 0, closed: false };
       terminals.set(id, terminal);
+      bumpIdle(id, terminal);
       stream.on('data', data => { terminal.output.push(data); terminal.bytes += data.length; if (terminal.bytes >= 256000) stream.pause(); });
-      const closed = () => { terminal.closed = true; client.end(); };
-      stream.on('error', closed); stream.once('close', closed); client.once('close', closed);
+      const onClosed = () => { terminal.closed = true; client.end(); };
+      stream.on('error', onClosed); stream.once('close', onClosed); client.once('close', onClosed);
       return { id };
     }
     throw new Error('未知局域网主机操作。');
   }
   return {
-    request, hostRequest, release,
+    request, hostRequest, release, rdpTarget,
+    sharedHosts: (logAccess, access) => store.list().map(host => {
+      const { id, name, address, mode, port, group, tags, pinned, modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, fingerprint, explicitKeyOnly } = host;
+      return {
+        id, name, address, mode, port, group, tags, pinned,
+        hasLogs: logAccess.enabled && (logAccess.jar && modules.jar || logAccess.nginx && modules.nginx),
+        ...(access.edit ? { modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, explicitKeyOnly, revision: host.revision || '', hasStoredKey: !!(host.keyPath || host.encryptedKey), hasPassword: !!host.secret } : {}),
+        ...(access.diagnose || access.terminal || access.edit ? { fingerprint } : {}),
+        ...(access.wake ? { canWake: !!mac } : {}),
+        ...(access.rdp ? { canRdp: !!rdpPort || platform === 'win32' } : {}),
+      };
+    }),
     async monitorJarSources(session = desktopSession) {
       const hosts = store.list().filter(host => host.modules.jar);
       const results = await Promise.allSettled(hosts.map(async host => {
@@ -306,7 +354,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       return remote(host, 'logs', action, { ...payload, logAccess: permissions }, permissions, session);
     },
     monitorTargets: () => store.list().map(host => ({ id: host.id, name: host.name, ...hostTarget(host) })),
-    closeTerminals() { terminalGeneration++; for (const id of terminals.keys()) closeTerminal(id); },
-    close() { scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
+    closeTerminals() { terminalGeneration++; for (const [id, entry] of terminals) if (entry.owner === desktopSession) closeTerminal(id); },
+    close() { closed = true; scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
   };
 }

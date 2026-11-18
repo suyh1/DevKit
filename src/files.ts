@@ -13,7 +13,11 @@ declare global {
 
 export async function saveText(text: string, filename: string): Promise<string> {
   if (window.devkitDesktop) return window.devkitDesktop.saveText(text, filename);
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  return downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), filename);
+}
+
+export function downloadBlob(blob: Blob, filename: string): string {
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url; anchor.download = filename; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);

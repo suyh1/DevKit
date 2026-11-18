@@ -5,7 +5,7 @@ import path from 'node:path';
 import { sshCall } from './ssh-exec.mjs';
 import { deploySshWorkspace } from './ssh-workspace-deploy.mjs';
 export { sshCall, sshOutput } from './ssh-exec.mjs';
-export async function connectSsh(host, password, { verifyOnly = false, socket } = {}) {
+export async function connectSsh(host, password, { verifyOnly = false, socket, privateKey } = {}) {
   const { default: { Client, utils } } = await import('ssh2');
   const username = host.user;
   const authentication = [];
@@ -16,22 +16,26 @@ export async function connectSsh(host, password, { verifyOnly = false, socket } 
     authentication.push({ type: 'keyboard-interactive', username, prompt: (_name, _instructions, _lang, prompts, finish) => {
       finish(prompts.length === 1 && !prompts[0].echo && /password|密码/i.test(prompts[0].prompt) ? [password] : []);
     } });
-  } else if (!verifyOnly && host.keyPath) {
+  } else if (!verifyOnly && (host.keyPath || privateKey)) {
     let key;
     try {
-      if (!(await stat(host.keyPath)).isFile()) throw new Error('请选择普通文件。');
-      const file = await open(host.keyPath, 'r');
-      try {
-        const info = await file.stat();
-        if (!info.isFile() || info.size > 262144) throw new Error('私钥文件过大或不可读取。');
-        const bytes = Buffer.alloc(info.size);
-        const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
-        key = utils.parseKey(bytes.subarray(0, bytesRead), password || undefined);
-      } finally { await file.close(); }
-    } catch (error) { throw authError(`无法读取指定的 SSH 私钥：${error.message}`); }
+      if (privateKey) key = utils.parseKey(privateKey, password || undefined);
+      else {
+        if (!(await stat(host.keyPath)).isFile()) throw new Error('请选择普通文件。');
+        const file = await open(host.keyPath, 'r');
+        try {
+          const info = await file.stat();
+          if (!info.isFile() || info.size > 262144) throw new Error('私钥文件过大或不可读取。');
+          const bytes = Buffer.alloc(info.size);
+          const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
+          key = utils.parseKey(bytes.subarray(0, bytesRead), password || undefined);
+        } finally { await file.close(); }
+      }
+    } catch { throw authError('无法读取已配置的 SSH 私钥。'); }
     if (key instanceof Error || Array.isArray(key) || !key.isPrivateKey()) throw authError('私钥格式无效，或解锁口令不正确。');
     authentication.push({ type: 'publickey', username, key });
   } else if (!verifyOnly) {
+    if (host.explicitKeyOnly) throw authError('请为此主机配置 SSH 私钥或密码。');
     const agent = process.env.SSH_AUTH_SOCK || (process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : '');
     if (agent) authentication.push({ type: 'agent', username, agent });
     for (const filename of ['id_ed25519', 'id_ecdsa', 'id_rsa']) {

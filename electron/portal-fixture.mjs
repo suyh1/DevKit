@@ -1,6 +1,8 @@
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtemp, realpath, writeFile, rm } from "node:fs/promises";
+import { generateKeyPairSync } from 'node:crypto';
+import { once } from 'node:events';
 import { createServer } from "node:net";
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
@@ -15,6 +17,8 @@ export async function portalFixture(root) {
     { initialApiState, newApiEndpoint },
     { createJarManager },
     { createLogCenter },
+    { createLanWorkspaces },
+    { createMonitorManager },
   ] = await Promise.all([
     load("server/project-store.mjs"),
     load("server/project-host.mjs"),
@@ -23,11 +27,14 @@ export async function portalFixture(root) {
     load("shared/api-workspace.mjs"),
     load("server/jar-manager.mjs"),
     load("server/log-center.mjs"),
+    load("server/lan-workspaces.mjs"),
+    load("server/monitor-manager.mjs"),
   ]);
   const directory = await realpath(
     await mkdtemp(path.join(tmpdir(), "devkit-portal-")),
   );
-  let store, nginx, library, host, jar;
+  let store, nginx, library, host, jar, lan, monitor, sshServer;
+  const sshClients = new Set();
   const faults = { statuses: false, logGate: null },
     calls = { commands: 0, remoteLogReads: 0 };
   try {
@@ -94,7 +101,10 @@ export async function portalFixture(root) {
     const jarState = await jar.request('upsert', { revision: 0, instance: {
       name: '审查测试应用', jar: jarPath, logMode: 'file', logName: 'audit.log', stopTimeout: 15, jvmArgs: ['-Dpassword=audit-secret'],
     } });
-    const remoteHost = 'a'.repeat(36), remoteId = 'b'.repeat(64);
+    lan = await createLanWorkspaces(directory);
+    const [remote] = await lan.hostRequest('save', { name: '慢速目标', mode: 'share', address: 'http://127.0.0.1:1', tags: ['测试节点'], modules: { jar: true } });
+    const remoteHost = remote.id, remoteId = 'b'.repeat(64);
+    monitor = await createMonitorManager(directory, { auto: false, lan: () => lan, probe: async () => 'TCP test fixture' });
     const logs = createLogCenter({ jar: () => jar, nginx: () => nginx, lan: () => ({
       logTargets: () => [{ id: remoteHost, name: '慢速目标', modules: { jar: true, nginx: false } }],
       async logs(_hostId, action) {
@@ -148,6 +158,8 @@ export async function portalFixture(root) {
       library: () => library,
       jar: () => jar,
       logs: () => logs,
+      lan: () => faults.shareHosts ? lan : undefined,
+      monitor: () => monitor,
     });
     const portServer = createServer();
     await new Promise((resolve) => portServer.listen(0, "127.0.0.1", resolve));
@@ -170,8 +182,32 @@ export async function portalFixture(root) {
       addresses.find((address) => address.startsWith("http://10.")) ||
       addresses.find((address) => !address.includes("127.0.0.1")) ||
       addresses[0];
+    async function startSshTarget() {
+      const { default: { Server } } = await import('ssh2');
+      const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+      sshServer = new Server({ hostKeys: [privateKey] }, client => {
+        sshClients.add(client);
+        client.on('error', () => {});
+        client.on('close', () => sshClients.delete(client));
+        client.on('authentication', auth => {
+          if (auth.method === 'password' && auth.username === 'portal-fixture' && auth.password === 'ssh-portal-fixture') auth.accept();
+          else auth.reject(['password']);
+        });
+        client.on('session', accept => {
+          const session = accept();
+          session.on('pty', accept => accept());
+          session.on('window-change', accept => accept?.());
+          session.on('shell', accept => { const stream = accept(); stream.write('portal ssh ready\r\n'); stream.on('data', bytes => stream.write(bytes)); });
+        });
+      }).listen(0, '127.0.0.1');
+      await once(sshServer, 'listening');
+      return sshServer.address().port;
+    }
     async function close() {
       await host.stop();
+      if (sshServer) await new Promise(resolve => { for (const client of sshClients) client.end(); sshServer.close(resolve); });
+      await monitor.close();
+      lan.close();
       await library.close();
       await nginx.close();
       await jar.close();
@@ -180,9 +216,11 @@ export async function portalFixture(root) {
       assert.ok(path.basename(directory).startsWith("devkit-portal-"));
       await rm(directory, { recursive: true, force: true });
     }
-    return { url, options, host, store, nginx, library, faults, calls, localLog, close };
+    return { url, options, host, store, nginx, library, faults, calls, localLog, startSshTarget, close };
   } catch (error) {
     await host?.stop();
+    await monitor?.close();
+    lan?.close();
     await library?.close();
     await nginx?.close();
     await jar?.close();

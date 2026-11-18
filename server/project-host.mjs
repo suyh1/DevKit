@@ -5,12 +5,16 @@ import { readFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
 import { probeProjects } from "./project-probe.mjs";
 import { createSharedWorkspaces } from './shared-workspaces.mjs';
 import { sharingServices, sharingAliases, hasLegacySharing } from '../shared/sharing.mjs';
 import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors, visitorServices } from './sharing-visitors.mjs';
+import { webTransferLimit } from './lan-sftp.mjs';
 
 const auditActions = new Set(['command', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
+const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'scan-start', 'wake', 'rdp-open', 'file-upload', 'file-download']);
 const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 const visitorsFor = settings => settings.visitors || [];
 const tlsFor = settings => settings.tls || null;
@@ -212,7 +216,8 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           let size = 0;
           for await (const chunk of request) {
             size += chunk.length;
-            if (size > (url.pathname === "/api/http/save-library" ? 16_100_000 : 4_100_000))
+            const limit = url.pathname === '/api/http/save-library' ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
+            if (size > limit)
               throw Object.assign(new Error("请求过大。"), { status: 413 });
             chunks.push(chunk);
           }
@@ -294,23 +299,58 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             request.method === "GET"
           )
             return json(200, await store.get());
-          const workspaceRoute = /^\/api\/(nginx|http|jar|monitor|logs)\/([a-z-]+)$/.exec(url.pathname);
+          const workspaceRoute = /^\/api\/(nginx|http|jar|monitor|logs|lan-hosts)\/([a-z-]+)$/.exec(url.pathname);
           if (workspaceRoute) {
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
-            const payload = await body();
+            const [, module, action] = workspaceRoute;
+            const upload = module === 'lan-hosts' && action === 'file-upload';
+            const download = module === 'lan-hosts' && action === 'file-download';
+            const rdp = module === 'lan-hosts' && action === 'rdp-open';
+            let rdpStream;
+            if (rdp) {
+              const controller = new AbortController();
+              response.once('close', () => { if (!response.writableFinished) controller.abort(); });
+              rdpStream = { signal: controller.signal, async write(id, stream, signal) {
+                ensureCurrentSession();
+                response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'X-DevKit-RDP-Session': id, 'X-Accel-Buffering': 'no' });
+                response.flushHeaders();
+                audit.record(session.visitor, 'lan-hosts.rdp-open', 'ok');
+                await pipeline(Readable.from(stream), response, { signal });
+              } };
+            }
+            let file;
+            if (upload || download) {
+              const transfers = new AbortController();
+              response.once('close', () => { if (!response.writableFinished) transfers.abort(); });
+              file = { signal: transfers.signal };
+              if (upload) {
+                if (request.headers['content-type'] !== 'application/octet-stream') return json(415, { error: '需要二进制文件请求。' });
+                if (Number(request.headers['content-length']) > webTransferLimit) return json(413, { error: '网页单个文件最多 128 MiB。' });
+                Object.assign(file, { input: request, name: url.searchParams.get('name') });
+              } else file.download = async (name, stream, signal) => {
+                ensureCurrentSession();
+                const encoded = encodeURIComponent(name).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16));
+                response.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encoded}` });
+                if (stream) await pipeline(stream, response, { signal });
+                else response.end();
+              };
+            }
+            const payload = upload ? { id: url.searchParams.get('id'), path: url.searchParams.get('path') } : await body();
             ensureCurrentSession();
-            if (workspaceRoute[1] === 'http' && workspaceRoute[2] === 'send')
+            if (module === 'http' && action === 'send')
               response.once('close', () => { if (!response.writableFinished) workspaces.cancel(token, payload?.id); });
-            const key = `${workspaceRoute[1]}.${workspaceRoute[2]}`;
-            const audited = auditActions.has(workspaceRoute[2]) || key === 'logs.read' && payload?.raw === true;
+            const key = `${module}.${action}`;
+            const audited = module === 'lan-hosts' ? lanAuditActions.has(action) : auditActions.has(action) || key === 'logs.read' && payload?.raw === true;
             let result;
             try {
-              result = await workspaces.request(workspaceRoute[1], workspaceRoute[2], payload, { token, settings: next });
+              result = await workspaces.request(module, action, payload, { token, settings: next, file, rdpStream, ensureCurrentSession });
             } catch (error) {
-              if (audited) audit.record(session.visitor, key, error.status === 403 || error.status === 404 ? 'denied' : 'failed');
+              if (audited && (!rdp || !response.headersSent)) audit.record(session.visitor, key, error.status === 403 || error.status === 404 ? 'denied' : 'failed');
               throw error;
             }
+            if (rdp) return;
             if (audited) audit.record(session.visitor, key, result?.ok === false ? 'failed' : 'ok');
+            if (download) return;
             ensureCurrentSession();
             return json(200, result);
           }

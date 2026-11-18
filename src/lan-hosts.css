@@ -24,6 +24,16 @@
 .lan-host-tags span { padding:2px 6px; color:var(--accent); background:var(--tint); border-radius:4px; font-size:10px; overflow-wrap:anywhere; }
 .lan-monitor-status { display:flex; flex-wrap:wrap; gap:5px 8px; align-items:center; margin:8px 0; }
 .lan-monitor-status small { margin:0; font-size:10px; }
+.lan-layout-list { grid-template-columns: minmax(0, 1fr); }
+.pc-dialog.lan-rdp-dialog { width: min(480px, calc(100vw - 24px)); }
+.pc-dialog.lan-rdp-active { width: min(1360px, calc(100vw - 24px)); }
+.lan-rdp-form:not([hidden]) { display: grid; gap: 12px; }
+.lan-rdp-trust, .lan-rdp-toolbar { display: flex; align-items: center; gap: 8px; }
+.lan-rdp-toolbar { justify-content: space-between; flex-wrap: wrap; padding-bottom: 8px; }
+.lan-rdp-toolbar > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.lan-rdp-viewport { display: grid; place-items: center; height: min(72dvh, 920px); min-height: 180px; overflow: hidden; background: #101720; border-radius: 8px; touch-action: none; }
+.lan-rdp-viewport > div:focus { outline: none; }
+.lan-host-list .pc-actions a { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .lan-key-picker { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .lan-key-picker > span { flex:1; min-width:100px; overflow-wrap:anywhere; }
 .lan-key-picker > small { flex-basis:100%; color:var(--error); }

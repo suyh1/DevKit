@@ -6,7 +6,7 @@ import { copyText } from './motion-primitives';
 import SftpPanel from './SftpPanel';
 import '@xterm/xterm/css/xterm.css';
 
-export default function SshTerminal({ id, active }: { id: string; active: boolean }) {
+export default function SshTerminal({ id, active, allowFiles, portal }: { id: string; active: boolean; allowFiles: boolean; portal: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const controls = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -26,8 +26,14 @@ export default function SshTerminal({ id, active }: { id: string; active: boolea
     observer.observe(node);
     if (node.offsetWidth) fit.fit();
     let disposed = false, session = '', timer: ReturnType<typeof setTimeout> | undefined;
+    let inputQueue: Promise<unknown> = Promise.resolve();
     const resize = terminal.onResize(size => { if (session) void lanRequest('terminal-resize', { id: session, ...size }).catch(() => {}); });
-    const input = terminal.onData(text => { if (session) void lanRequest('terminal-input', { id: session, text }).catch(() => {}); });
+    const input = terminal.onData(text => {
+      const id = session;
+      if (id) inputQueue = inputQueue.then(() => {
+        if (!disposed && session === id) return lanRequest('terminal-input', { id, text });
+      }).catch(() => {});
+    });
     const selected = terminal.onSelectionChange(() => setSelection(terminal.hasSelection()));
     async function close() {
       if (session) { const id = session; session = ''; await lanRequest('terminal-close', { id }).catch(() => {}); }
@@ -57,11 +63,11 @@ export default function SshTerminal({ id, active }: { id: string; active: boolea
       {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); }}>重新连接</button>}
       <button type="button" className="text-button" disabled={!selection} onClick={() => void copyText(controls.current?.getSelection() || '').then(() => setFeedback('已复制选区'), () => setFeedback('复制失败'))}>复制选区</button>
       <button type="button" className="text-button" onClick={() => { controls.current?.clear(); controls.current?.focus(); }}>清空显示</button>
-      <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => setFilesOpen(value => !value)}>SFTP 文件</button>
+      {allowFiles && <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => setFilesOpen(value => !value)}>SFTP 文件</button>}
     </div>
     <div className="lan-terminal-content">
       <div className="lan-xterm" ref={container} />
-      {filesOpen && connectionId && <SftpPanel key={connectionId} session={connectionId} />}
+      {allowFiles && filesOpen && connectionId && <SftpPanel key={connectionId} session={connectionId} portal={portal} />}
     </div>
   </div>;
 }

@@ -9,14 +9,14 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、Nginx 配置与实例管理、接口设计、文档与调试一体化工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.18.1**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
+当前版本：**v1.19.0**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.18.1_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.18.1/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.19.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.19.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，使用顶部工具栏的“局域网共享”统一开放模块和设置权限。
-4. 管理其他电脑时，在“共享 → 局域网主机”保存 DevKit 共享或 SSH 连接，并勾选所需栏目。回到 JAR 管理或 Nginx 配置，添加实例时选择本机或已保存的目标主机。浏览远程文件时可直接打开绝对目录，也可逐级浏览。
+4. 管理其他电脑时，在“共享 → 局域网主机”保存 DevKit 共享或 SSH 连接，并勾选所需栏目。回到 JAR 管理或 Nginx 配置，添加实例时选择本机或已保存的目标主机。浏览远程文件时可直接打开绝对目录，也可逐级浏览。在“局域网共享”开放“局域网主机”后，获准的访客可查看同一份主机清单，并按监控和日志权限查看对应主机的记录。
 5. 打开“HTTP 调试”，在“接口项目”中维护项目、目录、接口定义和环境变量，切换接口设计、文档与运行调试。接口目录按拼音或字母排列，搜索时仅显示有匹配接口的目录。支持响应 Schema 校验、OpenAPI/Swagger JSON/YAML 导入导出、Markdown 文档和完整项目备份。原来的“快速请求”保留集合、历史和代码生成流转。全部界面与数据可离线使用，只有点击发送才访问目标服务，详见 [HTTP/API 工作台说明](docs/http-workbench.md)。
 6. 点击窗口关闭按钮，选择“退出软件”或“最小化到托盘”，可勾选记住选择；在“偏好设置 → 窗口与托盘”中随时改回每次询问。托盘菜单可打开或退出，真正退出时仍检查未保存草稿。
 
@@ -133,7 +133,7 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
 | Nginx 配置 | 工作台 | 按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。 |
 | JAR 管理 | 工作台 | 按主机渐进加载 Java 应用，窄屏使用卡片，SSH 自动部署便携运行时，支持启停重启、日志、健康检查、系统自启和配置编辑。 |
-| 局域网主机 | 工作台 | 桌面端发现、分组和导入主机，分步诊断 DevKit／SSH 连接。支持私钥和跳板机、多会话终端及 SFTP、端口监控、Windows 远程桌面和网络唤醒。 |
+| 局域网主机 | 工作台 | 管理、发现和导入主机，支持 SSH 终端、SFTP、端口监控和网络唤醒。共享网页可按访客权限直连远程桌面。 |
 
 ### 经纬度处理
 
@@ -241,7 +241,7 @@ PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可
 - **导入导出与恢复**：支持 JSON 导出、导入影响预览、合并或替换；保存时检查版本冲突。自动保留最近 30 份快照，支持命名备份、恢复预览，导入和恢复前自动备份。
 - **对比方案**：在“参与对比的档案”中选择 2–4 个档案，按项目编码对齐并标记缺少的项目，比较完整配置、最终入口与变量。使用结果上方的“只看差异”筛选，可导出 JSON 报告。
 - **手动探活**：项目卡片/列表提供单项“探活”，当前配置提供“全部探活”（包含筛选外项目），也可检测勾选项。停用项目跳过，逐项展示正常/异常、状态码、耗时及检测时间，并汇总进度；结果仅在当前页面临时保留，不自动轮询。请求由主机发起，启停只控制入口状态，不启动或停止系统服务。
-- **局域网访问**：顶部工具栏提供全局“局域网共享”与实时状态；项目中心、Nginx、HTTP 页面可通过“共享设置”快捷打开同一面板。桌面端开启共享后，其他电脑通过主机 IP / 端口进入共享工作台，使用口令登录。六个服务均独立选择，首次不预选；权限在对应服务内设置，编辑与执行分别授权。浏览器顶部统一切换主题及退出登录，关闭服务会清除其权限。旧配置保留已有授权，应用失败保留原服务与会话。可设置下次启动自动共享。详见 [共享工作台](docs/workspace-sharing.md)。
+- **局域网访问**：从顶部“局域网共享”统一设置地址、访问口令和访客权限。七个服务可独立开放，首次不预选。“局域网主机”可分别授予档案管理、诊断、SSH 终端、SFTP、发现、唤醒与远程桌面权限。配置 `guacd` 后，获准的访客可在共享网页内直接连接远程桌面。已保存的连接凭据由共享主机加密保存。详见 [共享工作台](docs/workspace-sharing.md)。
 
 ### 配置保存与迁移
 
@@ -258,7 +258,7 @@ PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.18.1_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.19.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -274,7 +274,7 @@ Linux：
 DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true node server/start.mjs
 ```
 
-默认监听 `0.0.0.0:8765`。首次通过 `DEVKIT_SHARE_*` 选择至少一个服务，编辑和执行另行授权。后续复用已保存设置，明确的环境变量逐项覆盖。主机可配置 HTTPS 证书、独立访客及访问审计。同一配置目录由一个主机进程使用。变量、证书及会话撤销见 [共享工作台](docs/workspace-sharing.md)。
+默认监听 `0.0.0.0:8765`。首次通过 `DEVKIT_SHARE_*` 选择至少一个服务，例如用 `DEVKIT_SHARE_LAN_HOSTS=true` 开放主机清单。编辑和执行另行授权。后续复用已保存设置，明确的环境变量逐项覆盖。主机可配置 HTTPS 证书、独立访客及访问审计。同一配置目录由一个主机进程使用。变量、证书及会话撤销见 [共享工作台](docs/workspace-sharing.md)。
 
 ## 开发与打包
 
@@ -290,13 +290,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.18.1_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.18.1-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.18.1-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.19.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.19.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.19.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
-| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.18.1/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.18.1/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.18.1/DevKit_ProjectCenter_1.18.1_node24.zip` |
+| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.19.0/DevKit-<platform>-<arch>/` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.19.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.19.0/DevKit_ProjectCenter_1.19.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

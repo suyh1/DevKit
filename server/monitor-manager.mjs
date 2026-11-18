@@ -132,13 +132,23 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
     if (!['http', 'tcp'].includes(item.health.type)) fail('请先为关联 JAR 配置 HTTP/TCP 健康检查。');
     return { ...monitor, ...item.health, timeout: monitor.timeout };
   }
+  function runRestriction(source, access) {
+    if (source?.type === 'lan' && access.allowLan === false) return '运行此端口监控需要局域网主机访问权限。';
+    if (source?.type === 'jar' && source.id.includes(':') && access.allowRemoteJar === false) return '运行此远程 JAR 检测需要 JAR 运行权限。';
+    return '';
+  }
+  function authorizeRun(source, access) {
+    const reason = runRestriction(source, access);
+    if (reason) throw Object.assign(new Error(reason), { status: 403 });
+  }
   function view(access = {}) {
     return structuredClone({ revision: data.revision, storageError, checkedAt: new Date(now()).toISOString(), monitors: data.monitors.map(monitor => {
       const runtime = data.runtime[monitor.id] || blank(), samples = runtime.samples.filter(sample => now() - Date.parse(sample.at) <= 86400000);
       const state = stateOf(monitor, runtime);
       const remoteHost = monitor.source?.type === 'jar' && monitor.source.id.includes(':') ? lan?.()?.hostName?.(monitor.source.id.split(':')[0]) || '目标主机' : '';
+      const sourceHost = monitor.source?.type === 'lan' && access.allowLan !== false ? lan?.()?.hostName?.(monitor.source.id) : undefined;
       const webhook = access.allowWebhook === false && monitor.webhook ? { ...monitor.webhook, url: '' } : monitor.webhook;
-      return { ...monitor, ...runtime, webhook, state, executionHost: remoteHost, checking: running.has(monitor.id), samples: runtime.samples.slice(-1440), incidents: runtime.incidents,
+      return { ...monitor, ...runtime, webhook, state, executionHost: remoteHost, sourceHost, runRestriction: runRestriction(monitor.source, access), checking: running.has(monitor.id), samples: runtime.samples.slice(-1440), incidents: runtime.incidents,
         availability: samples.length ? Math.round(samples.filter(item => item.ok).length / samples.length * 10000) / 100 : null,
         sampleCount: samples.length, average: samples.length ? Math.round(samples.reduce((sum, item) => sum + item.elapsed, 0) / samples.length) : null };
     }) });
@@ -244,8 +254,9 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
   }
   async function tick() {
     if (closed) return;
-    void dispatchNotifications();
+    const delivery = dispatchNotifications();
     for (const item of data.monitors) if (running.size < 3 && item.enabled && !maintenance(item) && !running.has(item.id) && (due.get(item.id) || 0) <= now()) void check(item.id).catch(error => { storageError = error.message; });
+    return delivery;
   }
   const timer = auto ? setInterval(tick, 1000) : null; timer?.unref();
   return {
@@ -259,7 +270,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
       if (action === 'sources') return sources(access);
       if (action === 'check') {
         const source = data.monitors.find(item => item.id === payload.id)?.source;
-        if (access.allowRemoteJar === false && source?.type === 'jar' && source.id.includes(':')) throw Object.assign(new Error('立即检测远程 JAR 需要 JAR 运行权限。'), { status: 403 });
+        authorizeRun(source, access);
         await check(payload.id); return view(access);
       }
       if (!['upsert', 'remove', 'toggle'].includes(action)) fail('未知监控操作。');
@@ -272,12 +283,14 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
           const previous = next.monitors.find(item => item.id === payload.monitor?.id);
           if (access.allowWebhook === false && payload.monitor?.webhook?.url) fail('未授予 Webhook 配置权限。');
           const monitor = normalizeMonitor(access.allowWebhook === false ? { ...payload.monitor, webhook: previous?.webhook } : payload.monitor); id = monitor.id;
+          if (monitor.enabled) authorizeRun(monitor.source, access);
           if (JSON.stringify(monitor.webhook) !== JSON.stringify(previous?.webhook || null)) next.notifications = next.notifications.filter(item => item.monitorId !== id);
           const index = next.monitors.findIndex(item => item.id === id);
           // Editing may configure a future target, but does not authorize outbound checks.
           if (monitor.source?.type === 'lan') {
             const retained = index >= 0 && next.monitors[index].source?.type === 'lan' && next.monitors[index].source.id === monitor.source.id;
-            if (!retained && (access.allowLan === false || !lan?.()?.monitorTargets().some(item => item.id === monitor.source.id))) fail('关联的局域网主机不存在或不可用。');
+            if (!retained && access.allowLan === false) throw Object.assign(new Error('关联监控需要局域网主机访问权限。'), { status: 403 });
+            if ((!retained || monitor.enabled) && !lan?.()?.monitorTargets().some(item => item.id === monitor.source.id)) fail('关联的局域网主机不存在或不可用。');
           } else if (monitor.source) {
             const remote = monitor.source.type === 'jar' && monitor.source.id.includes(':');
             const candidates = await sources({ ...access, allowRemoteJar: remote && access.allowRemoteJar !== false, allowLan: false });
@@ -293,7 +306,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
           if (action === 'remove') { next.monitors = next.monitors.filter(item => item.id !== id); next.notifications = next.notifications.filter(item => item.monitorId !== id); delete next.runtime[id]; }
           else {
             if (typeof payload.enabled !== 'boolean') fail('启用状态无效。');
-            if (payload.enabled && access.allowRemoteJar === false && item.source?.type === 'jar' && item.source.id.includes(':')) throw Object.assign(new Error('启用远程 JAR 检测需要 JAR 运行权限。'), { status: 403 });
+            if (payload.enabled) authorizeRun(item.source, access);
             item.enabled = payload.enabled;
           }
         }

@@ -3,19 +3,32 @@ import { sharingServices } from '../shared/sharing.mjs';
 import { managedRequest } from './managed-workspace.mjs';
 import { redactLogResult } from './log-redaction.mjs';
 import { apiSharingView } from './api-sharing-view.mjs';
+import { createRdpSessions } from './lan-rdp.mjs';
+
+const lanActions = new Map([
+  ['save', 'edit'], ['remove', 'edit'], ['import-preview', 'edit'], ['import-connections', 'edit'],
+  ['diagnose', 'diagnose'], ['test', 'diagnose'], ['reset-trust', 'diagnose'],
+  ['terminal-open', 'terminal'], ['terminal-read', 'terminal'], ['terminal-input', 'terminal'], ['terminal-resize', 'terminal'], ['terminal-close', 'terminal'],
+  ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
+  ['scan-interfaces', 'discover'], ['scan-start', 'discover'], ['scan-cancel', 'discover'], ['wake', 'wake'],
+  ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-close', 'rdp'],
+]);
+const lanChanges = new Set(['save', 'remove', 'import-connections', 'reset-trust']);
 
 // Reuse the desktop's managers rather than acquiring a second directory lock.
 export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan }) {
   const clients = new Map();
   const managedSessions = new Map();
+  const rdpSessions = createRdpSessions();
   function releaseManaged(token) {
     lan?.()?.release(token);
+    rdpSessions.release(token);
     void jar?.()?.releaseConsoleSession?.(token)?.catch(() => {});
   }
   async function manage(token, action) {
     const session = managedSessions.get(token) || { closed: false };
     managedSessions.set(token, session);
-    try { return await action(); }
+    try { return await action(session); }
     finally { if (session.closed) releaseManaged(token); }
   }
   const fail = (status, message) => {
@@ -34,6 +47,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
       releaseManaged(token);
     },
     close() {
+      rdpSessions.close();
       for (const client of clients.values()) client.close();
       clients.clear();
       for (const [token, session] of managedSessions) {
@@ -42,8 +56,45 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
       }
       managedSessions.clear();
     },
-    async request(module, action, payload, { token, settings }) {
+    async request(module, action, payload, { token, settings, file, rdpStream, ensureCurrentSession = () => {} }) {
       const services = sharingServices(settings);
+      const allowLan = services['lan-hosts'].enabled;
+      if (module === 'lan-hosts') {
+        const access = services['lan-hosts'];
+        if (!allowLan) fail(404, '未开放局域网主机共享。');
+        if (action !== 'list') {
+          const permission = lanActions.get(action);
+          if (!permission) fail(404, '接口不存在。');
+          if (!access[permission] || (permission === 'files' && !access.terminal) ||
+            (action === 'reset-trust' || action === 'test' && payload?.fingerprint) && !access.edit) fail(403, '未授予此局域网主机操作权限。');
+        }
+        const coordinator = lan?.(); if (!coordinator) fail(503, '局域网主机档案不可用。');
+        const hosts = () => coordinator.sharedHosts(services.logs, access);
+        if (action === 'list') {
+          const statuses = services.monitor.enabled ? await monitor?.()?.request('lan-statuses', {}, { allowLan }) || [] : [];
+          return { hosts: hosts(), statuses };
+        }
+        if (action === 'rdp-input') return rdpSessions.input(payload, token);
+        if (action === 'rdp-close') return rdpSessions.disconnect(payload, token);
+        if (action === 'rdp-open') {
+          if (!rdpStream) fail(400, '缺少远程桌面显示通道。');
+          const target = coordinator.rdpTarget(payload?.id);
+          const hostId = payload.id;
+          return manage(token, session => rdpSessions.open(target, payload, { token, stream: rdpStream, verify() {
+            if (session.closed) fail(401, '请先登录共享工作台。');
+            ensureCurrentSession();
+            const current = coordinator.rdpTarget(hostId);
+            if (target.address !== current.address || target.port !== current.port) fail(409, '远程桌面目标已更新，请重新连接。');
+          } }));
+        }
+        return manage(token, async session => {
+          const result = await coordinator.hostRequest(action, payload, file, { token, ensureCurrent() {
+            if (session.closed) fail(401, '请先登录共享工作台。');
+            ensureCurrentSession();
+          } });
+          return lanChanges.has(action) ? hosts() : result;
+        });
+      }
       if (module === 'logs') {
         if (!services.logs.enabled) fail(404, '未开放日志中心共享。');
         const manager = logs?.(); if (!manager) fail(503, '主机日志中心不可用。');
@@ -61,7 +112,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
         if (['upsert', 'remove'].includes(action) && !services.monitor.edit) fail(403, '未授予监控编辑权限。');
         if ((['toggle', 'check'].includes(action) || action === 'upsert' && payload?.monitor?.enabled) && !services.monitor.control) fail(403, '未授予监控运行权限；仅编辑用户请保存为暂停状态。');
         if (action === 'remove' && !services.monitor.control && (await manager.request('get')).monitors.find(item => item.id === payload?.id)?.enabled) fail(403, '移除运行中的监控需要运行权限。');
-        return manage(token, () => manager.request(action, payload, { allowProjects: services.projects.enabled, allowJar: services.jar.enabled, allowRemoteJar: services.jar.enabled && services.jar.control, session: token, allowLan: false, allowControl: services.monitor.control, allowWebhook: services.monitor.edit && services.monitor.control }));
+        return manage(token, () => manager.request(action, payload, { allowProjects: services.projects.enabled, allowJar: services.jar.enabled, allowRemoteJar: services.jar.enabled && services.jar.control, session: token, allowLan, allowControl: services.monitor.control, allowWebhook: services.monitor.edit && services.monitor.control }));
       }
       if (module === 'jar' || module === 'nginx') {
         const label = module === 'jar' ? 'JAR' : 'Nginx';

@@ -3,6 +3,7 @@ import { rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
+import { Transform } from 'node:stream';
 import { sshCall } from './lan-ssh.mjs';
 import { withDeadline } from './lan-probe.mjs';
 
@@ -12,8 +13,12 @@ function remotePath(value, host) {
   return value.trim().replaceAll('\\', '/').replace(/^(\w:)(?=\/|$)/, '/$1');
 }
 
+export const webTransferLimit = 128 * 1024 * 1024;
+
 export async function useSftp(client, action, value, host, localFile) {
-  const signal = AbortSignal.timeout(action === 'file-list' ? 15000 : 15 * 60 * 1000);
+  const timeout = AbortSignal.timeout(action === 'file-list' ? 15000 : 15 * 60 * 1000);
+  const web = typeof localFile === 'object' && localFile;
+  const signal = web?.signal ? AbortSignal.any([timeout, web.signal]) : timeout;
   let opening = true;
   const sftp = await withDeadline(sshCall(client, 'sftp').then(channel => {
     if (!opening) channel.end();
@@ -22,6 +27,7 @@ export async function useSftp(client, action, value, host, localFile) {
   const abort = () => sftp.end();
   signal.addEventListener('abort', abort, { once: true });
   try {
+    signal.throwIfAborted();
     const requested = remotePath(value?.path || '.', host);
     const target = await sshCall(sftp, 'realpath', requested);
     if (action === 'file-list') {
@@ -36,7 +42,15 @@ export async function useSftp(client, action, value, host, localFile) {
     }
     if (!localFile) throw new Error('请选择本地文件。');
     if (action === 'file-download') {
-      if (!(await sshCall(sftp, 'stat', target)).isFile()) throw new Error('请选择远程普通文件。');
+      const info = await sshCall(sftp, 'stat', target);
+      if (!info.isFile()) throw new Error('请选择远程普通文件。');
+      if (web) {
+        if (!Number.isSafeInteger(info.size) || info.size < 0 || info.size > webTransferLimit) throw Object.assign(new Error('网页单个文件最多 128 MiB。'), { status: 413 });
+        const name = path.posix.basename(target);
+        const stream = info.size ? sftp.createReadStream(target, { end: info.size - 1 }) : null;
+        await web.download(name, stream, signal);
+        return { name };
+      }
       const temporary = path.join(path.dirname(localFile), `.devkit-${randomUUID()}.part`);
       try {
         await pipeline(sftp.createReadStream(target), createWriteStream(temporary, { flags: 'wx', mode: 0o600 }), { signal });
@@ -44,14 +58,23 @@ export async function useSftp(client, action, value, host, localFile) {
       } finally { await unlink(temporary).catch(() => {}); }
       return { name: path.basename(localFile) };
     }
-    if (!(await stat(localFile)).isFile()) throw new Error('请选择本地普通文件。');
-    const name = path.basename(localFile), destination = path.posix.join(target, name);
-    if (/[\x00-\x1f]/.test(name)) throw new Error('文件名包含控制字符。');
+    if (!web && !(await stat(localFile)).isFile()) throw new Error('请选择本地普通文件。');
+    const name = web ? web.name : path.basename(localFile);
+    if (typeof name !== 'string' || /[\x00-\x1f]/.test(name) || (web && (!name.trim() || name.length > 255 || ['.', '..'].includes(name) || /[/\\]/.test(name))) || (host.platform === 'win32' && /[:*?"<>|\\]/.test(name))) throw new Error('文件名无效。');
+    const destination = path.posix.join(target, name);
     try { await sshCall(sftp, 'lstat', destination); throw new Error('目标目录已有同名文件。'); }
     catch (error) { if (error.code !== 2) throw error; }
     const temporary = path.posix.join(target, `.devkit-${randomUUID()}.part`);
     try {
-      await pipeline(createReadStream(localFile), sftp.createWriteStream(temporary, { flags: 'wx', mode: 0o600 }), { signal });
+      const output = sftp.createWriteStream(temporary, { flags: 'wx', mode: 0o600 });
+      if (web) {
+        let bytes = 0;
+        const limit = new Transform({ transform(chunk, _encoding, next) {
+          bytes += chunk.length;
+          next(bytes > webTransferLimit ? Object.assign(new Error('网页单个文件最多 128 MiB。'), { status: 413 }) : null, chunk);
+        } });
+        await pipeline(web.input.iterator({ destroyOnReturn: false }), limit, output, { signal });
+      } else await pipeline(createReadStream(localFile), output, { signal });
       await sshCall(sftp, 'rename', temporary, destination);
     } finally { await sshCall(sftp, 'unlink', temporary).catch(() => {}); }
     return { name };

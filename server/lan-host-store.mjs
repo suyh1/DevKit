@@ -55,14 +55,19 @@ function normalize(value, existing) {
   host.name ||= host.address;
   if (existing && (!sameEndpoint(existing, host) || existing.user !== host.user)) host.id = randomUUID();
   if (existing && sameEndpoint(existing, host)) {
-    if (existing.jumpHostId === host.jumpHostId && existing.fingerprint) host.fingerprint = existing.fingerprint;
+    if (existing.jumpHostId === host.jumpHostId) {
+      if (existing.fingerprint) host.fingerprint = existing.fingerprint;
+      if (existing.previousFingerprint) host.previousFingerprint = existing.previousFingerprint;
+    }
     if (existing.user === host.user && existing.visitor === host.visitor && existing.auth === host.auth && existing.keyPath === host.keyPath && existing.secret) host.secret = existing.secret;
   }
   return host;
 }
 function sameEndpoint(a, b) { return a.mode === b.mode && a.address === b.address && a.port === b.port; }
 function sameServer(a, b) { return sameEndpoint(a, b) && a.jumpHostId === b.jumpHostId; }
-export function publicHost({ secret, ...host }) { return { ...host, hasPassword: !!secret }; }
+export function publicHost({ secret, encryptedKey, explicitKeyOnly, previousFingerprint, ...host }) {
+  return { ...host, hasPassword: !!secret, hasStoredKey: !!encryptedKey, explicitKeyOnly: explicitKeyOnly === true };
+}
 
 export function jumpRoute(host, find) {
   const route = [], seen = new Set([host.id]);
@@ -77,12 +82,13 @@ export function jumpRoute(host, find) {
   return route;
 }
 
-function planImport(current, values) {
+function planImport(current, values, web = false) {
   if (!Array.isArray(values) || values.length > 200) throw new Error('每次最多预览 200 条连接。');
   const next = [...current];
   const rows = values.map((value, index) => {
     try {
       const host = normalize({ ...value, keyPath: undefined, jumpHostId: undefined, user: value?.user || userInfo().username });
+      if (web && host.mode === 'ssh') host.explicitKeyOnly = true;
       if (next.some(item => sameServer(item, host) && item.user === host.user)) return { index, host: publicHost(host), error: '重复连接' };
       if (next.length >= 50) return { index, host: publicHost(host), error: '已达 50 台主机上限' };
       next.push(host);
@@ -107,47 +113,77 @@ export async function createLanHostStore(directory) {
   const stored = await readFile(registry, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
   if (!Array.isArray(stored)) throw new Error('局域网主机连接档案格式无效。');
   let hosts = stored, queue = Promise.resolve();
-  function update(change) {
+  function update(change, ensureCurrent) {
     const pending = queue.then(async () => {
+      ensureCurrent?.();
       const next = await change(hosts);
+      ensureCurrent?.();
       if (next !== hosts) { await atomicFile(registry, JSON.stringify(next, null, 2)); hosts = next; }
       return hosts.map(publicHost);
     });
     queue = pending.catch(() => {});
     return pending;
   }
-  async function save(value, existing) {
+  async function encrypt(host, field, value) {
+    const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', await loadKey(true), iv);
+    cipher.setAAD(Buffer.from(field === 'secret' ? host.id : `${host.id}:${field}`));
+    const bytes = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+    return Buffer.concat([iv, cipher.getAuthTag(), bytes]).toString('base64');
+  }
+  async function decrypt(host, field) {
+    if (!host[field]) return '';
+    const bytes = Buffer.from(host[field], 'base64'), decipher = createDecipheriv('aes-256-gcm', await loadKey(false), bytes.subarray(0, 12));
+    decipher.setAAD(Buffer.from(field === 'secret' ? host.id : `${host.id}:${field}`));
+    decipher.setAuthTag(bytes.subarray(12, 28));
+    return Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8');
+  }
+  async function save(value, existing, web) {
+    if (web && value?.keyPath !== undefined) throw new Error('请上传要保存的私钥文件。');
     const host = normalize(value, existing);
+    if (value.password !== undefined && (typeof value.password !== 'string' || value.password.length > (host.mode === 'share' ? 128 : 4096))) throw new Error('密码长度无效。');
+    const sameIdentity = !!existing && host.id === existing.id && host.jumpHostId === existing.jumpHostId;
+    if (web && existing && !sameIdentity && host.id === existing.id) host.id = randomUUID();
+    if (web && !sameIdentity) { delete host.secret; delete host.previousFingerprint; }
+    if (host.mode === 'ssh' && (existing?.explicitKeyOnly || web && (!sameIdentity || existing.auth !== host.auth || value.clearKey || value.privateKey !== undefined))) host.explicitKeyOnly = true;
+    if (host.mode === 'ssh' && host.auth === 'key') {
+      if (value.privateKey !== undefined) {
+        if (typeof value.privateKey !== 'string' || Buffer.byteLength(value.privateKey) > 262144 || !value.privateKey.trim()) throw new Error('请选择有效的 SSH 私钥文件（最多 256 KiB）。');
+        const { default: { utils } } = await import('ssh2');
+        const key = utils.parseKey(value.privateKey, value.password || undefined);
+        if (key instanceof Error || Array.isArray(key) || !key.isPrivateKey()) throw new Error('私钥格式无效，或解锁口令不正确。');
+        delete host.keyPath;
+        delete host.secret;
+        delete host.previousFingerprint;
+        host.encryptedKey = await encrypt(host, 'encryptedKey', value.privateKey);
+      } else if (!value.clearKey && sameIdentity && existing.auth === 'key' && !host.keyPath) {
+        if (existing.encryptedKey) host.encryptedKey = existing.encryptedKey;
+        if (web && existing.keyPath) { host.keyPath = existing.keyPath; host.secret = existing.secret; }
+      }
+      if (value.clearKey === true) delete host.keyPath;
+      if (!host.keyPath && !host.encryptedKey) delete host.secret;
+    }
     if (value.clearPassword === true) delete host.secret;
     if (value.password !== undefined && value.password !== '') {
-      if (typeof value.password !== 'string' || value.password.length > (host.mode === 'share' ? 128 : 4096)) throw new Error('密码长度无效。');
-      if (host.mode === 'share' || host.auth === 'password' || host.keyPath) {
-        const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', await loadKey(true), iv);
-        cipher.setAAD(Buffer.from(host.id));
-        const bytes = Buffer.concat([cipher.update(value.password, 'utf8'), cipher.final()]);
-        host.secret = Buffer.concat([iv, cipher.getAuthTag(), bytes]).toString('base64');
-      }
+      if (host.mode === 'share' || host.auth === 'password' || host.keyPath || host.encryptedKey) host.secret = await encrypt(host, 'secret', value.password);
+      if (host.auth === 'password') delete host.previousFingerprint;
     }
     return host;
   }
   return {
     list: () => hosts,
-    previewImport: values => planImport(hosts, values).rows,
-    importConnections: values => update(current => {
-      const { next } = planImport(current, values);
+    previewImport: (values, web) => planImport(hosts, values, web).rows,
+    importConnections: (values, web) => update(current => {
+      const { next } = planImport(current, values, web);
       return next.length === current.length ? current : next;
-    }),
-    async password(host) {
-      if (!host.secret) return '';
-      const bytes = Buffer.from(host.secret, 'base64'), decipher = createDecipheriv('aes-256-gcm', await loadKey(false), bytes.subarray(0, 12));
-      decipher.setAAD(Buffer.from(host.id));
-      decipher.setAuthTag(bytes.subarray(12, 28));
-      return Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8');
-    },
-    save: value => update(async current => {
+    }, web?.ensureCurrent),
+    password: host => decrypt(host, 'secret'),
+    privateKey: host => decrypt(host, 'encryptedKey'),
+    save: (value, web) => update(async current => {
       const existing = current.find(item => item.id === value?.id);
       if (value?.id && !existing) throw new Error('主机连接已不存在。');
-      const next = await save(value, existing);
+      if (web && existing && (existing.revision || '') !== value.revision) throw Object.assign(new Error('主机档案已更新，请刷新后重试。'), { status: 409 });
+      const next = await save(value, existing, web);
+      next.revision = randomUUID();
       if (existing?.jumpHostId !== next.jumpHostId || next.id !== existing?.id && next.jumpHostId) {
         const find = id => current.find(item => item.id === id);
         const afterChange = id => id === next.id ? next : id === existing?.id ? undefined : find(id);
@@ -163,7 +199,7 @@ export async function createLanHostStore(directory) {
       if (current.some(item => item !== existing && sameServer(item, next) && item.user === next.user)) throw new Error('此连接已保存。');
       if (!existing && current.length >= 50) throw new Error('最多保存 50 台主机。');
       return existing ? current.map(item => item === existing ? next : item) : [...current, next];
-    }),
+    }, web?.ensureCurrent),
     import: values => update(current => {
       const next = [...current];
       for (const value of Array.isArray(values) ? values.slice(0, 50) : []) {
@@ -174,13 +210,29 @@ export async function createLanHostStore(directory) {
       }
       return next.length === current.length ? current : next;
     }),
-    remove: id => update(current => current.filter(host => host.id !== id)),
-    trust: (expected, fingerprint, reset = false) => update(current => {
+    remove: (value, web) => update(current => {
+      const id = web ? value?.id : value;
+      const host = current.find(item => item.id === id);
+      if (web && (!host || (host.revision || '') !== value.revision)) throw Object.assign(new Error('主机档案已更新，请刷新后重试。'), { status: 409 });
+      return host ? current.filter(item => item !== host) : current;
+    }, web?.ensureCurrent),
+    trust: (expected, fingerprint, reset = false, ensureCurrent) => update(current => {
       if (!reset && !fingerprintPattern.test(fingerprint)) throw new Error('主机指纹无效。');
       const host = current.find(item => item === expected);
       if (!host) throw new Error('主机档案已变更，请重新连接。');
       if (!reset && host.fingerprint && host.fingerprint !== fingerprint) throw new Error('SSH 主机指纹已变化。请核对目标机后重置已信任的指纹。');
-      return current.map(item => item === host ? { ...host, fingerprint: reset ? undefined : fingerprint } : item);
-    }),
+      const next = { ...host, revision: randomUUID(), fingerprint: reset ? undefined : fingerprint };
+      if (reset) next.previousFingerprint = host.fingerprint || host.previousFingerprint;
+      else {
+        delete next.previousFingerprint;
+        if (ensureCurrent && host.previousFingerprint && host.previousFingerprint !== fingerprint) {
+          delete next.secret;
+          delete next.encryptedKey;
+          delete next.keyPath;
+          next.explicitKeyOnly = true;
+        }
+      }
+      return current.map(item => item === host ? next : item);
+    }, ensureCurrent),
   };
 }

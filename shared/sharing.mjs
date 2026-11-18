@@ -5,6 +5,7 @@ const fields = {
   jar: ["edit", "control"],
   monitor: ["edit", "control"],
   logs: ["jar", "nginx", "export", "raw"],
+  'lan-hosts': ['edit', 'diagnose', 'terminal', 'files', 'discover', 'wake', 'rdp'],
 };
 const own = (value, key) => Object.hasOwn(value, key);
 export function emptySharingServices() {
@@ -40,8 +41,8 @@ export function sharingServices(value = {}) {
       throw new Error("共享服务设置无效。");
     const result = emptySharingServices();
     for (const [id, permissions] of Object.entries(fields)) {
-      // Existing v2 settings predate JAR sharing. Migration must never grant it.
-      const service = value.services[id] ?? (['jar', 'monitor', 'logs'].includes(id) ? result[id] : undefined);
+      // Services added after v2 remain disabled in older settings.
+      const service = value.services[id] ?? (['jar', 'monitor', 'logs', 'lan-hosts'].includes(id) ? result[id] : undefined);
       if (
         !service ||
         typeof service !== "object" ||

@@ -21,6 +21,8 @@ import { discoverHosts, lanInterfaces, scanRange } from './lan-discovery.mjs';
 import { localBroadcast, magicPacket } from './lan-power.mjs';
 import { detectSshTarget } from './ssh-workspace-deploy.mjs';
 import { createLogCenter } from './log-center.mjs';
+import { createMonitorManager } from './monitor-manager.mjs';
+import { sharingFromEnvironment } from './sharing-environment.mjs';
 
 async function port() {
   const socket = createServer().listen(0, '127.0.0.1');
@@ -178,7 +180,7 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.deepEqual((await api('jar', 'statuses', { scope: 'inventory' })).data.map(status => status.id), [instance.id]);
   const viewer = await gateway.lan.request(gateway.jar, 'jar', 'get', { scope: 'inventory' }, { edit: false, control: false }, 'viewer');
   assert.deepEqual(viewer.instances[0].env, {});
-  assert.equal((await api('lan-hosts', 'list')).status, 403);
+  assert.equal((await api('lan-hosts', 'list')).status, 404);
   assert.equal((await gateway.lan.hostRequest('list'))[0].password, undefined);
   assert.equal((await readFile(path.join(gateway.directory, 'lan-hosts', 'connections.json'), 'utf8')).includes(target.password), false);
   const group = (await api('jar', 'get', { scope: 'inventory-host', hostId })).data;
@@ -201,6 +203,103 @@ test('LAN gateway shares local and remote registries, confines operations to the
   const reopened = await createLanWorkspaces(gateway.directory);
   try { assert.equal((await reopened.request(gateway.jar, 'jar', 'get', { hostId })).instances[0].id, instance.id); }
   finally { reopened.close(); }
+});
+
+test('shared LAN inventory omits connection secrets and combines per-visitor host, monitor and log permissions', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-shared-hosts-'));
+  const closes = [];
+  t.after(async () => {
+    for (const close of closes.reverse()) await close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const store = await createProjectStore(directory);
+  closes.push(() => store.close());
+  const lan = await createLanWorkspaces(directory);
+  closes.push(() => lan.close());
+  const password = 'shared-inventory-fixture';
+  const hosts = await lan.hostRequest('save', {
+    mode: 'ssh', name: 'Saved system', address: '192.0.2.17', port: 2222, user: 'private-login', platform: 'linux',
+    auth: 'key', keyPath: path.join(directory, 'private.key'), password, mac: '02:00:00:00:00:01', rdpPort: 3389,
+    group: 'Test group', tags: ['staging'], pinned: true, modules: { jar: true },
+  });
+  const [host] = hosts;
+  const source = { type: 'lan', id: host.id };
+  const monitor = await createMonitorManager(directory, { auto: false, lan: () => lan, probe: async target => {
+    assert.deepEqual([target.type, target.host, target.port], ['tcp', '192.0.2.17', 2222]);
+    return 'fixture connected';
+  } });
+  closes.push(() => monitor.close());
+  await mkdir(path.join(directory, '.vite'));
+  await writeFile(path.join(directory, '.vite', 'manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
+  await writeFile(path.join(directory, 'portal.html'), '<!doctype html><title>fixture</title>');
+  const shared = await createProjectHost(store, directory, { lan: () => lan, monitor: () => monitor });
+  closes.push(() => shared.stop());
+  const listening = await port(), origin = `http://127.0.0.1:${listening}`;
+  const services = sharingFromEnvironment({ DEVKIT_SHARE_LAN_HOSTS: 'true' });
+  services.monitor = { enabled: true, edit: true, control: true };
+  services.logs = { enabled: true, jar: true, nginx: false, export: false, raw: false };
+  const view = emptySharingServices(), monitorOnly = emptySharingServices();
+  view['lan-hosts'].enabled = true;
+  monitorOnly.monitor = services.monitor;
+  const options = { host: '127.0.0.1', port: listening, password, services, visitors: [
+    { name: 'inventory', password, services: view }, { name: 'monitor', password, services: monitorOnly },
+  ] };
+  await shared.start(options);
+  const post = (uri, body, cookie = '') => fetch(origin + '/api/' + uri, {
+    method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  async function login(visitor) {
+    const response = await post('sharing/login', { visitor, password });
+    assert.equal(response.status, 200);
+    return response.headers.get('set-cookie').split(';')[0];
+  }
+  const api = async (uri, cookie, value = {}) => {
+    const response = await post(uri, value, cookie);
+    return [response.status, await response.json()];
+  };
+  assert.equal((await api('lan-hosts/list'))[0], 401);
+  let full = await login();
+  const inventory = await login('inventory'), monitoring = await login('monitor');
+  assert.equal((await api('lan-hosts/list', monitoring))[0], 404);
+  assert.equal((await api('lan-hosts/save', full, { name: 'unauthorized mutation' }))[0], 403);
+  assert.equal((await api('lan-hosts/terminal-open', full, { id: host.id }))[0], 403);
+  assert.equal((await api('monitor/sources', inventory))[0], 404);
+  assert.deepEqual(await api('monitor/sources', monitoring), [200, []]);
+  assert.deepEqual(await api('monitor/sources', full), [200, [{ label: '局域网主机 / Saved system', source }]]);
+  assert.deepEqual(await api('lan-hosts/list', inventory), [200, { statuses: [], hosts: [{
+    id: host.id, name: host.name, mode: host.mode, address: host.address, port: host.port, group: host.group, tags: host.tags, pinned: true, hasLogs: false,
+  }] }]);
+
+  const config = { name: 'Port monitor', type: 'tcp', enabled: true, source };
+  assert.equal((await api('monitor/upsert', monitoring, { revision: 0, monitor: { ...config, enabled: false } }))[0], 403);
+  const [status, state] = await api('monitor/upsert', full, { revision: 0, monitor: config });
+  assert.equal(status, 200);
+  const [{ id, sourceHost }] = state.monitors;
+  assert.equal(sourceHost, host.name);
+  assert.equal((await api('monitor/check', monitoring, { id }))[0], 403);
+  assert.equal((await api('monitor/check', full, { id }))[1].monitors[0].state, 'up');
+  const [, list] = await api('lan-hosts/list', full);
+  assert.equal(list.hosts[0].hasLogs, true);
+  assert.deepEqual(list.statuses.map(item => [item.hostId, item.id, item.state]), [[host.id, id, 'up']]);
+  assert.deepEqual((await api('lan-hosts/list', inventory))[1].statuses, []);
+  const [paused, pauseState] = await api('monitor/toggle', monitoring, { id, revision: state.revision, enabled: false });
+  assert.equal(paused, 200);
+  assert.equal((await api('monitor/toggle', monitoring, { id, revision: pauseState.revision, enabled: true }))[0], 403);
+  assert.equal((await api('monitor/upsert', monitoring, { revision: pauseState.revision, monitor: { ...config, id } }))[0], 403);
+
+  const old = { ...services };
+  delete old['lan-hosts'];
+  await shared.start({ ...options, services: old, visitors: [] });
+  assert.equal((await api('lan-hosts/list', full))[0], 401);
+  full = await login();
+  assert.equal((await api('lan-hosts/list', full))[0], 404);
+  await shared.start({ ...options, services: sharingFromEnvironment({ DEVKIT_SHARE_LAN_HOSTS: 'true' }), visitors: [] });
+  full = await login();
+  const [onlyStatus, onlyList] = await api('lan-hosts/list', full);
+  assert.equal(onlyStatus, 200);
+  assert.equal(onlyList.hosts[0].id, host.id);
+  assert.deepEqual(onlyList.statuses, []);
+  assert.equal((await api('monitor/get', full))[0], 404);
 });
 
 function sftpFixture(stream, folder, onWrite) {
@@ -247,6 +346,112 @@ function sftpFixture(stream, folder, onWrite) {
   });
   stream.on('CLOSE', (id, token) => { const handle = handles.get(token.toString()); handles.delete(token.toString()); void status(id, handle.close?.() || Promise.resolve()); });
 }
+
+test('shared host editing and SSH/SFTP use write-only credentials and private sessions', { timeout: 30000 }, async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-web-ssh-'));
+  const closes = [];
+  t.after(async () => {
+    for (const close of closes.reverse()) await close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  await mkdir(path.join(directory, 'files'));
+  const rsa = options => generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { format: 'pem', type: 'pkcs1', ...options }, publicKeyEncoding: { format: 'pem', type: 'spki' } }).privateKey;
+  const password = 'fixture-key-passphrase', privateKey = rsa({ cipher: 'aes-256-cbc', passphrase: password });
+  const expectedKey = ssh.utils.parseKey(privateKey, password);
+  const clients = new Set();
+  const target = new ssh.Server({ hostKeys: [rsa()] }, client => {
+    clients.add(client);
+    client.on('close', () => clients.delete(client));
+    client.on('error', () => {});
+    client.on('authentication', auth => {
+      if (auth.username === 'operator' && auth.method === 'publickey' && auth.key.data.equals(expectedKey.getPublicSSH()) && (!auth.signature || expectedKey.verify(auth.blob, auth.signature, auth.hashAlgo) === true)) auth.accept();
+      else auth.reject(['publickey']);
+    });
+    client.on('session', accept => {
+      const session = accept();
+      session.on('pty', accept => accept());
+      session.on('shell', accept => { const stream = accept(); stream.write('terminal fixture\n'); stream.on('data', bytes => stream.write(bytes)); });
+      session.on('sftp', accept => sftpFixture(accept(), directory, () => {}));
+    });
+  }).listen(0, '127.0.0.1');
+  await once(target, 'listening');
+  closes.push(() => new Promise(resolve => { for (const client of clients) client.end(); target.close(resolve); }));
+  const store = await createProjectStore(directory), lan = await createLanWorkspaces(directory);
+  closes.push(() => store.close(), () => lan.close());
+  await mkdir(path.join(directory, '.vite'));
+  await writeFile(path.join(directory, '.vite', 'manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
+  await writeFile(path.join(directory, 'portal.html'), '<!doctype html><title>fixture</title>');
+  const shared = await createProjectHost(store, directory, { lan: () => lan });
+  closes.push(() => shared.stop());
+  const listening = await port(), origin = `http://127.0.0.1:${listening}`;
+  const services = emptySharingServices(), visitor = emptySharingServices();
+  for (const key of Object.keys(services['lan-hosts'])) services['lan-hosts'][key] = true;
+  Object.assign(visitor['lan-hosts'], { enabled: true, terminal: true });
+  const sharingPassword = 'test-only-shared-ssh', options = { host: '127.0.0.1', port: listening, password: sharingPassword, services, visitors: [{ name: 'terminal', password: sharingPassword, services: visitor }] };
+  await shared.start(options);
+  const post = (route, cookie, body, contentType = 'application/json') => fetch(`${origin}/api/${route}`, {
+    method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': contentType },
+    body: contentType === 'application/json' ? JSON.stringify(body) : body,
+  });
+  async function login(visitor) {
+    const response = await post('sharing/login', '', { visitor, password: sharingPassword });
+    assert.equal(response.status, 200);
+    return response.headers.get('set-cookie').split(';')[0];
+  }
+  const admin = await login(), guest = await login('terminal');
+  const request = (action, payload = {}, cookie = admin) => post('lan-hosts/' + action, cookie, payload);
+  const data = async (action, payload, cookie) => {
+    const response = await request(action, payload, cookie), result = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(result));
+    return result;
+  };
+  const original = { name: 'Web SSH', address: '127.0.0.1', port: target.address().port, platform: process.platform === 'win32' ? 'win32' : 'linux', mode: 'ssh', user: 'operator', auth: 'key', privateKey, password };
+  assert.equal((await request('save', original, guest)).status, 403);
+  assert.equal((await request('save', { ...original, keyPath: path.join(directory, 'forbidden') })).status, 400);
+  const [host] = await data('save', original);
+  assert.equal(host.hasStoredKey, true);
+  assert.equal(host.hasPassword, true);
+  for (const field of ['privateKey', 'password', 'secret', 'encryptedKey', 'keyPath']) assert.equal(Object.hasOwn(host, field), false);
+  const persisted = await readFile(path.join(directory, 'lan-hosts', 'connections.json'), 'utf8');
+  assert.ok(!persisted.includes(password) && !persisted.includes('BEGIN RSA PRIVATE KEY'));
+  const [edited] = await data('save', { ...host, name: 'Renamed SSH' });
+  assert.equal(edited.hasStoredKey, true);
+  assert.equal((await request('save', { ...host, name: 'Stale edit' })).status, 409);
+  assert.equal((await request('terminal-open', { id: host.id })).status, 400);
+  const { fingerprint } = await data('test', { id: host.id });
+  await data('test', { id: host.id, fingerprint });
+  const shell = await data('terminal-open', { id: host.id, cols: 80, rows: 24 });
+  assert.equal((await request('terminal-read', shell, guest)).status, 404);
+  await data('terminal-close', shell, guest);
+  const guestShell = await data('terminal-open', { id: host.id }, guest);
+  assert.equal((await request('file-list', guestShell, guest)).status, 403);
+  await data('terminal-input', { ...shell, text: 'echo-fixTURE\r' });
+  let output = '';
+  for (let attempt = 0; attempt < 30 && !output.includes('echo-fixTURE'); attempt++) {
+    output += Buffer.from((await data('terminal-read', shell)).data, 'base64').toString();
+    if (!output.includes('echo-fixTURE')) await delay(30);
+  }
+  assert.match(output, /echo-fixTURE/);
+  const desktopShell = await lan.hostRequest('terminal-open', { id: host.id });
+  await lan.hostRequest('terminal-close', desktopShell);
+  const bytes = Buffer.from([0, 1, 22, 255]);
+  const upload = await post(`lan-hosts/file-upload?${new URLSearchParams({ id: shell.id, path: '.', name: 'web.bin' })}`, admin, bytes, 'application/octet-stream');
+  assert.equal(upload.status, 200, await upload.text());
+  const listing = await data('file-list', { ...shell, path: '.' });
+  assert.equal(listing.entries[0].name, 'web.bin');
+  const download = await request('file-download', { ...shell, path: listing.entries[0].path });
+  assert.equal(download.status, 200);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+  const revoked = emptySharingServices(); revoked['lan-hosts'].enabled = true;
+  await shared.start({ ...options, password: '', visitors: [{ name: 'terminal', services: revoked }] });
+  assert.equal((await request('terminal-read', guestShell, guest)).status, 401);
+  assert.equal((await request('terminal-open', { id: host.id }, await login('terminal'))).status, 403);
+  await data('terminal-read', shell);
+  const { hosts: [current] } = await data('list');
+  await data('remove', { id: host.id, revision: current.revision });
+  assert.equal((await request('terminal-read', shell)).status, 404);
+  assert.deepEqual((await data('list')).hosts, []);
+});
 
 test('SSH verifies host identity, runs a PTY, and deploys portable Node through SFTP and SSH exec', { timeout: 150000 }, async t => {
   const folder = await mkdtemp(path.join(tmpdir(), 'devkit-lan-ssh-'));

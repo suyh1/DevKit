@@ -8,12 +8,13 @@ import {
 } from "react";
 import { SunMoon, LogOut, Copy, Download, Menu, X, FolderOpen, Server, Coffee, Activity, ScrollText, Search, Send } from "lucide-react";
 import CommandPalette from './CommandPalette';
-import { parseWorkspaceLink, workspaceHash } from './workspace-links';
+import { openWorkspaceLink, parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
 import NginxCenter from "./NginxCenter";
 import JarCenter from './JarCenter';
 import MonitorCenter from './MonitorCenter';
 import LogCenter from './LogCenter';
+import LanHosts from './LanHosts';
 import HttpWorkbench from "./HttpWorkbench";
 import { useConfirmation, useResetOverlays } from "./Confirmation";
 import { projectRequest } from "./project-api";
@@ -36,6 +37,7 @@ const modules = [
   { id: 'jar', name: 'JAR 管理' },
   { id: 'monitor', name: '监控中心' },
   { id: 'logs', name: '日志中心' },
+  { id: 'lan-hosts', name: '局域网主机' },
 ] as const;
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
@@ -453,12 +455,14 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     : [
         ('edit' in active && active.edit)
           ? "可编辑"
-          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读' }[
+          : { projects: "项目只读", nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
         page === 'jar' && services.jar.control ? (services.logs.enabled && services.logs.jar ? '可管理运行与控制台输入' : '可管理运行') : '',
         page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',
+        page === 'lan-hosts' && services['lan-hosts'].terminal ? '可使用 SSH 终端' : '',
+        page === 'lan-hosts' && services['lan-hosts'].rdp ? '可连接远程桌面' : '',
         page === "http" && services.http.send ? "可发送请求" : "",
         page === "projects" && services.projects.probe ? "可检测入口" : "",
       ]
@@ -533,7 +537,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               <span>
                 {page === "projects"
                   ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
-                  : page === 'logs' ? '仅可读取已授权的日志来源；筛选与清空显示不修改主机文件。' : page === 'monitor' ? '检测由主机定时执行；故障与恢复记录、历史样本保存在共享主机。' : page === 'jar' ? '路径和进程属于各应用所在的主机。多人可查看控制台，输入需运行权限和控制权。' : page === "nginx"
+                  : page === 'lan-hosts' ? 'SSH 连接和端口检测由共享主机发起，连接凭据保存在共享主机。' : page === 'logs' ? '仅可读取已授权的日志来源；筛选与清空显示不修改主机文件。' : page === 'monitor' ? '检测由主机定时执行；故障与恢复记录、历史样本保存在共享主机。' : page === 'jar' ? '路径和进程属于各应用所在的主机。多人可查看控制台，输入需运行权限和控制权。' : page === "nginx"
                     ? "配置、路径和运行操作指向实例所在的主机。导出文件下载到当前浏览器。"
                     : "接口项目保存在共享主机，请求从主机发出，localhost 指主机；快速请求集合保存在当前浏览器。"}
               </span>
@@ -581,6 +585,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             {services.jar.enabled && <div className="portal-page" hidden={page !== 'jar'} inert={page !== 'jar'}><JarCenter active={page === 'jar'} /></div>}
             {services.monitor.enabled && <div className="portal-page" hidden={page !== 'monitor'} inert={page !== 'monitor'}><MonitorCenter active={page === 'monitor'} /></div>}
             {services.logs.enabled && <div className="portal-page" hidden={page !== 'logs'} inert={page !== 'logs'}><LogCenter active={page === 'logs'} /></div>}
+            {services['lan-hosts'].enabled && <div className="portal-page" hidden={page !== 'lan-hosts'} inert={page !== 'lan-hosts'}><LanHosts portal active={page === 'lan-hosts'} onOpenMonitor={id => openWorkspaceLink('monitor', id)} /></div>}
             {services.http.enabled && (
               <div
                 className="portal-page"

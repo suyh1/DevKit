@@ -9,7 +9,7 @@ export const workspaceModules = [
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
   { id: 'jar', name: 'JAR 管理', description: '按主机渐进加载 Java 应用，窄屏使用卡片，SSH 自动部署便携运行时，支持启停重启、日志、健康检查、系统自启和配置编辑。', category: '工作台', badge: '共享' },
-  { id: 'lan-hosts', name: '局域网主机', description: '桌面端发现、分组和导入主机，分步诊断 DevKit／SSH 连接。支持私钥和跳板机、多会话终端及 SFTP、端口监控、Windows 远程桌面和网络唤醒。', category: '工作台' },
+  { id: 'lan-hosts', name: '局域网主机', description: '管理、发现和导入主机，支持 SSH 终端、SFTP、端口监控和网络唤醒。共享网页可按访客权限直连远程桌面。', category: '工作台', badge: '共享' },
 ] as const;
 
 export type WorkspaceModule = typeof workspaceModules[number];

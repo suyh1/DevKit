@@ -120,7 +120,7 @@ sudo chmod 700 /opt/devkit/configs
 
 ## 无桌面常驻的部署方式
 
-仓库还提供独立 Node 服务入口，可按选项托管项目中心、Nginx 配置、HTTP 工作台、JAR 管理及监控中心。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
+仓库还提供独立 Node 服务入口，可按选项开放共享工作台的七个栏目。适合部署到常开的 Windows/Linux/ARM64 服务器；**仅服务端需要 Node.js 24+**，浏览器客户端不需要。使用源码时先构建前端；使用 `DevKit_ProjectCenter_1.6.0_node24.zip` 时解压即可，不需要安装 npm 依赖或重新构建：
 
 ```powershell
 # 仅源码部署需要先执行：npm run build
@@ -140,7 +140,7 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' \
 DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 ```
 
-首次至少显式开放一项服务：`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，或使用 `DEVKIT_SHARE_NGINX=true`、`DEVKIT_SHARE_HTTP=true`、`DEVKIT_SHARE_JAR=true`、`DEVKIT_SHARE_MONITOR=true` 显式启用；`DEVKIT_NGINX_CONTROL=true` 另开 Nginx 运行操作，`DEVKIT_JAR_EDIT=true` / `DEVKIT_JAR_CONTROL=true` 分别授权 JAR 设置编辑与运行管理（含控制台输入和系统自启），详细权限与示例见 [共享工作台](workspace-sharing.md)。
+首次至少显式开放一项服务。`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，`DEVKIT_SHARE_LAN_HOSTS=true` 开放已保存的主机清单。Nginx、HTTP、JAR、监控和日志也可分别开放。服务开关、编辑和运行权限见 [共享工作台](workspace-sharing.md)。
 
 首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。项目编辑使用 `DEVKIT_PROJECT_EDIT=true`，入口检测使用 `DEVKIT_PROJECT_PROBE=true`，两者独立。后续启动复用已保存设置，环境变量逐项覆盖。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 

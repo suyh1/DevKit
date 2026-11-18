@@ -18,6 +18,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const [error, setError] = useState(''), [message, setMessage] = useState('');
   const [sourceStatus, setSourceStatus] = useState<Record<string, 'pending' | 'ready' | 'failed'>>({});
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [regex, setRegex] = useState(false), [level, setLevel] = useState('all'), [raw, setRaw] = useState(false), [paused, setPaused] = useState(false), [loading, setLoading] = useState(false);
+  const [hostFilter, setHostFilter] = useState('');
   const rawAllowed = raw && canReadRawLogs();
   const linked = useWorkspaceResource('logs');
   const handledLink = useRef('');
@@ -51,10 +52,15 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   useEffect(() => {
     if (!linked || !active) { handledLink.current = ''; return; }
     if (handledLink.current === linked) return;
+    if (linked.startsWith('host:')) {
+      handledLink.current = linked;
+      setHostFilter(linked.slice(5)); setSearch('');
+      return;
+    }
     const matched = catalog.sources.filter(item => item.id === linked || `instance:${item.instanceId}` === linked).slice(0, 4);
     if (!matched.length) return;
     handledLink.current = linked;
-    setSearch(''); setSelected(matched.map(item => item.id)); setPaused(false);
+    setSearch(''); setHostFilter(''); setSelected(matched.map(item => item.id)); setPaused(false);
   }, [linked, active, catalog.sources]);
   function toggle(id: string) {
     setSelected(values => values.includes(id) ? values.filter(value => value !== id) : values.length < 4 ? [...values, id] : values);
@@ -67,11 +73,14 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
       setMessage(await saveText(rawAllowed ? result.text || '' : mask(result.text || ''), `devkit-log-${source.id.slice(-12)}.txt`));
     } catch (failure) { setError((failure as Error).message); }
   }
-  const matching = catalog.sources.filter(item => `${item.name} ${item.path} ${item.hostName || ''}`.toLowerCase().includes(search.toLowerCase()));
+  const matching = catalog.sources.filter(item => (!hostFilter || (item.hostId || 'local') === hostFilter) && `${item.name} ${item.path} ${item.hostName || ''}`.toLowerCase().includes(search.toLowerCase()));
   const groups = [...new Set(matching.map(item => item.hostId || ''))];
+  const localName = window.devkitLogs ? '本机' : '共享主机';
+  const missingHost = hostFilter && hostFilter !== 'local' && !catalog.hosts?.some(host => host.id === hostFilter);
+  const hostLoad = sourceStatus[hostFilter === 'local' ? '' : hostFilter];
   const linkTarget = linked?.replace(/^instance:/, '') || '';
   const linkHost = linkTarget.includes(':') ? linkTarget.split(':')[0] : '';
-  const linkStatus = linked && sourceStatus[''] === 'ready' && !catalog.sources.some(item => item.id === linked || `instance:${item.instanceId}` === linked) ? sourceStatus[linkHost] || 'ready' : undefined;
+  const linkStatus = linked && !linked.startsWith('host:') && sourceStatus[''] === 'ready' && !catalog.sources.some(item => item.id === linked || `instance:${item.instanceId}` === linked) ? sourceStatus[linkHost] || 'ready' : undefined;
   return <section className="log-center">
     <header className="log-heading workspace-banner"><div><ScrollText size={27} /><div><h1>日志中心</h1><p>在同一视图中追踪应用与网关日志。</p></div></div><div className="log-actions"><SharingButton /><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
     {error && <p className="pc-error" role="alert">{error}</p>}{message && <p className="pc-message" role="status">{message}</p>}
@@ -80,7 +89,8 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     <div className="log-toolbar"><label className="log-query"><Search size={14} /><input aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input type="checkbox" checked={!rawAllowed} disabled={!canReadRawLogs()} onChange={event => setRaw(!event.target.checked)} />主机脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
     <div className="log-layout">
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><input aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
-        <div className="log-source-list">{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : window.devkitLogs ? '本机' : '共享主机'}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && <p>{loading ? '正在读取来源…' : '暂无匹配的日志来源。'}</p>}</div>
+        <select aria-label="按主机筛选日志来源" value={hostFilter} onChange={event => setHostFilter(event.target.value)}><option value="">全部主机</option><option value="local">{localName}</option>{catalog.hosts?.map(host => <option key={host.id} value={host.id}>{host.name}</option>)}{missingHost && <option value={hostFilter}>{loading ? '正在读取目标主机…' : '目标主机不可用'}</option>}</select>
+        <div className="log-source-list">{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : hostLoad === 'pending' || loading && !hostLoad ? '正在读取来源…' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
       {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>从左侧选择最多 4 个来源。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className={`log-panels log-panels-${selected.length}`}>{selected.map(id => {

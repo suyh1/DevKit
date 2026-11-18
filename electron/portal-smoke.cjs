@@ -616,6 +616,98 @@ app
         fixture.faults.logGate = null;
       }
       assert.deepEqual(errors, []);
+      console.log('Portal: validating LAN host inventory, monitoring and log navigation');
+      fixture.faults.shareHosts = true;
+      await fixture.host.start({ ...fixture.options, services: {
+        projects: { enabled: false }, nginx: { enabled: false }, http: { enabled: false },
+        'lan-hosts': { enabled: true, edit: true, diagnose: true, terminal: true, files: true, rdp: true }, monitor: { enabled: true, edit: true, control: true },
+        logs: { enabled: true, jar: true },
+      }, visitors: [] });
+      await window.loadURL(fixture.url + '?audit=lan-hosts#lan-hosts');
+      await login();
+      const inventory = '.lan-host-list';
+      await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
+      await fill('.lan-search input', '找不到的主机');
+      await wait('document.querySelector(".lan-center")?.textContent.includes("没有匹配的主机")');
+      await fill('.lan-search input', '测试节点');
+      await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
+      await button('启用端口监控', `${inventory} button`);
+      await wait('document.querySelector(".monitor-detail h2")?.textContent==="慢速目标" && location.hash.startsWith("#monitor/lan-")');
+      await button('立即检测', '.monitor-detail button');
+      await wait('document.querySelector(".monitor-detail")?.textContent.includes("TCP test fixture")');
+      await button('局域网主机', '.portal-sidebar button');
+      await wait(`document.querySelector('${inventory}')?.textContent.includes('端口可达')`);
+      await button('监控历史', `${inventory} button`);
+      await wait('location.hash.startsWith("#monitor/lan-")');
+      await button('局域网主机', '.portal-sidebar button');
+      await button('查看日志', `${inventory} button`);
+      await wait('document.querySelector(".log-source-list")?.textContent.includes("远程延迟日志")');
+      assert.ok(!await js('document.querySelector(".log-source-list").textContent.includes("审查测试应用")'));
+      for (const width of [390, 321]) {
+        window.setContentSize(width, 810);
+        await wait(`Math.abs(innerWidth-${width})<=1`);
+        await js('location.hash="#lan-hosts"');
+        await wait('!!document.querySelector(".portal-page:not([hidden]) .lan-host-list")');
+        assert.ok(await js('document.querySelector(".portal-content").scrollWidth<=document.querySelector(".portal-content").clientWidth'));
+      }
+      window.setContentSize(1440, 900);
+      await wait('innerWidth>=1300');
+      await selector('.lan-search input');
+      key('A', ['control']); key('Backspace');
+      const sshPort = await fixture.startSshTarget();
+      await button('添加主机', '.lan-heading-actions button');
+      await fill('.lan-host-form .lan-address input', '127.0.0.1');
+      await js(`(() => { const e=document.querySelector('.lan-host-form .lan-port input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e, '${sshPort}'); e.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+      await fill('.lan-host-form .lan-host-name input', '浏览器 SSH');
+      await fill('.lan-host-form input[maxlength="120"][autocomplete="off"]', 'portal-fixture');
+      await fill('.lan-host-form input[type=password]', 'ssh-portal-fixture');
+      await button('保存连接', '.lan-host-form button');
+      await wait('document.querySelector(".lan-host-list").textContent.includes("浏览器 SSH")');
+      await selector('.lan-host-list button[aria-label="编辑 浏览器 SSH"]');
+      assert.equal(await js('document.querySelector(".lan-host-form input[type=password]").value'), '');
+      await fill('.lan-host-form .lan-host-name input', '网页 SSH 已编辑');
+      await button('保存连接', '.lan-host-form button');
+      await wait('document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑")');
+      await button('打开终端', '.lan-host-list button');
+      await button('信任并连接', 'dialog[open] button');
+      await wait('document.querySelector(".lan-terminal-message [role=status]")?.textContent==="已连接"');
+      await wait('document.querySelector(".xterm-rows")?.textContent.includes("portal ssh ready")');
+      await window.webContents.insertText('browser-echo');
+      await wait('document.querySelector(".xterm-rows")?.textContent.includes("browser-echo")');
+      await selector('.lan-host-list button[aria-label="移除 网页 SSH 已编辑"]');
+      await button('移除连接', 'dialog[open] button');
+      await wait('!document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑") && !document.querySelector(".lan-terminal-tabs")');
+      console.log('Portal: validating the embedded remote desktop');
+      const rdp = await (await import('./rdp-fixture.mjs')).rdpFixture();
+      const gateway = { DEVKIT_GUACD_HOST: '127.0.0.1', DEVKIT_GUACD_PORT: String(rdp.port), DEVKIT_GUACD_TLS: 'false' };
+      const previousGateway = Object.fromEntries(Object.keys(gateway).map(key => [key, process.env[key]]));
+      Object.assign(process.env, gateway);
+      try {
+        // Only the fixture guacd receives the saved address. No Windows host is contacted.
+        const deployed = await js(`fetch('/api/lan-hosts/save', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'测试远程桌面',mode:'ssh',address:'192.0.2.45',user:'fixture',port:22,platform:'win32',rdpPort:3391})}).then(r=>r.status)`);
+        assert.equal(deployed, 200);
+        await button('刷新', '.lan-heading-actions button');
+        await button('连接远程桌面', '.lan-host-list button');
+        await fill('.lan-rdp-form input[name=username]', 'portal-rdp-user');
+        await fill('.lan-rdp-form input[name=password]', 'portal-rdp-test');
+        await button('连接', '.lan-rdp-form button');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
+        await wait(`Array.from(document.querySelectorAll('.lan-rdp-viewport canvas')).some(canvas=>canvas.width>=640&&Array.from(canvas.getContext('2d').getImageData(1,1,1,1).data).join(',')==='40,100,150,255')`);
+        const fixtureConnection = rdp.connections.at(-1);
+        assert.deepEqual([fixtureConnection.hostname, fixtureConnection.port, fixtureConnection.username], ['192.0.2.45', '3391', 'portal-rdp-user']);
+        await button('发送 Ctrl+Alt+Del', '.lan-rdp-toolbar button');
+        for (let attempt = 0; attempt < 40 && !rdp.messages.some(row => row.join(',') === 'key,65535,0'); attempt++) await delay(25);
+        assert.ok(rdp.messages.some(row => row.join(',') === 'key,65535,0'));
+        await button('断开连接', '.lan-rdp-toolbar button');
+        await wait('!document.querySelector(".lan-rdp-form").hidden && !document.querySelector(".lan-rdp-form input[name=password]").value');
+        await selector('button[aria-label="关闭远程桌面"]');
+      } finally {
+        await rdp.close();
+        for (const [key, value] of Object.entries(previousGateway)) {
+          if (value === undefined) delete process.env[key]; else process.env[key] = value;
+        }
+      }
+      assert.deepEqual(errors, []);
       await fs.writeFile(
         path.join(output, "results.json"),
         JSON.stringify(
@@ -639,6 +731,8 @@ app
             compactHeader: true,
             brokenResourceLinks: true,
             independentLogStreams: true,
+            sharedLanInventory: true,
+            embeddedRemoteDesktop: true,
             commandsExecuted: 0,
           },
           null,

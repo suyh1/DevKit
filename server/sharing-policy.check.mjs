@@ -222,6 +222,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     jar: { enabled: false, edit: false, control: false },
     monitor: { enabled: false, edit: false, control: false },
     logs: { enabled: false, jar: false, nginx: false, export: false, raw: false },
+    'lan-hosts': { enabled: false, edit: false, diagnose: false, terminal: false, files: false, discover: false, wake: false, rdp: false },
   });
   const disabled = emptySharingServices();
   disabled.nginx = { enabled: false, edit: true, control: true };
@@ -241,11 +242,13 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
       DEVKIT_SHARE_HTTP: "true",
       DEVKIT_HTTP_SEND: "true",
       DEVKIT_HTTP_EDIT: "false",
+      DEVKIT_SHARE_LAN_HOSTS: "true",
     },
     { services: old },
   );
   assert.deepEqual(cli.projects, { enabled: false, edit: false, probe: false });
   assert.deepEqual(cli.http, { enabled: true, edit: false, send: true });
+  assert.deepEqual(cli['lan-hosts'], { ...old['lan-hosts'], enabled: true });
   assert.throws(
     () => sharingFromEnvironment({ DEVKIT_HTTP_SEND: "yes" }),
     /true.*false/,

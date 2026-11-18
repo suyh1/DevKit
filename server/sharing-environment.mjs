@@ -28,6 +28,10 @@ export function sharingFromEnvironment(env, saved = {}) {
     jar: { enabled: 'DEVKIT_SHARE_JAR', edit: 'DEVKIT_JAR_EDIT', control: 'DEVKIT_JAR_CONTROL' },
     monitor: { enabled: 'DEVKIT_SHARE_MONITOR', edit: 'DEVKIT_MONITOR_EDIT', control: 'DEVKIT_MONITOR_CONTROL' },
     logs: { enabled: 'DEVKIT_SHARE_LOGS', jar: 'DEVKIT_LOGS_JAR', nginx: 'DEVKIT_LOGS_NGINX', export: 'DEVKIT_LOGS_EXPORT', raw: 'DEVKIT_LOGS_RAW' },
+    'lan-hosts': {
+      enabled: 'DEVKIT_SHARE_LAN_HOSTS', edit: 'DEVKIT_LAN_HOSTS_EDIT', diagnose: 'DEVKIT_LAN_HOSTS_DIAGNOSE', terminal: 'DEVKIT_LAN_HOSTS_TERMINAL',
+      files: 'DEVKIT_LAN_HOSTS_FILES', discover: 'DEVKIT_LAN_HOSTS_DISCOVER', wake: 'DEVKIT_LAN_HOSTS_WAKE', rdp: 'DEVKIT_LAN_HOSTS_RDP',
+    },
   }))
     for (const [key, variable] of Object.entries(variables))
       services[id][key] = read(variable, services[id][key]);

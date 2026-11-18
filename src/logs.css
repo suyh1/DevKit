@@ -9,3 +9,4 @@
 @media(max-width:1100px) { .log-layout { grid-template-columns:180px minmax(0,1fr); }.log-panels { grid-template-columns:minmax(0,1fr); overflow:auto; grid-auto-rows:minmax(240px,1fr); } }
 @media(max-width:700px) { .log-center { height:auto; min-height:0; }.log-layout { display:block; }.log-sources { max-height:240px; margin-bottom:12px; }.log-source-list { min-height:70px; }.log-panels { display:flex; flex-direction:column; overflow:visible; }.log-pane { min-height:280px; height:380px; flex:none; }.log-query { flex-basis:100%; }.log-actions { width:100%; }.log-toolbar { gap:10px; }.log-heading h1 { font-size:22px; }.log-empty { min-height:220px; } }
 .log-source-list h3 { margin:10px 6px 4px; color:var(--muted); font-size:12px; }
+.log-sources > select { width: 100%; min-width: 0; flex-shrink: 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); color: var(--text); font: inherit; }
