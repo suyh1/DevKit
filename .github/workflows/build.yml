@@ -178,7 +178,9 @@ jobs:
       - run: node scripts/check-project-server.mjs
       - name: Read release directory
         id: release-directory
-        run: echo "path=artifacts/release-$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          echo "path=artifacts/release-$version" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: project-center-node24
