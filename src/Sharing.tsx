@@ -396,9 +396,9 @@ function SharingPanel({
                         permissions: [],
                       },
                       {
-                        id: 'project-todos', name: '项目与待办', description: '查看已发布的项目、进度和待办',
+                        id: 'project-todos', name: '待办清单', description: '查看已发布的纯文本待办清单',
                         permissions: [
-                          { key: 'edit', label: '编辑项目与待办', detail: '允许在网页创建共享项目，以及编辑、删除已共享的项目和待办。' },
+                          { key: 'edit', label: '编辑待办清单', detail: '允许在网页创建共享清单，以及编辑和删除已共享的清单。' },
                         ],
                       },
                       {
@@ -521,7 +521,7 @@ function SharingPanel({
                                 ? "接口文档与环境"
                                 : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
-                                : service.id === 'project-todos' ? '已发布的项目、进度和待办' : "项目与档案"}
+                                : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
                             。
                           </p>
                           {service.permissions.map((permission) => (

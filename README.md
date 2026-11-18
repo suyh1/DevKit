@@ -9,11 +9,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、Nginx 配置与实例管理、接口设计、文档与调试一体化工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.20.0**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
+当前版本：**v1.23.0**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.20.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.20.0/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.23.0_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.23.0/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，使用顶部工具栏的“局域网共享”统一开放模块和设置权限。
 4. 管理其他电脑时，在“共享 → 局域网主机”保存 DevKit 共享或 SSH 连接，并勾选所需栏目。回到 JAR 管理或 Nginx 配置，添加实例时选择本机或已保存的目标主机。浏览远程文件时可直接打开绝对目录，也可逐级浏览。在“局域网共享”开放“局域网主机”后，获准的访客可查看同一份主机清单，并按监控和日志权限查看对应主机的记录。
@@ -131,8 +131,8 @@ Windows 解压版需要保留整个应用目录，再运行 `devkit.exe`。Windo
 | 监控中心 | 工作台 | 定时 HTTP/TCP 检测，可关联项目、本机与远程 JAR 或局域网主机，支持维护窗口、故障恢复记录与 Webhook 通知。 |
 | HTTP 调试 | 工作台 | 可局域网共享的 API 项目、接口设计、文档与调试，支持快速请求、multipart 字段与文件上传、环境变量、响应 Schema 校验及 OpenAPI/Swagger 导入导出。 |
 | 项目中心 | 工作台 | 管理项目入口、环境档案与局域网共享。 |
-| 项目与待办 | 工作台 | 按项目管理待办、负责人、优先级和截止日期，支持清单、看板与局域网协作。 |
-| 本机文件共享管理 | 工作台 | 按独立端口和指定范围管理多个只读文件共享，在浏览器下载文件或文件夹 ZIP。 |
+| 待办清单 | 工作台 | 像编辑文本文件一样管理待办，支持分组、标签、快捷键、归档、清单导入导出及局域网共享。 |
+| 本机文件共享管理 | 工作台 | 通过共享清单和详情查看状态、端口和文件范围，管理多项只读共享并在网页下载文件或文件夹 ZIP。 |
 | Nginx 配置 | 工作台 | 按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。 |
 | JAR 管理 | 工作台 | 按主机渐进加载 Java 应用，窄屏使用卡片，SSH 自动部署便携运行时，支持启停重启、日志、健康检查、系统自启和配置编辑。 |
 | 局域网主机 | 工作台 | 管理、发现和导入主机，支持 SSH 终端、SFTP、端口监控和网络唤醒。共享网页可按访客权限直连远程桌面。 |
@@ -260,7 +260,7 @@ PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.20.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.23.0_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -280,13 +280,23 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 ## 本机文件共享管理
 
-在“共享栏目”中为每项共享选择文件或文件夹、指定端口，启动后可打开浏览器下载单个文件或文件夹 ZIP。勾选发布并在“局域网共享”中开放此栏目，获准访客即可从共享工作台浏览和下载。详见 [配置与访问方式](docs/workspace-sharing.md#本机文件共享管理)。
+在共享清单中查看运行状态与端口，选中共享后管理范围、复制指定网卡的链接或打开下载页。下载页支持筛选文件名和下载文件夹 ZIP。勾选发布并在“局域网共享”中开放栏目，获准访客即可登录浏览和下载。[配置与访问方式](docs/workspace-sharing.md#本机文件共享管理)
 
-## 项目与待办
+## 待办清单
 
-在“共享栏目”中添加项目和待办，维护负责人、优先级、截止日期及进度，在清单和看板间切换。可逐项目发布，局域网访客按授权查看或编辑。详见 [项目与待办](docs/project-center.md#项目与待办)。
+待办清单采用 Todo+ 风格的纯文本编辑。用冒号分组、用 `☐` 写任务，并可通过编辑器上方的按钮写入验收条件、续做点、自定义视图、工作台引用、回访日期、前置依赖、周期规则和分组默认标签。阅读时显示可点击的方框和引用、中文标签与验收进度，编辑时可查看源码。桌面端和局域网页均支持导入文本清单和导出 `.todo`。可逐份发布，局域网访客获编辑权限后可导入新清单，只读访客可导出已发布清单。[待办清单](docs/project-center.md#待办清单)
 
 ## 开发与打包
+
+在 Windows 上双击仓库根目录的 [`start-preview.cmd`](start-preview.cmd)，即可使用当前源码启动桌面预览，验证待办清单、文件共享和局域网功能。启动需要 Node.js 24+ 和 `tar`，依赖缺失时脚本会自动安装。预览窗口标题为“DevKit · 源码预览”，桌面偏好和浏览器数据独立保存在 `artifacts/desktop-preview-profile/`，项目和共享配置沿用仓库的 `configs/`。源码修改后，彻底退出预览窗口再双击脚本即可加载新版本，无需生成安装包。
+
+### GitHub 正式发行
+
+正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
+
+工作流会检查 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP。全部通过后，打开 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载对应文件和 SHA-256 校验清单。常规提交、拉取请求和手动运行可以在 Actions 查看测试和构建结果；只有匹配版本号的推送标签会发布 Release。
+
+### 开发与构建命令
 
 构建机使用 Node.js 24 和 `tar`，Linux 构建机还需 `unzip`。制作 `.deb` 或独立服务 ZIP 需 Python 3.10+。首次构建会获取并校验 Electron 和 SSH 目标机用的便携 Node.js，构建完成后可在离线环境部署。可提供本地官方 Node.js 发布归档，通过 `DEVKIT_SSH_NODE_DIST_DIR` 指定所在目录。
 
@@ -300,13 +310,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.20.0_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.20.0-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.20.0-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.23.0_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.23.0-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.23.0-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
-| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.20.0/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.20.0/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.20.0/DevKit_ProjectCenter_1.20.0_node24.zip` |
+| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.23.0/DevKit-<platform>-<arch>/` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.23.0/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.23.0/DevKit_ProjectCenter_1.23.0_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 
@@ -315,7 +325,7 @@ node scripts/package-all.mjs --collect-only
 npm run verify:release
 ```
 
-制作安装包时校验实际 ASAR 内容并生成构建凭据。汇总时用当前构建内容比对凭据，同时核对版本、架构和安装包校验值，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。CI 工作流 `.github/workflows/build.yml` 使用同一组打包入口，构建三平台产物与独立服务 ZIP。Windows 打包显式设置 `publish: 'never'`，产物由 Actions 上传；普通构建不隐式发布 GitHub Release，也不要求 `GH_TOKEN`。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤；Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
+制作安装包时校验实际 ASAR 内容并生成构建凭据。汇总时用当前构建内容比对凭据，同时核对版本、架构和安装包校验值，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。Windows 打包显式设置 `publish: 'never'`。GitHub Actions 的发布任务使用仓库提供的 `GITHUB_TOKEN` 上传已校验的文件。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤。Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
 
 ### 本地产物保留
 

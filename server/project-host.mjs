@@ -225,7 +225,8 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           let size = 0;
           for await (const chunk of request) {
             size += chunk.length;
-            const limit = url.pathname === '/api/http/save-library' ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
+            const largeDocument = ['/api/http/save-library', '/api/project-todos/save', '/api/project-todos/create'].includes(url.pathname);
+            const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
             if (size > limit)
               throw Object.assign(new Error("请求过大。"), { status: 413 });
             chunks.push(chunk);
@@ -319,12 +320,12 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           }
           if (url.pathname.startsWith('/api/project-todos/')) {
             const access = services['project-todos'];
-            if (!access.enabled) return json(404, { error: '未开放项目与待办共享。' });
+            if (!access.enabled) return json(404, { error: '未开放待办清单共享。' });
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const todos = managers.projectTodos?.();
-            if (!todos) return json(503, { error: '项目与待办暂不可用。' });
+            if (!todos) return json(503, { error: '待办清单暂不可用。' });
             const action = url.pathname.slice('/api/project-todos/'.length);
-            if (action !== 'get' && !access.edit) return json(403, { error: '项目与待办为只读模式。' });
+            if (action !== 'get' && !access.edit) return json(403, { error: '待办清单为只读模式。' });
             const payload = await body();
             ensureCurrentSession();
             const result = await todos.request(action, payload, { portal: true, edit: access.edit, authorize: ensureCurrentSession });

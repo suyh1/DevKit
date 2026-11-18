@@ -34,18 +34,26 @@ test('browser RDP selects only saved targets, relays display and input, and revo
   const host = await createProjectHost(store, folder, { lan: () => lan });
   cleanup.push(() => host.stop());
   const [target] = await lan.hostRequest('save', { mode: 'ssh', name: 'RDP fixture', address: '192.0.2.32', platform: 'win32', user: 'ssh-placeholder', port: 22, rdpPort: 3390 });
-  const probe = net.createServer().listen(0, '127.0.0.1');
-  await once(probe, 'listening');
-  const port = probe.address().port, origin = `http://127.0.0.1:${port}`;
-  await new Promise(resolve => probe.close(resolve));
   const services = emptySharingServices(), permitted = emptySharingServices(), unprivileged = emptySharingServices();
   for (const value of [services, permitted, unprivileged]) value['lan-hosts'].enabled = true;
   services['lan-hosts'].rdp = permitted['lan-hosts'].rdp = true;
   const password = 'fixture-rdp-portal-password';
-  const settings = { host: '127.0.0.1', port, password, services, visitors: [
+  const settings = { host: '127.0.0.1', password, services, visitors: [
     { name: 'rdp-visitor', password, services: permitted }, { name: 'viewer', password, services: unprivileged },
   ] };
-  await host.start(settings);
+  for (let attempt = 0; ; attempt++) {
+    const probe = net.createServer().listen(0, settings.host);
+    await once(probe, 'listening');
+    settings.port = probe.address().port;
+    await new Promise(resolve => probe.close(resolve));
+    try {
+      await host.start(settings);
+      break;
+    } catch (error) {
+      if (error.code !== 'EADDRINUSE' || attempt === 2) throw error;
+    }
+  }
+  const origin = `http://${settings.host}:${settings.port}`;
   const post = (route, body, cookie = '', headerOrigin = origin) => fetch(`${origin}/api/${route}`, {
     method: 'POST', headers: { Cookie: cookie, Origin: headerOrigin, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(8000),
   });

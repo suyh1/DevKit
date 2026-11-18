@@ -11,7 +11,7 @@ import { createLogCenter } from './log-center.mjs';
 import { sharingFromEnvironment } from './sharing-environment.mjs';
 import { createLanWorkspaces } from './lan-workspaces.mjs';
 import { createFileShares } from './file-shares.mjs';
-import { createProjectTodos } from './project-todos.mjs';
+import { createTodoLists } from './todo-lists.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
@@ -30,7 +30,7 @@ try {
   monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar, lan: () => lan });
   fileShares = await createFileShares(directory).catch(error => console.error(`文件共享配置：${error.message}`));
   if (services['project-todos'].enabled)
-    projectTodos = await createProjectTodos(directory).catch(error => console.error(`项目与待办配置：${error.message}`));
+    projectTodos = await createTodoLists(directory).catch(error => console.error(`待办清单配置：${error.message}`));
   const result = await host.start({
     host: process.env.HOST || "0.0.0.0",
     port: Number(process.env.PORT || 8765),

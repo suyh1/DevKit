@@ -1,0 +1,40 @@
+export type TodoStatus = 'open' | 'done' | 'cancelled';
+export type TodoLineAction = 'box' | 'done' | 'cancelled' | 'started';
+export type TodoTag = { name: string; value: string; from: number; to: number };
+export type TodoReference = { kind: 'share' | 'tool'; name: string; from: number; to: number };
+export type TodoTaskLine = { kind: 'task'; indent: string; depth: number; symbol: string; text: string; status: TodoStatus; tags: TodoTag[]; textFrom: number };
+export type TodoSectionLine = { kind: 'section'; indent: string; depth: number; name: string };
+export type TodoCheckLine = { kind: 'check'; indent: string; depth: number; text: string; prefixTo: number; checked: boolean };
+export type TodoDirective = { kind: 'directive'; indent: string; depth: number; command: '接着' | '视图' | '默认'; text: string; prefixTo: number };
+export type TodoCheck = TodoCheckLine & { line: number; taskLine: number };
+export type TodoDependency = { id: string; line?: number; state: TodoStatus | 'self' | 'duplicate' | 'missing' };
+export type TodoTask = TodoTaskLine & {
+  line: number; endLine: number; section?: number; path: string; archived: boolean;
+  checks: TodoCheck[]; dependencies: TodoDependency[];
+  resume?: { line: number; text: string }; waiting?: { person: string; review: string };
+};
+export type TodoSection = TodoSectionLine & { line: number; parent?: number; path: string; archived: boolean; defaults: Map<string, string>; defaultLines: number[] };
+export type TodoView = { line: number; name: string; filters: TodoTag[] };
+export type TodoModel = {
+  lines: string[]; sections: TodoSection[]; tasks: TodoTask[]; views: TodoView[];
+  checks: Map<number, TodoCheck>; tasksByLine: Map<number, TodoTask>; sectionsByLine: Map<number, TodoSection>;
+};
+export const todoDefault: string;
+export const todoStorageLimit: number;
+export function todoTags(text: string): TodoTag[];
+export function isTodoDefaultTag(name: string): boolean;
+export function replaceTodoTags(text: string, names: string[], tags: string[]): string;
+export function todoReferences(text: string): TodoReference[];
+export function readTodoLine(line: string): TodoTaskLine | TodoSectionLine | TodoCheckLine | TodoDirective | undefined;
+export function parseTodo(body: string): TodoModel;
+export function todoGroupAt(model: TodoModel, line: number, depth?: number): TodoSection | undefined;
+export function todoGroupDefaults(model: TodoModel, section?: TodoSection): string[];
+export function todoTaskTitle(task: TodoTaskLine): string;
+export function isTodoDate(value?: string): boolean;
+export function changeTodoLine(line: string, action: TodoLineAction, timestamp: string): string;
+export function planTodoCommand(model: TodoModel, numbers: Iterable<number>, action: TodoLineAction, now?: Date): {
+  edits: [line: number, text: string][]; pendingChecks: number; repeated: number; invalidRepeats: number;
+};
+export function archiveTodo(body: string): { body: string; archived: number };
+export function todoDateKey(date?: Date): string;
+export function todoTimestamp(date?: Date): string;

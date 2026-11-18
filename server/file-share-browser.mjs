@@ -104,53 +104,85 @@ async function streamArchive(response, target, label, protectedRoot, signal, aut
   }
 }
 
-function page(share, base, relative, rows, { name, parent, archive, query = '', page = 1, pages = 1, portal } = {}) {
+function page(share, base, relative, rows, { name, parent, archive, query = '', page = 1, pages = 1, portal, total = rows.length } = {}) {
   const pageLink = number => escape(base + relative + '?' + new URLSearchParams({ q: query, page: String(number) }));
   const listItems = rows.map(row => `
     <li>
-      <div><small>${row.directory ? '文件夹' : '文件'}</small><a href="${escape(row.href)}">${escape(row.label)}</a></div>
-      ${row.directory ? `<a class="download" href="${escape(row.href + '?zip=1')}">下载 ZIP</a>` : ''}
+      <span class="item-icon" data-folder="${row.directory}" aria-hidden="true"></span>
+      <a class="item-name" href="${escape(row.href)}">${escape(row.label)}</a>
+      <span class="item-type">${row.directory ? '文件夹' : '文件'}</span>
+      <a class="download" href="${escape(row.href + (row.directory ? '?zip=1' : ''))}" aria-label="${escape('下载 ' + row.label + (row.directory ? ' ZIP' : ''))}">${row.directory ? '下载 ZIP' : '下载'}</a>
     </li>`).join('');
-  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(name || share.name)} · DevKit 文件共享</title>
 <style>
   :root {
     color-scheme: light dark;
-    --surface: light-dark(#fff, #171b23);
-    --canvas: light-dark(#f4f6fa, #10131a);
-    --line: light-dark(#dce1ea, #343d4b);
-    --ink: light-dark(#172234, #e5eaf3);
-    --muted: light-dark(#526179, #aebad0);
-    --link: light-dark(#174da3, #a9caff);
+    --surface: light-dark(#fff, #1c1e22);
+    --canvas: light-dark(#f5f6f8, #141518);
+    --line: light-dark(#dce0e7, #34373e);
+    --ink: light-dark(#252934, #e8e9ed);
+    --muted: light-dark(#616877, #acafb9);
+    --link: light-dark(#3d5fad, #a6b8f4);
+    --accent-ink: light-dark(#fff, #171d30);
+    --wash: light-dark(#f0f2f5, #22252a);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--canvas); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
-  main { max-width: 960px; margin: auto; padding: clamp(16px, 4vw, 42px); }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  main { max-width: 1056px; margin: auto; padding: clamp(12px, 3vw, 32px); }
   a { color: var(--link); text-underline-offset: 3px; }
-  h1 { font-size: clamp(25px, 5vw, 36px); margin: .35em 0; overflow-wrap: anywhere; }
-  p { color: var(--muted); }
-  header { margin-bottom: 20px; }
-  section { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; overflow: hidden; }
-  ul { padding: 0; margin: 0; list-style: none; }
-  li, .empty { padding: 12px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+  :is(a,button,input):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  .trail, .heading, .tools, .pages { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .trail { min-height: 28px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .trail a { min-width: 0; }
+  .heading { min-height: 36px; justify-content: space-between; margin-bottom: 12px; }
+  h1 { flex: 1 1 160px; min-width: 0; font-size: clamp(20px, 3vw, 24px); line-height: 1.3; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+  .tools { justify-content: space-between; min-height: 44px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .tools h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .tools small { margin-inline-start: 8px; color: var(--muted); font-weight: 450; }
+  section { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; }
+  ul, p { padding: 0; margin: 0; list-style: none; }
+  li { display: grid; grid-template-columns: 16px minmax(0, 1fr) 64px 72px; gap: 8px; align-items: center; min-height: 44px; padding: 4px 12px; }
   li + li { border-top: 1px solid var(--line); }
-  li > div { min-width: 0; overflow-wrap: anywhere; }
-  small { color: var(--muted); margin-right: 10px; }
-  .download { white-space: nowrap; }
-  nav, form { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
-  input, button { font: inherit; padding: 7px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
-  input { max-width: 100%; }
-  button { cursor: pointer; }
+  li:hover { background: var(--wash); }
+  .item-name { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-weight: 550; text-decoration: none; }
+  .item-name:hover { color: var(--link); text-decoration: underline; }
+  .item-type, .empty { color: var(--muted); font-size: 12px; }
+  .empty { padding: 24px 16px; }
+  .item-icon { width: 12px; height: 14px; border: 1.5px solid var(--muted); border-radius: 2px; }
+  .item-icon[data-folder="true"] { width: 16px; height: 12px; border-top-width: 3px; color: var(--link); }
+  .download { display: inline-flex; align-items: center; justify-self: end; min-height: 32px; font-size: 12px; white-space: nowrap; }
+  form { display: flex; gap: 8px; min-width: 0; }
+  input, button, .primary { min-height: 32px; font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+  input { min-width: 0; width: 176px; }
+  .primary { display: inline-flex; align-items: center; background: var(--link); color: var(--accent-ink); border-color: var(--link); text-decoration: none; }
+  button { white-space: nowrap; }
+  button, .primary { cursor: pointer; }
+  .pages { justify-content: space-between; margin-top: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  @media (max-width: 580px) {
+    li { grid-template-columns: 16px minmax(0, 1fr) auto; }
+    .item-type { display: none; }
+    form { width: 100%; }
+    input { flex: 1; }
+  }
 </style>
-<main><header>
-${portal ? '<a href="/#file-shares">返回共享工作台</a>' : '<span>DevKit 文件共享</span>'}
-<h1>${escape(name || share.name)}</h1>
-${name ? `<p>${escape(share.name)}</p>` : ''}
-<nav>${parent ? `<a href="${escape(parent)}">返回上一级</a>` : ''}${archive ? `<a href="${escape(archive)}">下载当前文件夹 ZIP</a>` : ''}</nav>
-${name ? `<form action="${escape(base + relative)}"><input name="q" type="search" maxlength="160" aria-label="筛选当前文件夹" placeholder="筛选当前文件夹" value="${escape(query)}"><button>筛选</button></form>` : ''}
-</header><section>${listItems ? `<ul>${listItems}</ul>` : '<p class="empty">没有可显示的文件。</p>'}</section>
-${pages > 1 ? `<nav aria-label="分页">${page > 1 ? `<a href="${pageLink(page - 1)}">上一页</a>` : ''}<span>第 ${page} / ${pages} 页</span>${page < pages ? `<a href="${pageLink(page + 1)}">下一页</a>` : ''}</nav>` : ''}
-</main></html>`;
+</head><body><main>
+<nav class="trail" aria-label="共享位置">
+  ${portal ? '<a href="/#file-shares">共享工作台</a>' : '<span>DevKit 文件共享</span>'}
+  ${name ? `<span aria-hidden="true">/</span><a href="${escape(base)}">${escape(share.name)}</a>` : ''}
+  ${parent && parent !== base ? `<span aria-hidden="true">/</span><a href="${escape(parent)}">返回上一级</a>` : ''}
+</nav>
+<header class="heading"><h1>${escape(name || share.name)}</h1>
+  ${archive ? `<a class="primary" href="${escape(archive)}">下载当前文件夹 ZIP</a>` : ''}
+</header>
+<section>
+  <header class="tools"><h2>${name ? '文件与文件夹' : '共享内容'} <small>${total} 项</small></h2>
+    ${name ? `<form action="${escape(base + relative)}"><input name="q" type="search" maxlength="160" aria-label="筛选当前文件夹" placeholder="筛选文件名" value="${escape(query)}"><button>筛选</button></form>` : ''}
+  </header>
+  ${listItems ? `<ul>${listItems}</ul>` : '<p class="empty">没有可显示的文件。</p>'}
+</section>
+${pages > 1 ? `<nav class="pages" aria-label="分页">${page > 1 ? `<a href="${pageLink(page - 1)}">上一页</a>` : ''}<span>第 ${page} / ${pages} 页</span>${page < pages ? `<a href="${pageLink(page + 1)}">下一页</a>` : ''}</nav>` : ''}
+</main></body></html>`;
 }
 
 export async function browseFileShare(share, { request, response, url, base, protectedRoot, portal, authorize, sessionSignal }) {
@@ -197,7 +229,7 @@ export async function browseFileShare(share, { request, response, url, base, pro
       label: entry.name, href: base + relative + encodeURIComponent(entry.name) + (entry.isDirectory() ? '/' : ''), directory: entry.isDirectory(),
     }));
     const parent = names.length ? base + [index, ...encoded.slice(0, -1)].join('/') + '/' : base;
-    return sendPage(page(share, base, relative, rows, { name: label, parent, archive: base + relative + '?zip=1', query, page: current, pages, portal }));
+    return sendPage(page(share, base, relative, rows, { name: label, parent, archive: base + relative + '?zip=1', query, page: current, pages, portal, total: entries.length }));
   }
   const file = await openSharedFile(target, protectedRoot);
   try {

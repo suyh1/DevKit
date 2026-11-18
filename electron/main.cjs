@@ -12,6 +12,11 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform', 'x11');
 }
 app.setName('DevKit');
+const previewProfile = !app.isPackaged && process.env.DEVKIT_PREVIEW_PROFILE;
+if (previewProfile) {
+  app.setPath('userData', previewProfile);
+  app.setPath('sessionData', previewProfile);
+}
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
 let window;
 let saving = false;
@@ -68,7 +73,12 @@ function hideToTray() {
 }
 let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
-if (!primary) app.quit();
+if (!primary) {
+  if (previewProfile) {
+    console.error('A DevKit source preview is already running. Quit it before previewing new changes.');
+    app.exit(1);
+  } else app.quit();
+}
 app.on('second-instance', showWindow);
 app.on('activate', showWindow);
 
@@ -133,10 +143,11 @@ async function openLanWindow(address, module) {
 async function createWindow() {
   httpClient = (await import('./server/http-client.mjs')).createHttpClient();
   window = new BrowserWindow({
-    width: 1360, height: 880, minWidth: 800, minHeight: 600, title: 'DevKit · 本地开发工作台',
+    width: 1360, height: 880, minWidth: 800, minHeight: 600, title: previewProfile ? 'DevKit · 源码预览' : 'DevKit · 本地开发工作台',
     backgroundColor: '#11171f', show: false, autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true, webviewTag: false },
   });
+  if (previewProfile) window.on('page-title-updated', event => event.preventDefault());
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) { httpClient?.cancelAll(); lan?.closeTerminals(); } });
   window.webContents.on('render-process-gone', () => lan?.closeTerminals());
@@ -183,7 +194,7 @@ app.whenReady().then(async () => {
     catch (error) { lanError = error.message; }
     try { fileShares = await (await import('./server/file-shares.mjs')).createFileShares(projectStorage.directory); }
     catch (error) { fileSharesError = error.message; }
-    try { projectTodos = await (await import('./server/project-todos.mjs')).createProjectTodos(projectStorage.directory); }
+    try { projectTodos = await (await import('./server/todo-lists.mjs')).createTodoLists(projectStorage.directory); }
     catch (error) { projectTodosError = error.message; }
     projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos });
     const sharing = await projectStore.settings();
@@ -319,9 +330,9 @@ app.whenReady().then(async () => {
     } catch (error) { return { error: error.message, status: error.status }; }
   });
   ipcMain.handle('devkit:project-todos', async (event, action, value) => {
-    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的项目与待办请求。');
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的待办清单请求。');
     try {
-      if (!projectTodos) throw new Error(projectTodosError || projectError || '项目与待办尚未准备好。');
+      if (!projectTodos) throw new Error(projectTodosError || projectError || '待办清单尚未准备好。');
       return { data: await projectTodos.request(action, value) };
     } catch (error) { return { error: error.message, status: error.status }; }
   });

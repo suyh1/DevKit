@@ -537,7 +537,7 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
     for (const client of clients) client.end();
     await Promise.allSettled([...processes].map(child => once(child, 'close')));
     await closed;
-    await rm(folder, { recursive: true, force: true });
+    await rm(folder, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
   });
   await once(server, 'listening');
   const wrongPlatform = windows ? 'linux' : 'win32';

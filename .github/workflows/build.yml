@@ -1,9 +1,9 @@
-name: Build Electron desktop packages
+name: Build and release DevKit
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['[0-9]*', 'v[0-9]*']
   pull_request:
   workflow_dispatch:
 
@@ -11,22 +11,53 @@ permissions:
   contents: read
 
 jobs:
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
   package:
+    needs: frontend
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            command: bundle:windows
+            platform: win32
+            arch: x64
+            format: nsis
             artifact: windows-x64
           - os: ubuntu-22.04
-            command: bundle:linux
+            platform: linux
+            arch: x64
+            format: deb
             artifact: linux-x64
           - os: ubuntu-22.04-arm
-            command: bundle:linux:arm64
+            platform: linux
+            arch: arm64
+            format: deb
             artifact: linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
+      # The release collector compares the actual packaged source bytes across platforms.
+      - name: Match Linux checkout line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -52,9 +83,13 @@ jobs:
       - run: npm run test:http
       - run: python scripts/test-deb-packaging.py
       - run: npm run test:java
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend
+          path: dist
       - name: Electron integration smoke
         if: runner.os == 'Windows'
-        run: npm run test:electron
+        run: node scripts/smoke-desktop.mjs
       - name: Offline API workspace integration
         if: runner.os == 'Windows'
         run: node scripts/smoke-desktop.mjs --api-only
@@ -73,7 +108,7 @@ jobs:
       - name: Portal native interaction and LAN clipboard regression
         if: runner.os == 'Windows'
         run: node scripts/smoke-portal.mjs
-      - run: npm run ${{ matrix.command }}
+      - run: node scripts/package-desktop.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --format=${{ matrix.format }}
         env:
           DEVKIT_KEEP_PACKAGE_RUNTIME: ${{ runner.os == 'Windows' && '1' || '0' }}
       - name: Verify packaged Electron app
@@ -120,6 +155,7 @@ jobs:
           retention-days: 14
 
   project-server:
+    needs: frontend
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -134,17 +170,90 @@ jobs:
       - run: npm run test:docs
       - run: npm run test:projects
       - run: npm run test:http
-      - run: npm run bundle:project-server
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend
+          path: dist
+      - run: node scripts/package-project-server.mjs
       - run: node scripts/check-project-server.mjs
+      - name: Read release directory
+        id: release-directory
+        run: echo "path=artifacts/release-$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: project-center-node24
           path: |
-            artifacts/release-*/*_node24.zip
-            artifacts/release-*/PROJECT-SERVER-SHA256SUMS
-            artifacts/release-*/project-server.json
-            artifacts/release-*/project-server-verification.json
-            artifacts/release-*/README.md
-            artifacts/release-*/docs/
+            ${{ steps.release-directory.outputs.path }}/*_node24.zip
+            ${{ steps.release-directory.outputs.path }}/PROJECT-SERVER-SHA256SUMS
+            ${{ steps.release-directory.outputs.path }}/project-server.json
+            ${{ steps.release-directory.outputs.path }}/project-server-verification.json
+            ${{ steps.release-directory.outputs.path }}/README.md
+            ${{ steps.release-directory.outputs.path }}/docs/
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [package, project-server]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify version tag
+        id: version
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "${GITHUB_REF_NAME#v}" != "$version" ]]; then
+            echo "Release tag $GITHUB_REF_NAME must match package.json version $version" >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: '*-*'
+      - name: Collect and verify release assets
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          node scripts/package-all.mjs --collect-only
+          npm run verify:release
+          release="artifacts/release-$VERSION"
+          cp artifacts/project-center-node24/{DevKit_ProjectCenter_"$VERSION"_node24.zip,PROJECT-SERVER-SHA256SUMS,project-server.json,project-server-verification.json} "$release/"
+          cd "$release"
+          sha256sum --strict --check PROJECT-SERVER-SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          cd "artifacts/release-$VERSION"
+          if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
+            if [[ "$is_draft" != true ]]; then
+              echo "Release $GITHUB_REF_NAME is already published" >&2
+              exit 1
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "DevKit $VERSION" --notes-from-tag
+          fi
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            *.exe *.deb *.zip SHA256SUMS PROJECT-SERVER-SHA256SUMS \
+            release.json project-server.json project-server-verification.json
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

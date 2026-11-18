@@ -14,7 +14,7 @@ import { mergeGeoOutput } from './geography';
 import Overview from './Overview';
 import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
-import ProjectTodos from './ProjectTodos';
+import TodoLists from './TodoLists';
 import FileShares from './FileShares';
 import NginxCenter from './NginxCenter';
 import JarCenter from './JarCenter';
@@ -65,7 +65,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
   const [sharedColor, setSharedColor] = useState('#147D64');
   const [colorFavorites, setColorFavorites] = useState(savedColors);
-  const jobs = useRef(new Map<string, Job>()), execute = useRef<() => void>(() => {});
+  const jobs = useRef(new Map<string, Job>()), execute = useRef<(() => void) | null>(null);
   const tabs = useRef<HTMLDivElement>(null), workspaceFile = useRef<HTMLInputElement>(null), saveDialog = useRef<HTMLDialogElement>(null);
   const tasksRef = useRef(tasks); tasksRef.current = tasks;
   const activeTask = tasks.find(task => task.id === activeId);
@@ -117,7 +117,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       worker.postMessage({ id: task.toolId, input: task.input, options: task.options });
     } catch (error) { fail(`无法启动处理任务：${String(error)}`); }
   }
-  execute.current = () => { if (page === 'task' && activeId && !searchOpen && !saveOpen) run(activeId); };
+  execute.current = page === 'task' && activeId && !searchOpen && !saveOpen ? () => run(activeId) : null;
   function closeTask(id: string) {
     const index = tasks.findIndex(task => task.id === id), task = tasks[index];
     if (!task) return;
@@ -168,7 +168,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     const handler = (event: KeyboardEvent) => {
       if (document.querySelector("dialog[open]")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (!saveDialog.current?.open) setSearchOpen(current => !current); }
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); execute.current(); }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && execute.current) { event.preventDefault(); execute.current(); }
       if (event.key === '/' && !(event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))) {
         const input = document.querySelector<HTMLInputElement>('.overview-workspace:not([hidden]) input');
         if (input) { event.preventDefault(); input.focus(); }
@@ -224,7 +224,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'logs'} hidden={page !== 'logs'} className="workspace"><LogCenter active={page === 'logs'} /></div>
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter /></div>
-        <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><ProjectTodos active={page === 'project-todos'} /></div>
+        <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><TodoLists active={page === 'project-todos'} onOpenTool={id => openTool(id)} /></div>
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>

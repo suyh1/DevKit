@@ -10,11 +10,10 @@
 
 ## 带到离线电脑的文件
 
-单独打包时从 `artifacts/linux-arm64/` 复制。三平台合集在对应的 `artifacts/release-版本/` 目录，运行时报告也随 `.deb` 安装：
+从 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载当前版本的 `_arm64.deb` 与 `SHA256SUMS`。运行时报告 `runtime-report.json` 随 `.deb` 安装。以下以 1.6.0 为例：
 
 - DevKit_1.6.0-1_arm64.deb
 - SHA256SUMS
-- runtime-report.json
 
 需要排查时另带项目里的 scripts/check-kylin.sh。
 

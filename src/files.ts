@@ -24,8 +24,8 @@ export function downloadBlob(blob: Blob, filename: string): string {
   return `已请求浏览器下载 ${filename}`;
 }
 
-export async function readText(file: File): Promise<{ text: string; encoding: string }> {
-  if (file.size > 8_000_000) throw new Error('请选择不超过 8 MB 的文本文件。');
+export async function readText(file: File, { maxBytes = 8_000_000, maxCharacters = 2_000_000 } = {}): Promise<{ text: string; encoding: string }> {
+  if (file.size > maxBytes) throw new Error(`请选择不超过 ${maxBytes / 1_000_000} MB 的文本文件。`);
   const bytes = new Uint8Array(await file.arrayBuffer());
   let encoding = 'utf-8';
   if (bytes[0] === 0xff && bytes[1] === 0xfe) encoding = 'utf-16le';
@@ -34,6 +34,6 @@ export async function readText(file: File): Promise<{ text: string; encoding: st
   let text: string;
   try { text = new TextDecoder(encoding, { fatal: true }).decode(bytes); }
   catch { throw new Error('无法读取文件编码，请先转换为 UTF-8 或带 BOM 的 UTF-16。'); }
-  if (text.length > 2_000_000) throw new Error('文本超过 2,000,000 字符限制。');
+  if (text.length > maxCharacters) throw new Error(`文本超过 ${maxCharacters.toLocaleString('en-US')} 字符限制。`);
   return { text, encoding: encoding.toUpperCase() };
 }

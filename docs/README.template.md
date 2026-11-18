@@ -177,13 +177,23 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 ## 本机文件共享管理
 
-在“共享栏目”中为每项共享选择文件或文件夹、指定端口，启动后可打开浏览器下载单个文件或文件夹 ZIP。勾选发布并在“局域网共享”中开放此栏目，获准访客即可从共享工作台浏览和下载。详见 [配置与访问方式](docs/workspace-sharing.md#本机文件共享管理)。
+在共享清单中查看运行状态与端口，选中共享后管理范围、复制指定网卡的链接或打开下载页。下载页支持筛选文件名和下载文件夹 ZIP。勾选发布并在“局域网共享”中开放栏目，获准访客即可登录浏览和下载。[配置与访问方式](docs/workspace-sharing.md#本机文件共享管理)
 
-## 项目与待办
+## 待办清单
 
-在“共享栏目”中添加项目和待办，维护负责人、优先级、截止日期及进度，在清单和看板间切换。可逐项目发布，局域网访客按授权查看或编辑。详见 [项目与待办](docs/project-center.md#项目与待办)。
+待办清单采用 Todo+ 风格的纯文本编辑。用冒号分组、用 `☐` 写任务，并可通过编辑器上方的按钮写入验收条件、续做点、自定义视图、工作台引用、回访日期、前置依赖、周期规则和分组默认标签。阅读时显示可点击的方框和引用、中文标签与验收进度，编辑时可查看源码。桌面端和局域网页均支持导入文本清单和导出 `.todo`。可逐份发布，局域网访客获编辑权限后可导入新清单，只读访客可导出已发布清单。[待办清单](docs/project-center.md#待办清单)
 
 ## 开发与打包
+
+在 Windows 上双击仓库根目录的 [`start-preview.cmd`](start-preview.cmd)，即可使用当前源码启动桌面预览，验证待办清单、文件共享和局域网功能。启动需要 Node.js 24+ 和 `tar`，依赖缺失时脚本会自动安装。预览窗口标题为“DevKit · 源码预览”，桌面偏好和浏览器数据独立保存在 `artifacts/desktop-preview-profile/`，项目和共享配置沿用仓库的 `configs/`。源码修改后，彻底退出预览窗口再双击脚本即可加载新版本，无需生成安装包。
+
+### GitHub 正式发行
+
+正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
+
+工作流会检查 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP。全部通过后，打开 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载对应文件和 SHA-256 校验清单。常规提交、拉取请求和手动运行可以在 Actions 查看测试和构建结果；只有匹配版本号的推送标签会发布 Release。
+
+### 开发与构建命令
 
 构建机使用 Node.js 24 和 `tar`，Linux 构建机还需 `unzip`。制作 `.deb` 或独立服务 ZIP 需 Python 3.10+。首次构建会获取并校验 Electron 和 SSH 目标机用的便携 Node.js，构建完成后可在离线环境部署。可提供本地官方 Node.js 发布归档，通过 `DEVKIT_SSH_NODE_DIST_DIR` 指定所在目录。
 
@@ -204,7 +214,7 @@ node scripts/package-all.mjs --collect-only
 npm run verify:release
 ```
 
-制作安装包时校验实际 ASAR 内容并生成构建凭据。汇总时用当前构建内容比对凭据，同时核对版本、架构和安装包校验值，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。CI 工作流 `.github/workflows/build.yml` 使用同一组打包入口，构建三平台产物与独立服务 ZIP。Windows 打包显式设置 `publish: 'never'`，产物由 Actions 上传；普通构建不隐式发布 GitHub Release，也不要求 `GH_TOKEN`。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤；Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
+制作安装包时校验实际 ASAR 内容并生成构建凭据。汇总时用当前构建内容比对凭据，同时核对版本、架构和安装包校验值，拒绝过期产物。Python 路径可用 `DEVKIT_PYTHON` 指定。Windows 打包显式设置 `publish: 'never'`。GitHub Actions 的发布任务使用仓库提供的 `GITHUB_TOKEN` 上传已校验的文件。提交旁的红叉表示自动检查失败，可在 Actions 中查看具体步骤。Windows Nginx 测试统一使用真实路径，兼容临时目录的 8.3 短路径别名。
 
 ### 本地产物保留
 

@@ -15,6 +15,8 @@ import type { LogCatalog } from './logs-api';
 import { projectRequest } from './project-api';
 import type { ProjectState } from '../shared/projects.mjs';
 import type { HostGroup } from './lan-api';
+import { todoRequest } from './planning-share-api';
+import { parseTodo } from '../shared/todo-text.mjs';
 
 export type WorkspacePage = typeof workspaceModules[number]['id'];
 export type WorkspaceLink = { page: WorkspacePage; id?: string };
@@ -69,6 +71,14 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
     projects: async () => {
       const state = await projectRequest<ProjectState>('get');
       add(state.profiles.flatMap(profile => profile.projects.map(item => perModule('projects', `${profile.id}:${item.id}`, item.name, profile.name))));
+    },
+    'project-todos': async () => {
+      const state = await todoRequest(!window.devkitProjectTodos, 'get');
+      add(state.documents.flatMap(sheet => [
+        perModule('project-todos', sheet.id, sheet.name, '待办清单'),
+        ...parseTodo(sheet.body).tasks.filter(task => task.text.trim() && task.status === 'open' && !task.archived)
+          .map(task => perModule('project-todos', `${sheet.id}:${task.line}`, task.text, sheet.name)),
+      ]));
     },
     jar: () => inventory('jar', jarRequest<JarState>),
     nginx: () => inventory('nginx', nginxRequest<NginxState>),

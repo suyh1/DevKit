@@ -9,7 +9,7 @@ export const categoryOrder = categories.map(category => category.name);
 export const workspaceModuleNav = {
   http: { Icon: Send, hint: '接口设计与调试' },
   projects: { Icon: FolderOpen, hint: '项目入口与环境档案' },
-  'project-todos': { Icon: ClipboardList, hint: '项目进度与待办看板' },
+  'project-todos': { Icon: ClipboardList, hint: '纯文本任务与标签' },
   'file-shares': { Icon: FolderUp, hint: '在浏览器下载本机文件' },
   nginx: { Icon: Server, hint: '配置与实例管理' },
   jar: { Icon: Coffee, hint: '应用启停与控制台' },

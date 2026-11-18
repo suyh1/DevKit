@@ -14,13 +14,8 @@ export type FileShare = {
   port: number; lan: boolean; enabled: boolean; published: boolean; running: boolean; error?: string; links: string[];
 };
 export type FileShareState = { revision: number; shares: FileShare[] };
-export type TodoStatus = 'todo' | 'doing' | 'done';
-export type TodoPriority = 'low' | 'normal' | 'high';
-export type TodoTask = {
-  id: string; title: string; description: string; assignee: string; due: string; status: TodoStatus; priority: TodoPriority;
-};
-export type TodoProject = { id: string; name: string; description: string; published: boolean; revision: number; tasks: TodoTask[] };
-export type TodoState = { projects: TodoProject[]; selectedId?: string };
+export type TodoDocument = { id: string; name: string; body: string; published: boolean; revision: number };
+type TodoState = { documents: TodoDocument[]; selectedId?: string };
 
 async function desktopRequest<T>(bridge: DesktopBridge | undefined, action: string, value?: unknown) {
   if (!bridge) throw new Error('请在 DevKit 桌面端打开此栏目。');

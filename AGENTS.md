@@ -7,6 +7,7 @@
 - 根目录 `README.md` 由 `scripts/update-readme.mjs` 生成，不直接编辑。
 - 新增、删除或调整工具时，维护工具注册表中的名称、description 和 `src/catalog.ts` 分类；生成器读取与界面相同的注册表。
 - 修改工作台、项目中心、存储、部署或打包功能时，同步更新 `docs/README.template.md` 中对应说明及相关专题文档。生成器不会从算法代码推断使用说明。
+- 正式发行统一由 GitHub Actions 打包、校验和发布。将版本更新提交到 `main`，再推送与 `package.json` 版本一致的附注标签（如 `1.23.0`）；从 GitHub Releases 下载安装包和独立服务 ZIP。本地开发使用源码预览，打包命令供构建和排查使用。
 - 所有发行打包入口必须在制作或汇总产物前完成 README 生成；生成失败应停止打包。Python 独立服务入口也应覆盖直接调用场景。
 - 打包成功后调用 `scripts/clean-artifacts.mjs` 中的清理规则，按版本号仅保留本地最新两个版本的发行产物和配套文件。合集确认文件和构建凭据一致后清理重复副本。构建临时目录在使用完成后移除，配置数据及未知文件保留。
 - 完成相关修改后运行 `npm run docs:update` 和 `npm run test:docs`；单独检查文档是否同步可运行 `npm run docs:check`。
