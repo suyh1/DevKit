@@ -53,7 +53,7 @@ try {
       appId: 'io.devkit.desktop', productName: 'DevKit', directories: { output: path.join(root, 'artifacts', `windows-${arch}`), buildResources: path.join(root, 'build') },
       artifactName: 'DevKit_${version}_${arch}-setup.${ext}', npmRebuild: false,
       win: { icon: path.join(root, 'build', 'icons', 'icon.ico') },
-      nsis: { oneClick: false, perMachine: false, differentialPackage: false, allowToChangeInstallationDirectory: true, installerLanguages: ['zh_CN', 'en_US'], include: path.join(root, 'build/preserve-configs.nsh') },
+      nsis: { oneClick: false, perMachine: false, differentialPackage: false, useZip: true, allowToChangeInstallationDirectory: true, installerLanguages: ['zh_CN', 'en_US'], include: path.join(root, 'build/preserve-configs.nsh') },
     } });
     const name = `DevKit_${manifest.version}_${arch}-setup.exe`;
     const checksum = sha256(await readFile(path.join(root, 'artifacts', `windows-${arch}`, name)));

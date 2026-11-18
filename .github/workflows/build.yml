@@ -93,7 +93,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: ${{ runner.os == 'Linux' && 'npm' || '' }}
       - uses: actions/setup-python@v5
         if: runner.os == 'Linux'
         with:
@@ -103,7 +103,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: npm ci --ignore-scripts --no-audit
+      - name: Install build dependencies
+        if: runner.os == 'Linux'
+        run: npm ci --ignore-scripts --no-audit
+      - name: Install build dependencies and prepare SSH runtimes
+        if: runner.os == 'Windows'
+        run: |
+          $sshRuntimes = Start-Job -WorkingDirectory $PWD.Path -ScriptBlock {
+            node scripts/stage-ssh-node.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Preparing SSH runtimes failed' }
+          }
+          try {
+            npm ci --ignore-scripts --no-audit
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Receive-Job -Job $sshRuntimes -Wait -ErrorAction Stop
+          } finally {
+            Remove-Job -Job $sshRuntimes -Force
+          }
       - name: Extended platform regression
         if: inputs.full_regression
         shell: bash
