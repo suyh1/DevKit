@@ -56,7 +56,7 @@ npm run bundle:all
 
 顺序构建 Windows x64 NSIS、Linux amd64 deb、Linux ARM64 deb。Linux 可继续使用各自的 bundle 命令，CI 保持三个目标的原生 runner。合集目录 `artifacts/release-1.2.0/` 包含三份安装包、`SHA256SUMS` 和记录架构/体积/摘要的 `release.json`；各架构目录保留运行时报告。若任一目标失败，合集命令以非零退出，只有全部成功后才汇总。
 
-GitHub 提交旁的检查状态来自 `.github/workflows/build.yml`。失败时先查看任务中的具体步骤：测试失败会直接阻止后续安装包制作和上传。Windows runner 的临时目录可能使用 `RUNNER~1` 等 8.3 别名，Nginx 测试夹具通过 `realpath` 与管理器的规范路径保持一致，再比较文件路径及模拟进程身份；不改变正式配置的路径校验。未配置测试用 nginx 时，桌面回归仍覆盖编辑与无运行结果的操作区；设置 `DEVKIT_NGINX_TEST_EXECUTABLE` 可进一步验证真实运行及执行反馈。
+GitHub 提交旁的检查状态来自 `.github/workflows/build.yml`。公共检查在单个运行器执行一轮。版本标签会触发各平台打包和产物校验。需要完整的 Electron 窗口和平台回归时，手动运行工作流并启用 `full_regression`。Windows runner 的临时目录可能使用 `RUNNER~1` 等 8.3 别名，Nginx 测试夹具通过 `realpath` 与管理器的规范路径保持一致。未配置测试用 nginx 时，桌面回归仍覆盖编辑与无运行结果的操作区；设置 `DEVKIT_NGINX_TEST_EXECUTABLE` 可进一步验证真实运行及执行反馈。
 
 正式发行由 GitHub Actions 完成。推送与 `package.json` 一致的附注版本标签后，工作流汇总三份安装包和独立服务 ZIP，核对构建凭据和 SHA-256，再上传并公开 [GitHub Release](https://github.com/suyh1/DevKit/releases)。Windows NSIS 构建继续使用 `publish: 'never'`，发布凭据仅提供给 Actions 的发布任务。
 

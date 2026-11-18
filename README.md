@@ -9,11 +9,11 @@
 
 DevKit 是中文界面的本地开发工作台，提供 **7 类、46 个离线工具**，以及可通过局域网共享的项目中心、Nginx 配置与实例管理、接口设计、文档与调试一体化工作台。桌面端基于 Electron + React + TypeScript，Windows、Linux amd64 与 Linux ARM64 共用内置 Chromium，无需目标电脑另装 Node.js、Python、Java、WebView2 或 WebKitGTK。运行 Nginx 实例需单独安装对应系统和架构的 nginx。
 
-当前版本：**v1.23.2**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
+当前版本：**v1.23.3**。工具输入和结果默认只保存在内存中；偏好、收藏、主动保存的 API 项目、HTTP 请求集合、JAR 管理和项目中心配置按各自规则保存。局域网共享和远程主机连接、手动入口检测、启用的定时监控及显式发送的 HTTP 调试请求会使用网络，无遥测和远程字体。运行 JAR 应用需要另装 Java。
 
 ## 开始使用
 
-1. 根据系统选择安装包：Windows 使用 `DevKit_1.23.2_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.23.2/`。
+1. 根据系统选择安装包：Windows 使用 `DevKit_1.23.3_x64-setup.exe`；Linux amd64 / ARM64 使用对应架构的 `.deb`。发行合集目录为 `artifacts/release-1.23.3/`。
 2. 启动后在总览中搜索工具名称或用途，或按 `Ctrl/Cmd + K` 打开全局搜索。工具可载入示例、粘贴文本或导入本地文件，处理后复制、导出或继续送入其他工具。
 3. 需要管理开发、测试、生产入口时，打开侧栏的“项目中心”，添加项目与配置档案；其他电脑需要访问时，使用顶部工具栏的“局域网共享”统一开放模块和设置权限。
 4. 管理其他电脑时，在“共享 → 局域网主机”保存 DevKit 共享或 SSH 连接，并勾选所需栏目。回到 JAR 管理或 Nginx 配置，添加实例时选择本机或已保存的目标主机。浏览远程文件时可直接打开绝对目录，也可逐级浏览。在“局域网共享”开放“局域网主机”后，获准的访客可查看同一份主机清单，并按监控和日志权限查看对应主机的记录。
@@ -260,7 +260,7 @@ PID 和日志均放在 JAR 同级，默认 `<JAR名>.pid`、`<JAR名>.log`，可
 
 ### 独立服务部署
 
-适合常驻主机：解压 `DevKit_ProjectCenter_1.23.2_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
+适合常驻主机：解压 `DevKit_ProjectCenter_1.23.3_node24.zip`，**服务端准备 Node.js 24+**，无需 `npm install`；浏览器客户端无需安装运行时。首次启动需提供口令。
 
 Windows PowerShell：
 
@@ -294,7 +294,9 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
 
-工作流会检查 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP。全部通过后，打开 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载对应文件和 SHA-256 校验清单。常规提交、拉取请求和手动运行可以在 Actions 查看测试和构建结果；只有匹配版本号的推送标签会发布 Release。
+普通提交和拉取请求只运行一轮无窗口检查和前端构建。推送版本标签后，工作流额外构建并校验 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP，全部通过后自动发布。安装包和 SHA-256 校验清单可在 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载。
+
+手动运行工作流可生成供验证的构建产物。需要回归桌面窗口或平台相关功能时，可勾选 `full_regression`；常规构建和正式发行默认关闭此选项。本地验证待办和共享可用 `npm run test:electron -- --sharing-settings-only`。
 
 ### 开发与构建命令
 
@@ -310,13 +312,13 @@ npm run desktop   # 构建后启动 Electron
 
 | 目标 | 命令 | 输出 |
 | --- | --- | --- |
-| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.23.2_x64-setup.exe` |
-| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.23.2-1_amd64.deb` |
-| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.23.2-1_arm64.deb` |
+| Windows x64 安装包 | `npm run bundle:windows` | `artifacts/windows-x64/DevKit_1.23.3_x64-setup.exe` |
+| Linux amd64 安装包 | `npm run bundle:linux` | `artifacts/linux-x64/DevKit_1.23.3-1_amd64.deb` |
+| Linux ARM64 / 麒麟安装包 | `npm run bundle:linux:arm64` | `artifacts/linux-arm64/DevKit_1.23.3-1_arm64.deb` |
 | 麒麟 ARM64（命令别名） | `npm run bundle:kylin` | `同 Linux ARM64` |
-| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.23.2/DevKit-<platform>-<arch>/` |
-| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.23.2/` |
-| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.23.2/DevKit_ProjectCenter_1.23.2_node24.zip` |
+| 当前系统解压版 | `npm run bundle:host` | `artifacts/release-1.23.3/DevKit-<platform>-<arch>/` |
+| 三平台安装包合集 | `npm run bundle:all` | `artifacts/release-1.23.3/` |
+| 独立项目中心服务 | `npm run bundle:project-server` | `artifacts/release-1.23.3/DevKit_ProjectCenter_1.23.3_node24.zip` |
 
 `bundle:all` 在 Windows 构建机依次制作三平台安装包，汇总 `SHA256SUMS`、`release.json` 和当前 README；独立服务 ZIP 使用单独的打包命令。仅汇总已经构建的安装包可运行：
 

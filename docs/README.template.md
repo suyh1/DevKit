@@ -191,7 +191,9 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
 
-工作流会检查 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP。全部通过后，打开 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载对应文件和 SHA-256 校验清单。常规提交、拉取请求和手动运行可以在 Actions 查看测试和构建结果；只有匹配版本号的推送标签会发布 Release。
+普通提交和拉取请求只运行一轮无窗口检查和前端构建。推送版本标签后，工作流额外构建并校验 Windows x64、Linux amd64、Linux ARM64 安装包及 Node.js 24 独立服务 ZIP，全部通过后自动发布。安装包和 SHA-256 校验清单可在 [GitHub Releases](https://github.com/suyh1/DevKit/releases) 下载。
+
+手动运行工作流可生成供验证的构建产物。需要回归桌面窗口或平台相关功能时，可勾选 `full_regression`；常规构建和正式发行默认关闭此选项。本地验证待办和共享可用 `npm run test:electron -- --sharing-settings-only`。
 
 ### 开发与构建命令
 
