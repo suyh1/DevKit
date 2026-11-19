@@ -52,12 +52,16 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
   const sessions = new Map(),
     attempts = new Map();
   function revoke(token) {
+    managers.collab?.()?.releaseDirect?.(token);
     sessions.get(token)?.abort.abort();
     sessions.delete(token);
     workspaces.release(token);
   }
   function clearSessions() {
-    for (const session of sessions.values()) session.abort.abort();
+    for (const [token, session] of sessions) {
+      managers.collab?.()?.releaseDirect?.(token);
+      session.abort.abort();
+    }
     sessions.clear();
     workspaces.close();
   }
@@ -186,6 +190,11 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           return json(403, {
             error: "未知访问地址，请使用共享面板提供的 IP 地址。",
           });
+        if (url.pathname.startsWith('/mock/')) {
+          const manager = managers.collab?.();
+          if (!manager || !publication.services.mock.enabled) return json(404, { error: '模拟服务未开放。' });
+          return await manager.serveMock(request, response, url, () => context === activeContext && context.settings.services.mock.enabled);
+        }
         if (
           !["GET", "HEAD"].includes(request.method) &&
           request.headers.origin !== origin
@@ -302,6 +311,36 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           }
           if (!authorized)
             return json(401, { error: "请先登录共享工作台。" });
+          const download = /^\/api\/transfer\/download\/([a-f0-9-]{36})$/.exec(url.pathname);
+          if (download) {
+            if (!services.transfer.enabled) return json(404, { error: '局域网快传未开放。' });
+            if (request.method !== 'GET') return json(405, { error: '需要 GET 请求。' });
+            const manager = managers.collab?.();
+            if (!manager) return json(503, { error: '收件箱暂不可用。' });
+            const { file, name, size } = await manager.openTransfer({ id: download[1], ticket: url.searchParams.get('ticket') }, { owner: token, authorize: ensureCurrentSession });
+            try {
+              ensureCurrentSession();
+              const encoded = encodeURIComponent(name.toWellFormed()).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16));
+              response.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': size, 'Content-Disposition': `attachment; filename*=UTF-8''${encoded}` });
+              await pipeline(file.createReadStream(), response, { signal: session.abort.signal });
+            } finally { await file.close(); }
+            return;
+          }
+          const collaboration = /^\/api\/(transfer|mock|whiteboard)\/([a-z]+)$/.exec(url.pathname);
+          if (collaboration) {
+            const [, module, action] = collaboration;
+            if (!services[module].enabled) return json(404, { error: '此栏目未开放。' });
+            if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
+            const readOnly = ['list', 'read'].includes(action) || module === 'whiteboard' && action === 'image' || module === 'transfer' && ['unlock', 'claim', 'answer'].includes(action);
+            if (!readOnly && !services[module].edit) return json(403, { error: '当前访客只有查看权限。' });
+            const manager = managers.collab?.();
+            if (!manager) return json(503, { error: '共享工具暂不可用。' });
+            const input = await body();
+            const data = await manager.request(module, action, input, { authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token });
+            ensureCurrentSession();
+            if (!readOnly && !['part', 'begin', 'cancel', 'sweep', 'presence', 'reply'].includes(action)) audit.record(session.visitor, module + '.' + action, 'ok');
+            return json(200, data ?? null);
+          }
           if (url.pathname.startsWith('/api/file-shares/')) {
             if (!services['file-shares'].enabled) return json(404, { error: '未开放本机文件共享。' });
             const shares = managers.fileShares?.();

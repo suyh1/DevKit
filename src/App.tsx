@@ -15,6 +15,7 @@ import Overview from './Overview';
 import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
 import TodoLists from './TodoLists';
+import { CollaborationPage } from './CollaborationPage';
 import FileShares from './FileShares';
 import NginxCenter from './NginxCenter';
 import JarCenter from './JarCenter';
@@ -228,6 +229,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter /></div>
         <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><TodoLists active={page === 'project-todos'} onOpenTool={id => openTool(id)} /></div>
+        {(['transfer', 'mock', 'whiteboard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>

@@ -12,6 +12,7 @@ import { workspaceModules } from './catalog';
 import CommandPalette from './CommandPalette';
 import { openWorkspaceLink, parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
+import { CollaborationPage } from './CollaborationPage';
 import TodoLists from './TodoLists';
 import { PublishedFileShares } from './FileShares';
 import NginxCenter from "./NginxCenter";
@@ -34,7 +35,7 @@ import { saveText } from "./files";
 import { DisplayModeProvider } from './DisplayMode';
 import type { DisplayMode } from './DisplayMode';
 
-const portalOrder = ['projects', 'project-todos', 'file-shares', 'nginx', 'http', 'jar', 'monitor', 'logs', 'lan-hosts'] as const satisfies readonly Page[];
+const portalOrder = ['projects', 'project-todos', 'file-shares', 'nginx', 'http', 'jar', 'monitor', 'logs', 'lan-hosts', 'transfer', 'mock', 'whiteboard'] as const satisfies readonly Page[];
 const modules = portalOrder.map(id => workspaceModules.find(item => item.id === id)!);
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
@@ -341,7 +342,6 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       ? {
           ...value,
           services:
-            value.services ||
             sharingServices({ ...value, canEdit: value.role === "editor" }),
         }
       : value;
@@ -452,7 +452,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     : [
         ('edit' in active && active.edit)
           ? "可编辑"
-          : { projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
+          : { projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', transfer: '可复制和下载', mock: '可查看接口', whiteboard: '可查看和导出', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
@@ -541,6 +541,9 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               <p>{summary}。{{
                 projects: '从当前浏览器打开入口，检测由共享主机发起。',
                 'project-todos': '清单保存在共享主机。',
+                transfer: '文件、文字和链接经共享收件箱传送，受保护内容需输入取件密码。',
+                mock: '从共享主机查看模拟接口、调用地址和近期记录。',
+                whiteboard: '从共享主机查看白板、截图和全部标注。',
                 'file-shares': '从共享主机下载已发布的文件。',
                 'lan-hosts': '连接由共享主机发起，目标地址见各连接。',
                 logs: '只读追踪来源，导出能力由主机授权。',
@@ -579,6 +582,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
               </div>
             )}
             {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><TodoLists portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
+            {(['transfer', 'mock', 'whiteboard'] as const).map(id => services[id].enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} /></div>)}
             {services['file-shares'].enabled && <div className="portal-page" hidden={page !== 'file-shares'} inert={page !== 'file-shares'}><PublishedFileShares active={page === 'file-shares'} /></div>}
             {services.nginx.enabled && (
               <div

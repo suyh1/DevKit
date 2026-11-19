@@ -15,7 +15,8 @@ import type { LogCatalog } from './logs-api';
 import { projectRequest } from './project-api';
 import type { ProjectState } from '../shared/projects.mjs';
 import type { HostGroup } from './lan-api';
-import { todoRequest } from './planning-share-api';
+import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
+import type { FileShareState } from './planning-share-api';
 import { parseTodo } from '../shared/todo-text.mjs';
 
 export type WorkspacePage = typeof workspaceModules[number]['id'];
@@ -79,6 +80,11 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
         ...parseTodo(sheet.body).tasks.filter(task => task.text.trim() && task.status === 'open' && !task.archived)
           .map(task => perModule('project-todos', `${sheet.id}:${task.line}`, task.text, sheet.name)),
       ]));
+    },
+    'file-shares': async () => {
+      const state = window.devkitFileShares ? await fileShareRequest<FileShareState>('get') : await publishedShares();
+      const shares = state.shares.filter(item => !('running' in item) || item.running && item.published);
+      add(shares.map(item => perModule('file-shares', item.id, item.name, '共享文件')));
     },
     jar: () => inventory('jar', jarRequest<JarState>),
     nginx: () => inventory('nginx', nginxRequest<NginxState>),

@@ -38,7 +38,16 @@ test('standalone service exposes opt-in workspaces without installed npm depende
     await writeFile(path.join(directory, 'dist/portal.html'), 'shared portal');
     await writeFile(path.join(directory, 'dist/.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
     const origin = `http://127.0.0.1:${await freePort()}`;
-    child = spawn(process.execPath, [path.join(directory, 'server/start.mjs')], { cwd: tmpdir(), windowsHide: true, env: { ...process.env, HOST: '127.0.0.1', PORT: new URL(origin).port, DEVKIT_PROJECT_DATA: path.join(directory, 'configs'), DEVKIT_PROJECT_PASSWORD: 'standalone-test-only', DEVKIT_PROJECT_EDIT: 'true', DEVKIT_SHARE_NGINX: 'true', DEVKIT_SHARE_HTTP: 'true', DEVKIT_SHARE_JAR: 'true', DEVKIT_SHARE_LOGS: 'true', DEVKIT_LOGS_JAR: 'true', DEVKIT_LOGS_NGINX: 'true', DEVKIT_SHARE_MONITOR: 'true', DEVKIT_MONITOR_EDIT: 'true', DEVKIT_MONITOR_CONTROL: 'false', DEVKIT_JAR_EDIT: 'false', DEVKIT_JAR_CONTROL: 'false', DEVKIT_NGINX_CONTROL: 'false' } });
+    child = spawn(process.execPath, [path.join(directory, 'server/start.mjs')], { cwd: tmpdir(), windowsHide: true, env: {
+      ...process.env, HOST: '127.0.0.1', PORT: new URL(origin).port, DEVKIT_PROJECT_DATA: path.join(directory, 'configs'),
+      DEVKIT_PROJECT_PASSWORD: 'standalone-test-only', DEVKIT_SHARE_PROJECTS: 'true', DEVKIT_PROJECT_EDIT: 'true',
+      DEVKIT_SHARE_NGINX: 'true', DEVKIT_SHARE_HTTP: 'true', DEVKIT_SHARE_JAR: 'true',
+      DEVKIT_SHARE_LOGS: 'true', DEVKIT_LOGS_JAR: 'true', DEVKIT_LOGS_NGINX: 'true',
+      DEVKIT_SHARE_MONITOR: 'true', DEVKIT_MONITOR_EDIT: 'true', DEVKIT_MONITOR_CONTROL: 'false',
+      DEVKIT_JAR_EDIT: 'false', DEVKIT_JAR_CONTROL: 'false', DEVKIT_NGINX_CONTROL: 'false',
+      DEVKIT_SHARE_TRANSFER: 'true', DEVKIT_TRANSFER_EDIT: 'true', DEVKIT_SHARE_MOCK: 'true', DEVKIT_SHARE_WHITEBOARD: 'true',
+      DEVKIT_SHARE_RELEASES: 'true', DEVKIT_RELEASES_EDIT: 'true', DEVKIT_SHARE_SNIPPETS: 'true', DEVKIT_SNIPPETS_EDIT: 'true',
+    } });
     let output = ''; child.stdout.on('data', chunk => { output += chunk; }); child.stderr.on('data', chunk => { output += chunk; });
     let ready = false;
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -53,7 +62,12 @@ test('standalone service exposes opt-in workspaces without installed npm depende
     assert.equal(capabilities.shareNginx, true); assert.equal(capabilities.shareHttp, true); assert.equal(capabilities.nginxControl, false);
     assert.deepEqual(capabilities.services.jar, { enabled: true, edit: false, control: false });
     const cookie = login.headers.get('set-cookie').split(';')[0];
-    for (const route of ['/api/http/get-library', '/api/nginx/get', '/api/jar/get', '/api/monitor/get', '/api/logs/sources']) {
+    for (const retired of ['releases', 'snippets']) {
+      assert.equal(Object.hasOwn(capabilities.services, retired), false);
+      const response = await fetch(origin + '/api/' + retired + '/get', { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
+      assert.equal(response.status, 404);
+    }
+    for (const route of ['/api/http/get-library', '/api/nginx/get', '/api/jar/get', '/api/monitor/get', '/api/logs/sources', '/api/transfer/list', '/api/mock/list', '/api/whiteboard/list']) {
       const response = await fetch(origin + route, { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(response.status, 200, await response.text());
     }

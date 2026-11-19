@@ -2,6 +2,9 @@ const fields = {
   projects: ["edit", "probe"],
   'project-todos': ['edit'],
   'file-shares': [],
+  transfer: ['edit'],
+  mock: ['edit'],
+  whiteboard: ['edit'],
   nginx: ["edit", "control"],
   http: ["edit", "send"],
   jar: ["edit", "control"],
@@ -9,6 +12,7 @@ const fields = {
   logs: ["jar", "nginx", "export", "raw"],
   'lan-hosts': ['edit', 'diagnose', 'terminal', 'files', 'discover', 'wake', 'rdp'],
 };
+const retiredServices = new Set(['releases', 'snippets']);
 const own = (value, key) => Object.hasOwn(value, key);
 export function emptySharingServices() {
   return Object.fromEntries(
@@ -38,7 +42,7 @@ export function sharingServices(value = {}) {
       !value.services ||
       typeof value.services !== "object" ||
       Array.isArray(value.services) ||
-      Object.keys(value.services).some((key) => !own(fields, key))
+      Object.keys(value.services).some((key) => !own(fields, key) && !retiredServices.has(key))
     )
       throw new Error("共享服务设置无效。");
     const result = emptySharingServices();

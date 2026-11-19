@@ -12,6 +12,9 @@ export function sharingFromEnvironment(env, saved = {}) {
   for (const [id, variables] of Object.entries({
     'project-todos': { enabled: 'DEVKIT_SHARE_PROJECT_TODOS', edit: 'DEVKIT_PROJECT_TODOS_EDIT' },
     'file-shares': { enabled: 'DEVKIT_SHARE_FILE_SHARES' },
+    transfer: { enabled: 'DEVKIT_SHARE_TRANSFER', edit: 'DEVKIT_TRANSFER_EDIT' },
+    mock: { enabled: 'DEVKIT_SHARE_MOCK', edit: 'DEVKIT_MOCK_EDIT' },
+    whiteboard: { enabled: 'DEVKIT_SHARE_WHITEBOARD', edit: 'DEVKIT_WHITEBOARD_EDIT' },
     projects: {
       enabled: "DEVKIT_SHARE_PROJECTS",
       edit: "DEVKIT_PROJECT_EDIT",

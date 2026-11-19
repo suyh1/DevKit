@@ -375,6 +375,12 @@ function SharingPanel({
                         id: 'file-shares', name: '本机文件共享管理', description: '浏览主机已发布的共享，下载文件与文件夹 ZIP',
                         permissions: [],
                       },
+                      { id: 'transfer', name: '局域网快传', description: '文件与文字互传',
+                        permissions: [{ key: 'edit', label: '发送与移除', detail: '可向共享收件箱发送内容，也可从所有设备的收件箱移除条目。' }] },
+                      { id: 'mock', name: '接口模拟服务', description: '多场景响应与调用记录',
+                        permissions: [{ key: 'edit', label: '编辑与发布模拟接口', detail: '可维护响应场景、发布或撤下接口，以及更换调用地址。' }] },
+                      { id: 'whiteboard', name: '截图协作白板', description: '截图与多人标注',
+                        permissions: [{ key: 'edit', label: '创建与编辑白板', detail: '可上传截图、添加与移除标注，以及重命名或删除画板。' }] },
                       {
                         id: 'project-todos', name: '待办清单', description: '查看已发布的纯文本待办清单',
                         permissions: [
@@ -500,6 +506,9 @@ function SharingPanel({
                               : service.id === 'logs' ? '日志中心及原页面的日志读取权限，按下方类别授权' : service.id === 'monitor' ? '监控配置、状态、检测历史及故障恢复记录' : service.id === 'jar' ? '应用状态和自启状态，日志和控制台输出在日志中心授权' : service.id === "http"
                                 ? "接口文档与环境"
                                 : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签'
+                                : service.id === 'transfer' ? '收件箱中的条目，受保护内容须凭取件密码领取'
+                                : service.id === 'mock' ? '模拟接口、调用地址和近期记录'
+                                : service.id === 'whiteboard' ? '白板、截图和全部标注'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
                                 : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
                             。

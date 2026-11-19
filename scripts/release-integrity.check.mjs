@@ -30,7 +30,7 @@ test('runtime inspection detects stale lazy chunks, desktop source and app versi
     for (const [name, content] of [['index.html', 'index'], ['assets/worker.js', 'worker']]) {
       await writeFile(path.join(root, 'dist', name), content); await writeFile(path.join(stage, 'dist', name), content);
     }
-    for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) {
+    for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'direct-save.cjs', 'security.json']) {
       await writeFile(path.join(root, 'electron', name), name); await writeFile(path.join(stage, name), name);
     }
     await mkdir(path.join(root, 'build', 'icons'), { recursive: true });

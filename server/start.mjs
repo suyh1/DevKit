@@ -10,6 +10,7 @@ import { createMonitorManager } from './monitor-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { sharingFromEnvironment } from './sharing-environment.mjs';
 import { createLanWorkspaces } from './lan-workspaces.mjs';
+import { createCollabStore } from './collab-store.mjs';
 import { createFileShares } from './file-shares.mjs';
 import { createTodoLists } from './todo-lists.mjs';
 
@@ -17,13 +18,14 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
-let nginx, library, jar, monitor, lan, fileShares, projectTodos;
+let collab, nginx, library, jar, monitor, lan, fileShares, projectTodos;
 const logs = createLogCenter({ nginx: () => nginx, jar: () => jar, lan: () => lan });
-const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos });
+const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, collab: () => collab });
 try {
   lan = await createLanWorkspaces(directory);
   const saved = await store.settings();
   const services = sharingFromEnvironment(process.env, saved);
+  if (services.transfer.enabled || services.whiteboard.enabled || services.mock.enabled) collab = await createCollabStore(directory);
   if (services.nginx.enabled || services.logs.nginx) nginx = await createNginxManager(directory);
   if (services.http.enabled) library = await createApiWorkspace(directory);
   jar = await createJarManager(directory);
@@ -46,6 +48,7 @@ try {
     result.directory,
   );
 } catch (error) {
+  await collab?.close();
   await fileShares?.close();
   await projectTodos?.close();
   lan?.close();
@@ -63,6 +66,7 @@ for (const signal of ["SIGINT", "SIGTERM"])
     if (closing) return;
     closing = true;
     await host.stop();
+    await collab?.close();
     await fileShares?.close();
     await projectTodos?.close();
     lan?.close();

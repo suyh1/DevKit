@@ -21,12 +21,12 @@ export async function remoteResponse(path: string, options: RequestInit) {
   if (response.status === 401 && requestAccess === access) window.dispatchEvent(new Event('devkit:session-required'));
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
-    throw new Error(result.error || `请求失败（${response.status}）`);
+    throw Object.assign(new Error(result.error || `请求失败（${response.status}）`), { status: response.status });
   }
   return response;
 }
 export async function remoteRequest<T>(
-  module: "http" | "nginx" | "jar" | "monitor" | "logs" | "lan-hosts" | "file-shares" | "project-todos",
+  module: "http" | "nginx" | "jar" | "monitor" | "logs" | "lan-hosts" | "file-shares" | "project-todos" | "transfer" | "mock" | "whiteboard",
   action: string,
   payload?: unknown,
   signal?: AbortSignal,
@@ -34,7 +34,7 @@ export async function remoteRequest<T>(
   const response = await remoteResponse(`/api/${module}/${action}`, {
     method: "POST",
     signal,
-    keepalive: module === 'jar' && action === 'console-release' || module === 'lan-hosts' && ['terminal-close', 'scan-cancel', 'rdp-close'].includes(action),
+    keepalive: module === 'transfer' && action === 'remove' || module === 'jar' && action === 'console-release' || module === 'lan-hosts' && ['terminal-close', 'scan-cancel', 'rdp-close'].includes(action),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload ?? {}),
   });

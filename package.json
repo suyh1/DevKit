@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "homepage": "https://github.com/suyh1/DevKit",
-  "version": "1.23.8",
+  "version": "1.23.9",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",
@@ -39,7 +39,7 @@
     "test:jar": "node --test server/jar.check.mjs server/jar-policies.check.mjs server/jar-supervisor.check.mjs server/jar-console.check.mjs server/jar-sharing.check.mjs",
     "serve:projects": "npm run prepare:ssh-node && node server/start.mjs",
     "bundle:project-server": "npm run build && node scripts/package-project-server.mjs",
-    "test:http": "node --test server/http-client.check.mjs server/api-workspace.check.mjs server/workspace-sharing.check.mjs server/sharing-policy.check.mjs server/lan-rdp.check.mjs server/planning-sharing.check.mjs",
+    "test:http": "node --test server/http-client.check.mjs server/api-workspace.check.mjs server/workspace-sharing.check.mjs server/sharing-policy.check.mjs server/lan-rdp.check.mjs server/planning-sharing.check.mjs server/collaboration.check.mjs",
     "test:portal": "npm run build && node scripts/smoke-portal.mjs"
   },
   "dependencies": {
@@ -71,6 +71,7 @@
     "java-parser": "^3.0.1",
     "lucide-react": "^0.468.0",
     "prettier": "^3.9.10",
+    "qrcode-generator": "2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sql-formatter": "^15.9.0",

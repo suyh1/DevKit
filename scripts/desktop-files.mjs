@@ -13,7 +13,7 @@ export async function prepareDesktop(platform, arch, stageRoot = path.join(root,
   await mkdir(staging, { recursive: true });
   await cp(path.join(root, 'LICENSE'), path.join(staging, 'LICENSE'));
   await cp(path.join(root, 'docs', 'apache-guacamole-license.md'), path.join(staging, 'apache-guacamole-license.md'));
-  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) await cp(path.join(root, 'electron', name), path.join(staging, name));
+  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'direct-save.cjs', 'security.json']) await cp(path.join(root, 'electron', name), path.join(staging, name));
   await cp(path.join(root, 'build', 'icons', '128x128.png'), path.join(staging, 'tray-icon.png'));
   for (const name of ['server', 'shared']) await cp(path.join(root, name), path.join(staging, name), { recursive: true, filter: filename => !/\.(?:check|test)\.m?[jt]s$|\.d\.mts$/.test(filename) });
   const packages = JSON.parse(await readFile(new URL('./server-runtime.json', import.meta.url), 'utf8'));

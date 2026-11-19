@@ -2,6 +2,9 @@ export type SharingServices = {
   projects: { enabled: boolean; edit: boolean; probe: boolean };
   'project-todos': { enabled: boolean; edit: boolean };
   'file-shares': { enabled: boolean };
+  transfer: { enabled: boolean; edit: boolean };
+  mock: { enabled: boolean; edit: boolean };
+  whiteboard: { enabled: boolean; edit: boolean };
   nginx: { enabled: boolean; edit: boolean; control: boolean };
   http: { enabled: boolean; edit: boolean; send: boolean };
   jar: { enabled: boolean; edit: boolean; control: boolean };

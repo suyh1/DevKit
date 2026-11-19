@@ -7,6 +7,7 @@ const staging = process.argv.includes('--packaged') ? path.join(root, 'artifacts
 const environment = { ...process.env, DEVKIT_TEST_APP: staging, DEVKIT_TEST_OUTPUT: path.join(root, 'artifacts', 'electron-smoke') };
 environment.DEVKIT_TEST_SHARING_SETTINGS_ONLY = process.argv.includes('--sharing-settings-only') ? '1' : '';
 environment.DEVKIT_TEST_WITHOUT_SHARING_SETTINGS = process.argv.includes('--without-sharing-settings') ? '1' : '';
+environment.DEVKIT_TEST_COLLAB_ONLY = process.argv.includes('--collaboration-only') ? '1' : '';
 environment.DEVKIT_TEST_API_ONLY = process.argv.includes('--api-only') ? '1' : '';
 environment.DEVKIT_TEST_PROJECTS_ONLY = process.argv.includes('--projects-only') ? '1' : '';
 environment.DEVKIT_TEST_HTTP_CLOSE_ONLY = process.argv.includes('--http-close-only') ? '1' : '';

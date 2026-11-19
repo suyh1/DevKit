@@ -219,6 +219,9 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     projects: { enabled: true, edit: true, probe: true },
     'project-todos': { enabled: false, edit: false },
     'file-shares': { enabled: false },
+    transfer: { enabled: false, edit: false },
+    mock: { enabled: false, edit: false },
+    whiteboard: { enabled: false, edit: false },
     nginx: { enabled: true, edit: true, control: true },
     http: { enabled: false, edit: false, send: false },
     jar: { enabled: false, edit: false, control: false },
@@ -227,6 +230,9 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     'lan-hosts': { enabled: false, edit: false, diagnose: false, terminal: false, files: false, discover: false, wake: false, rdp: false },
   });
   const disabled = emptySharingServices();
+  const retired = { enabled: true, edit: true };
+  assert.deepEqual(sharingServices({ services: { ...old, releases: retired, snippets: retired } }), old);
+  assert.throws(() => sharingServices({ services: { ...old, unknown: retired } }), /共享服务设置无效/);
   disabled.nginx = { enabled: false, edit: true, control: true };
   assert.deepEqual(sharingServices({ services: disabled }).nginx, {
     enabled: false,

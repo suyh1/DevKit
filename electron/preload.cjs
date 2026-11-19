@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('devkitDesktop', {
 contextBridge.exposeInMainWorld('devkitProjects', {
   request: (action, payload) => ipcRenderer.invoke('devkit:projects', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitCollab', {
+  request: (module, action, value) => ipcRenderer.invoke('devkit:collab', module, action, value),
+});
 contextBridge.exposeInMainWorld('devkitFileShares', {
   request: (action, payload) => ipcRenderer.invoke('devkit:file-shares', action, payload),
 });

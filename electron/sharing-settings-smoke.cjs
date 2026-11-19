@@ -57,7 +57,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     );
     await openShortcut(".global-sharing-button");
     assert.deepEqual(await js('[...document.querySelectorAll(".sharing-service")].map(service => service.dataset.service).sort()'),
-      ['file-shares', 'http', 'jar', 'lan-hosts', 'logs', 'monitor', 'nginx', 'project-todos', 'projects']);
+      ['file-shares', 'http', 'jar', 'lan-hosts', 'logs', 'mock', 'monitor', 'nginx', 'project-todos', 'projects', 'transfer', 'whiteboard']);
     assert.equal(
       await js(
         '[...document.querySelectorAll(".sharing-service-toggle input")].every(input=>!input.checked)',
@@ -150,12 +150,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await wait(
       'document.querySelector(".global-sharing-button")?.dataset.sharingState==="stopped"',
     );
-    assert.equal(
-      await js(
-        'document.querySelectorAll(".sharing-panel .pc-sharing-state code").length',
-      ),
-      0,
-    );
+    await wait('!document.querySelector(".sharing-panel .pc-sharing-state > div > code")');
     await close();
     await navigate("HTTP 调试");
     await openShortcut(".http-workspace-topline .sharing-shortcut");

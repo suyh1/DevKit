@@ -28,7 +28,7 @@ export async function buildFingerprint(root, archive) {
   for (const folder of ['server', 'shared']) {
     try { await walk(path.join(root, folder), '', folder); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'security.json']) files.push({ source: path.join(root, 'electron', name), archive: name });
+  for (const name of ['main.cjs', 'preload.cjs', 'policy.cjs', 'desktop-preferences.cjs', 'direct-save.cjs', 'security.json']) files.push({ source: path.join(root, 'electron', name), archive: name });
   files.push({ source: path.join(root, 'build', 'icons', '128x128.png'), archive: 'tray-icon.png' });
   const hashes = [];
   for (const file of files.sort((a, b) => a.archive.localeCompare(b.archive, 'en'))) {
