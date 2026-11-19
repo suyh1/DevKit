@@ -404,6 +404,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       assert.equal(await web('document.querySelector(".td-documents nav").textContent'), '网页导入清单');
       assert.equal(await web(`!!document.querySelector(${JSON.stringify(todoInput)})`), false);
       assert.equal(await web(`!!(${importButton})`), false);
+      assert.equal(await web('[...document.querySelectorAll(".td-toolbar button")].some(button => button.textContent === "添加子任务")'), false);
       const session = browser.webContents.session;
       const download = new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Todo browser download timed out')), 8000);
@@ -471,6 +472,15 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await wait('document.querySelector(".td-line-number").textContent === "第 4 行"');
       await click('继续做 · 验证只读下载和文件名', '.td-outline-details button');
       await wait('document.querySelector(".td-line-number").textContent === "第 7 行"');
+      await click('添加子任务', toolbar);
+      await window.webContents.insertText('测试只读账号');
+      await click('添加子任务', toolbar);
+      await window.webContents.insertText('核对下载文件名');
+      await click('完成', toolbar);
+      await jump('核对下载', js);
+      await click('添加子任务', toolbar);
+      await window.webContents.insertText('检查分享地址');
+      assert.match(await js(editorContents), /\n    :: 续做 验证只读下载和文件名\n      ☐ 测试只读账号 @验收 @owner\(小陈\)\n        ✔ 核对下载文件名 .*@done\(.*\)\n    ☐ 检查分享地址 @验收 @owner\(小陈\)\n  ☐ 跟进认证/);
       await jump('核对下载', js);
       await click('完成', toolbar);
       await click('继续验收', 'dialog[open] button');
@@ -510,8 +520,18 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await fillSyntax('input', '网页待办', web);
       await click('写入清单', '.td-syntax-form button', web);
       await wait('Array.from(document.querySelectorAll(".td-outline option")).some(option => option.textContent === "网页待办")', web);
+      await jump('核对下载', web);
+      await click('添加子任务', toolbar, web);
+      await web(`(() => {
+        const clipboardData = new DataTransfer();
+        clipboardData.setData('text/plain', '核对网页下载');
+        document.querySelector('.td-editor .cm-content').dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }));
+      })()`);
+      await wait(`${editorContents}.includes("核对网页下载")`, web);
       await click('保存', '.td-sheet-head button', web);
       await wait('document.querySelector(".td-status [role=status]").textContent === "已保存"', web);
+      const savedWebTodo = (await js(desktopDocs)).find(item => item.name === '网页扩展语法');
+      assert.match(savedWebTodo.body, /\n    ☐ 核对网页下载 @验收 @owner\(小陈\)\n  ☐ 跟进认证/);
       await filter('follow-up', web);
       await wait('document.querySelector(".td-outline-task")?.textContent.includes("跟进认证") && document.querySelector(".td-follow-up").textContent === "1 项回访到期"', web);
       await filter('all', web);
@@ -535,6 +555,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       assert.equal(await web('!!document.querySelector(".td-syntax-toolbar")'), false);
       await wait('!!document.querySelector(".td-preview-check[aria-disabled=true]")', web);
       await click('大纲', toolbar, web);
+      await jump('核对网页下载', web);
       await jump('打开共享', web);
       await click('打开引用', toolbar, web);
       await wait('location.hash === "#project-todos" && document.querySelector(".td-status [role=status]").textContent.includes("未开放本机文件共享")', web);
@@ -553,6 +574,6 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await js('window.devkitProjects.request("stop")');
   }
   console.log(
-    "Global sharing settings, file downloads, Todo shortcuts, extended syntax and desktop/browser Todo import and export passed.",
+    "Global sharing settings, file downloads, Todo shortcuts, nested subtasks, syntax and desktop/browser import and export passed.",
   );
 };

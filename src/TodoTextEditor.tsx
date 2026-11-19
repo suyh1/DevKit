@@ -4,11 +4,11 @@ import { Compartment, EditorSelection, EditorState, Prec, Transaction } from '@c
 import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { indentWithTab, isolateHistory } from '@codemirror/commands';
 import { basicSetup } from 'codemirror';
-import { archiveTodo, parseTodo, planTodoCommand, readTodoLine, todoGroupAt, todoGroupDefaults, todoReferences, todoTaskTitle } from '../shared/todo-text.mjs';
+import { archiveTodo, parseTodo, planTodoCommand, readTodoLine, todoChildIndent, todoGroupAt, todoGroupDefaults, todoReferences, todoTaskTitle } from '../shared/todo-text.mjs';
 import type { TodoLineAction, TodoReference } from '../shared/todo-text.mjs';
 import { todoRendering, todoSourceMode } from './todo-rendering';
 
-type Command = TodoLineAction | 'new' | 'archive' | 'open-reference';
+type Command = TodoLineAction | 'new' | 'child' | 'archive' | 'open-reference';
 export type TodoEditorHandle = {
   run(command: Command): void;
   jump(line: number): void;
@@ -22,12 +22,12 @@ type Props = {
   onNotice: (text: string) => void;
 };
 
-function insertTask(view: EditorView, continueLine = false) {
+function insertTask(view: EditorView, mode: 'new' | 'child' | 'continue') {
   if (view.state.readOnly || view.composing) return false;
   const selection = view.state.selection.main;
   const line = view.state.doc.lineAt(selection.head);
   const info = readTodoLine(line.text);
-  if (continueLine) {
+  if (mode === 'continue') {
     if (!selection.empty || info?.kind !== 'task' || info.status !== 'open') return false;
     const suffix = line.text.slice(selection.head - line.from);
     if (todoTaskTitle({ ...info, text: suffix })) return false;
@@ -38,12 +38,18 @@ function insertTask(view: EditorView, continueLine = false) {
     }
   }
   const model = parseTodo(view.state.doc.toString());
+  const anchor = model.tasksByLine.get(line.number) ?? model.resumesByLine.get(line.number);
+  const child = mode === 'child';
+  if (child && !anchor) return false;
   const empty = !line.text.trim();
   const originalIndent = /^[ \t]*/.exec(line.text)![0];
   const depth = originalIndent.replaceAll('\t', '  ').length;
-  const section = todoGroupAt(model, line.number, empty && !originalIndent ? undefined : depth);
-  const indent = info?.kind === 'section' ? `${originalIndent}  ` : empty && !originalIndent && section ? `${section.indent}  ` : originalIndent;
-  const lastLine = view.state.doc.line(model.tasksByLine.get(line.number)?.endLine ?? line.number);
+  const section = todoGroupAt(model, anchor?.kind === 'resume' ? anchor.taskLine : line.number, empty && !originalIndent ? undefined : depth);
+  let indent = originalIndent;
+  if (child && anchor) indent = todoChildIndent(model, anchor);
+  else if (info?.kind === 'section') indent += '  ';
+  else if (empty && !originalIndent && section) indent = `${section.indent}  `;
+  const lastLine = view.state.doc.line(anchor?.endLine ?? line.number);
   const from = empty ? line.from : lastLine.to;
   const prefix = `${empty ? '' : '\n'}${indent}☐ `;
   const defaults = todoGroupDefaults(model, section);
@@ -125,7 +131,7 @@ export default function TodoTextEditor(props: Props) {
       const editor = view.current;
       if (!editor) return;
       if (command === 'archive') archive(editor);
-      else if (command === 'new') insertTask(editor);
+      else if (command === 'new' || command === 'child') insertTask(editor, command);
       else if (command === 'open-reference') openReference(editor);
       else changeLines(editor, command);
       if (!confirming.current) editor.focus();
@@ -177,7 +183,7 @@ export default function TodoTextEditor(props: Props) {
             { key: 'Alt-s', run: editor => changeLines(editor, 'started') },
             { key: 'Alt-o', run: openReference },
             { key: 'Mod-Shift-a', run: archive },
-            { key: 'Enter', run: editor => insertTask(editor, true) },
+            { key: 'Enter', run: editor => insertTask(editor, 'continue') },
           ])),
           keymap.of([indentWithTab]),
           EditorView.contentAttributes.of({ 'aria-label': '待办文本', 'aria-multiline': 'true', spellcheck: 'false', tabindex: '0' }),

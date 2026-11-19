@@ -8,7 +8,7 @@ import { createFileShares } from './file-shares.mjs';
 import { createProjectHost } from './project-host.mjs';
 import { createProjectStore } from './project-store.mjs';
 import { createTodoLists } from './todo-lists.mjs';
-import { archiveTodo, changeTodoLine, isTodoDate, parseTodo, planTodoCommand, todoGroupAt, todoGroupDefaults, todoReferences } from '../shared/todo-text.mjs';
+import { archiveTodo, changeTodoLine, isTodoDate, parseTodo, planTodoCommand, todoChildIndent, todoGroupAt, todoGroupDefaults, todoReferences } from '../shared/todo-text.mjs';
 import { emptySharingServices, sharingServices } from '../shared/sharing.mjs';
 
 async function fixture(work) {
@@ -233,7 +233,9 @@ test('Todo extensions preserve indentation, named views, reference offsets and a
   assert.equal(first.endLine, 8);
   assert.deepEqual(first.checks.map(check => [check.line, check.checked]), [[5, false]]);
   assert.equal(model.checks.get(8).taskLine, 7);
-  assert.deepEqual(first.resume, { line: 6, text: '验证只读访问' });
+  assert.equal(first.resume, model.resumesByLine.get(6));
+  assert.equal(first.resume.text, '验证只读访问');
+  assert.equal(first.resume.endLine, 6);
   assert.deepEqual(first.waiting, { person: '小周', review: '2026-12-01' });
   assert.deepEqual(first.dependencies.map(dep => [dep.id, dep.state, dep.line]), [['build', 'done', 15], ['auth', 'cancelled', 16]]);
   assert.deepEqual(second.dependencies.map(dep => dep.state), ['duplicate', 'missing', 'self']);
@@ -246,6 +248,24 @@ test('Todo extensions preserve indentation, named views, reference offsets and a
   assert.deepEqual(planTodoCommand(model, [5], 'done').edits, [[5, '    ? [x] ZIP 完整']]);
   const note = parseTodo('发布:\n  :: 默认 @验收 @owner(小陈)\n  核对说明 @owner(小周)');
   assert.deepEqual(planTodoCommand(note, [3], 'box').edits, [[3, '  ☐ 核对说明 @owner(小周) @验收']]);
+});
+
+test('subtasks can keep nesting beneath resume points and retain their own state', () => {
+  const nested = Array.from({ length: 32 }, (_, index) => `${' \t'}${'  '.repeat(index)}☐ 步骤 ${index + 1}`);
+  const model = parseTodo(['✔ 发布', ' :: 续做 从只读账号开始', ...nested, ' ☐ 配置', '☐ 下一项'].join('\n'));
+  const [parent, ...tasks] = model.tasks;
+  const resume = model.resumesByLine.get(2);
+  assert.equal(parent.resume, resume);
+  assert.equal(resume.taskLine, parent.line);
+  assert.equal(resume.endLine, nested.length + 2);
+  assert.equal(parent.endLine, resume.endLine + 1);
+  assert.equal(todoChildIndent(model, parent), ' ');
+  assert.equal(todoChildIndent(model, resume), ' \t');
+  assert.equal(tasks[0].level, 2);
+  assert.equal(tasks[nested.length - 1].level, nested.length + 1);
+  assert.deepEqual(tasks.slice(-2).map(task => task.level), [1, 0]);
+  assert.deepEqual(planTodoCommand(model, [3], 'done').edits.map(([line]) => line), [3]);
+  assert.equal(archiveTodo(model.lines.join('\n')).archived, 0);
 });
 
 test('completing a recurring Todo keeps history, generates one dated successor and resets acceptance', () => {
@@ -296,7 +316,8 @@ test('shorthand and full-width Todo syntax keep acceptance state and resolve the
   const model = parseTodo(body), task = model.tasksByLine.get(4);
   assert.equal(model.views[0].name, '待验收');
   assert.deepEqual([...model.sections[0].defaults.values()], ['@验收']);
-  assert.deepEqual(task.resume, { line: 7, text: '改用只读账号' });
+  assert.equal(task.resume, model.resumesByLine.get(7));
+  assert.equal(task.resume.text, '改用只读账号');
   assert.deepEqual(task.checks.map(check => [check.text, check.checked]), [['ZIP 能解压', false], ['文件名正确', true]]);
   assert.equal(changeTodoLine(model.lines[4], 'done', ''), '    ? [x] ZIP 能解压');
   assert.equal(changeTodoLine(model.lines[5], 'done', ''), '    ？ [ ] 文件名正确');

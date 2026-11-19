@@ -53,8 +53,8 @@ export function readTodoLine(line) {
 }
 
 export function parseTodo(body) {
-  const lines = body.split('\n'), sections = [], tasks = [], views = new Map(), stack = [], parents = [];
-  const checks = new Map(), tasksByLine = new Map(), sectionsByLine = new Map();
+  const lines = body.split('\n'), sections = [], tasks = [], views = new Map(), stack = [], blocks = [];
+  const checks = new Map(), tasksByLine = new Map(), sectionsByLine = new Map(), resumesByLine = new Map();
   const byId = new Map();
   let previous = 0;
   for (const [index, line] of lines.entries()) {
@@ -62,7 +62,9 @@ export function parseTodo(body) {
     const number = index + 1;
     const info = readTodoLine(line);
     const depth = info?.depth ?? indentWidth(/^[ \t]*/.exec(line)[0]);
-    while (parents.length && parents.at(-1).depth >= depth) parents.pop().endLine = previous;
+    while (blocks.length && blocks.at(-1).depth >= depth) blocks.pop().endLine = previous;
+    const parent = blocks.at(-1);
+    const owner = parent?.kind === 'resume' ? tasksByLine.get(parent.taskLine) : parent;
     if (info?.kind === 'section') {
       while (stack.length && stack.at(-1).depth >= info.depth) stack.pop();
       const section = {
@@ -79,27 +81,32 @@ export function parseTodo(body) {
       const assigned = stack.at(-1), waiting = info.tags.find(tag => tag.name === 'wait');
       const review = valueOf(info.tags, 'review') || '';
       const task = {
-        ...info, line: number, endLine: number, section: assigned?.line, path: assigned?.path ?? '',
+        ...info, line: number, endLine: number, level: (parent?.level ?? -1) + 1,
+        section: assigned?.line, path: assigned?.path ?? '',
         archived: assigned?.archived === true, checks: [], dependencies: [],
         waiting: waiting || review ? { person: waiting?.value.trim() || '', review } : undefined,
       };
       tasks.push(task);
       tasksByLine.set(number, task);
-      parents.push(task);
+      blocks.push(task);
       const id = valueOf(info.tags, 'id')?.toLowerCase();
       if (id) {
         if (!byId.has(id)) byId.set(id, []);
         byId.get(id).push(task);
       }
-    } else if (info?.kind === 'check' && parents.length) {
-      const owner = parents.at(-1);
+    } else if (info?.kind === 'check' && owner) {
       const check = { ...info, line: number, taskLine: owner.line };
       owner.checks.push(check);
       checks.set(number, check);
     } else if (info?.kind === 'directive') {
       const enclosing = stack.findLast(section => section.depth < depth);
-      const owner = parents.at(-1);
-      if (info.command === '接着' && owner) owner.resume = { line: number, text: info.text.trim() };
+      if (info.command === '接着' && owner) {
+        const resume = { kind: 'resume', indent: info.indent, depth, line: number, endLine: number,
+          level: parent.level + 1, taskLine: owner.line, text: info.text.trim() };
+        owner.resume = resume;
+        resumesByLine.set(number, resume);
+        blocks.push(resume);
+      }
       if (info.command === '默认' && enclosing && !enclosing.archived) {
         enclosing.defaultLines.push(number);
         for (const tag of todoTags(info.text)) {
@@ -114,7 +121,7 @@ export function parseTodo(body) {
     }
     previous = number;
   }
-  for (const task of parents) task.endLine = previous;
+  for (const block of blocks) block.endLine = previous;
   for (const task of tasks) {
     const ids = new Set(task.tags.filter(tag => tag.name === 'after').flatMap(tag => tag.value.split(',').map(id => id.trim().toLowerCase())).filter(Boolean));
     task.dependencies = [...ids].map(id => {
@@ -124,7 +131,21 @@ export function parseTodo(body) {
       return { id, line: target?.line, state };
     });
   }
-  return { lines, sections, tasks, views: [...views.values()], checks, tasksByLine, sectionsByLine };
+  return { lines, sections, tasks, views: [...views.values()], checks, tasksByLine, sectionsByLine, resumesByLine };
+}
+
+export function todoChildIndent(model, block) {
+  let indent = `${block.indent}  `, nearest = Infinity;
+  for (let index = block.line; index < block.endLine; index++) {
+    const line = model.lines[index];
+    if (!line.trim()) continue;
+    const candidate = /^[ \t]*/.exec(line)[0], depth = indentWidth(candidate);
+    if (depth >= nearest) continue;
+    indent = candidate;
+    nearest = depth;
+    if (nearest === block.depth + 1) break;
+  }
+  return indent;
 }
 
 export function todoGroupAt(model, line, depth) {

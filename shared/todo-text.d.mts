@@ -8,16 +8,18 @@ export type TodoCheckLine = { kind: 'check'; indent: string; depth: number; text
 export type TodoDirective = { kind: 'directive'; indent: string; depth: number; command: '接着' | '视图' | '默认'; text: string; prefixTo: number };
 export type TodoCheck = TodoCheckLine & { line: number; taskLine: number };
 export type TodoDependency = { id: string; line?: number; state: TodoStatus | 'self' | 'duplicate' | 'missing' };
+export type TodoResume = { kind: 'resume'; indent: string; depth: number; line: number; endLine: number; level: number; taskLine: number; text: string };
 export type TodoTask = TodoTaskLine & {
-  line: number; endLine: number; section?: number; path: string; archived: boolean;
+  line: number; endLine: number; level: number; section?: number; path: string; archived: boolean;
   checks: TodoCheck[]; dependencies: TodoDependency[];
-  resume?: { line: number; text: string }; waiting?: { person: string; review: string };
+  resume?: TodoResume; waiting?: { person: string; review: string };
 };
 export type TodoSection = TodoSectionLine & { line: number; parent?: number; path: string; archived: boolean; defaults: Map<string, string>; defaultLines: number[] };
 export type TodoView = { line: number; name: string; filters: TodoTag[] };
 export type TodoModel = {
   lines: string[]; sections: TodoSection[]; tasks: TodoTask[]; views: TodoView[];
   checks: Map<number, TodoCheck>; tasksByLine: Map<number, TodoTask>; sectionsByLine: Map<number, TodoSection>;
+  resumesByLine: Map<number, TodoResume>;
 };
 export const todoDefault: string;
 export const todoStorageLimit: number;
@@ -27,6 +29,7 @@ export function replaceTodoTags(text: string, names: string[], tags: string[]): 
 export function todoReferences(text: string): TodoReference[];
 export function readTodoLine(line: string): TodoTaskLine | TodoSectionLine | TodoCheckLine | TodoDirective | undefined;
 export function parseTodo(body: string): TodoModel;
+export function todoChildIndent(model: TodoModel, block: TodoTask | TodoResume): string;
 export function todoGroupAt(model: TodoModel, line: number, depth?: number): TodoSection | undefined;
 export function todoGroupDefaults(model: TodoModel, section?: TodoSection): string[];
 export function todoTaskTitle(task: TodoTaskLine): string;

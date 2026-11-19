@@ -78,7 +78,7 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
       const followUp = needsTodoFollowUp(item, today);
       const title = outlineTitle(item);
       const checked = item.checks.filter(check => check.checked).length;
-      return <li key={item.line}>
+      return <li key={item.line} style={{ paddingInlineStart: `min(${item.level * 10}px, 30%)` }}>
         <button type="button" className="td-outline-task" onClick={() => jump(mode === 'resume' && resume ? resume.line : item.line)}>
           <span className={`td-mark-${item.status}`} aria-hidden="true">{item.status === 'done' ? '✔' : item.status === 'cancelled' ? '✘' : '☐'}</span>
           <span className="td-outline-task-name" title={item.text}>{title}</span>

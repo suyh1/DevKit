@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Check, Code2, Download, FileText, Link2, ListTree, Plus, RefreshCw, Save, Settings2, Upload, X } from 'lucide-react';
+import { Archive, Check, Code2, Download, FileText, Link2, ListPlus, ListTree, Plus, RefreshCw, Save, Settings2, Upload, X } from 'lucide-react';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { readText, saveText } from './files';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
@@ -176,6 +176,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
   const archived = tasks.filter(task => task.archived).length;
   const followUps = tasks.filter(task => needsTodoFollowUp(task, today)).length;
   const checks = model.tasksByLine.get(model.checks.get(line)?.taskLine ?? line)?.checks ?? [];
+  const canAddChild = model.tasksByLine.has(line) || model.resumesByLine.has(line);
   const locked = busy || !canEdit;
   return <section className="td-workspace">
     <header className="td-heading"><h1>待办清单</h1><div className="td-actions">
@@ -211,6 +212,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         <div className="td-toolbar" role="group" aria-label="任务操作">
           {canEdit && <>
             <button type="button" disabled={locked || !editor} onClick={() => editor?.run('new')}><Plus size={15} />新任务</button>
+            <button type="button" title="在光标所在的任务或续做点下添加" disabled={locked || !editor || !canAddChild} onClick={() => editor?.run('child')}><ListPlus size={15} />添加子任务</button>
             <button type="button" title="Alt+D" disabled={locked || !editor} onClick={() => editor?.run('done')}><Check size={15} />完成</button>
             <button type="button" title="Alt+C" disabled={locked || !editor} onClick={() => editor?.run('cancelled')}><X size={15} />取消</button>
             <button type="button" title="Ctrl/⌘+Shift+A" disabled={locked || !editor} onClick={() => editor?.run('archive')}><Archive size={15} />归档</button>
@@ -221,8 +223,9 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
           <details className="td-shortcuts"><summary aria-label="语法与快捷键">语法</summary><div>
             <dl>
               <dt>任务与日期</dt><dd><code>☐ 待办 @today @due(2026-12-01)</code></dd>
+              <dt>子任务</dt><dd>在任务或续做点下缩进写 <code>☐ 子任务</code>，可逐层拆分、单独完成</dd>
               <dt>验收条件</dt><dd>任务下缩进 <code>? ZIP 能解压</code>。方框可点击勾选</dd>
-              <dt>续做点</dt><dd>任务下缩进 <code>:: 续做 验证只读访客</code></dd>
+              <dt>续做点</dt><dd>记录停在哪里或回来从哪接上，例如 <code>:: 续做 已测管理员，下次从只读账号开始</code></dd>
               <dt>自定义视图</dt><dd><code>:: 视图 待验收 @tag(验收) @state(open)</code></dd>
               <dt>工作台引用</dt><dd><code>[[共享:发布材料]]</code> 或 <code>[[工具:JSON 格式化]]</code></dd>
               <dt>等待回访</dt><dd><code>@wait(小周) @review(2026-12-04)</code></dd>

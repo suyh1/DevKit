@@ -1,4 +1,4 @@
-import { isTodoDate, isTodoDefaultTag, replaceTodoTags, todoTags } from '../shared/todo-text.mjs';
+import { isTodoDate, isTodoDefaultTag, replaceTodoTags, todoChildIndent, todoTags } from '../shared/todo-text.mjs';
 import type { TodoModel, TodoTask } from '../shared/todo-text.mjs';
 
 export type TodoSyntaxAction = 'check' | 'resume' | 'view' | 'reference' | 'wait' | 'dependency' | 'repeat' | 'defaults';
@@ -83,9 +83,10 @@ export function planTodoSyntax(model: TodoModel, action: TodoSyntaxAction, field
 
   switch (action) {
     case 'check':
-      return addBelow(task.endLine, `${task.indent}  ? [ ] ${required(primary, '请填写验收条件。')}`);
+      return addBelow(task.endLine, `${todoChildIndent(model, task)}? [ ] ${required(primary, '请填写验收条件。')}`);
     case 'resume': {
-      const text = `${task.indent}  :: 续做 ${required(primary, '请填写接下来要做的事。')}`;
+      const indent = task.resume?.indent ?? todoChildIndent(model, task);
+      const text = `${indent}:: 续做 ${required(primary, '请填写做到哪里或回来从哪接上。')}`;
       return task.resume ? replace(task.resume.line, text) : addBelow(task.endLine, text);
     }
     case 'reference': {

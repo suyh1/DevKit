@@ -76,7 +76,7 @@ export default function TodoSyntaxActions({ model, editor, line, locked, portal 
           </select>
         </label>}
         {action === 'check' && input('验收内容', '例如 ZIP 解压后目录完整')}
-        {action === 'resume' && input('接下来要做的事', '例如 用只读账号验证下载')}
+        {action === 'resume' && input('做到哪里或回来从哪接上', '例如 已测管理员，下次从只读账号开始')}
         {action === 'defaults' && input('默认标签', '用空格分隔，例如 验收 运维')}
         {action === 'view' && <>
           {input('视图名称', '例如 待验收')}

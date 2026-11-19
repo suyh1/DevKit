@@ -29,6 +29,15 @@ describe('Todo syntax toolbar edits', () => {
     expect(resume.body).not.toContain('核对旧地址');
   });
 
+  it('preserves imported resume indentation and attaches new checks to the selected task', () => {
+    const lines = ['☐ 验证下载', ' :: 接着 核对旧地址', '  ☐ 只读下载', '☐ 下一项'];
+    const model = parseTodo(lines.join('\n'));
+    const resume = planTodoSyntax(model, 'resume', { ...todoSyntaxFields('resume', model, 1, false), primary: '记录新地址' });
+    expect(resume.edits).toEqual([[2, ' :: 续做 记录新地址']]);
+    const check = planTodoSyntax(model, 'check', { ...todoSyntaxFields('check', model, 1, false), primary: '链接可打开' });
+    expect(check.edits).toEqual([[3, '  ☐ 只读下载\n ? [ ] 链接可打开']]);
+  });
+
   it('writes views, references, reviews and recurrence as native document syntax', () => {
     expect(apply('view', { primary: '待验收', secondary: '验收' }).model.views[0].name).toBe('待验收');
     const { model } = apply('reference', { primary: '发布材料', option: '共享' });
