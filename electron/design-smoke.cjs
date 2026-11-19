@@ -9,6 +9,13 @@ module.exports = async function designSmoke(window, output) {
   window.show(); window.focus(); window.webContents.focus();
   const js = code => window.webContents.executeJavaScript(code);
   const settle = () => js('new Promise(resolve => setTimeout(resolve, 350))');
+  async function wheel(delta) {
+    const point = await js(`(() => {
+      const rect = document.querySelector('.home-overview').getBoundingClientRect();
+      return { x: Math.round(rect.x + rect.width * .78), y: Math.round(rect.y + rect.height * .47) };
+    })()`);
+    window.webContents.sendInputEvent({ type: 'mouseWheel', ...point, deltaY: -delta });
+  }
   async function wait(expression) {
     for (let attempt = 0; attempt < 100; attempt++) {
       if (await js(expression)) return;
@@ -27,17 +34,20 @@ module.exports = async function designSmoke(window, output) {
       await settle();
       const geometry = await js(`(() => {
         const workspace = document.querySelector('.overview-workspace');
-        workspace.scrollTop = 0;
+        const launch = workspace.querySelector('.home-launch');
+        const catalog = workspace.querySelector('.home-catalog');
         const navbar = document.querySelector('.floating-navbar');
         const controls = [...navbar.querySelectorAll('button')].filter(button => button.getClientRects().length);
         return { width: innerWidth, pageOverflow: document.documentElement.scrollWidth > innerWidth,
           workspaceOverflow: workspace.scrollWidth > workspace.clientWidth + 1,
           navbarOutside: controls.some(button => { const rect = button.getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth + 1; }),
           floating: navbar.getBoundingClientRect().top > 0,
-          launcherColumns: getComputedStyle(document.querySelector('.home-launch')).gridTemplateColumns,
-          firstToolTop: document.querySelector('.tool-card').getBoundingClientRect().top,
+          launchScrollbar: getComputedStyle(launch).scrollbarWidth,
+          workspaceOverflowY: getComputedStyle(workspace).overflowY,
+          launchFits: launch.scrollHeight <= launch.clientHeight + 1,
+          catalogHidden: catalog.inert && catalog.getBoundingClientRect().top >= workspace.getBoundingClientRect().bottom - 1,
           background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-          panel: getComputedStyle(document.querySelector('.quick-start-card')).backgroundColor,
+          panel: getComputedStyle(document.querySelector('.smart-open')).backgroundColor,
           text: getComputedStyle(workspace).color,
           accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
           appGradient: getComputedStyle(document.querySelector('.app')).backgroundImage };
@@ -51,24 +61,71 @@ module.exports = async function designSmoke(window, output) {
       assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(37, 48, 71)');
       assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#305aa6');
       assert.equal(geometry.appGradient, 'none');
-      if (width >= 768) assert.ok(geometry.firstToolTop < 620, `${theme} ${width}: tool library visible on arrival`);
+      assert.equal(geometry.catalogHidden, true, `${theme} ${width}: library is off-screen and inert on arrival`);
+      assert.equal(geometry.launchScrollbar, 'none');
+      assert.equal(geometry.workspaceOverflowY, 'clip');
+      assert.equal(geometry.launchFits, true);
       report.push({ theme, ...geometry });
       if ([1440, 375].includes(width)) await fs.writeFile(path.join(output, `design-home-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
     }
   }
   window.setContentSize(1440, 1000);
   await js("document.documentElement.dataset.theme = 'light'");
-  assert.equal(await js('document.querySelector(".overview-heading h1").textContent'), '工作台');
-  const favoriteCount = await js('Number(document.querySelector(\'.sidebar-workspace button[title="我的收藏"] small\').textContent)');
-  await js('document.querySelectorAll(".library-scope button")[1].click()');
-  await settle();
-  assert.equal(await js('document.querySelectorAll(".tool-card").length'), favoriteCount);
-  await js('document.querySelectorAll(".library-scope button")[1].dispatchEvent(new KeyboardEvent("keydown", {key:"ArrowRight", bubbles:true}))');
-  await settle();
-  assert.equal(await js('document.querySelectorAll(".library-scope button")[2].getAttribute("aria-pressed")'), 'true');
-  await js('document.querySelectorAll(".library-scope button")[2].dispatchEvent(new KeyboardEvent("keydown", {key:"Home", bubbles:true}))');
-  await settle();
+  assert.equal(await js('document.querySelector(".overview-heading h1").textContent'), '开发工作台');
+  {
+    const previousClipboard = await clipboard.readText();
+    try {
+      window.focus(); window.webContents.focus();
+      await clipboard.writeText('{"name":"DevKit","ready":true}');
+      await js('document.querySelector(".smart-open-paste").click()');
+      assert.equal(await js('document.activeElement.matches(".smart-open textarea")'), true);
+      window.webContents.paste();
+      await wait('document.querySelectorAll(".smart-suggestion").length === 3');
+      await js('document.querySelector(".smart-open-actions .text-button").click()');
+      await wait('!document.querySelector(".smart-suggestion")');
+    } finally {
+      if (previousClipboard) await clipboard.writeText(previousClipboard);
+      else clipboard.clear();
+    }
+  }
+  const atLibrary = '!!document.querySelector(".home-overview[data-screen=library]")';
+  await wheel(120);
+  await wait(atLibrary);
+  await wait(`(() => {
+    const catalog = document.querySelector('.home-catalog');
+    const viewport = document.querySelector('.home-overview');
+    const bounds = catalog.getBoundingClientRect();
+    return !catalog.inert && Math.abs(bounds.top - viewport.getBoundingClientRect().top) < 1 &&
+      Math.abs(bounds.height - viewport.clientHeight) < 1 && catalog.scrollHeight > catalog.clientHeight && catalog.offsetWidth > catalog.clientWidth;
+  })()`);
+  assert.equal(await js('document.querySelector(".home-launch").inert'), true);
+  assert.equal(await js('document.querySelector(".home-catalog .category-filters, .home-catalog .library-scope")'), null);
   assert.equal(await js('document.querySelectorAll(".tool-card").length'), 46);
+  await fs.writeFile(path.join(output, 'design-library-light.png'), (await window.webContents.capturePage()).toPNG());
+  await settle();
+  await wheel(320);
+  await wait('document.querySelector(".home-catalog").scrollTop > 50');
+  await wheel(-500);
+  await wait('document.querySelector(".home-catalog").scrollTop === 0');
+  assert.equal(await js(atLibrary), true, 'The list scrolls to its top before returning to the launch screen');
+  await settle();
+  await wheel(-120);
+  await wait(`!(${atLibrary})`);
+  await js('document.body.dispatchEvent(new KeyboardEvent("keydown", {key:"/", bubbles:true, cancelable:true}))');
+  await wait(atLibrary);
+  assert.equal(await js('document.activeElement.matches(".library-search input")'), true);
+  await window.webContents.insertText('经纬度工具');
+  await wait('document.querySelectorAll(".tool-card").length === 1');
+  await js('document.querySelector(".home-catalog button[aria-label=列表视图]").click()');
+  await wait('!!document.querySelector(".home-catalog .tool-list")');
+  await js(`{
+    const input = document.querySelector('.library-search input');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.home-catalog button[aria-label=卡片视图]').click();
+    document.querySelector('.overview-back').click();
+  }`);
+  await wait(`!(${atLibrary})`);
   try {
     window.webContents.setZoomFactor(2);
     await settle();
@@ -90,20 +147,28 @@ module.exports = async function designSmoke(window, output) {
   window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
   window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
   await wait('!document.querySelector(".command-dialog[open]")');
-  await js('document.querySelector(".overview-workspace").scrollTop = 0; document.activeElement.blur()');
-  await settle();
-  await fs.writeFile(path.join(output, 'design-library-light.png'), (await window.webContents.capturePage()).toPNG());
   window.webContents.debugger.attach('1.3');
   try {
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    assert.equal(await js('getComputedStyle(document.querySelector(".home-launch")).animationName'), 'none');
+    assert.equal(await js('getComputedStyle(document.querySelector(".overview-deck")).transitionDuration'), '0s');
     assert.equal(await js('getComputedStyle(document.querySelector(".segmented-control .motion-pill")).transitionDuration'), '0s');
+    await window.webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    const point = await js(`(() => {
+      const rect = document.querySelector('.home-launch').getBoundingClientRect();
+      return { x: Math.round(rect.x + rect.width * .85), y: Math.round(rect.y + rect.height * .65) };
+    })()`);
+    await window.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await window.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, y: point.y - 100 }] });
+    await window.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await wait(atLibrary);
+    await js('document.querySelector(".overview-back").click()');
+    await wait(`!(${atLibrary})`);
   } finally {
+    await window.webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: false });
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     window.webContents.debugger.detach();
   }
-  await js('document.activeElement.blur(); document.querySelector(".overview-workspace").scrollTop = 0');
-  await js('document.querySelector(".quick-start-grid button").click()');
+  await js('document.querySelector(".quick-start button").click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "JSON 格式化"');
   await js("document.documentElement.dataset.theme = 'dark'");
   await wait('!!document.querySelector(".task-pane:not([hidden]) .editor-footer button")');
@@ -127,7 +192,9 @@ module.exports = async function designSmoke(window, output) {
   await fs.writeFile(path.join(output, 'design-editor-light.png'), (await window.webContents.capturePage()).toPNG());
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   await wait('!!document.querySelector(".overview-workspace:not([hidden])")');
-  await js('[...document.querySelectorAll(".quick-start-grid button,.tool-card-open")].find(button => button.textContent.startsWith("调色板与色阶")).click()');
+  await js('document.querySelector(".overview-library-entry").click()');
+  await wait(atLibrary);
+  await js('[...document.querySelectorAll(".tool-card-open")].find(button => button.textContent.startsWith("调色板与色阶")).click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
@@ -221,6 +288,7 @@ module.exports = async function designSmoke(window, output) {
     }
   }
   await js(`document.querySelector('input[name="theme-style"][value="default"]').click()`);
+  await js(`document.querySelector('.sidebar button[title="工作台"]').click()`);
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'design-report.json'), JSON.stringify(report, null, 2));
   console.log('Design smoke passed: graphite palette, semantic success, editor, projects, responsive themes, navigation, keyboard and reduced motion.');

@@ -82,6 +82,8 @@ app.on('browser-window-created', (_event, window) => {
       }
       if (process.env.DEVKIT_TEST_GEOGRAPHY_ONLY === '1') {
         window.setMinimumSize(360, 600); window.setSize(1440, 1000);
+        await window.webContents.executeJavaScript('document.querySelector(".overview-library-entry").click()');
+        await waitFor('!document.querySelector(".home-catalog").inert');
         await window.webContents.executeJavaScript('document.querySelector(\'button[aria-label="新建经纬度工具任务"]\').click()');
         await waitFor('!!document.querySelector(".geo-workbench")');
         await window.webContents.executeJavaScript('[...document.querySelectorAll(".geo-workbench .editor-footer button")].find(b=>b.textContent.includes("示例")).click()');
@@ -121,6 +123,8 @@ app.on('browser-window-created', (_event, window) => {
       await waitFor('document.querySelector(".task-pane:not([hidden]) .output-card .cm-content")?.textContent.includes("9007199254740993")');
       assert.equal(await window.webContents.executeJavaScript('JSON.stringify(localStorage).includes("推荐测试")'), false);
       await window.webContents.executeJavaScript('document.querySelector(".home-tab").click()');
+      await window.webContents.executeJavaScript('document.querySelector(".overview-library-entry").click()');
+      await waitFor('!document.querySelector(".home-catalog").inert');
       await window.webContents.executeJavaScript('[...document.querySelectorAll("button")].find(button => button.getAttribute("aria-label") === "新建JSON 格式化任务").click()');
       await waitFor('!!document.querySelector(".task-pane:not([hidden]) .editor-footer button")');
       await window.webContents.executeJavaScript('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例")).click()');

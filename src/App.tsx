@@ -55,6 +55,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);
   const [page, setPage] = useState<Page>(tasks.length ? 'task' : 'home');
+  const [homeVisit, setHomeVisit] = useState(0);
   const [monitorFocus, setMonitorFocus] = useState<{ id: string }>();
   const [favorites, setFavorites] = useState<ToolId[]>(() => { const saved = readPreference('devkit:favorites'); return Array.isArray(saved) ? normalizeFavorites(saved) : ['json', 'timestamp']; });
   const [recent, setRecent] = useState<ToolId[]>([]);
@@ -133,6 +134,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       history.replaceState(null, '', location.pathname + location.search);
       window.dispatchEvent(new Event('hashchange'));
     }
+    if (next === 'home') setHomeVisit(current => current + 1);
     setPage(next);
     if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true);
   }
@@ -169,10 +171,6 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       if (document.querySelector("dialog[open]")) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (!saveDialog.current?.open) setSearchOpen(current => !current); }
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && execute.current) { event.preventDefault(); execute.current(); }
-      if (event.key === '/' && !(event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)))) {
-        const input = document.querySelector<HTMLInputElement>('.overview-workspace:not([hidden]) input');
-        if (input) { event.preventDefault(); input.focus(); }
-      }
     };
     const currentJobs = jobs.current;
     window.addEventListener('keydown', handler, true);
@@ -235,7 +233,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>
         <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
-        <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={(id, text, options) => openTool(id, true, text, options)} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
+        <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={(id, text, options) => openTool(id, true, text, options)} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} homeVisit={homeVisit} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>
 {tasks.map(task => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId]; return <div data-motion-page inert={page !== 'task' || task.id !== activeId} key={task.id} id={`task-${task.id}`} role="tabpanel" aria-labelledby={`tab-${task.id}`} hidden={page !== 'task' || task.id !== activeId} className={`workspace task-pane ${isColorTool(task.toolId) ? 'color-workspace-shell' : 'text-workspace-shell'}`}><div className="page-heading workspace-banner"><span className={`tool-icon page-icon category-${categoryMeta[tool.category].key}`}><Icon size={23} /></span><div className="page-title"><h1>{tool.name}</h1></div><button className="secondary-button" title="新建同类独立任务" onClick={() => openTool(task.toolId, true)}><CopyPlus size={14} /><span>新任务</span></button><button className={`icon-button ${favorites.includes(task.toolId) ? 'is-favorite' : ''}`} title="收藏工具" aria-label={`${favorites.includes(task.toolId) ? '取消收藏' : '收藏'}${tool.name}`} aria-pressed={favorites.includes(task.toolId)} onClick={() => toggleFavorite(task.toolId)}><Star size={17} fill={favorites.includes(task.toolId) ? 'currentColor' : 'none'} /></button></div>{isColorTool(task.toolId) ? <ColorWorkbench mode={task.toolId} primary={sharedColor} onPrimary={setSharedColor} favorites={colorFavorites} onFavorites={setColorFavorites} /> : task.toolId === 'geo-coordinates' ? <GeoWorkbench task={task} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} /> : <ToolWorkspace onDebug={config => { setHttpInitial({ config, key: Date.now() }); navigate('http'); }} task={task} preferences={preferences} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} onSend={(toolId, text, options) => openTool(toolId, true, text, options)} />}</div>; })}
       </div>
