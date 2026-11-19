@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { appendFile, readFile, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { emptySharingServices, sharingServices } from '../shared/sharing.mjs';
+import { sharingServices } from '../shared/sharing.mjs';
 
 const fail = message => { throw new Error(message); };
 export function passwordRecord(password) {
@@ -28,13 +28,6 @@ export function updateVisitors(input, previous = []) {
     if (!credentials) fail(`请设置访客 ${name} 的访问口令。`);
     return { name, salt: credentials.salt, hash: credentials.hash, services: sharingServices({ services: item.services }) };
   });
-}
-export function visitorServices(global, visitor) {
-  const result = emptySharingServices();
-  for (const [module, permissions] of Object.entries(result)) {
-    for (const key of Object.keys(permissions)) permissions[key] = global[module]?.[key] === true && visitor[module]?.[key] === true;
-  }
-  return result;
 }
 export function createSharingAudit(directory) {
   const file = path.join(directory, 'sharing-audit.jsonl');

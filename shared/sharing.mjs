@@ -104,3 +104,11 @@ export function sharingAliases(services) {
     nginxControl: services.nginx.control,
   };
 }
+
+export function visitorServices(serviceGrants, visitor) {
+  const result = emptySharingServices();
+  for (const [module, permissions] of Object.entries(result)) {
+    for (const key of Object.keys(permissions)) permissions[key] = serviceGrants[module]?.[key] === true && visitor[module]?.[key] === true;
+  }
+  return result;
+}

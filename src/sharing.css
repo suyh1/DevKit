@@ -35,3 +35,12 @@
 .sharing-visitor-service { display:flex; flex-wrap:wrap; gap:5px 12px; margin:5px 0; }
 .sharing-visitor-service label { display:inline-flex; align-items:center; gap:4px; }
 .sharing-audit { max-height:190px; overflow:auto; padding-inline-start:17px; font-size:12px; overflow-wrap:anywhere; }
+
+.global-sharing-button > small { color: var(--muted); font-size: 11px; }
+.sharing-panel .pc-sharing-state { margin: 0 0 16px; }
+.sharing-effective { padding: 8px 10px; background: var(--tint); border-radius: 6px; color: var(--text); overflow-wrap: anywhere; }
+.sharing-effective > strong { margin-inline-end: 6px; font-size: 12px; }
+@media (max-width: 950px) { .global-sharing-button > small { display: none; } }
+@media (max-width: 550px) { .global-sharing-button > span { display: none; } }
+
+.sharing-panel .pc-sharing-state small > code { overflow-wrap: anywhere; font-family: var(--font-mono); }

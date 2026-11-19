@@ -174,7 +174,11 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   const statusStale = !!statusError || !statusTime;
   const locked = useRef(false), loadedHostRevision = useRef<number | null>(null), polling = useRef(false);
   const current = state?.instances.find(instance => instance.id === selected), rawStatus = statuses.find(item => item.id === selected);
+  const [listHost, setListHost] = useState<string | null>(null);
+  const hostGroups = groupInstances(state?.instances || [], state?.groups).filter(group => group.items.length);
+  const selectedListHost = hostGroups.some(group => group.id === listHost) ? listHost : null;
   const hostFor = (item?: NginxInstance) => targetGroup(state?.groups, item?.hostId);
+
   const canEdit = (item?: NginxInstance) => canWriteWorkspace('nginx') && (hostFor(item)?.edit ?? true);
   const currentEdit = canEdit(current), currentControl = canOperateNginx() && (hostFor(current)?.control ?? true);
   const readLogs = canReadWorkspaceLogs('nginx');
@@ -182,6 +186,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   const content = drafts[file] ?? '', dirtyFiles = documents.filter(doc => drafts[doc.path] !== doc.content), pendingFields = Object.values(fieldPending).some(Boolean);
   const dirty = dirtyFiles.length > 0 || pendingFields;
   const linked = useWorkspaceResource('nginx'), linkedHandled = useRef('');
+  useEffect(() => { if (active && linked) setListHost(null); }, [active, linked]);
   const linkStatus = linked && state ? inventoryLinkStatus(linked, state.instances, state.groups) : undefined;
   useEffect(() => {
     if (!active || !linked) { linkedHandled.current = ''; return; }
@@ -371,28 +376,60 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
     {linkStatus === 'missing' && <p className="pc-notice" role="status">{missingResourceLink(' Nginx 实例')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的 Nginx 实例，请重试连接目标主机。</p>}
     {window.devkitNginx && state && <LegacySshImport module="nginx" groups={state.groups} disabled={busy || dirty} refresh={() => void task(() => refresh())} />}
-    {!state ? <div className="ng-empty-loading" role="status">{busy ? '正在读取实例…' : '请刷新以读取实例列表。'}</div> : !state.instances.length ? <div className="ng-empty"><span className="ng-empty-icon"><Server size={28} /></span><h2>尚未添加 Nginx 实例</h2><p>每个实例使用一份主配置，可关联多份附属文件。<br />Windows 和 Linux 均支持相同的多文件配置。</p><div className="ng-empty-actions"><MotionButton busy={busy} className="run-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('create')}><Plus size={16} />新建配置</MotionButton><MotionButton busy={busy} className="secondary-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><FolderOpen size={16} />导入已有文件</MotionButton></div><small>{remoteAccess() ? "填写共享主机目录以生成配置，或登记主机已有配置。" : "可选择目录生成一套配置，或将已有配置加入工作区。"}</small></div> : <div className="ng-layout"><aside className="ng-instances" aria-label="Nginx 实例列表">{groupInstances(state.instances, state.groups).filter(group => group.items.length).map(group => <section className="ng-host-group" key={group.id}><h3>{group.name}</h3>{group.items.map(instance => {
+    {!state ? <div className="ng-empty-loading" role="status">{busy ? '正在读取实例…' : '请刷新以读取实例列表。'}</div> : !state.instances.length ? <div className="ng-empty"><span className="ng-empty-icon"><Server size={28} /></span><h2>尚未添加 Nginx 实例</h2><p>每个实例使用一份主配置，可关联多份附属文件。<br />Windows 和 Linux 均支持相同的多文件配置。</p><div className="ng-empty-actions"><MotionButton busy={busy} className="run-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('create')}><Plus size={16} />新建配置</MotionButton><MotionButton busy={busy} className="secondary-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><FolderOpen size={16} />导入已有文件</MotionButton></div><small>{remoteAccess() ? "填写共享主机目录以生成配置，或登记主机已有配置。" : "可选择目录生成一套配置，或将已有配置加入工作区。"}</small></div> : <div className="ng-layout"><aside className="ng-instances" aria-label="Nginx 实例列表">
+      {hostGroups.length > 1 && <label className="ng-list-host">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
+        <option value="all">全部主机</option>{hostGroups.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
+      </select></label>}
+      {hostGroups.filter(group => selectedListHost === null || group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.name}</h3>{group.items.map(instance => {
       const itemStatus = statusStale ? undefined : statuses.find(item => item.id === instance.id);
       return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => { if (selected !== instance.id) discardThen(() => void task(() => load(instance.id))); }}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code>{basename(instance.main)}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
     })}</section>)}<p className="ng-help">{remoteAccess() ? '共享主机' : '本机'}的实例登记与备份保存在 {state.directory}。各实例的配置文件在所属主机的原路径编辑。</p></aside>
-    {current && <div className="ng-detail"><NginxControlDock active={active} scrollRoot={scrollRoot}>{({ stuck, compact, toggle }) => <><header className="ng-instance-heading"><div><h2>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2><p className="ng-help">{hostFor(current)?.name}</p><p className="ng-dock-main-path" title={current.main}>{current.main}</p></div><div className="ng-actions"><button className="text-button ng-dock-toggle" hidden={!stuck} onClick={toggle} aria-expanded={!compact} ><ChevronRight size={13} />{compact ? '展开详情' : '收起详情'}</button><MotionButton busy={busy} className="text-button"  disabled={busy || dirty || !currentEdit} onClick={() => setInstanceForm(current)}><Settings2 size={15} />实例设置</MotionButton><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton></div></header>
-      <div className="ng-dock-metadata" inert={compact}><div><p className="ng-runtime">{hostFor(current) && <>{hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}<br /></>}运行目录：<code>{current.prefix}</code><br />{status?.detail}{status?.pidPath && <> · PID 文件：<code>{status.pidPath}</code></>}</p>
-      </div></div>
-      <div className="ng-status-connection" role="status" data-stale={statusStale}><span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span><button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button></div><div className="ng-toolbar"><div className="ng-actions">
-        <MotionButton busy={busy} className="text-button"  disabled={busy || dirty || !currentControl || status?.state === 'platform'} onClick={() => void task(() => command('test'))}><CheckCircle2 size={15} />检查配置</MotionButton>
-        <MotionButton busy={busy} className="text-button"  disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'stopped'} onClick={() => void task(() => command('start'))}><Play size={15} />启动</MotionButton>
-        <MotionButton busy={busy} className="text-button"  disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'running'} onClick={() => void task(() => command('reload'))}><RefreshCw size={15} />重载</MotionButton>
-        <MotionButton busy={busy} className="text-button"  disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'running'} onClick={() => setConfirmation({ title: `优雅停止 ${current.name}？`, detail: '向此主配置对应的 Nginx 主进程发送 quit，等待现有连接完成。', confirm: '停止 Nginx', action: () => void task(() => command('stop')) })}><Square size={15} />停止</MotionButton>
-      </div><div className="ng-actions"><MotionButton busy={busy} className="text-button"  disabled={busy || dirty} onClick={() => void task(async () => setBackups(await nginxRequest<NginxBackup[]>('backups', { id: current.id })))}><History size={15} />备份</MotionButton><MotionButton busy={busy} className="text-button"  disabled={busy} onClick={() => discardThen(() => void task(() => load(current.id)))}>重新读取</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy || !dirty || !currentEdit} onClick={() => void task(save)}><Save size={15} />保存文件{dirtyFiles.length ? ` (${dirtyFiles.length})` : ''}</MotionButton></div></div>
-      {dirty && <p className="ng-warning ng-message">有未保存的修改。“检查并应用”会先测试临时草稿，再请你确认受影响的实例。{pendingFields && '请移出字段或按 Enter 完成编辑。'}</p>}
-      {(dirty || rollback?.id === current.id || recovery?.id === current.id) && <div className="ng-actions">
-        {dirty && <MotionButton busy={busy} className="secondary-button" disabled={busy || pendingFields || !currentEdit || !currentControl} onClick={() => void task(() => checkAndApply())}><CheckCircle2 size={15} />检查并应用</MotionButton>}
-        {rollback?.id === current.id && <MotionButton busy={busy} className="secondary-button" disabled={busy || dirty || !currentEdit || !currentControl} onClick={() => void task(() => restoreDisk(rollback.backupId))}><History size={15} />第 1 步 · 恢复磁盘文件</MotionButton>}
-        {recovery?.id === current.id && <MotionButton busy={busy} className="secondary-button" disabled={busy || dirty || !currentControl} onClick={() => void task(() => reloadRestored(recovery.backupId))}>第 2 步 · 确认进程并重载</MotionButton>}
-      </div>}
-      {output && <NginxCommandOutput output={output} compact={compact} />}</>}</NginxControlDock>
+    {current && <div className="ng-detail">
+      <NginxControlDock active={active} scrollRoot={scrollRoot}>{stuck => <>
+        <div className="ng-dock-details" inert={stuck}>
+          <div>
+            <header className="ng-instance-heading">
+              <div>
+                <h2>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2>
+                <p className="ng-help">目标主机 <strong>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')}</strong></p>
+                <p title={current.main}>{current.main}</p>
+              </div>
+              <div className="ng-actions">
+                <MotionButton busy={busy} className="text-button" disabled={busy || dirty || !currentEdit} onClick={() => setInstanceForm(current)}><Settings2 size={15} />实例设置</MotionButton>
+                <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
+              </div>
+            </header>
+            <p className="ng-runtime">{hostFor(current) && <>{hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}<br /></>}运行目录：<code>{current.prefix}</code><br />{status?.detail}{status?.pidPath && <> · PID 文件：<code>{status.pidPath}</code></>}</p>
+            <div className="ng-status-connection" role="status" data-stale={statusStale}>
+              <span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span>
+              <button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button>
+            </div>
+          </div>
+        </div>
+        <div className="ng-toolbar" role="group" aria-label="实例主要操作">
+          <MotionButton busy={busy} className="text-button" disabled={busy || dirty || !currentControl || status?.state === 'platform'} onClick={() => void task(() => command('test'))}><CheckCircle2 size={15} />检查配置</MotionButton>
+          <MotionButton busy={busy} className="text-button" disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'stopped'} onClick={() => void task(() => command('start'))}><Play size={15} />启动</MotionButton>
+          <MotionButton busy={busy} className="text-button" disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'running'} onClick={() => void task(() => command('reload'))}><RefreshCw size={15} />重载</MotionButton>
+          <MotionButton busy={busy} className="text-button" disabled={busy || dirty || statusStale || statusChecking || !currentControl || status?.state !== 'running'} onClick={() => setConfirmation({ title: `优雅停止 ${current.name}？`, detail: '向此主配置对应的 Nginx 主进程发送 quit，等待现有连接完成。', confirm: '停止 Nginx', action: () => void task(() => command('stop')) })}><Square size={15} />停止</MotionButton>
+          <MotionButton busy={busy} className="run-button" disabled={busy || !dirty || !currentEdit} onClick={() => void task(save)}><Save size={15} />保存文件{dirtyFiles.length ? ` (${dirtyFiles.length})` : ''}</MotionButton>
+        </div>
+        <div className="ng-dock-details" inert={stuck}>
+          <div>
+            {dirty && <p className="ng-warning ng-message">有未保存的修改。“检查并应用”会先测试临时草稿，再请你确认受影响的实例。{pendingFields && '请移出字段或按 Enter 完成编辑。'}</p>}
+            <div className="ng-actions ng-change-actions" role="group" aria-label="配置变更">
+              <MotionButton busy={busy} className="text-button" disabled={busy || dirty} onClick={() => void task(async () => setBackups(await nginxRequest<NginxBackup[]>('backups', { id: current.id })))}><History size={15} />备份</MotionButton>
+              <MotionButton busy={busy} className="text-button" disabled={busy} onClick={() => discardThen(() => void task(() => load(current.id)))}>重新读取</MotionButton>
+              <MotionButton busy={busy} className="secondary-button" disabled={busy || pendingFields} onClick={() => void task(() => previewChanges())}>变更与引用预览</MotionButton>
+              {dirty && <MotionButton busy={busy} className="secondary-button" disabled={busy || pendingFields || !currentEdit || !currentControl} onClick={() => void task(() => checkAndApply())}><CheckCircle2 size={15} />检查并应用</MotionButton>}
+              {rollback?.id === current.id && <MotionButton busy={busy} className="secondary-button" disabled={busy || dirty || !currentEdit || !currentControl} onClick={() => void task(() => restoreDisk(rollback.backupId))}><History size={15} />第 1 步 · 恢复磁盘文件</MotionButton>}
+              {recovery?.id === current.id && <MotionButton busy={busy} className="secondary-button" disabled={busy || dirty || !currentControl} onClick={() => void task(() => reloadRestored(recovery.backupId))}>第 2 步 · 确认进程并重载</MotionButton>}
+            </div>
+            {output && <NginxCommandOutput output={output} />}
+          </div>
+        </div>
+      </>}</NginxControlDock>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
-      <div className="feature-toolbar"><MotionButton busy={busy} className="secondary-button" disabled={busy || pendingFields} onClick={() => void task(() => previewChanges())}>变更与引用预览</MotionButton>{readLogs && <><button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button><button className="text-button" onClick={() => openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button></>}<ResourceLink page="nginx" id={current.id} /></div>{readLogs && <MotionPresence kind="panel" present={logsOpen}>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}</MotionPresence>}
+      <div className="feature-toolbar">{readLogs && <><button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button><button className="text-button" onClick={() => openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button></>}<ResourceLink page="nginx" id={current.id} /></div>{readLogs && <MotionPresence kind="panel" present={logsOpen}>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}</MotionPresence>}
       <MotionGroup className="ng-file-tabs" role="tablist" aria-label="配置文件">{documents.map(doc => <button key={doc.path}  role="tab" aria-selected={file === doc.path} disabled={busy || pendingFields} onClick={() => { setFile(doc.path); setFieldPending({}); setQuery(''); }}><FileCode2 size={14} /><span>{basename(doc.path)}</span><small>{doc.path === current.main ? '主' : '附属'}{drafts[doc.path] !== doc.content ? ' ●' : ''}</small></button>)}</MotionGroup>
       {file && <><div className="ng-editor-heading"><code title={file}>{file}</code><span className="sr-only" id={editorHelpId}>全文编辑填写完整指令；字段编辑只填参数，Enter或离开字段提交草稿，保存后再检查与重载。附属文件是否生效由include决定。</span><MotionGroup className="ng-actions" role="group" aria-label="配置编辑方式">{content.startsWith('\uFEFF') && <MotionButton busy={busy} className="text-button" disabled={busy || pendingFields || !currentEdit}  onClick={() => changeContent(content.slice(1))}>移除 UTF-8 BOM</MotionButton>}<button className={`text-button ${mode === 'fields' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'fields'} onClick={() => setMode('fields')}>字段配置</button><button className={`text-button ${mode === 'source' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'source'} onClick={() => setMode('source')}>全文编辑</button></MotionGroup></div>
       <fieldset className="ng-editor-fieldset" aria-describedby={editorHelpId} disabled={busy || !currentEdit}>

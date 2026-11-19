@@ -305,8 +305,7 @@ export default function ApiWorkspace({
     <section className="api-workspace" aria-busy={busy}>
       <div className="api-topline workspace-banner">
         <div>
-          <div className="eyebrow">{remoteAccess() ? "SHARED API WORKSPACE" : "LOCAL API WORKSPACE"}</div>
-          <h1>接口工作台</h1>
+          <h1>HTTP 调试</h1>
           <p>{remoteAccess() ? "接口定义与环境保存在共享主机，本次调试值仅留在当前页面。" : "设计接口、维护文档与调试，共用一份本地项目定义。"}</p>
         </div>
         <div className="api-actions">

@@ -27,12 +27,12 @@ export default function SharedWorkspaceNavigation({ page, onChoose, modules, onE
     (surface.querySelector<HTMLButtonElement>('[aria-current=page]') || surface.querySelector<HTMLButtonElement>('.shared-nav-item'))?.focus({ preventScroll: true });
     return () => { observer.disconnect(); window.removeEventListener('resize', place); };
   }, [open]);
-  return <div className="shared-navigation"><button ref={trigger} className="shared-nav-trigger" aria-label="共享" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? 'shared-workspace-menu' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } }}><LayoutGrid size={14} /><span>共享</span><ChevronDown className="shared-nav-chevron" size={12} /></button>
+  return <div className="shared-navigation"><button ref={trigger} className="shared-nav-trigger" aria-label="共享栏目" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? 'shared-workspace-menu' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); } }}><LayoutGrid size={14} /><span>共享栏目</span><ChevronDown className="shared-nav-chevron" size={12} /></button>
     {open && createPortal(<div ref={panel} id="shared-workspace-menu" className="shared-nav-panel" popover="auto" role="menu" aria-label="共享栏目" onToggle={event => { if ((event.nativeEvent as ToggleEvent).newState === 'closed') close(); }} onKeyDown={event => {
       const items = [...panel.current!.querySelectorAll<HTMLButtonElement>('[role=menuitem]')], index = items.indexOf(document.activeElement as HTMLButtonElement);
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); }
       else if (event.key === 'Tab') {
-        event.preventDefault(); const primary = [...trigger.current!.closest('nav')!.querySelectorAll<HTMLButtonElement>('button')], position = primary.indexOf(trigger.current!);
+        event.preventDefault(); const primary = [...trigger.current!.closest('header')!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')], position = primary.indexOf(trigger.current!);
         const next = primary[position + (event.shiftKey ? -1 : 1)] || trigger.current!; close(); next.focus({ preventScroll: true });
       } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault(); items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length]?.focus();

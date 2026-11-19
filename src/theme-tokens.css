@@ -1,8 +1,10 @@
 /* One palette for desktop and project portal; component files consume these tokens. */
 :root {
-  --bg: #f5f6f8; --surface: #fff; --surface-raised: #fff; --soft: #f0f2f5;
-  --text: #252934; --muted: #616877; --subtle: #687080; --line: #dce0e7;
-  --accent: #3d5fad; --accent-hover: #304d91; --accent-ink: #fff; --tint: #ecf0fa;
+  --font-ui: 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'Noto Sans Mono CJK SC', Consolas, ui-monospace, monospace;
+  --bg: #f2f4f7; --surface: #fff; --surface-raised: #fff; --soft: #f0f2f5;
+  --text: #253047; --muted: #616877; --subtle: #687080; --line: #d6dce5;
+  --accent: #305aa6; --accent-hover: #304d91; --accent-ink: #fff; --tint: #ecf0fa;
   --success: #287746; --success-tint: #edf5ee; --warning: #94620d;
   --error: #b42335; --diff-added: var(--success); --diff-deleted: var(--error);
   --diff-added-bg: #16a34a18; --diff-deleted-bg: #ef444418;
@@ -11,9 +13,9 @@
   --color-story-background: linear-gradient(135deg, var(--surface), var(--tint));
   --shadow: 0 4px 24px #17203306; --shadow-hover: 0 12px 32px #17203312;
   --syntax-key: #4270ac; --syntax-string: #6d5793; --syntax-number: #a45b28;
-  --syntax-keyword: #8e53b1; --syntax-comment: #7c8d99; --syntax-type: #9a6821; --syntax-function: #3566b2;
+  --syntax-keyword: #8e53b1; --syntax-comment: #556878; --syntax-type: #9a6821; --syntax-function: #3566b2;
   --editor-gutter: #f8f9fb; --editor-active: #3d5fad07; --editor-selection: #b9ccf766;
-  --selection: #b9ccf780; --editor-focus-line: #3d5fad; --focus-shadow: #3d5fad08;
+  --selection: #b9ccf780; --editor-focus-line: #305aa6; --focus-shadow: #3d5fad08;
   --button-shadow: #3d5fad24;
   --ease-out: cubic-bezier(.2,.7,.2,1);
 }

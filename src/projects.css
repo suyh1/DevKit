@@ -1570,3 +1570,8 @@ body:has(.pc-login) {
 .pc-probe-progress { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0; font-size:12px; line-height:1.7; }
 .pc-probe-progress progress { width:140px; max-width:100%; accent-color:var(--accent); }
 .pc-repair-variable { font-size:12px; justify-content:flex-start; text-align:left; margin:6px 0; }
+
+.pc-entry-actions { display: flex; justify-content: flex-end; margin-block: 10px; }
+.pc-entry-actions:empty { display: none; }
+.pc-selection:not(.pc-bulk) { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-block: 8px; color: var(--muted); font-size: 12px; }
+.pc-content :is(.pc-toolbar, .pc-selection)[hidden], .project-center :is(.pc-toolbar, .pc-selection)[hidden] { display: none; }

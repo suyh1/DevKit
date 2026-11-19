@@ -8,7 +8,7 @@
   backdrop-filter: none !important;
   will-change: auto !important;
 }
-:root[data-display-mode=performance][data-theme-style=glass] :is(.floating-navbar, .sidebar, .settings-section, .pc-card, .pc-shell, .welcome-card, .quick-start-card, .smart-open, .tool-card, .color-story-card) {
+:root[data-display-mode=performance][data-theme-style=glass] :is(.floating-navbar, .sidebar, .settings-section, .pc-card, .pc-shell, .quick-start-card, .smart-open, .tool-card) {
   background: var(--surface);
 }
 :root[data-display-mode=performance] .motion-presence[data-state=closing] { display: none; }

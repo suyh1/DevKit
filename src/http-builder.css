@@ -189,3 +189,7 @@
 .http-multipart-row input, .http-multipart-row select { min-width:0; padding:6px; color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:6px; }
 .http-multipart-row small { display:block; overflow-wrap:anywhere; }
 @media(max-width:540px) { .http-multipart-row { grid-template-columns:minmax(0,1fr) auto; } }
+
+.http-execution-host { align-self: center; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.http-execution-host strong { color: var(--text); }
+.http-response-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }

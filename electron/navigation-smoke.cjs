@@ -244,6 +244,7 @@ module.exports = async function navigationSmoke(window, output) {
   };
   window.setContentSize(1280, 844);
   await settle();
+  await click('.topbar button[aria-label="收起导航"]');
   await click('.shared-nav-trigger');
   await wait(`!!document.querySelector('${topMenu}:popover-open')`);
   const defaultOrder = await js(listOrder(topMenu));
@@ -296,12 +297,14 @@ module.exports = async function navigationSmoke(window, output) {
   const reloaded = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
   window.webContents.reload();
   await reloaded;
+  await click('.topbar button[aria-label="收起导航"]');
   await wait('!!document.querySelector(".shared-nav-trigger")');
   await click('.shared-nav-trigger');
   await wait(`!!document.querySelector('${topMenu}:popover-open')`);
   assert.deepEqual(await js(listOrder(topMenu)), updatedOrder);
   await key('Escape');
 
+  await click('.topbar button[aria-label="展开导航"]');
   window.setMinimumSize(360, 450);
   window.setContentSize(375, 500);
   await settle();

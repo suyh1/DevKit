@@ -197,6 +197,12 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     {documents && <div className="td-shell">
       <aside className="td-documents" aria-label="清单文档">
         <header><h2>清单</h2></header>
+        {documents.length > 0 && <label className="td-document-picker"><span className="sr-only">切换清单</span>
+          <select value={sheet?.id ?? ''} disabled={busy} onChange={event => void select(event.target.value)}>
+            {sheet && !documents.some(item => item.id === sheet.id) && <option value={sheet.id}>{sheet.name}（草稿）</option>}
+            {documents.map(item => <option key={item.id} value={item.id}>{item.name}{item.id === sheet?.id && dirty ? '（未保存）' : ''}</option>)}
+          </select>
+        </label>}
         {documents.length > 0 ? <nav aria-label="已保存的清单">{documents.map(item => <button key={item.id} type="button" aria-current={item.id === sheet?.id ? 'page' : undefined} disabled={busy}
           onClick={() => void select(item.id)}><FileText size={15} /><span title={item.name}>{item.name}</span>{item.id === sheet?.id && dirty && <i title="未保存" />}</button>)}</nav>
           : <p>暂无清单</p>}
@@ -218,12 +224,16 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
             <button type="button" disabled={locked || !editor} onClick={() => editor?.run('new')}><Plus size={15} />新任务</button>
             <button type="button" title="在光标所在的任务或续做点下添加" disabled={locked || !editor || !canAddChild} onClick={() => editor?.run('child')}><ListPlus size={15} />添加子任务</button>
             <button type="button" title="Alt+D" disabled={locked || !editor} onClick={() => editor?.run('done')}><Check size={15} />完成</button>
-            <button type="button" title="Alt+C" disabled={locked || !editor} onClick={() => editor?.run('cancelled')}><X size={15} />取消</button>
-            <button type="button" title="Ctrl/⌘+Shift+A" disabled={locked || !editor} onClick={() => editor?.run('archive')}><Archive size={15} />归档</button>
           </>}
           <button type="button" aria-pressed={outline} onClick={() => setOutline(value => !value)}><ListTree size={15} />大纲</button>
-          <button type="button" title="Alt+O" disabled={!editor || !todoReferences(model.lines[line - 1] ?? '').length} onClick={() => editor?.run('open-reference')}><Link2 size={15} />打开引用</button>
-          <button type="button" title="查看原始语法" aria-pressed={sourceMode} onClick={() => setSourceMode(value => !value)}><Code2 size={15} />源码</button>
+          <details className="td-more"><summary>更多操作</summary><div>
+            {canEdit && <>
+              <button type="button" title="Alt+C" disabled={locked || !editor} onClick={() => editor?.run('cancelled')}><X size={15} />取消</button>
+              <button type="button" title="Ctrl/⌘+Shift+A" disabled={locked || !editor} onClick={() => editor?.run('archive')}><Archive size={15} />归档</button>
+            </>}
+            <button type="button" title="Alt+O" disabled={!editor || !todoReferences(model.lines[line - 1] ?? '').length} onClick={() => editor?.run('open-reference')}><Link2 size={15} />打开引用</button>
+            <button type="button" title="查看原始语法" aria-pressed={sourceMode} onClick={() => setSourceMode(value => !value)}><Code2 size={15} />源码</button>
+          </div></details>
           <details className="td-shortcuts"><summary aria-label="语法与快捷键">语法</summary><div>
             <dl>
               <dt>任务与日期</dt><dd><code>☐ 待办 @today @due(2026-12-01)</code></dd>

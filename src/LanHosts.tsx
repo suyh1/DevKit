@@ -193,6 +193,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
   const [rdpHost, setRdpHost] = useState<LanHost>();
   const [query, setQuery] = useState(''), [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(''), [error, setError] = useState('');
+  const [focusedHost, setFocusedHost] = useState('');
   const [tabs, setTabs] = useState<Tab[]>([]), [selected, setSelected] = useState<number>();
   const requestVersion = useRef(0), working = useRef(false);
   const confirm = useConfirmation();
@@ -255,6 +256,8 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
     if (selected === id) setSelected(remaining.at(-1)?.id);
   }
   const grouped = groupLanHosts(hosts, query, endpoint);
+  const visibleHosts = grouped.flatMap(([, entries]) => entries);
+  const currentHost = visibleHosts.find(host => host.id === focusedHost) ?? visibleHosts[0];
   return <section className="lan-center">
     <header className="lan-heading workspace-banner"><div><h1>局域网主机</h1><p>{allowed('terminal') ? '管理远程连接、验证主机指纹，并在 SSH 终端中维护服务器。' : '查看共享主机保存的远程连接与端口状态。'}</p></div>{available && <div className="lan-heading-actions">
       {portal && <button className="secondary-button" disabled={busy} onClick={() => void task(() => load())}>刷新</button>}
@@ -273,7 +276,9 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
             const status = statuses.find(item => item.hostId === host.id);
             const link = portal && host.mode === 'share' ? workbenchLink(host.address) : undefined;
             return <li key={host.id}>
-          <header>{host.mode === 'ssh' ? <Terminal size={17} /> : <Globe size={17} />}<div><strong>{host.name}</strong><small>{endpoint(host)}</small></div>
+          <header><button type="button" className="lan-connection-select" aria-expanded={currentHost?.id === host.id} aria-controls={`lan-actions-${host.id}`} onClick={() => setFocusedHost(host.id)}>
+            {host.mode === 'ssh' ? <Terminal size={17} /> : <Globe size={17} />}<span><strong>{host.name}</strong><small>{endpoint(host)}</small></span>
+          </button>
             {allowed('edit') && <><button className="icon-button" disabled={busy} aria-label={`${host.pinned ? '取消置顶' : '置顶'} ${host.name}`} aria-pressed={!!host.pinned} onClick={() => void task(async () => {
               setHosts(await lanRequest<LanHost[]>('save', { ...host, pinned: !host.pinned }));
             })}><Pin size={14} /></button>
@@ -282,7 +287,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
           {!!host.tags?.length && <div className="lan-host-tags">{host.tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
           <p className="lan-note">{host.mode === 'ssh' ? (!portal || allowed('edit') ? `${host.platform === 'win32' ? 'Windows' : 'Linux'} · ${host.auth === 'password' ? '密码' : '密钥'} · ${host.fingerprint ? '已信任' : '待验证指纹'}` : `SSH${host.fingerprint ? ' · 已信任' : ''}`) : 'DevKit 共享'}{(Object.keys(titles) as ManagedModule[]).filter(module => host.modules[module]).map(module => ` · ${titles[module]}`).join('')}</p>
           {status && <p className="lan-monitor-status"><span className={`monitor-status ${status.state}`}>{lanMonitorLabels[status.state]}</span>{status.checkedAt && <small>最近检测 {new Date(status.checkedAt).toLocaleString()}{status.elapsed === undefined ? '' : ` · ${status.elapsed} ms`}</small>}</p>}
-          <div className="pc-actions">
+          <div className="pc-actions" id={`lan-actions-${host.id}`} hidden={currentHost?.id !== host.id}>
             {host.mode === 'ssh' ? allowed('terminal') && <button className="secondary-button" disabled={busy || !host.fingerprint && !(allowed('edit') && allowed('diagnose'))} title={!host.fingerprint ? '首次连接需核对 SSH 指纹' : undefined} onClick={() => void task(async () => { if (host.fingerprint || await verify(host)) { const id = nextTab++; setTabs(items => [...items, { id, host }]); setSelected(id); } })}><Terminal size={14} />打开终端</button> : portal ? link && <a className="text-button" href={link} target="_blank" rel="noreferrer"><ExternalLink size={14} />打开工作台</a> : <button className="secondary-button" disabled={busy} onClick={() => void task(async () => { const result = await window.devkitDesktop?.openLanHost?.(host.address, host.modules.nginx && !host.modules.jar ? 'nginx' : 'jar'); if (!result || result.error) throw new Error(result?.error || '远程工作台不可用。'); })}><ExternalLink size={14} />打开工作台</button>}
             {allowed('diagnose') && <button className="text-button" disabled={busy} onClick={() => void task(() => diagnose(host))}>测试连接</button>}
             {monitorAvailable && (status || addMonitor) && <button className="text-button" disabled={busy} onClick={() => void task(async () => onOpenMonitor(portal && status ? status.id : await ensureLanMonitor(host)))}>{status ? '监控历史' : '启用端口监控'}</button>}
@@ -309,7 +314,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
         </li>; })}</Fragment>)}</ul>
       </aside>
       {allowed('terminal') && <section className="lan-terminal-area" aria-label="SSH 终端">
-        {!!tabs.length ? <div role="tablist" aria-label="SSH 会话" className="lan-terminal-tabs">{tabs.map(tab => <div key={tab.id} className={selected === tab.id ? 'selected' : ''}><button type="button" role="tab" aria-selected={selected === tab.id} aria-controls={`lan-tab-${tab.id}`} onClick={() => setSelected(tab.id)}><Terminal size={14} />{tab.host.name}</button><button type="button" className="icon-button" aria-label={`关闭 ${tab.host.name} 的终端`} onClick={() => closeTab(tab.id)}><X size={14} /></button></div>)}</div> : <div className="lan-terminal-empty"><Terminal size={32} /><h2>SSH 终端</h2><p>从左侧选择一台 SSH 主机打开会话。</p></div>}
+        {!!tabs.length ? <div role="tablist" aria-label="SSH 会话" className="lan-terminal-tabs">{tabs.map(tab => <div key={tab.id} className={selected === tab.id ? 'selected' : ''}><button type="button" role="tab" aria-selected={selected === tab.id} aria-controls={`lan-tab-${tab.id}`} onClick={() => setSelected(tab.id)}><Terminal size={14} />{tab.host.name}<small>{endpoint(tab.host)}</small></button><button type="button" className="icon-button" aria-label={`关闭 ${tab.host.name} 的终端`} onClick={() => closeTab(tab.id)}><X size={14} /></button></div>)}</div> : <div className="lan-terminal-empty"><Terminal size={32} /><h2>SSH 终端</h2><p>从左侧选择一台 SSH 主机打开会话。</p></div>}
         <Suspense fallback={<p className="lan-note">正在加载终端…</p>}>{tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}><SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={allowed('files')} portal={portal} /></div>)}</Suspense>
       </section>}
     </div>}

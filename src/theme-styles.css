@@ -102,32 +102,33 @@
   --button-shadow: color-mix(in srgb, var(--accent) 16%, transparent);
   --color-story-background: linear-gradient(135deg, var(--surface), var(--tint));
 }
-:root[data-theme-style=minimal] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .collection-welcome, .color-story-card, .pc-dialog, .pc-shell) { border-radius: 6px; box-shadow: none; }
-:root[data-theme-style=organic] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .collection-welcome, .color-story-card, .pc-dialog, .pc-shell) { border-radius: 24px; }
-:root[data-theme-style=editorial] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .collection-welcome, .color-story-card, .pc-dialog, .pc-shell) { border-radius: 4px; }
-:root[data-theme-style=editorial] :is(.welcome-content h1, .settings-heading h1, .pc-heading h1, .pc-card h3) { font-family: Georgia, 'Songti SC', SimSun, serif; letter-spacing: .02em; }
-:root[data-theme-style=brutalist] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .collection-welcome, .color-story-card, .pc-dialog, .pc-shell) { border: 2px solid var(--line); border-radius: 2px; box-shadow: var(--shadow); }
+:root[data-theme-style=minimal] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border-radius: 6px; box-shadow: none; }
+:root[data-theme-style=organic] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border-radius: 24px; }
+:root[data-theme-style=editorial] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border-radius: 4px; }
+:root[data-theme-style=editorial] :is(.overview-heading h1, .settings-heading h1, .pc-heading h1, .pc-card h3) { font-family: Georgia, 'Songti SC', SimSun, serif; letter-spacing: .02em; }
+:root[data-theme-style=brutalist] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border: 2px solid var(--line); border-radius: 2px; box-shadow: var(--shadow); }
 :root[data-theme-style=brutalist] :is(.run-button, .secondary-button, .pc-bulk button, .theme-option, .quick-start-grid button, .smart-open-input textarea) { border: 2px solid var(--line); border-radius: 2px; }
-:root[data-theme-style=soft] :is(.floating-navbar, .settings-section, .pc-card, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .color-story-card, .pc-dialog, .pc-shell) { border-radius: 22px; box-shadow: var(--shadow); }
+:root[data-theme-style=soft] :is(.floating-navbar, .settings-section, .pc-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border-radius: 22px; box-shadow: var(--shadow); }
 :root[data-theme-style=soft] :is(.run-button, .secondary-button, .quick-start-grid button, .theme-option) { border-radius: 16px; }
 :root[data-theme-style=glass] {
   --app-background: radial-gradient(ellipse at top left, var(--tint), transparent 65%), var(--bg);
   --glass: color-mix(in srgb, var(--surface) 90%, transparent);
 }
-:root[data-theme-style=glass] :is(.floating-navbar, .sidebar, .settings-section, .pc-card, .pc-shell, .welcome-card, .quick-start-card, .smart-open, .tool-card, .color-story-card) { background: var(--glass); backdrop-filter: blur(24px) saturate(115%); border-radius: 16px; box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
+:root[data-theme-style=glass] :is(.floating-navbar, .sidebar, .settings-section, .pc-card, .pc-shell, .quick-start-card, .smart-open, .tool-card) { background: var(--glass); backdrop-filter: blur(24px) saturate(115%); border-radius: 16px; box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
 :root[data-theme-style=gradient] {
   --app-background: linear-gradient(135deg, var(--bg), var(--soft) 55%, var(--gradient-end));
   --hero-bg: linear-gradient(120deg, var(--tint), var(--surface) 60%, var(--gradient-end));
   --color-story-background: linear-gradient(135deg, var(--gradient-end), var(--tint));
 }
-:root[data-theme-style=gradient] :is(.settings-section, .pc-card, .welcome-card, .quick-start-card, .smart-open, .tool-card, .color-story-card, .pc-dialog) { border-radius: 18px; box-shadow: var(--shadow); }
+:root[data-theme-style=gradient] :is(.settings-section, .pc-card, .quick-start-card, .smart-open, .tool-card, .pc-dialog) { border-radius: 18px; box-shadow: var(--shadow); }
+:root[data-theme-style=gradient] .home-launch .smart-open { background: var(--hero-bg); }
 :root[data-theme-style=gradient] .run-button { background: linear-gradient(110deg, var(--accent), var(--accent-hover)); }
 :root[data-theme-style=retro] {
   --app-background: repeating-linear-gradient(0deg, transparent 0 3px, color-mix(in srgb, var(--text) 3%, transparent) 3px 4px), var(--bg);
 }
-:root[data-theme-style=retro] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .welcome-card, .quick-start-card, .smart-open, .tool-card, .sidebar, .color-story-card, .pc-dialog, .pc-shell) { border-radius: 8px; box-shadow: var(--shadow); }
-:root[data-theme-style=retro] :is(.welcome-content h1, .settings-heading h1, .pc-heading h1, .pc-card h3, .quick-start-card h2) { font-family: Georgia, 'Songti SC', SimSun, serif; letter-spacing: .025em; }
-:root[data-theme-style=retro] .welcome-card { border: 3px double var(--line); }
+:root[data-theme-style=retro] :is(.floating-navbar, .settings-section, .pc-card, .pc-profile, .quick-start-card, .smart-open, .tool-card, .sidebar, .pc-dialog, .pc-shell) { border-radius: 8px; box-shadow: var(--shadow); }
+:root[data-theme-style=retro] :is(.overview-heading h1, .settings-heading h1, .pc-heading h1, .pc-card h3, .quick-start-card h2) { font-family: Georgia, 'Songti SC', SimSun, serif; letter-spacing: .025em; }
+:root[data-theme-style=retro] .home-launch .smart-open { border: 3px double var(--line); }
 .theme-picker { min-width: 0; border: 0; margin: 16px 0; padding: 0; }
 .theme-picker legend { font-size: 13px; font-weight: 600; }
 .theme-picker p { color: var(--muted); font-size: 12px; }

@@ -55,15 +55,14 @@ export function PublishedFileShares({ active }: { active: boolean }) {
           <header><h2>共享目录</h2><ShareSearch query={query} change={setQuery} /></header>
           {visible.length > 0 ? <ul className="pl-lines file-share-list">{visible.map(item => <li key={item.id}><button className="pl-share-row" type="button"
             aria-pressed={item.id === share?.id} onClick={() => setSelected(item.id)}>
-            <Folder size={16} /><strong>{item.name}</strong><span>{scopeLabel(item.roots)}</span><ArrowUpRight size={16} />
-          </button></li>)}</ul> : <p className="pl-panel-empty">{shares.length ? '找不到匹配的共享。' : '主机暂无已发布的文件共享。'}</p>}
+            <Folder size={16} /><strong>{item.name}</strong><span>{scopeLabel(item.roots)}</span>
+          </button><a className="pl-button pl-download" href={item.href} aria-label={`浏览与下载 ${item.name}`}><ArrowUpRight size={15} />下载</a></li>)}</ul> : <p className="pl-panel-empty">{shares.length ? '找不到匹配的共享。' : '主机暂无已发布的文件共享。'}</p>}
         </section>
         {share && <section className="pl-surface pl-share-detail">
           <header><div><small>共享详情</small><h2>{share.name}</h2></div></header>
           <div className="pl-share-detail-body">
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>
             <ShareRoots roots={share.roots} />
-            <a className="pl-button pl-primary file-share-browse" href={share.href}><ArrowUpRight size={16} />浏览与下载</a>
           </div>
         </section>}
       </div>
@@ -179,14 +178,14 @@ export default function FileShares({ active }: { active: boolean }) {
           </header>
           <div className="pl-share-detail-body">
             <div className="pl-share-endpoint"><code>:{share.port}</code><div><strong>{share.lan ? '局域网直连' : '仅本机直连'}</strong>
-              <span>{share.published ? '已配置发布到共享工作台' : '仅通过独立端口访问'}</span></div><Globe2 size={16} /></div>
+              <span className="pl-endpoint-status"><b data-tone={shareTone(share)}>{shareStatus(share)}</b>{share.published ? '已发布' : '未发布'}</span></div><Globe2 size={16} /></div>
             {share.error && <p className="pc-error" role="alert">{share.error}</p>}
             <div className="pl-actions">
               <button className="pl-button pl-primary" type="button" disabled={!share.running || busy} onClick={() => void fileShareRequest('open', { id: share.id }).catch(failure => setError(failure.message))}><ArrowUpRight size={16} />打开网页</button>
               <button className="pl-button" type="button" disabled={busy} onClick={() => void mutate('toggle', { id: share.id, revision: state.revision, enabled: !share.running }, share.running ? '共享已停止' : '共享已启动')}>{share.running ? '停止' : '启动'}</button>
             </div>
             {share.links.length > 0 && <div className="pl-share-links"><h3>访问地址</h3>
-              {share.links.map(link => <div key={link}><code>{new URL(link).host}</code><button type="button" className="pl-text"
+              {share.links.map(link => <div key={link}><code>{link}</code><button type="button" className="pl-text"
                 aria-label={`复制 ${new URL(link).host} 的共享链接`} onClick={() => copy(link)}><Copy size={16} />复制链接</button></div>)}
             </div>}
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>

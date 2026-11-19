@@ -1,5 +1,5 @@
 export const themeStyles = [
-  { id: 'default', name: '默认主题', description: '原有灰白 / 石墨灰与蓝色强调', colors: ['#f5f6f8', '#3d5fad', '#141518'] },
+  { id: 'default', name: '默认主题', description: '原有灰白 / 石墨灰与蓝色强调', colors: ['#f2f4f7', '#305aa6', '#141518'] },
   { id: 'minimal', name: '极简扁平', description: '黑白层次、克制留白与清晰边界', colors: ['#fafafa', '#27272a', '#18181b'] },
   { id: 'organic', name: '自然有机', description: '暖米色、森林绿与柔和圆角', colors: ['#f5f3ea', '#356345', '#18231c'] },
   { id: 'editorial', name: '编辑杂志', description: '纸张色、酒红强调与衬线标题', colors: ['#f7f1e8', '#963d50', '#261d21'] },

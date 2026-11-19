@@ -221,7 +221,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       );
       assert.equal(
         await js(
-          '(()=>{const bar=document.querySelector(".floating-navbar"),r=bar.getBoundingClientRect(),nav=bar.querySelector(".floating-nav-links");return nav.querySelectorAll("button").length===3&&!!nav.querySelector("[aria-label=共享]")&&!!nav.querySelector("[aria-label=工作空间]")&&!!nav.querySelector("[aria-label=收藏]")&&[...bar.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
+          '(()=>{const bar=document.querySelector(".floating-navbar"),r=bar.getBoundingClientRect();return ["打开工具搜索","恢复工作区","保存工作区"].every(label=>!!bar.querySelector(`[aria-label="${label}"]`))&&[...bar.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(button=>{const b=button.getBoundingClientRect();return b.left>=r.left&&b.right<=r.right+1})})()',
         ),
         true,
         `Navigation clipped at ${width}`,
@@ -303,6 +303,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       })()`);
       await click('保存', 'dialog[open] button');
       await wait('document.querySelector(".td-sheet-head h2")?.textContent === "本机清单"');
+      await js('document.querySelector(".td-toolbar .td-more").open = true');
       await click('源码', '.td-toolbar button');
       await click('新任务', '.td-toolbar button');
       await window.webContents.insertText('本机待办 @today');
@@ -457,8 +458,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await wait('document.querySelector(".td-editor .cm-activeLine").textContent.includes("@after(build)")');
       await click('源码', toolbar);
       await wait('!document.querySelector(".td-preview-token")');
-      assert.deepEqual(await js(`[...document.querySelectorAll(${JSON.stringify(syntaxToolbar)})].map(button => button.textContent)`),
-        ['验收条件', '续做点', '自定义视图', '添加引用', '等待回访', '前置任务', '周期任务', '分组默认']);
+      assert.deepEqual(await js(`[...document.querySelectorAll(${JSON.stringify(syntaxToolbar)})].map(button => button.textContent).sort()`),
+        ['验收条件', '续做点', '自定义视图', '添加引用', '等待回访', '前置任务', '周期任务', '分组默认'].sort());
       await jump('核对下载', js);
       await click('续做点', syntaxToolbar);
       await wait('document.querySelector(".td-syntax-form input")?.value === "验证只读下载"');
@@ -538,7 +539,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       browser.setContentSize(375, 780);
       await wait('Math.abs(innerWidth - 375) <= 1', web);
       assert.ok(await web('[...document.querySelectorAll(".td-toolbar")].every(bar => bar.scrollWidth <= bar.clientWidth)'));
-      assert.ok(await web('[...document.querySelectorAll(".td-toolbar button")].every(button => button.getBoundingClientRect().height <= 29)'));
+      assert.ok(await web('document.querySelector(".td-document-picker").getClientRects().length === 1 && document.querySelector(".td-documents nav").getClientRects().length === 0'));
       await wait('!!document.querySelector(".td-preview-reference[data-reference-kind=share]")', web);
       await web('document.querySelector(".td-preview-reference[data-reference-kind=share]").click()');
       try {

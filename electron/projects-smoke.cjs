@@ -135,7 +135,7 @@ module.exports = async function checkProjects(window, output, staging) {
   await ipc('save', { data: batchState, revision: batchState.revision });
   await click('刷新');
   await wait(window.webContents, 'document.querySelectorAll(".pc-card").length === 3');
-  assert.equal(await js('[...document.querySelectorAll(".pc-bulk button")].find(b => b.textContent.includes("删除所选")).disabled'), true);
+  assert.equal(await js('!!document.querySelector(".pc-bulk")'), false);
   const originalMinimum = window.getMinimumSize();
   window.setMinimumSize(360, 600);
   async function checkBulkAlignment(state) {
@@ -171,8 +171,6 @@ module.exports = async function checkProjects(window, output, staging) {
     await js(`document.documentElement.dataset.themeStyle = 'default'; document.documentElement.dataset.theme = 'dark'`);
     window.setContentSize(1440, 1000);
   }
-  await checkBulkAlignment('disabled');
-
   await js(`[...document.querySelectorAll('.pc-card')].filter(card => card.textContent.includes('批量项目')).forEach(card => card.querySelector('input[type=checkbox]').click())`);
   await wait(window.webContents, 'document.querySelector(".pc-bulk").textContent.includes("已选 2 项")');
   await checkBulkAlignment('selected');
@@ -191,7 +189,7 @@ module.exports = async function checkProjects(window, output, staging) {
   await js('new Promise(resolve => setTimeout(resolve, 250))');
   await fs.writeFile(path.join(output, 'preview-project-batch-delete.png'), (await window.webContents.capturePage()).toPNG());
   await click('确认删除');
-  await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-bulk").textContent.includes("已选 0 项")');
+  await wait(window.webContents, '!document.querySelector("dialog[open]") && !document.querySelector(".pc-bulk")');
   const afterBatch = await ipc('get');
   assert.equal(afterBatch.revision, batchRevision + 1, 'one atomic save');
   assert.equal(afterBatch.profiles[1].projects.length, 1);
@@ -403,7 +401,7 @@ module.exports = async function checkProjects(window, output, staging) {
     );
     assert.equal(
       await remote.webContents.executeJavaScript(
-        'document.querySelector(".pc-toolbar .run-button").disabled',
+        '!document.querySelector(".pc-entry-actions .run-button")',
       ),
       true,
     );
@@ -444,7 +442,7 @@ module.exports = async function checkProjects(window, output, staging) {
     await remote.webContents.executeJavaScript(
       'document.documentElement.dataset.theme="light"; new Promise(resolve=>setTimeout(resolve,200))',
     );
-    assert.deepEqual(await remote.webContents.executeJavaScript('({background:getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),accent:getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()})'), { background: '#f5f6f8', accent: '#3d5fad' });
+    assert.deepEqual(await remote.webContents.executeJavaScript('({background:getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),accent:getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()})'), { background: '#f2f4f7', accent: '#305aa6' });
     await fs.writeFile(
       path.join(output, "preview-project-portal.png"),
       (await remote.webContents.capturePage()).toPNG(),

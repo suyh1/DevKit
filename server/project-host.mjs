@@ -9,8 +9,8 @@ import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { probeProjects } from "./project-probe.mjs";
 import { createSharedWorkspaces } from './shared-workspaces.mjs';
-import { sharingServices, sharingAliases, hasLegacySharing } from '../shared/sharing.mjs';
-import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors, visitorServices } from './sharing-visitors.mjs';
+import { sharingServices, sharingAliases, hasLegacySharing, visitorServices } from '../shared/sharing.mjs';
+import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } from './sharing-visitors.mjs';
 import { webTransferLimit } from './lan-sftp.mjs';
 
 const auditActions = new Set(['command', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);

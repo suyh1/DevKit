@@ -18,7 +18,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const [error, setError] = useState(''), [message, setMessage] = useState('');
   const [sourceStatus, setSourceStatus] = useState<Record<string, 'pending' | 'ready' | 'failed'>>({});
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [regex, setRegex] = useState(false), [level, setLevel] = useState('all'), [raw, setRaw] = useState(false), [paused, setPaused] = useState(false), [loading, setLoading] = useState(false);
-  const [hostFilter, setHostFilter] = useState('');
+  const [hostFilter, setHostFilter] = useState(''), [focusedSource, setFocusedSource] = useState('');
   const rawAllowed = raw && canReadRawLogs();
   const linked = useWorkspaceResource('logs');
   const handledLink = useRef('');
@@ -60,11 +60,14 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     const matched = catalog.sources.filter(item => item.id === linked || `instance:${item.instanceId}` === linked).slice(0, 4);
     if (!matched.length) return;
     handledLink.current = linked;
-    setSearch(''); setHostFilter(''); setSelected(matched.map(item => item.id)); setPaused(false);
+    setSearch(''); setHostFilter(''); setSelected(matched.map(item => item.id)); setFocusedSource(matched[0].id); setPaused(false);
   }, [linked, active, catalog.sources]);
   function toggle(id: string) {
     setSelected(values => values.includes(id) ? values.filter(value => value !== id) : values.length < 4 ? [...values, id] : values);
   }
+  const paneId = selected.includes(focusedSource) ? focusedSource : selected[0];
+  const panes = selected.map(id => catalog.sources.find(item => item.id === id)
+    || { id, name: '来源已移除或不再授权', path: '', kind: 'jar' as const, instanceId: '', mode: 'file' as const });
   async function exportLog(source: LogSource) {
     setMessage('');
     try {
@@ -93,15 +96,23 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
         <div className="log-source-list">{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : hostLoad === 'pending' || loading && !hostLoad ? '正在读取来源…' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
-      {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>从左侧选择最多 4 个来源。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className={`log-panels log-panels-${selected.length}`}>{selected.map(id => {
-        const source = catalog.sources.find(item => item.id === id) || { id, name: '来源已移除或不再授权', path: '', kind: 'jar' as const, instanceId: '', mode: 'file' as const };
-        return <LogPane key={`${id}:${rawAllowed}`} source={source} tracking={active && !paused} refreshSeconds={refreshSeconds} query={query} regex={regex} level={level} redact={!rawAllowed} exportLog={() => void exportLog(source)} close={() => toggle(id)} />;
-      })}</div>}
+      {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>从左侧选择最多 4 个来源。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className="log-streams">
+        {panes.length > 1 && <div className="log-switcher" role="group" aria-label="切换日志流">
+          {panes.map(source => <button key={source.id} type="button" aria-pressed={paneId === source.id}
+            title={source.hostName ? `${source.hostName} / ${source.name}` : source.name}
+            onClick={() => setFocusedSource(source.id)}>{source.name}</button>)}
+        </div>}
+        <div className={`log-panels log-panels-${panes.length}`}>{panes.map(source =>
+          <LogPane key={`${source.id}:${rawAllowed}`} source={source} focused={source.id === paneId} tracking={active && !paused}
+            refreshSeconds={refreshSeconds} query={query} regex={regex} level={level} redact={!rawAllowed}
+            exportLog={() => void exportLog(source)} close={() => toggle(source.id)} />)}
+        </div>
+      </div>}
     </div>
   </section>;
 }
 
-function LogPane({ source, tracking, refreshSeconds, query, regex, level, redact, exportLog, close }: { source: LogSource; tracking: boolean; refreshSeconds: number; query: string; regex: boolean; level: string; redact: boolean; exportLog: () => void; close: () => void }) {
+function LogPane({ source, focused, tracking, refreshSeconds, query, regex, level, redact, exportLog, close }: { source: LogSource; focused: boolean; tracking: boolean; refreshSeconds: number; query: string; regex: boolean; level: string; redact: boolean; exportLog: () => void; close: () => void }) {
   const [stream, setStream] = useState<Stream>();
   const [filtered, setFiltered] = useState(''), [filterError, setFilterError] = useState(''), [follow, setFollow] = useState(true), [notice, setNotice] = useState('');
   const output = useRef<HTMLPreElement>(null);
@@ -140,7 +151,7 @@ function LogPane({ source, tracking, refreshSeconds, query, regex, level, redact
     return () => { clearTimeout(timer); worker.terminate(); };
   }, [stream?.text, query, regex, level, redact]);
   useEffect(() => { if (follow && output.current) output.current.scrollTop = output.current.scrollHeight; }, [filtered, follow]);
-  return <section className="log-pane" aria-label={source.name}><header><div><strong>{source.name}</strong><small title={source.path}>{source.path || '应用内存输出'}</small></div><button aria-label={`关闭 ${source.name}`} onClick={close}><X size={15} /></button></header>
+  return <section className="log-pane" aria-label={source.name} data-focused={focused}><header><div><strong>{source.name}</strong><small title={source.path}>{source.path || '应用内存输出'}</small></div><button aria-label={`关闭 ${source.name}`} onClick={close}><X size={15} /></button></header>
     <div className="log-pane-tools"><label><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} />自动滚动</label><div><button title="回到底部" aria-label={`回到底部 ${source.name}`} onClick={() => { setFollow(true); if (output.current) output.current.scrollTop = output.current.scrollHeight; }}><ArrowDown size={14} /></button><button title="清空本页显示" aria-label={`清空 ${source.name}`} onClick={clear}><Eraser size={14} /></button><button title="复制已筛选显示内容" aria-label={`复制 ${source.name}`} disabled={!!filterError} onClick={() => { void copyText(filtered).then(() => setNotice('已复制当前筛选内容。')).catch(error => setNotice(error.message)); }}><Copy size={14} /></button>{canExportLogs() && <button title="导出来源最近的有界内容（不应用筛选）" aria-label={`导出 ${source.name}`} onClick={exportLog}><Download size={14} /></button>}</div></div>
     {(stream?.error || filterError) && <p className="log-pane-error" role="alert">{stream?.error || filterError}{stream?.error && stream?.text && ' 当前保留上次内容，状态可能已过期。'}</p>}
     <pre ref={output} tabIndex={0} aria-label={`${source.name} 日志内容`}>{filterError ? '' : filtered || (stream ? '暂无匹配的日志行。' : '正在连接来源…')}</pre>

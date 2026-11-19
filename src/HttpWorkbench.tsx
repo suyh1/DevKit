@@ -230,11 +230,11 @@ export default function HttpWorkbench({
     }
   }
   return (
-    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目 · 文档与调试</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
+    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading workspace-banner">
         <div className="page-title">
-          <div className="eyebrow">HTTP CLIENT</div>
           <h1>HTTP 调试</h1>
+          <p className="workflow-intro">快速请求 · 集合保存在{remoteAccess() ? '当前浏览器' : '本机'}</p>
         </div>
         <button
           className="secondary-button"
@@ -249,9 +249,6 @@ export default function HttpWorkbench({
           新请求
         </button>
       </div>
-      <p className="workflow-intro">
-        请求由共享主机或桌面本机发出，点击发送才访问目标。支持 HTTP(S)、文本/JSON 正文；不自动跟随重定向。响应仅在内存。{remoteAccess() && " 请求集合保存在当前浏览器；接口项目才与主机共享。"}
-      </p>
       <div className="http-layout">
         <aside ref={collection} className="http-collection">
           <h2>
@@ -409,6 +406,7 @@ export default function HttpWorkbench({
             >
               生成请求代码
             </button>
+            <small className="http-execution-host">请求发起方 <strong>{remoteAccess() ? location.host : '桌面本机'}</strong></small>
             <MotionButton
               trackBusy
               className="run-button"
@@ -463,7 +461,7 @@ export default function HttpWorkbench({
             <MotionPresence present={!!response}>
               {response && (
                 <section className="http-response">
-                  <div className="feature-toolbar">
+                  <div className="http-response-summary">
                     <strong className={response.status >= 400 ? 'pc-invalid' : 'success-text'}>
                       {response.status} {response.statusText}
                     </strong>
@@ -471,6 +469,8 @@ export default function HttpWorkbench({
                       {response.elapsed} ms · {response.bytes.toLocaleString()} 字节
                     </span>
                     {response.status >= 300 && response.status < 400 && <span>未跟随重定向</span>}
+                  </div>
+                  <div className="feature-toolbar">
                     <MotionGroup className="http-response-tabs">
                       <button className="text-button" aria-pressed={responseTab === 'body'} onClick={() => setResponseTab('body')}>
                         响应正文

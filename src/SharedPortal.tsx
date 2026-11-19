@@ -460,6 +460,12 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',
         page === 'lan-hosts' && services['lan-hosts'].terminal ? '可使用 SSH 终端' : '',
         page === 'lan-hosts' && services['lan-hosts'].rdp ? '可连接远程桌面' : '',
+        page === 'lan-hosts' && services['lan-hosts'].files ? '可用 SFTP' : '',
+        page === 'lan-hosts' && services['lan-hosts'].diagnose ? '可诊断连接' : '',
+        page === 'lan-hosts' && services['lan-hosts'].discover ? '可发现主机' : '',
+        page === 'lan-hosts' && services['lan-hosts'].wake ? '可唤醒主机' : '',
+        page === 'logs' && services.logs.export ? '可导出日志' : '',
+        page === 'logs' && services.logs.raw ? '可读原始日志' : '',
         page === "http" && services.http.send ? "可发送请求" : "",
         page === "projects" && services.projects.probe ? "可检测入口" : "",
       ]
@@ -518,7 +524,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       </header>
       {session?.authenticated && <CommandPalette key={workspaceEpoch} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
       {session?.authenticated && <>
-        <aside className="portal-sidebar"><span className="portal-nav-caption">共享工作台</span><PortalNavigation modules={available} page={page} navigate={navigate} /><p>内容与运行操作均来自共享主机。服务及权限由主机配置。</p></aside>
+        <aside className="portal-sidebar"><span className="portal-nav-caption">共享工作台</span><PortalNavigation modules={available} page={page} navigate={navigate} /><p>共享主机 <strong>{location.host}</strong></p></aside>
         <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong><button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
       </>}
       <div key={workspaceEpoch} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
@@ -530,15 +536,20 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
           </section>
         ) : (
           <>
-            {page !== 'project-todos' && page !== 'file-shares' && <div className="portal-access">
-              <span>
-                {page === "projects"
-                  ? "项目与档案保存在共享主机；入口在当前浏览器打开，入口检测由主机执行。"
-                  : page === 'lan-hosts' ? 'SSH 连接和端口检测由共享主机发起，连接凭据保存在共享主机。' : page === 'logs' ? '仅可读取已授权的日志来源；筛选与清空显示不修改主机文件。' : page === 'monitor' ? '检测由主机定时执行；故障与恢复记录、历史样本保存在共享主机。' : page === 'jar' ? '路径和进程属于各应用所在的主机。多人可查看控制台，输入需运行权限和控制权。' : page === "nginx"
-                    ? "配置、路径和运行操作指向实例所在的主机。导出文件下载到当前浏览器。"
-                    : "接口项目保存在共享主机，请求从主机发出，localhost 指主机；快速请求集合保存在当前浏览器。"}
-              </span>
-            </div>}
+            {active?.enabled && <details className="portal-access">
+              <summary>主机与权限 <span>{location.host}</span></summary>
+              <p>{summary}。{{
+                projects: '从当前浏览器打开入口，检测由共享主机发起。',
+                'project-todos': '清单保存在共享主机。',
+                'file-shares': '从共享主机下载已发布的文件。',
+                'lan-hosts': '连接由共享主机发起，目标地址见各连接。',
+                logs: '只读追踪来源，导出能力由主机授权。',
+                monitor: '共享主机执行定时检测。',
+                jar: '路径和进程属于选中的实例主机。',
+                nginx: '配置和运行操作作用于选中的实例主机。',
+                http: '由共享主机发送请求；快速请求集合保存在当前浏览器。',
+              }[page]}</p>
+            </details>}
             {notice && (
               <div className="portal-notice" role="status">
                 <span>{notice}</span>

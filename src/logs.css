@@ -10,3 +10,23 @@
 @media(max-width:700px) { .log-center { height:auto; min-height:0; }.log-layout { display:block; }.log-sources { max-height:240px; margin-bottom:12px; }.log-source-list { min-height:70px; }.log-panels { display:flex; flex-direction:column; overflow:visible; }.log-pane { min-height:280px; height:380px; flex:none; }.log-query { flex-basis:100%; }.log-actions { width:100%; }.log-toolbar { gap:10px; }.log-heading h1 { font-size:22px; }.log-empty { min-height:220px; } }
 .log-source-list h3 { margin:10px 6px 4px; color:var(--muted); font-size:12px; }
 .log-sources > select { width: 100%; min-width: 0; flex-shrink: 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); color: var(--text); font: inherit; }
+
+.log-center { container-type: inline-size; }
+.log-streams { min-width: 0; min-height: 0; display: grid; }
+.log-switcher { display: none; }
+.log-center :is(.log-live, .log-pane header small, .log-pane footer, .log-pane footer small, .log-pane-tools > label, .log-sources small, .log-empty small, .log-warnings) { font-size: 12px; }
+.log-pane > pre { font-family: var(--font-mono); font-size: 13px; }
+@container (max-width: 720px) {
+  .log-layout { display: block; }
+  .log-sources { max-height: 235px; margin-bottom: 12px; }
+  .log-switcher { display: flex; gap: 4px; padding: 4px; margin-bottom: 5px; overflow-x: auto; }
+  .log-switcher button { flex: none; min-height: 34px; padding-inline: 10px; border-radius: 5px; background: var(--surface); color: var(--muted); }
+  .log-switcher button[aria-pressed=true] { background: var(--tint); color: var(--accent); }
+  .log-panels { display: block; overflow: visible; }
+  .log-pane { height: min(420px, 65vh); min-height: 240px; }
+  .log-pane[data-focused=false] { display: none; }
+}
+@media (pointer: coarse) {
+  .log-switcher button { min-height: 44px; }
+  .log-pane button { min-width: 44px; min-height: 44px; }
+}

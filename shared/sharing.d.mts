@@ -13,3 +13,4 @@ export function emptySharingServices(): SharingServices;
 export function hasLegacySharing(value?: unknown): boolean;
 export function sharingServices(value?: unknown): SharingServices;
 export function sharingAliases(services: SharingServices): { canEdit: boolean; shareProjects: boolean; shareNginx: boolean; shareHttp: boolean; nginxControl: boolean };
+export function visitorServices(serviceGrants: SharingServices, visitor: SharingServices): SharingServices;

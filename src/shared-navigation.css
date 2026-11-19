@@ -1,6 +1,6 @@
 .shared-navigation { display:flex; align-items:center; }
-.floating-navbar .floating-nav-links .shared-nav-trigger { width:auto; gap:5px; }
-.floating-navbar .floating-nav-links .shared-nav-trigger>span { display:inline; }
+.shared-nav-trigger { display: inline-flex; align-items: center; gap: 5px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 12px; white-space: nowrap; }
+.shared-nav-trigger:is(:hover, [aria-expanded=true], [aria-current=page]) { color: var(--accent); background: var(--tint); }
 @media(max-width:760px) { .floating-navbar .floating-nav-links>[aria-label="工作空间"]>span { display:none; } }
 .shared-nav-chevron { transition:transform 140ms var(--ease-out); opacity:.65; }
 .shared-nav-trigger[aria-expanded=true] .shared-nav-chevron { transform:rotate(180deg); }

@@ -324,3 +324,6 @@ input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; curs
 .smart-suggestion small { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .smart-open-error { color: var(--diff-deleted); font-size: 12px; }
 @media (max-width: 600px) { .smart-open-input { flex-direction: column; } .smart-open-input > div { flex-direction: row; flex-wrap: wrap; } .smart-open { padding: 12px; } }
+
+.output-card .result-routing { flex-shrink: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.previous-result { color: var(--warning); }

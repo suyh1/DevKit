@@ -11,7 +11,7 @@ import { Radio, RefreshCw, Plus } from "lucide-react";
 import { isProjectDesktop, projectRequest } from "./project-api";
 import type { Sharing, SharingAudit } from "./project-api";
 import { workspaceModules } from './catalog';
-import { emptySharingServices } from "../shared/sharing.mjs";
+import { emptySharingServices, visitorServices } from "../shared/sharing.mjs";
 import type { SharingServices } from "../shared/sharing.mjs";
 import { Modal, Field } from "./project-components";
 import { MotionButton, MotionPresence } from "./Motion";
@@ -121,13 +121,8 @@ export function SharingButton({ global = false }: { global?: boolean }) {
       onClick={open}
     >
       <Radio size={15} />
-      <span>
-        {global
-          ? status?.running && !error
-            ? "共享中"
-            : error ? "状态未知" : !status ? "读取中" : "未开启"
-          : "共享设置"}
-      </span>
+      <span>{global ? '局域网共享' : '共享设置'}</span>
+      {global && <small>{status?.running && !error ? '运行中' : error ? '状态未知' : !status ? '读取中' : '未开启'}</small>}
       {global && <i aria-hidden="true" />}
     </button>
   );
@@ -271,11 +266,27 @@ function SharingPanel({
             </>
           ) : (
             <>
-              <p>
-                设置访问地址、登录方式与各栏目的访客权限
-                调试的局域网访问。所有路径、文件与运行命令都属于这台主机，退出
-                DevKit 会停止共享。
-              </p>
+              <div className="pc-sharing-state">
+                <strong>{draft.running ? "共享正在运行" : "共享已停止"}</strong>
+                {draft.addresses.map((url) => (
+                  <div key={url}>
+                    <code>{url}</code>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() =>
+                        void copyText(url)
+                          .then(() => setMessage("共享地址已复制。"))
+                          .catch((error) => setError(String(error)))
+                      }
+                    >
+                      复制地址
+                    </button>
+                  </div>
+                ))}
+                {!draft.running && <small>开启后显示可供访客访问的地址。</small>}
+                <small>数据目录 <code>{draft.directory}</code></small>
+              </div>
               <fieldset disabled={busy} className="sharing-fields">
                 <div className="pc-form-grid">
                   <Field label="监听范围">
@@ -329,39 +340,8 @@ function SharingPanel({
                     <Field label="证书对应域名或 IPv4"><input placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
                   </div>}
                 </details>
-                <details className="sharing-production">
-                  <summary>独立访客权限{draft.visitors?.length ? `（${draft.visitors.length}）` : ''}</summary>
-                  <p>每名访客使用自己的名称和口令。共享服务设置限定访客可获得的权限。</p>
-                  {(draft.visitors || []).map((visitor, index) => {
-                    const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
-                    const existing = visitor.hasPassword === true;
-                    const labels: Record<string, string> = { edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: 'JAR 日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
-                    return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
-                      <div className="pc-form-grid">
-                        <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
-                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /></Field>
-                      </div>
-                      {workspaceModules.map(item => {
-                        const name = item.id, service = visitor.services[name];
-                        const patch = (key: string, value: boolean) => change({ ...visitor, services: { ...visitor.services, [name]: { ...service, [key]: value } } });
-                        return <div className="sharing-visitor-service" key={name}><label><input type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
-                          {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
-                        </div>;
-                      })}
-                      <button type="button" className="text-button" onClick={() => setDraft({ ...draft, visitors: draft.visitors!.filter((_, position) => position !== index) })}>移除访客</button>
-                    </fieldset>;
-                  })}
-                  <button type="button" className="secondary-button" disabled={(draft.visitors?.length || 0) >= 30} onClick={() => setDraft({ ...draft, visitors: [...(draft.visitors || []), { name: '', password: '', services: emptySharingServices() }] })}><Plus size={14} />添加访客</button>
-                </details>
-                <details className="sharing-production" onToggle={event => {
-                  if (!event.currentTarget.open) return;
-                  void projectRequest<SharingAudit[]>('sharing-audit').then(setAudit).catch(failure => setError(failure.message));
-                }}><summary>访问审计</summary>
-                  {audit ? <ul className="sharing-audit">{audit.map((item, index) => <li key={index}><time>{new Date(item.at).toLocaleString()}</time> · {item.visitor || '通用口令'} · {item.action} · {({ ok: '成功', failed: '失败', denied: '拒绝', revoked: '会话撤销' })[item.outcome] || item.outcome}</li>)}</ul> : <p>正在读取审计记录…</p>}
-                  {audit?.length === 0 && <p>暂无访问记录。</p>}
-                </details>
                 <div className="sharing-services-heading">
-                  <h3>共享服务与访问权限</h3>
+                  <h3>开放栏目</h3>
                   <p className="pc-hint">
                     按需选择服务；开放后默认只允许查看，再分别授予编辑或执行权限。
                   </p>
@@ -564,6 +544,46 @@ function SharingPanel({
                     请至少选择一个服务后开启共享。如需关闭所有访问，请使用“停止共享”。
                   </p>
                 )}
+                <details className="sharing-production">
+                  <summary>访客权限{draft.visitors?.length ? `（${draft.visitors.length}）` : ''}</summary>
+                  <p>每名访客使用自己的名称和口令。共享服务设置限定访客可获得的权限。</p>
+                  {(draft.visitors || []).map((visitor, index) => {
+                    const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
+                    const existing = visitor.hasPassword === true;
+                    const labels: Record<string, string> = { edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: 'JAR 日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
+                    const effective = visitorServices(draft.services, visitor.services);
+                    const grants = workspaceModules.flatMap(item => {
+                      const service = effective[item.id];
+                      if (!service.enabled) return [];
+                      const extra = Object.entries(service).filter(([key, granted]) => key !== 'enabled' && granted).map(([key]) => labels[key]);
+                      const read = item.id === 'file-shares' ? '下载' : '查看';
+                      return [`${item.name}（${[read, ...extra].join('、')}）`];
+                    });
+                    return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
+                      <div className="pc-form-grid">
+                        <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
+                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /></Field>
+                      </div>
+                      {workspaceModules.map(item => {
+                        const name = item.id, service = visitor.services[name];
+                        const patch = (key: string, value: boolean) => change({ ...visitor, services: { ...visitor.services, [name]: { ...service, [key]: value } } });
+                        return <div className="sharing-visitor-service" key={name}><label><input type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
+                          {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
+                        </div>;
+                      })}
+                      <p className="sharing-effective"><strong>生效权限</strong> {grants.length ? grants.join('；') : '暂无可访问的栏目'}</p>
+                      <button type="button" className="text-button" onClick={() => setDraft({ ...draft, visitors: draft.visitors!.filter((_, position) => position !== index) })}>移除访客</button>
+                    </fieldset>;
+                  })}
+                  <button type="button" className="secondary-button" disabled={(draft.visitors?.length || 0) >= 30} onClick={() => setDraft({ ...draft, visitors: [...(draft.visitors || []), { name: '', password: '', services: emptySharingServices() }] })}><Plus size={14} />添加访客</button>
+                </details>
+                <details className="sharing-production" onToggle={event => {
+                  if (!event.currentTarget.open) return;
+                  void projectRequest<SharingAudit[]>('sharing-audit').then(setAudit).catch(failure => setError(failure.message));
+                }}><summary>访问记录</summary>
+                  {audit ? <ul className="sharing-audit">{audit.map((item, index) => <li key={index}><time>{new Date(item.at).toLocaleString()}</time> · {item.visitor || '通用口令'} · {item.action} · {({ ok: '成功', failed: '失败', denied: '拒绝', revoked: '会话撤销' })[item.outcome] || item.outcome}</li>)}</ul> : <p>正在读取审计记录…</p>}
+                  {audit?.length === 0 && <p>暂无访问记录。</p>}
+                </details>
                 <label className="pc-check">
                   <input
                     type="checkbox"
@@ -578,26 +598,6 @@ function SharingPanel({
               <p className="pc-hint">
                 {draft.tls ? '已配置 HTTPS，请使用客户端信任且名称匹配的证书。' : 'HTTP 使用明文连接，仅用于可信局域网。'}系统防火墙需允许所选端口入站。
               </p>
-              <div className="pc-sharing-state">
-                <strong>{draft.running ? "共享正在运行" : "共享已停止"}</strong>
-                {draft.addresses.map((url) => (
-                  <div key={url}>
-                    <code>{url}</code>
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() =>
-                        void copyText(url)
-                          .then(() => setMessage("共享地址已复制。"))
-                          .catch((error) => setError(String(error)))
-                      }
-                    >
-                      复制地址
-                    </button>
-                  </div>
-                ))}
-                <small>数据目录：{draft.directory}</small>
-              </div>
               <footer>
                 {draft.running && (
                   <MotionButton

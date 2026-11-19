@@ -27,17 +27,18 @@ module.exports = async (window, output) => {
     assert.equal(await js(`document.querySelector('.shared-sidebar-trigger').getAttribute('aria-expanded')`), 'false', 'Shared sidebar starts collapsed');
     await js(`document.querySelector('.shared-sidebar-trigger').click()`);
     await wait(window.webContents, `!!document.querySelector('#shared-sidebar-panel:popover-open')`);
-    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 7);
+    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 9);
     assert.equal(await js(`!!document.querySelector('#shared-sidebar-panel [title="局域网主机"]')`), true);
     await js(`document.querySelector('#shared-sidebar-panel [title="日志中心"]').click()`);
     await wait(window.webContents, `!document.querySelector('#shared-sidebar-panel:popover-open')`);
     const minimum = window.getMinimumSize(); window.setMinimumSize(360, 600);
-    for (const width of [1440, 1024, 768, 390]) {
+    await js(`document.querySelector('.topbar button[aria-label="收起导航"]').click()`);
+    for (const width of [1440, 1024, 768]) {
       window.setContentSize(width, 900); await delay(150);
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
       const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('.shared-nav-item').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
-      assert.equal(geometry.count, 7); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
+      assert.equal(geometry.count, 9); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
       window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
       assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
       if (width === 1440) { window.show(); window.focus(); await delay(200); await fs.writeFile(path.join(output, 'shared-secondary-navigation.png'), (await window.webContents.capturePage()).toPNG()); }
@@ -55,6 +56,14 @@ module.exports = async (window, output) => {
     await js(`document.querySelectorAll('.log-source-list input').forEach(e=>e.click())`);
     await wait(window.webContents, `document.querySelectorAll('.log-pane').length===4&&[...document.querySelectorAll('.log-pane pre')].every(e=>e.textContent.includes('INFO'))`);
     assert.equal(await js(`document.querySelector('.log-panels').textContent.includes('private-value')`), false, 'Display masking is on by default');
+    window.setMinimumSize(360, 600);
+    window.setContentSize(390, 780);
+    await wait(window.webContents, `[...document.querySelectorAll('.log-pane')].filter(node => node.getClientRects().length).length === 1`);
+    await js(`document.querySelectorAll('.log-switcher button')[1].click()`);
+    await wait(window.webContents, `document.querySelectorAll('.log-switcher button')[1].getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.log-pane')[1].getClientRects().length > 0`);
+    window.setMinimumSize(...minimum);
+    window.setContentSize(1440, 900);
+
     await fill('筛选日志内容', 'ERROR'); await wait(window.webContents, `[...document.querySelectorAll('.log-pane pre')].filter(e=>e.textContent.includes('failure')).length===2&&![...document.querySelectorAll('.log-pane pre')].some(e=>e.textContent.includes('INFO started'))`);
     assert.equal(await js(`[...document.querySelectorAll('.log-pane pre')].some(e=>e.textContent.includes('INFO started'))`), false);
     await fill('筛选日志内容', ''); await delay(850);

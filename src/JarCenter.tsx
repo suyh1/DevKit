@@ -88,6 +88,7 @@ export default function JarCenter({ active }: { active: boolean }) {
   const [state, setState] = useState<JarState | null>(null), [statuses, setStatuses] = useState<JarStatus[]>([]);
   const [form, setForm] = useState<JarInstance | 'new' | null>(null), [java, setJava] = useState<JavaDetection | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [query, setQuery] = useState('');
+  const [listHost, setListHost] = useState<string | null>(null);
   const [monitorError, setMonitorError] = useState('');
   const [javaHost, setJavaHost] = useState('');
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 920px)').matches);
@@ -113,7 +114,7 @@ export default function JarCenter({ active }: { active: boolean }) {
   const linked = useWorkspaceResource('jar');
   const linkStatus = linked && state ? inventoryLinkStatus(linked, state.instances, state.groups) : undefined;
   const linkedRow = useRef<HTMLTableRowElement>(null);
-  useEffect(() => { if (active && linkStatus === 'found') setQuery(''); }, [active, linked, linkStatus]);
+  useEffect(() => { if (active && linkStatus === 'found') { setQuery(''); setListHost(null); } }, [active, linked, linkStatus]);
   useEffect(() => { if (active && linkStatus === 'found' && !query) linkedRow.current?.scrollIntoView({ block: 'center' }); }, [active, linked, linkStatus, query]);
   const hosts = useHostInventory('jar', jarRequest, state, setState, setStatuses);
   async function refresh() { await hosts.inventory(); await hosts.poll(); }
@@ -164,13 +165,18 @@ export default function JarCenter({ active }: { active: boolean }) {
       }
     });
   }
-  const filtered = state?.instances.filter(item => `${item.name} ${item.jar} ${targetGroup(state.groups, item.hostId)?.name || ''}`.toLowerCase().includes(query.toLowerCase())) || [];
+  const hostOptions = state?.groups || [];
+  const selectedListHost = hostOptions.some(group => group.id === listHost) ? listHost : null;
+  const filtered = state?.instances.filter(item => (selectedListHost === null || (item.hostId || '') === selectedListHost)
+    && `${item.name} ${item.jar} ${targetGroup(state.groups, item.hostId)?.name || ''}`.toLowerCase().includes(query.toLowerCase())) || [];
   const consoleItem = state?.instances.find(item => item.id === consoleId);
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
     <header className="jar-heading workspace-banner"><div><span className="jar-eyebrow"><Coffee size={17} />Java 应用</span><h1>JAR 管理</h1><p>按主机管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><label className="jar-java-target">Java 检测主机<select disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>{(state?.groups || []).map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}</select></label><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用 JAR 管理。</p>}
     {java && <div className={java.found ? 'jar-java' : 'jar-warning'}><strong>{javaTarget ? hostRole(javaTarget) + ' · ' : ''}{java.found ? java.version : '未检测到 Java'}</strong><p>{java.found ? java.executable : java.output}</p></div>}
-    <div className="jar-toolbar"><label className="jar-search"><Search size={16} /><input aria-label="搜索 JAR" placeholder="搜索名称或路径" value={query} onChange={event => setQuery(event.target.value)} /></label><div className="jar-actions"><label className="jar-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(async () => { await refresh(); if (readLogs && logId) setLog(await jarRequest<JarLog>('log-tail', { id: logId })); })}><RefreshCw size={15} />刷新</MotionButton></div></div>
+    <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-java-target">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
+      <option value="all">全部主机</option>{hostOptions.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
+    </select></label>}<label className="jar-search"><Search size={16} /><input aria-label="搜索 JAR" placeholder="搜索名称或路径" value={query} onChange={event => setQuery(event.target.value)} /></label><div className="jar-actions"><label className="jar-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(async () => { await refresh(); if (readLogs && logId) setLog(await jarRequest<JarLog>('log-tail', { id: logId })); })}><RefreshCw size={15} />刷新</MotionButton></div></div>
     {error && <p className="jar-error" role="alert">{error}</p>}{notice && <p className="jar-notice" role="status">{notice}</p>}
     {monitorError && <p className="jar-warning" role="alert">状态刷新失败，以下显示上次结果：{monitorError}</p>}
     <HostProgress groups={state?.groups} retry={id => void hosts.retry(id)} />
@@ -181,19 +187,20 @@ export default function JarCenter({ active }: { active: boolean }) {
     {!state && available && !error && <p className="jar-help">正在读取 JAR 列表…</p>}
     {state && !state.instances.length && <div className="jar-empty"><Coffee size={35} /><h2>添加第一个 Java 应用</h2><p>选择 JAR 文件，起一个方便辨认的名字，即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />选择 JAR 文件</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的 JAR。</p>}
-    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="JAR 应用"><thead><tr><th>应用 / 文件</th><th>进程状态</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
+    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="JAR 应用"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
       const write = canEdit(item), control = canControl(item);
       const status = statuses.find(status => status.id === item.id), running = status?.state === 'running', stopped = status && ['stopped', 'exited'].includes(status.state), supervised = status?.supervision?.active;
+      const hostName = targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机');
       const extraActions = <>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
           {write && <button className="text-button" disabled={busy} onClick={() => setConfig(item)}><FileText size={14} />配置文件</button>}
           <button className="text-button" disabled={busy} onClick={() => setStartup(item)}><Play size={14} />系统自启</button>
-          <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: '只移除列表记录，保留 JAR、日志与运行文件。移除前需关闭系统自启。', confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
+          <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: `目标主机 ${hostName}。只移除列表记录，保留 JAR、日志与运行文件。移除前需关闭系统自启。`, confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
       </>;
       return <tr key={item.id} ref={linked === item.id ? linkedRow : undefined} data-linked={linked === item.id || undefined} className="jar-instance">
-        <td><strong>{item.name}</strong><span title={item.jar}>{basename(item.jar)}</span><small className="jar-full-path">{item.jar}</small><small>{bytes(status?.size)} · {item.logMode === 'file' ? '文件日志' : item.logMode === 'console' ? '控制台模式' : '静默模式'}{status?.fileMissing ? ' · JAR 文件缺失' : ''}</small><small>环境：{item.profiles.find(profile => profile.id === item.profile)?.name || '公共变量'}</small></td>
-        <td><span className={`jar-status ${status?.state || ''}`}>{status ? labels[status.state] : '待检测'}</span>
+        <td><div className="jar-instance-title"><strong>{item.name}</strong><span className={`jar-status ${status?.state || ''}`}>{status ? labels[status.state] : '待检测'}</span></div><small className="jar-target">目标主机 {hostName}</small><span title={item.jar}>{basename(item.jar)}</span><small className="jar-full-path">{item.jar}</small><small>{bytes(status?.size)} · {item.logMode === 'file' ? '文件日志' : item.logMode === 'console' ? '控制台模式' : '静默模式'}{status?.fileMissing ? ' · JAR 文件缺失' : ''}</small><small>环境：{item.profiles.find(profile => profile.id === item.profile)?.name || '公共变量'}</small></td>
+        <td>
           {status?.health && <small className={`jar-health ${status.health.state}`} title={status.health.detail}>业务：{healthLabels[status.health.state]}{status.health.latency !== undefined ? ` · ${status.health.latency} ms` : ''}</small>}
           {supervised && <small>{supervisionLabels[status.supervision!.state] || status.supervision!.state} · 重试 {status.supervision!.attempts}/{item.restart.maxRetries}</small>}
           {status?.supervision?.nextRetryAt && <small>下次：{new Date(status.supervision.nextRetryAt).toLocaleTimeString()}</small>}
@@ -206,8 +213,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {readLogs && item.logMode !== 'silent' && <button className="text-button" onClick={() => openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
-          {!narrow && extraActions}
-        </div><details className="jar-advanced"><summary>{narrow ? '详细信息与更多操作' : '更多运行信息'}</summary>{narrow && <><p>{item.jar}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p><div className="jar-row-actions">{extraActions}</div></>}<p>Java：{status?.executable || item.executable || '自动检测'}</p><p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
+        </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{item.jar}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>Java：{status?.executable || item.executable || '自动检测'}</p><p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
           <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'force-stop')}>强制终止</button>

@@ -84,3 +84,12 @@
   .portal-bar .secondary-button,.portal-bar .portal-logout { flex:none; width:36px; height:36px; padding:0; justify-content:center; }
   .portal-appearance > summary span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 }
+
+.portal-sidebar > p > strong { display: block; margin-top: 5px; font-size: 12px; overflow-wrap: anywhere; }
+details.portal-access { display: block; margin-bottom: 10px; }
+.portal-access > summary { cursor: pointer; width: fit-content; max-width: 100%; overflow-wrap: anywhere; }
+.portal-access > summary > span { margin-inline-start: 6px; font-family: var(--font-mono); }
+.portal-access > p { margin: 6px 0 0; }
+@media (pointer: coarse) {
+  .portal-bar .secondary-button, .portal-bar .portal-logout { min-width: 44px; min-height: 44px; }
+}

@@ -169,7 +169,6 @@
 .pl-share-roots > li > div { display: grid; flex: 1; min-width: 0; gap: 4px; }
 .pl-share-roots strong { color: var(--text); font-weight: 550; }
 .pl-share-roots small { white-space: nowrap; }
-.file-share-browse { justify-self: start; }
 
 /* File sharing editor */
 .pc-dialog.planning-editor-dialog { width: min(560px, calc(100vw - 32px)); }
@@ -221,3 +220,11 @@
 @media (prefers-reduced-motion: reduce) {
   .planning-workspace :is(.pl-button, .pl-icon, .pl-text) { transition: none; }
 }
+
+.pl-files-workspace .file-share-list > li:has(.pl-download) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.pl-files-workspace .pl-download { color: var(--accent); white-space: nowrap; text-decoration: none; margin-inline-end: 6px; }
+.pl-endpoint-status b { margin-inline-end: 8px; font-weight: 650; color: var(--muted); }
+.pl-endpoint-status b[data-tone=done] { color: var(--success); }
+.pl-endpoint-status b[data-tone=late] { color: var(--error); }
+.pl-share-links code { overflow-wrap: anywhere; min-width: 0; font-family: var(--font-mono); }
+@media (pointer: coarse) { .pl-files-workspace .pl-download { min-height: 44px; } }

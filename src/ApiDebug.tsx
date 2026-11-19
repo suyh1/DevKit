@@ -252,6 +252,7 @@ export default function ApiDebug({
             }
           />
         </label>
+        <small className="http-execution-host">请求发起方 <strong>{remoteAccess() ? location.host : '桌面本机'}</strong></small>
         <button
           className="run-button"
           disabled={!running && (!request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()) || !!(multipart && multipartIssue(multipart)))}

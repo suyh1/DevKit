@@ -659,38 +659,61 @@ export default function ProjectCenter({
             <span>
               {profile.projects.length} 个项目 · {profile.variables.length} 个变量
             </span>
-            {canProbe && <button className="secondary-button" disabled={busy || !profile.projects.length}
+            {canProbe && !!profile.projects.length && <button className="secondary-button" disabled={busy}
               title="检测当前档案全部已启用项目，包含筛选外项目，跳过停用项目"
               onClick={() => void action(() => probe(profile.projects))}>
               <ShieldCheck size={15} />全部探活
             </button>}
+            {canEdit && <div className="pc-entry-actions">
+              <MotionButton outcome={error ? "error" : ""} busy={busy}
+                className="run-button"
+                disabled={busy}
+                onClick={() =>
+                  editEntry({
+                    id: newProjectId(),
+                    name: "",
+                    code: `project-${Date.now().toString(36)}`,
+                    group: "",
+                    description: "",
+                    url: "http://{{host}}:8080/",
+                    enabled: true,
+                    query: [],
+                  })
+                }
+              >
+                <Plus size={15} />
+                添加项目
+              </MotionButton>
+            </div>}
           </div>
           {probeProgress?.profileId === profile.id && <div className="pc-probe-progress" role="status">
             <span>{probing.length ? "主机探活中" : probeProgress.done === probeProgress.total ? "主机探活完成" : "主机探活中断"} · {probeProgress.done}/{probeProgress.total} · 正常 {probeProgress.success} · 异常 {probeProgress.failed} · 跳过停用 {probeProgress.skipped}</span>
             <progress aria-label="当前档案探活进度" value={probeProgress.done} max={Math.max(1, probeProgress.total)} />
           </div>}
           <div className="pc-metrics" aria-label="当前档案概况">
-            <span>
-              <CheckCircle2 size={14} />
-              <strong>
-                {resolved.filter((item) => item.enabled && !item.error).length}
-              </strong>
-              可打开
-            </span>
-            <span>
-              <strong>{resolved.filter((item) => !item.enabled).length}</strong>
-              已停用
-            </span>
-            <button
-              className={
-                resolved.some((item) => item.error) ? "pc-invalid" : ""
-              }
-              onClick={() => setFilter("invalid")}
-            >
-              <AlertCircle size={14} />
-              <strong>{resolved.filter((item) => item.error).length}</strong>
-              配置异常
-            </button>
+            {profile.projects.length > 0 && <>
+              <span>
+                <CheckCircle2 size={14} />
+                <strong>
+                  {resolved.filter((item) => item.enabled && !item.error).length}
+                </strong>
+                可打开
+              </span>
+              <span>
+                <strong>{resolved.filter((item) => !item.enabled).length}</strong>
+                已停用
+              </span>
+              <button
+                className={
+                  resolved.some((item) => item.error) ? "pc-invalid" : ""
+                }
+                onClick={() => setFilter("invalid")}
+              >
+                <AlertCircle size={14} />
+                <strong>{resolved.filter((item) => item.error).length}</strong>
+                配置异常
+              </button>
+            </>}
             {canEdit && (
               <button onClick={() => manageVariables()}>
                 <Settings2 size={14} />
@@ -699,7 +722,7 @@ export default function ProjectCenter({
             )}
           </div>
           {missingVariables.length > 0 && <div className="pc-missing-variables" role="status"><span>当前档案缺少变量：<strong>{missingVariables.join('、')}</strong>。请填写变量值后保存档案。</span>{canEdit && <button className="secondary-button" onClick={() => manageVariables(missingVariables)}>补齐缺少的变量</button>}</div>}
-          <div className="pc-toolbar">
+          <div className="pc-toolbar" hidden={!profile.projects.length}>
             <label className="pc-search">
               <Search size={15} />
               <input
@@ -739,27 +762,8 @@ export default function ProjectCenter({
               <option value="disabled">已停用</option>
               <option value="invalid">配置异常</option>
             </select>
-            <MotionButton outcome={error ? "error" : ""} busy={busy}
-              className="run-button"
-              disabled={busy || !canEdit}
-              onClick={() =>
-                editEntry({
-                  id: newProjectId(),
-                  name: "",
-                  code: `project-${Date.now().toString(36)}`,
-                  group: "",
-                  description: "",
-                  url: "http://{{host}}:8080/",
-                  enabled: true,
-                  query: [],
-                })
-              }
-            >
-              <Plus size={15} />
-              添加项目
-            </MotionButton>
           </div>
-          <div className="pc-bulk">
+          <div className={selectedProjects.length ? "pc-selection pc-bulk" : "pc-selection"} hidden={!profile.projects.length}>
             <label className="pc-select-all">
               <input
                 ref={allSelected}
@@ -795,74 +799,72 @@ export default function ProjectCenter({
                 ? "（含筛选外项目）"
                 : ""}
             </span>
-            {selected.length > 0 && (
+            {!!selectedProjects.length && <>
               <button onClick={() => setSelected([])}><X size={14} aria-hidden="true" /><span>清除选择</span></button>
-            )}
-            {canEdit && (
-              <>
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  disabled={busy || !selectedProjects.length}
-                  onClick={() => void action(() => setEnabled(true))}
-                >
-                  <Power size={14} aria-hidden="true" />启用所选
-                </MotionButton>
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  disabled={busy || !selectedProjects.length}
-                  onClick={() => void action(() => setEnabled(false))}
-                >
-                  <PowerOff size={14} aria-hidden="true" />停用所选
-                </MotionButton>
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  className="pc-invalid"
-                  disabled={busy || !selectedProjects.length}
-                  onClick={() => {
-                    if (!profile || !selectedProjects.length) return;
-                    const profileId = profile.id;
-                    const ids = new Set(selectedProjects.map(item => item.id));
-                    const names = selectedProjects.map(item => item.name).join("、");
-                    const hidden = selectedProjects.filter(item => !projects.some(visible => visible.id === item.id)).length;
-                    setConfirmation({
-                      title: `删除所选 ${ids.size} 个项目？`,
-                      description: `将从档案“${profile.name}”删除：${names}。${hidden ? `包含 ${hidden} 个筛选外的已勾选项目。` : ""}删除前自动备份，可在“备份与恢复”中找回；其他档案不受影响。`,
-                      run: async base => {
-                        await persist({ ...base, profiles: base.profiles.map(item => item.id === profileId ? {
-                          ...item, projects: item.projects.filter(project => !ids.has(project.id)),
-                        } : item) }, base.revision);
-                      },
-                    });
-                  }}
-                ><Trash2 size={14} aria-hidden="true" />删除所选</MotionButton>
+              {canEdit && (
+                <>
+                  <MotionButton outcome={error ? "error" : ""} busy={busy}
+                    disabled={busy}
+                    onClick={() => void action(() => setEnabled(true))}
+                  >
+                    <Power size={14} aria-hidden="true" />启用所选
+                  </MotionButton>
+                  <MotionButton outcome={error ? "error" : ""} busy={busy}
+                    disabled={busy}
+                    onClick={() => void action(() => setEnabled(false))}
+                  >
+                    <PowerOff size={14} aria-hidden="true" />停用所选
+                  </MotionButton>
+                  <MotionButton outcome={error ? "error" : ""} busy={busy}
+                    className="pc-invalid"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!profile || !selectedProjects.length) return;
+                      const profileId = profile.id;
+                      const ids = new Set(selectedProjects.map(item => item.id));
+                      const names = selectedProjects.map(item => item.name).join("、");
+                      const hidden = selectedProjects.filter(item => !projects.some(visible => visible.id === item.id)).length;
+                      setConfirmation({
+                        title: `删除所选 ${ids.size} 个项目？`,
+                        description: `将从档案“${profile.name}”删除：${names}。${hidden ? `包含 ${hidden} 个筛选外的已勾选项目。` : ""}删除前自动备份，可在“备份与恢复”中找回；其他档案不受影响。`,
+                        run: async base => {
+                          await persist({ ...base, profiles: base.profiles.map(item => item.id === profileId ? {
+                            ...item, projects: item.projects.filter(project => !ids.has(project.id)),
+                          } : item) }, base.revision);
+                        },
+                      });
+                    }}
+                  ><Trash2 size={14} aria-hidden="true" />删除所选</MotionButton>
 
-              </>
-            )}
-            {canProbe && (
-                <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  disabled={
-                    busy ||
-                    !selectedProjects.length
-                  }
-                  onClick={() =>
-                    void action(() => probe(selectedProjects))
-                  }
-                >
-                  <ShieldCheck size={14} aria-hidden="true" />检测所选入口
-                </MotionButton>
-            )}
-            <button
-              disabled={!projects.length && !selectedProjects.length}
-              onClick={() =>
-                void copy(
-                  (selectedProjects.length ? selectedProjects : projects)
-                    .map(
-                      (item) =>
-                        `${item.name}\t${resolveProject(item, profile).url || "配置异常"}`,
-                    )
-                    .join("\n"),
-                )
-              }
-            >
-              <Copy size={14} aria-hidden="true" /><span>{selectedProjects.length ? "复制所选清单" : "复制当前清单"}</span>
-            </button>
+                </>
+              )}
+              {canProbe && (
+                  <MotionButton outcome={error ? "error" : ""} busy={busy}
+                    disabled={busy}
+                    onClick={() =>
+                      void action(() => probe(selectedProjects))
+                    }
+                  >
+                    <ShieldCheck size={14} aria-hidden="true" />检测所选入口
+                  </MotionButton>
+              )}
+            </>}
+            {(projects.length > 0 || selectedProjects.length > 0) && <button
+                type="button"
+                className={selectedProjects.length ? undefined : "text-button"}
+                onClick={() =>
+                  void copy(
+                    (selectedProjects.length ? selectedProjects : projects)
+                      .map(
+                        (item) =>
+                          `${item.name}\t${resolveProject(item, profile).url || "配置异常"}`,
+                      )
+                      .join("\n"),
+                  )
+                }
+              >
+                <Copy size={14} aria-hidden="true" /><span>{selectedProjects.length ? "复制所选清单" : "复制当前清单"}</span>
+            </button>}
           </div>
           {!projects.length && (
             <div className="pc-empty">

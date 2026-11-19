@@ -34,32 +34,31 @@ module.exports = async function designSmoke(window, output) {
           workspaceOverflow: workspace.scrollWidth > workspace.clientWidth + 1,
           navbarOutside: controls.some(button => { const rect = button.getBoundingClientRect(); return rect.left < 0 || rect.right > innerWidth + 1; }),
           floating: navbar.getBoundingClientRect().top > 0,
-          bentoColumns: getComputedStyle(document.querySelector('.home-bento')).gridTemplateColumns,
+          launcherColumns: getComputedStyle(document.querySelector('.home-launch')).gridTemplateColumns,
+          firstToolTop: document.querySelector('.tool-card').getBoundingClientRect().top,
           background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
           panel: getComputedStyle(document.querySelector('.quick-start-card')).backgroundColor,
           text: getComputedStyle(workspace).color,
           accent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-          appGradient: getComputedStyle(document.querySelector('.app')).backgroundImage,
-          aurora: getComputedStyle(document.querySelector('.aurora')).display };
+          appGradient: getComputedStyle(document.querySelector('.app')).backgroundImage };
       })()`);
       assert.equal(geometry.pageOverflow, false, `${theme} ${width}: page overflow`);
       assert.equal(geometry.workspaceOverflow, false, `${theme} ${width}: workspace overflow`);
       assert.equal(geometry.navbarOutside, false, `${theme} ${width}: navbar outside viewport`);
       assert.equal(geometry.floating, true);
-      assert.equal(geometry.background, theme === 'dark' ? '#141518' : '#f5f6f8');
+      assert.equal(geometry.background, theme === 'dark' ? '#141518' : '#f2f4f7');
       assert.equal(geometry.panel, theme === 'dark' ? 'rgb(28, 30, 34)' : 'rgb(255, 255, 255)');
-      assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(37, 41, 52)');
-      assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#3d5fad');
+      assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(37, 48, 71)');
+      assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#305aa6');
       assert.equal(geometry.appGradient, 'none');
-      assert.equal(geometry.aurora, 'none');
+      if (width >= 768) assert.ok(geometry.firstToolTop < 620, `${theme} ${width}: tool library visible on arrival`);
       report.push({ theme, ...geometry });
       if ([1440, 375].includes(width)) await fs.writeFile(path.join(output, `design-home-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
     }
   }
   window.setContentSize(1440, 1000);
   await js("document.documentElement.dataset.theme = 'light'");
-  assert.match(await js('document.querySelector(".welcome-content h1").textContent'), /让专注发生.*让灵感成形/);
-  assert.notEqual(await js('getComputedStyle(document.querySelector(".art-code")).transform'), 'none');
+  assert.equal(await js('document.querySelector(".overview-heading h1").textContent'), '工作台');
   const favoriteCount = await js('Number(document.querySelector(\'.sidebar-workspace button[title="我的收藏"] small\').textContent)');
   await js('document.querySelectorAll(".library-scope button")[1].click()');
   await settle();
@@ -70,30 +69,40 @@ module.exports = async function designSmoke(window, output) {
   await js('document.querySelectorAll(".library-scope button")[2].dispatchEvent(new KeyboardEvent("keydown", {key:"Home", bubbles:true}))');
   await settle();
   assert.equal(await js('document.querySelectorAll(".tool-card").length'), 46);
-  await js('document.querySelector(".category-marquee button").click()');
-  await wait('document.querySelector(".category-marquee").dataset.paused === "true"');
-  const reducedMotion = await js('matchMedia("(prefers-reduced-motion: reduce)").matches');
-  // A system-wide reduction disables animation entirely. Its shorthand resets
-  // animationPlayState to "running", even though nothing is moving.
-  await wait(reducedMotion
-    ? 'getComputedStyle(document.querySelector(".marquee-track")).animationName === "none"'
-    : 'getComputedStyle(document.querySelector(".marquee-track")).animationPlayState === "paused"');
-  console.log(`Home motion preference: ${reducedMotion ? 'reduced (animation disabled)' : 'normal (pause verified)'}`);
-  await js('document.querySelector(".welcome-actions button").click()');
-  assert.equal(await js('document.activeElement.getAttribute("aria-label")'), '筛选工具库');
+  try {
+    window.webContents.setZoomFactor(2);
+    await settle();
+    assert.equal(await js(`(() => {
+      const bar = document.querySelector('.floating-navbar');
+      return document.documentElement.scrollWidth <= innerWidth &&
+        [...bar.querySelectorAll('button')].every(button => {
+          const bounds = button.getBoundingClientRect();
+          return !bounds.width || bounds.left >= 0 && bounds.right <= innerWidth;
+        });
+    })()`), true, 'Desktop controls fit at 200% zoom');
+  } finally {
+    window.webContents.setZoomFactor(1);
+    await settle();
+  }
+  await js('document.querySelector(".top-search").click()');
+  await wait('!!document.querySelector(".command-dialog[open] input")');
+  assert.equal(await js('document.activeElement.matches(".command-dialog input")'), true);
+  window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+  window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+  await wait('!document.querySelector(".command-dialog[open]")');
   await js('document.querySelector(".overview-workspace").scrollTop = 0; document.activeElement.blur()');
   await settle();
   await fs.writeFile(path.join(output, 'design-library-light.png'), (await window.webContents.capturePage()).toPNG());
   window.webContents.debugger.attach('1.3');
   try {
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-    assert.equal(await js('getComputedStyle(document.querySelector(".marquee-track")).animationName'), 'none');
+    assert.equal(await js('getComputedStyle(document.querySelector(".home-launch")).animationName'), 'none');
     assert.equal(await js('getComputedStyle(document.querySelector(".segmented-control .motion-pill")).transitionDuration'), '0s');
   } finally {
     await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
     window.webContents.debugger.detach();
   }
-  await js('document.querySelector(".category-marquee button").click(); document.activeElement.blur(); document.querySelector(".overview-workspace").scrollTop = 0');
+  await js('document.activeElement.blur(); document.querySelector(".overview-workspace").scrollTop = 0');
   await js('document.querySelector(".quick-start-grid button").click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "JSON 格式化"');
   await js("document.documentElement.dataset.theme = 'dark'");
@@ -113,18 +122,18 @@ module.exports = async function designSmoke(window, output) {
   await js("document.documentElement.dataset.theme = 'light'");
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .status-success")).color'), 'rgb(40, 119, 70)');
-  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(61, 95, 173)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(48, 90, 166)');
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(248, 249, 251)');
   await fs.writeFile(path.join(output, 'design-editor-light.png'), (await window.webContents.capturePage()).toPNG());
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   await wait('!!document.querySelector(".overview-workspace:not([hidden])")');
-  await js('document.querySelector(".color-story-card").click()');
+  await js('[...document.querySelectorAll(".quick-start-grid button,.tool-card-open")].find(button => button.textContent.startsWith("调色板与色阶")).click()');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   for (const name of ['日志中心', '监控中心', 'HTTP 调试', 'Nginx 配置', 'JAR 管理', '局域网主机', '项目中心']) {
     await openWorkspace(name);
-    const title = JSON.stringify(name === 'HTTP 调试' ? '接口工作台' : name);
+    const title = JSON.stringify(name);
     await wait(`[...document.querySelectorAll('.workspace-banner h1')].some(heading => heading.textContent === ${title} && heading.getClientRects().length)`);
     assert.equal(await js(`getComputedStyle([...document.querySelectorAll('.workspace-banner h1')].find(heading => heading.textContent === ${title} && heading.getClientRects().length).closest('.workspace-banner')).borderInlineStartWidth`), '3px');
   }
@@ -135,9 +144,9 @@ module.exports = async function designSmoke(window, output) {
   await fs.writeFile(path.join(output, 'design-projects-dark.png'), (await window.webContents.capturePage()).toPNG());
   await js("document.documentElement.dataset.theme = 'light'");
   await js('document.querySelector(\'.sidebar button[title="我的收藏"]\').click()');
-  await wait('document.querySelector(".collection-welcome h1")?.textContent === "你的常用工具"');
+  await wait('document.querySelector(".overview-heading h1")?.textContent === "我的收藏"');
   await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
-  await wait('!!document.querySelector(".overview-workspace:not([hidden]) .home-bento")');
+  await wait('!!document.querySelector(".overview-workspace:not([hidden]) .home-launch")');
   await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
   window.setSize(...size); window.setMinimumSize(...minimum);
   window.setMinimumSize(360, 600);
@@ -184,10 +193,10 @@ module.exports = async function designSmoke(window, output) {
           const styles = getComputedStyle(document.documentElement);
           return { overflow: document.documentElement.scrollWidth > innerWidth || section.scrollWidth > section.clientWidth + 1,
             background: styles.getPropertyValue('--bg').trim(), text: styles.getPropertyValue('--text').trim(),
-            heroImage: getComputedStyle(document.querySelector('.welcome-card')).backgroundImage,
+            heroImage: getComputedStyle(document.querySelector('.home-launch .smart-open')).backgroundImage,
             panelRadius: getComputedStyle(document.querySelector('.settings-section')).borderRadius,
             panelBlur: getComputedStyle(document.querySelector('.settings-section')).backdropFilter,
-            heroBorder: getComputedStyle(document.querySelector('.welcome-card')).borderTopStyle,
+            heroBorder: getComputedStyle(document.querySelector('.home-launch .smart-open')).borderTopStyle,
             saved: JSON.parse(localStorage.getItem('devkit:preferences')) };
         })()`);
         assert.equal(appearance.overflow, false, `${style}/${mode}/${width} fits`);

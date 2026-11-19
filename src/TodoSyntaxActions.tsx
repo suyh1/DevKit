@@ -53,16 +53,21 @@ export default function TodoSyntaxActions({ model, editor, line, locked, portal 
     <input required={required} maxLength={240} placeholder={placeholder} value={fields.primary} onChange={event => update({ primary: event.target.value })} />
   </label>;
 
+  const inTask = editable.some(({ task }) => task.line <= line && task.endLine >= line);
+  const group = todoGroupAt(model, line);
+  const primary = inTask ? ['check', 'resume'] : group && !group.archived ? ['defaults'] : ['view'];
+  const actionButton = ([name, text, Icon]: typeof actions[number]) => {
+    const unavailable = name === 'defaults' && !groups.length ? '先添加分组'
+      : name !== 'defaults' && name !== 'view' && !editable.length ? '先添加任务'
+        : name === 'dependency' && tasks.length < 2 ? '至少需要两项任务' : '';
+    return <button key={name} type="button" aria-haspopup="dialog" title={unavailable || text} disabled={locked || !editor || !!unavailable} onClick={() => begin(name)}>
+      <Icon size={14} />{text}
+    </button>;
+  };
   return <>
     <div className="td-toolbar td-syntax-toolbar" role="group" aria-label="待办扩展操作">
-      {actions.map(([name, text, Icon]) => {
-        const unavailable = name === 'defaults' && !groups.length ? '先添加分组'
-          : name !== 'defaults' && name !== 'view' && !editable.length ? '先添加任务'
-            : name === 'dependency' && tasks.length < 2 ? '至少需要两项任务' : '';
-        return <button key={name} type="button" aria-haspopup="dialog" title={unavailable || text} disabled={locked || !editor || !!unavailable} onClick={() => begin(name)}>
-          <Icon size={14} />{text}
-        </button>;
-      })}
+      {actions.filter(([name]) => primary.includes(name)).map(actionButton)}
+      <details className="td-more"><summary>扩展语法</summary><div>{actions.filter(([name]) => !primary.includes(name)).map(actionButton)}</div></details>
     </div>
     {draft && fields && <Modal title={label!} closeLabel="关闭待办扩展操作" close={() => setDraft(null)} draft={fields} className="td-settings-dialog">
       <form className="td-settings td-syntax-form" onSubmit={event => { event.preventDefault(); submit(); }}>

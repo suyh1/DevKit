@@ -206,3 +206,34 @@ button.td-preview-check:hover { border-color: var(--accent); background: var(--t
   .td-toolbar { padding-inline: 4px; }
   .td-status { padding-inline: 8px; }
 }
+
+.td-document-picker { display: none; }
+.td-document-picker select { width: 100%; min-width: 0; min-height: 38px; padding: 5px 8px; border: 1px solid var(--td-border); border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; }
+.td-toolbar .td-more { position: relative; color: var(--muted); }
+.td-more summary { display: list-item; padding: 5px 7px; cursor: pointer; border-radius: 5px; font-size: 12px; }
+.td-more[open] summary { color: var(--accent); background: var(--tint); }
+.td-more > div {
+  position: absolute; z-index: 6; inset-inline-end: 0; top: calc(100% + 4px); display: grid; min-width: 126px;
+  padding: 4px; border: 1px solid var(--td-border); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow);
+}
+.td-more > div > button { justify-content: flex-start; white-space: nowrap; }
+.td-toolbar .td-more:has(+ .td-shortcuts) > div { inset-inline-end: auto; inset-inline-start: 0; }
+.td-editor .cm-editor.cm-focused { outline: 2px solid var(--accent); outline-offset: -2px; }
+.td-editor .cm-scroller { font-family: var(--font-mono); }
+@container (max-width: 720px) {
+  .td-documents:has(.td-document-picker) { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+  .td-document-picker { display: block; }
+  .td-documents nav { display: none; }
+  .td-editor-layout[data-outline='true'] .td-outline { grid-row: 1; border-top: 0; border-bottom: 1px solid var(--td-border); }
+}
+@container (max-width: 430px) {
+  .td-toolbar .td-more > div { inset-inline-end: 0; inset-inline-start: auto; }
+  .td-toolbar .td-more:has(+ .td-shortcuts) > div { inset-inline-start: auto; inset-inline-end: 0; }
+  .td-syntax-toolbar .td-more > div { inset-inline-end: auto; inset-inline-start: 0; }
+}
+@media (pointer: coarse) {
+  .td-workspace :is(.td-heading, .td-sheet-head) .td-actions button,
+  .td-workspace .td-toolbar button, .td-workspace .td-toolbar summary, .td-document-picker select { min-height: 44px; }
+  .td-workspace .td-toolbar summary { align-content: center; }
+  .td-workspace .td-actions .td-icon { width: 44px; }
+}

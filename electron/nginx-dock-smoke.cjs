@@ -4,7 +4,7 @@ const path = require('node:path');
 
 module.exports = async function checkNginxDock(window, output) {
   const js = source => window.webContents.executeJavaScript(source);
-  const settle = () => new Promise(resolve => setTimeout(resolve, 320));
+  const settle = () => new Promise(resolve => setTimeout(resolve, 200));
   async function wait(expression) {
     for (let attempt = 0; attempt < 120; attempt++) { if (await js(expression)) return; await new Promise(resolve => setTimeout(resolve, 40)); }
     throw new Error(`Sticky controls condition failed: ${expression}`);
@@ -19,7 +19,7 @@ module.exports = async function checkNginxDock(window, output) {
         await wait('document.querySelector(".ng-control-dock")?.dataset.stuck === "false"'); await settle();
         const expandedHeight = await js('document.querySelector(".ng-control-dock").getBoundingClientRect().height');
         await js(`{const root=document.querySelector('.nginx-workspace'),anchor=document.querySelector('.ng-dock-anchor');root.scrollTop=anchor.getBoundingClientRect().top-root.getBoundingClientRect().top+root.scrollTop+130;}`);
-        await wait('document.querySelector(".ng-control-dock")?.dataset.compact === "true"'); await settle();
+        await wait('document.querySelector(".ng-control-dock")?.dataset.stuck === "true"'); await settle();
         const first = await js(`(()=>{const dock=document.querySelector('.ng-control-dock'),root=document.querySelector('.nginx-workspace'),bar=document.querySelector('.ng-toolbar'),d=dock.getBoundingClientRect(),r=root.getBoundingClientRect(),b=bar.getBoundingClientRect();return {top:d.top,bottom:d.bottom,height:d.height,left:d.left,right:d.right,rootTop:r.top,rootContentTop:r.top+parseFloat(getComputedStyle(root).paddingTop),rootBottom:r.bottom,barTop:b.top,barBottom:b.bottom,scroll:root.scrollTop};})()`);
         const ancestors = await js(`(()=>{let node=document.querySelector('.ng-control-dock');const rows=[];while(node){const s=getComputedStyle(node),r=node.getBoundingClientRect();rows.push({class:node.className,overflow:s.overflow,position:s.position,top:r.top,height:r.height,scrollTop:node.scrollTop,scrollHeight:node.scrollHeight,padding:s.paddingTop,transform:s.transform});node=node.parentElement}return rows})()`);
         await fs.writeFile(path.join(output, 'nginx-sticky-debug.json'), JSON.stringify({ width, expandedHeight, ...first, ancestors }, null, 2));
@@ -30,22 +30,32 @@ module.exports = async function checkNginxDock(window, output) {
         await js('document.querySelector(".nginx-workspace").scrollTop += 160'); await settle();
         const secondTop = await js('document.querySelector(".ng-control-dock").getBoundingClientRect().top');
         assert.ok(Math.abs(secondTop - first.top) <= 2, `${width}: scrolling the config does not move controls`);
-        if (await js('!!document.querySelector(".ng-output")')) {
-          assert.equal(await js('document.querySelector(".ng-output").open'), false, 'Previous result is summarized on stick');
-          await js('document.querySelector(".ng-output summary").click()'); await wait('document.querySelector(".ng-output").open'); await settle();
-          assert.ok(await js('document.querySelector(".ng-output-body").getBoundingClientRect().height<=151'));
+        assert.ok(Math.abs(first.height - (first.barBottom - first.barTop)) <= 2, `${width}: dock occupies one action row`);
+        assert.deepEqual(await js(`[...document.querySelectorAll('.ng-toolbar button')].map(button=>button.textContent.trim())`),
+          ['检查配置', '启动', '重载', '停止', '保存文件']);
+        assert.equal(await js(`[...document.querySelectorAll('.ng-dock-details')].every(section=>section.inert && section.clientHeight === 0 && getComputedStyle(section).visibility === 'hidden')`),
+          true, `${width}: no instance or execution details remain visible`);
+        assert.equal(await js(`new Set([...document.querySelectorAll('.ng-toolbar button')].map(button=>{const bounds=button.getBoundingClientRect();return Math.round(bounds.top + bounds.height / 2)})).size`),
+          1, 'Buttons stay on one line');
+        if (process.env.DEVKIT_NGINX_TEST_EXECUTABLE && width === 1440 && theme === 'light') {
+          await js(`document.querySelector('.ng-toolbar button').click()`);
+          await wait(`!document.querySelector('.ng-toolbar button').disabled && !!document.querySelector('.ng-output')`);
+          assert.equal(await js(`getComputedStyle(document.querySelector('.ng-output')).visibility`), 'hidden', 'New command output stays hidden while pinned');
         }
         await fs.writeFile(path.join(output, `nginx-sticky-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
-        await js('document.querySelector(".ng-dock-toggle").click()'); await wait('document.querySelector(".ng-control-dock").dataset.compact === "false"'); await settle();
-        assert.equal(await js('document.querySelector(".ng-dock-metadata").inert'), false);
-        await js('document.querySelector(".ng-dock-toggle").click()'); await wait('document.querySelector(".ng-control-dock").dataset.compact === "true"'); await settle();
         await js(`{const input=document.querySelector('.ng-argument input');input.scrollIntoView({block:'start'});input.focus();}`); await settle();
         const focus = await js(`({field:document.querySelector('.ng-argument input').getBoundingClientRect().top,dock:document.querySelector('.ng-control-dock').getBoundingClientRect().bottom})`);
         assert.ok(focus.field >= focus.dock - 2, `${width}: scrolled field is not covered by dock`);
         if (width === 390) {
-          await js(`[...document.querySelectorAll('.ng-toolbar button')].find(button=>button.textContent.trim()==='重新读取').focus()`); await settle();
-          assert.equal(await js('(()=>{const r=document.activeElement.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1})()'), true, 'Keyboard reveals narrow action groups');
+          await js(`document.querySelector('.ng-toolbar button').focus()`); await settle();
+          assert.equal(await js('(()=>{const r=document.activeElement.getBoundingClientRect();return document.activeElement.matches(".ng-toolbar button")&&r.left>=0&&r.right<=innerWidth+1})()'), true, 'The narrow action row accepts keyboard focus');
           await js('document.activeElement.blur()');
+        }
+        await js('document.querySelector(".nginx-workspace").scrollTop=0');
+        await wait('document.querySelector(".ng-control-dock").dataset.stuck === "false"'); await settle();
+        assert.equal(await js(`[...document.querySelectorAll('.ng-dock-details')].every(section=>!section.inert && getComputedStyle(section).visibility === 'visible')`), true);
+        if (await js(`!!document.querySelector('.ng-output')`)) {
+          assert.equal(await js(`getComputedStyle(document.querySelector('.ng-output')).visibility`), 'visible', 'Execution output returns with the details');
         }
         report.push({ width, theme, ...first, editorFieldUncovered: true });
       }
@@ -53,7 +63,7 @@ module.exports = async function checkNginxDock(window, output) {
     window.webContents.debugger.attach('1.3');
     try {
       await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-      assert.equal(await js('getComputedStyle(document.querySelector(".ng-dock-metadata")).transitionDuration'), '0s');
+      assert.equal(await js('getComputedStyle(document.querySelector(".ng-dock-details")).transitionDuration'), '0s');
       if (await js('!!document.querySelector(".ng-output-body")')) {
         assert.equal(await js('getComputedStyle(document.querySelector(".ng-output-body")).animationName'), 'none');
       }
@@ -61,7 +71,7 @@ module.exports = async function checkNginxDock(window, output) {
       await window.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] }); window.webContents.debugger.detach();
     }
     await fs.writeFile(path.join(output, 'nginx-sticky-report.json'), JSON.stringify(report, null, 2));
-    console.log('Nginx sticky controls passed: stable actions and feedback, compact/expanded details, editor focus clearance, three widths, both themes, keyboard and reduced motion.');
+    console.log('Nginx sticky controls passed: a fixed single row, hidden command feedback and restored details, editor focus clearance, three widths, both themes, keyboard and reduced motion.');
   } finally {
     await js(`window.__ngDockDetails?.forEach(({element,open})=>element.open=open);delete window.__ngDockDetails;document.querySelector('.nginx-workspace').scrollTop=0;document.documentElement.dataset.theme='light'`);
     window.setSize(...size); await settle();

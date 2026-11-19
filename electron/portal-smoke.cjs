@@ -256,11 +256,11 @@ app
       );
       await wheel(1100);
       await wait(
-        'document.querySelector(".ng-control-dock")?.dataset.compact==="true"',
+        'document.querySelector(".ng-control-dock")?.dataset.stuck==="true" && [...document.querySelectorAll(".ng-dock-details")].every(section=>section.inert&&section.clientHeight===0&&getComputedStyle(section).visibility==="hidden")',
       );
       assert.equal(
         await js(
-          '(()=>{const dock=document.querySelector(".ng-control-dock").getBoundingClientRect(),bar=document.querySelector(".portal-bar").getBoundingClientRect();return dock.top>=bar.bottom&&dock.height<innerHeight*.6})()',
+          '(()=>{const dock=document.querySelector(".ng-control-dock").getBoundingClientRect(),bar=document.querySelector(".portal-bar").getBoundingClientRect();const actions=document.querySelector(".ng-toolbar").getBoundingClientRect();return dock.top>=bar.bottom&&Math.abs(dock.height-actions.height)<=2})()',
         ),
         true,
       );
@@ -280,7 +280,7 @@ app
       );
       assert.equal(
         await js(
-          '(()=>{const root=document.querySelector(".portal-content").getBoundingClientRect(),dock=document.querySelector(".ng-control-dock").getBoundingClientRect(),fields=document.querySelector(".ng-fields").getBoundingClientRect();return dock.top>=root.top&&fields.bottom<=root.bottom+1&&root.height-dock.height>=120})()',
+          '(()=>{const root=document.querySelector(".portal-content").getBoundingClientRect(),dock=document.querySelector(".ng-control-dock").getBoundingClientRect(),fields=document.querySelector(".ng-fields").getBoundingClientRect();const actions=document.querySelector(".ng-toolbar");return dock.top>=root.top&&fields.bottom<=root.bottom+1&&Math.abs(dock.height-actions.getBoundingClientRect().height)<=2&&getComputedStyle(actions).flexWrap==="nowrap"})()',
         ),
         true,
         "Nginx bottom and editor space at phone width",
@@ -288,6 +288,14 @@ app
       await screenshot("nginx-bottom-390");
       window.setContentSize(1440, 900);
       await delay(150);
+      await js('document.querySelector(".portal-content").scrollTop=0');
+      await wait('[...document.querySelectorAll(".ng-dock-details")].every(section=>!section.inert&&getComputedStyle(section).visibility==="visible")');
+      await wait(`(() => {
+        const button = [...document.querySelectorAll('.ng-instance-heading button')].find(item => item.textContent.trim() === '实例设置');
+        if (!button) return false;
+        const bounds = button.getBoundingClientRect();
+        return button.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+      })()`);
       await button("实例设置", ".ng-center button");
       await wait('!!document.querySelector(".ng-form-modal[open]")');
       key("Escape");
@@ -449,7 +457,7 @@ app
       await js("document.execCommand=window.fixtureExecCommand;true");
       await selector('button[aria-label="关闭请求代码"]');
       await wait('!document.querySelector("dialog[open]")');
-      await button("接口项目 · 文档与调试", "[role=tab]");
+      await button("接口项目", "[role=tab]");
       await selector('button[aria-label="新增API接口"]');
       await wait('!!document.querySelector(".api-draft-item")');
       await selector('button[aria-label="刷新API工作区"]');
@@ -543,6 +551,7 @@ app
       await login();
       await wait('document.querySelector(".jar-instance")?.textContent.includes("审查测试应用")');
       await wait('[...document.querySelectorAll(".jar-instance button")].some(button => button.textContent.trim() === "设置" && !button.disabled)');
+      await selector('.jar-instance .jar-advanced summary');
       await button('设置', '.jar-instance button');
       await wait('!!document.querySelector(".jar-dialog[open]")');
       assert.match(await js('document.querySelector(".jar-dialog textarea").value'), /audit-secret/);
@@ -626,6 +635,7 @@ app
       await window.loadURL(fixture.url + '?audit=lan-hosts#lan-hosts');
       await login();
       const inventory = '.lan-host-list';
+      const selectHost = name => pointer(`[...document.querySelectorAll('.lan-connection-select')].find(button => button.querySelector('strong').textContent === ${JSON.stringify(name)})`);
       await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
       await fill('.lan-search input', '找不到的主机');
       await wait('document.querySelector(".lan-center")?.textContent.includes("没有匹配的主机")');
@@ -668,6 +678,7 @@ app
       await fill('.lan-host-form .lan-host-name input', '网页 SSH 已编辑');
       await button('保存连接', '.lan-host-form button');
       await wait('document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑")');
+      await selectHost('网页 SSH 已编辑');
       await button('打开终端', '.lan-host-list button');
       await button('信任并连接', 'dialog[open] button');
       await wait('document.querySelector(".lan-terminal-message [role=status]")?.textContent==="已连接"');
@@ -687,6 +698,7 @@ app
         const deployed = await js(`fetch('/api/lan-hosts/save', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'测试远程桌面',mode:'ssh',address:'192.0.2.45',user:'fixture',port:22,platform:'win32',rdpPort:3391})}).then(r=>r.status)`);
         assert.equal(deployed, 200);
         await button('刷新', '.lan-heading-actions button');
+        await selectHost('测试远程桌面');
         await button('连接远程桌面', '.lan-host-list button');
         await fill('.lan-rdp-form input[name=username]', 'portal-rdp-user');
         await fill('.lan-rdp-form input[name=password]', 'portal-rdp-test');
