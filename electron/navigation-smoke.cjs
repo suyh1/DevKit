@@ -221,6 +221,21 @@ module.exports = async function navigationSmoke(window, output) {
   const orderDialog = '.shared-order-dialog';
   const dialogOpen = `!!document.querySelector('${orderDialog}[open]')`;
   const listOrder = menu => `[...document.querySelectorAll('${menu} strong')].map(item => item.textContent)`;
+  const draftOrder = '[...document.querySelectorAll(".shared-order-name")].map(item => item.textContent)';
+  const handle = name => `[aria-label="拖动${name}排序"]`;
+  const position = name => `[aria-label="${name}的位置"]`;
+  const focus = selector => js(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+  const center = selector => js(`(() => {
+    const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  })()`);
+  const mouse = (type, point) => window.webContents.sendInputEvent({ type, ...point, button: 'left', clickCount: 1 });
+  const startDrag = async point => {
+    mouse('mouseMove', point);
+    mouse('mouseDown', point);
+    mouse('mouseMove', { x: point.x + 8, y: point.y });
+    await wait('!!document.querySelector(".shared-order-preview")');
+  };
   const topMenu = '#shared-workspace-menu';
   const click = async selector => {
     const lookup = `document.querySelector(${JSON.stringify(selector)})`;
@@ -236,7 +251,36 @@ module.exports = async function navigationSmoke(window, output) {
   assert.equal(await js('document.activeElement.textContent'), '排序');
   await key('Enter');
   await wait(dialogOpen);
-  await js('document.querySelector(\'[aria-label="上移监控中心"]\').focus()');
+  await settle();
+
+  const first = defaultOrder[0], last = defaultOrder.at(-1);
+  const target = await center(handle(defaultOrder[4]));
+  await startDrag(await center(handle(first)));
+  mouse('mouseMove', target);
+  await settle();
+  mouse('mouseUp', target);
+  await wait('!document.querySelector(".shared-order-preview")');
+  const draggedOrder = [...defaultOrder.slice(1, 5), first, ...defaultOrder.slice(5)];
+  assert.deepEqual(await js(draftOrder), draggedOrder, 'Dragging can move across several rows');
+
+  await focus(handle(first));
+  await key('Space');
+  await wait('!!document.querySelector(".shared-order-preview")');
+  await key('Up');
+  await key('Escape');
+  assert.equal(await js(dialogOpen), true, 'Esc cancels the active drag before closing the dialog');
+  assert.deepEqual(await js(draftOrder), draggedOrder);
+  await key('Space');
+  await key('Up');
+  await key('Space');
+  const keyboardOrder = [...defaultOrder.slice(1, 4), first, ...defaultOrder.slice(4)];
+  assert.deepEqual(await js(draftOrder), keyboardOrder, 'Keyboard dragging can move a row');
+
+  await focus(position(last));
+  await key('Home');
+  assert.deepEqual(await js(draftOrder), [last, ...keyboardOrder.slice(0, -1)], 'The position selector can jump to the first row');
+  assert.equal(await js('document.activeElement.getAttribute("aria-label")'), `${last}的位置`);
+  await focus('[aria-label="上移监控中心"]');
   await key('Enter');
   assert.equal(await js('document.activeElement.getAttribute("aria-label")'), '上移监控中心');
   await fs.writeFile(path.join(output, 'shared-order-desktop.png'), (await window.webContents.capturePage()).toPNG());
@@ -244,7 +288,7 @@ module.exports = async function navigationSmoke(window, output) {
   await key('Enter');
   await wait(`!(${dialogOpen})`);
   assert.equal(await js('document.activeElement.matches(".shared-nav-trigger")'), true);
-  const updatedOrder = [defaultOrder[1], defaultOrder[0], ...defaultOrder.slice(2)];
+  const updatedOrder = [keyboardOrder[0], last, ...keyboardOrder.slice(1, -1)];
   await click(sharedTrigger);
   await wait(`!!document.querySelector('${sharedPanel}:popover-open')`);
   assert.deepEqual(await js(listOrder(sharedPanel)), updatedOrder);
@@ -258,15 +302,33 @@ module.exports = async function navigationSmoke(window, output) {
   assert.deepEqual(await js(listOrder(topMenu)), updatedOrder);
   await key('Escape');
 
-  window.setContentSize(375, 700);
+  window.setMinimumSize(360, 450);
+  window.setContentSize(375, 500);
   await settle();
   await click('.topbar button[aria-label="展开导航"]');
   await click(sharedTrigger);
   await wait(`!!document.querySelector('${sharedPanel}.category-panel-inline')`);
   await click(`${sharedPanel} .shared-sort-action`);
   await wait(dialogOpen);
+  await settle();
+  const edge = await js(`(() => {
+    const r = document.querySelector('.shared-order-list').getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.floor(r.bottom - 4) };
+  })()`);
+  await startDrag(await center(handle(updatedOrder[0])));
+  mouse('mouseMove', edge);
+  await wait(`(() => {
+    const list = document.querySelector('.shared-order-list');
+    return list.scrollTop > 0 && list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+  })()`);
+  mouse('mouseUp', edge);
+  await wait('!document.querySelector(".shared-order-preview")');
+  assert.deepEqual(await js(draftOrder), [...updatedOrder.slice(1), updatedOrder[0]], 'Dragging past the visible rows reaches the last position');
+  await settle();
   await click('.shared-order-footer .text-button');
   await settle();
+  assert.deepEqual(await js(draftOrder), defaultOrder, 'Reset restores the default order in the draft');
+  assert.equal(await js('document.querySelector(".shared-order-list").scrollTop'), 0);
   await fs.writeFile(path.join(output, 'shared-order-narrow.png'), (await window.webContents.capturePage()).toPNG());
   await key('Escape');
   await wait(`!(${dialogOpen})`);
@@ -289,5 +351,5 @@ module.exports = async function navigationSmoke(window, output) {
   await js('document.documentElement.dataset.theme="light"');
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'navigation-report.json'), JSON.stringify(report, null, 2));
-  console.log('Navigation passed: category popovers, responsive menus, keyboard focus and shared order persistence, cancel and reset.');
+  console.log('Navigation passed: category popovers, responsive menus, shared order dragging, scrolling, position selection, keyboard focus, persistence, cancel and reset.');
 };

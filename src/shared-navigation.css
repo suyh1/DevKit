@@ -19,23 +19,38 @@
 .shared-sort-action svg, .shared-order-dialog svg { stroke-width:1.5; }
 .category-panel-heading:has(.shared-sort-action) { align-items:center; }
 
-.shared-order-dialog { width:min(448px,calc(100% - 32px)); max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid var(--line); border-radius:16px; background:var(--surface); color:var(--text); box-shadow:0 8px 24px #0002; }
+.shared-order-dialog { width:min(500px,calc(100% - 24px)); max-height:calc(100dvh - 24px); margin:auto; padding:0; border:1px solid var(--line); border-radius:16px; background:var(--surface); color:var(--text); box-shadow:0 8px 24px #0002; }
 .shared-order-dialog[open] { display:flex; flex-direction:column; }
 .shared-order-dialog::backdrop { background:#10131866; }
 .shared-order-heading { display:flex; justify-content:space-between; gap:12px; padding:20px 20px 16px; }
 .shared-order-heading h2 { margin:0 0 4px; font-size:20px; font-weight:500; }
 .shared-order-heading p { margin:0; color:var(--muted); font-size:13px; }
 .shared-order-heading .icon-button { flex:none; }
-.shared-order-list { margin:0; padding:0 20px; overflow:auto; list-style:none; }
-.shared-order-list li { display:flex; align-items:center; gap:8px; min-height:48px; padding:4px; border-top:1px solid var(--line); font-size:14px; }
-.shared-order-list li>svg, .shared-order-position { flex:none; color:var(--muted); }
-.shared-order-position { width:20px; font-family:var(--mono, monospace); font-variant-numeric:tabular-nums; font-size:12px; }
-.shared-order-name { flex:1; }
-.shared-order-list button { display:grid; flex:none; place-items:center; width:36px; height:36px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); }
+.shared-order-list { min-height:0; margin:0; padding:0 20px; overflow:auto; overscroll-behavior:contain; list-style:none; }
+.shared-order-list li, .shared-order-preview { display:flex; align-items:center; gap:8px; min-height:48px; padding:4px; background:var(--surface); font-size:14px; }
+.shared-order-list li { border-top:1px solid var(--line); }
+.shared-order-list li>svg, .shared-order-preview>svg { flex:none; color:var(--muted); }
+.shared-order-name { flex:1; min-width:0; overflow-wrap:anywhere; }
+.shared-order-position { flex:none; min-height:36px; padding:0 4px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:12px; font-variant-numeric:tabular-nums; cursor:pointer; }
+.shared-order-arrows { display:flex; gap:4px; }
+.shared-order-list button { display:grid; flex:none; place-items:center; width:34px; height:36px; padding:0; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); }
 .shared-order-list button:hover:not([aria-disabled=true]) { background:var(--soft); color:var(--text); }
 .shared-order-list button[aria-disabled=true] { opacity:.45; cursor:default; }
+.shared-order-list .shared-order-handle { border-color:transparent; background:transparent; cursor:grab; touch-action:none; }
+.shared-order-list .shared-order-handle:active, .shared-order-list [data-dragging=true] .shared-order-handle { cursor:grabbing; }
+.shared-order-list [data-dragging=true] { background:var(--tint); }
+.shared-order-list [data-dragging=true] > :not(:focus-visible) { opacity:.35; }
+.shared-order-preview { height:100%; padding:4px 12px; border:1px solid var(--accent); border-radius:8px; box-shadow:0 4px 12px #0002; }
 .shared-order-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; padding:12px 20px 16px; border-top:1px solid var(--line); }
 .shared-order-footer .text-button { margin-right:auto; }
 .shared-order-footer .run-button { margin-left:0; }
 :root[data-theme=dark] :is(.shared-nav-panel[popover], .shared-order-dialog) { box-shadow:none; }
-@media(prefers-reduced-motion:reduce) { .shared-nav-chevron { transition:none; } }
+@media(max-width:420px) {
+  .shared-order-heading, .shared-order-list, .shared-order-footer { padding-inline:12px; }
+  .shared-order-list li { gap:6px; }
+  .shared-order-list button { width:32px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .shared-nav-chevron { transition:none; }
+  .shared-order-list li { transition:none !important; }
+}
