@@ -559,6 +559,32 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await jump('打开共享', web);
       await click('打开引用', toolbar, web);
       await wait('location.hash === "#project-todos" && document.querySelector(".td-status [role=status]").textContent.includes("未开放本机文件共享")', web);
+      const sheetActions = '.td-sheet-head button';
+      const confirmation = '.confirm-dialog[open] button';
+      assert.equal(await web('!!document.querySelector(".td-sheet-head .td-delete")'), false);
+
+      await navigate('待办清单');
+      await click('删除清单', sheetActions);
+      await wait('document.querySelector(".confirm-dialog[open] p")?.textContent.includes("未保存的编辑")');
+      await click('保留清单', confirmation);
+      await wait('!document.querySelector(".confirm-dialog[open]")');
+      assert.match(await js(editorContents), /补充说明/);
+      await click('删除清单', sheetActions);
+      await click('删除清单', confirmation);
+      await wait('document.querySelector(".td-sheet-head h2")?.textContent === "本机清单"');
+      assert.equal((await js(desktopDocs)).some(item => item.name === '桌面扩展语法'), false);
+
+      await click('退出登录', '.portal-bar button', web);
+      await click('退出', 'dialog[open] button', web);
+      await login('', 'global-sharing-test-only');
+      await click('删除清单', sheetActions, web);
+      await click('删除清单', confirmation, web);
+      await wait('document.querySelector(".td-sheet-head h2")?.textContent === "网页扩展语法"', web);
+      await click('删除清单', sheetActions, web);
+      await click('删除清单', confirmation, web);
+      await wait('document.querySelector(".td-empty [role=status]")?.textContent === "已删除清单"', web);
+      assert.deepEqual(await js(desktopDocs), afterImport);
+
       const stopped = await js(`window.devkitFileShares.request('toggle', { id:${JSON.stringify(status.id)}, revision:${restarted.data.revision}, enabled:false })`);
       assert.equal(stopped.error, undefined);
     } finally {
@@ -574,6 +600,6 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await js('window.devkitProjects.request("stop")');
   }
   console.log(
-    "Global sharing settings, file downloads, Todo shortcuts, nested subtasks, syntax and desktop/browser import and export passed.",
+    "Global sharing settings, file downloads, Todo shortcuts, nested subtasks, syntax and desktop/browser import, export and deletion passed.",
   );
 };

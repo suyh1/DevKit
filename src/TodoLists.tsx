@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Check, Code2, Download, FileText, Link2, ListPlus, ListTree, Plus, RefreshCw, Save, Settings2, Upload, X } from 'lucide-react';
+import { Archive, Check, Code2, Download, FileText, Link2, ListPlus, ListTree, Plus, RefreshCw, Save, Settings2, Trash2, Upload, X } from 'lucide-react';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { readText, saveText } from './files';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
@@ -92,7 +92,9 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
       setDocuments(result.documents);
       const updated = result.documents.find(item => item.id === result.selectedId);
       if (action === 'create' && updated) { setSelected(updated.id); setDraft(null); setLine(1); }
-      else if (action === 'save' || action === 'remove') setDraft(null);
+      else if (action === 'remove') {
+        setSelected(''); setDraft(null); setLine(1); setJumpTo(0);
+      } else if (action === 'save') setDraft(null);
       else if (action === 'settings' && updated) setDraft(current => current && { ...current, base: updated });
       if (closeSettings) setSettings(null);
       setMessage(success);
@@ -144,8 +146,9 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     setDraft(null); setSettings(null); refresh();
   }
   async function remove(current: TodoDocument) {
-    if (!await confirm({ title: '删除清单？', detail: `“${current.name}”的全文和归档会被删除。`, confirm: '删除清单', cancel: '保留清单' })) return;
-    await request('remove', { id: current.id, revision: current.revision }, '已删除清单', true);
+    const detail = `“${current.name}”的全文和归档会被永久删除。${dirty ? '未保存的编辑也会丢失。' : ''}`;
+    if (!await confirm({ title: '删除清单？', detail, confirm: '删除清单', cancel: '保留清单' })) return;
+    await request('remove', { id: current.id, revision: current.revision }, '已删除清单');
   }
 
   async function openReference(reference: Pick<TodoReference, 'kind' | 'name'>) {
@@ -206,6 +209,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
             {canEdit && <button className="td-icon" type="button" aria-label="清单设置" title="清单设置" disabled={busy || outdated} onClick={() => {
               setFormError(''); setSettings({ current: sheet, name: sheet.name, published: sheet.published });
             }}><Settings2 size={16} /></button>}
+            {canEdit && <button className="td-delete" type="button" disabled={busy || outdated} onClick={() => void remove(sheet)}><Trash2 size={16} />删除清单</button>}
             {canEdit && <button className="td-primary" type="button" disabled={!dirty || busy || outdated} onClick={save}><Save size={16} />保存</button>}
           </div>
         </header>
@@ -255,7 +259,8 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
           <span role="status">{message || (dirty ? '未保存' : portal && !canEdit ? '只读' : '已保存')}</span>
         </footer>
       </div> : <div className="td-empty"><FileText size={22} /><h2>{portal ? '暂无已发布的清单' : '从一份清单开始'}</h2>
-        {canEdit && <p>新建清单，或导入已有的 <code>.todo</code> 文件。</p>}</div>}
+        {canEdit && <p>新建清单，或导入已有的 <code>.todo</code> 文件。</p>}
+        {message && <p role="status">{message}</p>}</div>}
     </div>}
     {settings && <Modal title={settings.current ? '清单设置' : settings.imported !== undefined ? '导入清单' : '新建清单'} closeLabel="关闭清单设置"
       description={settings.imported === undefined ? undefined : portal ? '文件将作为一份新清单发布到共享工作台。' : '文件将保存为一份新清单。'}
@@ -270,8 +275,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         {!portal && <label className="pc-check"><input type="checkbox" checked={settings.published} onChange={event => setSettings({ ...settings, published: event.target.checked })} />发布到共享工作台</label>}
         {settings.current?.published && <ResourceLink page="project-todos" id={settings.current.id} />}
         {formError && <p className="td-alert" role="alert">{formError}</p>}
-        <footer>{settings.current && <button className="td-delete" type="button" disabled={busy} onClick={() => { if (settings.current) void remove(settings.current); }}>删除清单</button>}
-          <ModalCancel /><button className="run-button" disabled={busy}>{settings.imported !== undefined ? '导入' : '保存'}</button></footer>
+        <footer><ModalCancel /><button className="run-button" disabled={busy}>{settings.imported !== undefined ? '导入' : '保存'}</button></footer>
       </form>
     </Modal>}
   </section>;

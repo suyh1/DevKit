@@ -23,7 +23,7 @@
 .td-actions { justify-content: flex-end; gap: 4px; }
 .td-workspace :is(.td-heading, .td-sheet-head) .td-actions button { min-height: 28px; }
 .td-actions .td-icon { width: 28px; }
-.td-actions :is(.td-primary, .td-secondary, .sharing-shortcut) { gap: 4px; padding-inline: 8px; }
+.td-actions :is(.td-primary, .td-secondary, .td-delete, .sharing-shortcut) { gap: 4px; padding-inline: 8px; }
 .td-actions .sharing-shortcut { padding-block: 4px; }
 .td-icon, .td-primary, .td-secondary, .td-toolbar button, .td-alert button, .td-delete {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -192,7 +192,7 @@ button.td-preview-check:hover { border-color: var(--accent); background: var(--t
 }
 .td-settings footer button { min-height: 36px; }
 .td-settings .run-button { padding: 8px 12px; margin-inline-start: 0; font-size: 12px; }
-.td-delete { margin-inline-end: auto; color: var(--error); }
+.td-delete { color: var(--error); }
 @container (max-width: 720px) {
   .td-shell { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .td-documents nav { display: flex; }
