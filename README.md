@@ -292,7 +292,9 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 
 ### GitHub 正式发行
 
-正式发行统一由 [GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml) 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`），在标签说明中写入更新内容。
+正式发行统一由 GitHub Actions 构建、校验和发布。提交并推送 `main` 上的版本更新后，推送与 `package.json` 版本一致的附注标签（例如 `1.23.0`）。[GitHub Actions](https://github.com/suyh1/DevKit/actions/workflows/build.yml)
+
+发布说明自动列出从当前版本可追溯的最近一个已发布正式版到当前标签之间的提交，并提供完整变更链接。首个正式版会列出截至该标签的提交。可在标签附注中用 Markdown 补充本次版本的用户可见变化。与基准版本完全相同的附注会自动省略。
 
 正式发行目标为 **5 分钟以内**，从版本标签触发 Actions 开始计时，直到 GitHub Release 的安装包可下载。排查耗时时可在 Actions 查看各阶段记录。
 

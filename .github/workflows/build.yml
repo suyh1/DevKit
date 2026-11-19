@@ -252,6 +252,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -281,6 +282,13 @@ jobs:
           cp artifacts/project-center-node24/{DevKit_ProjectCenter_"$VERSION"_node24.zip,PROJECT-SERVER-SHA256SUMS,project-server.json,project-server-verification.json} "$release/"
           cd "$release"
           sha256sum --strict --check PROJECT-SERVER-SHA256SUMS
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/releases" -f per_page=100 \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' > "$RUNNER_TEMP/published-tags.txt"
+          node scripts/generate-release-notes.mjs "$GITHUB_REF_NAME" "$RUNNER_TEMP/published-tags.txt" > "$RUNNER_TEMP/release-notes.md"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -294,7 +302,7 @@ jobs:
               exit 1
             fi
             gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
-            gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --latest --title "DevKit $VERSION" --notes-from-tag "${assets[@]}"
+            gh release create "$GITHUB_REF_NAME" --verify-tag --latest --title "DevKit $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" "${assets[@]}"
           fi

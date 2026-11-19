@@ -30,7 +30,7 @@
     "test:electron": "npm run build && node scripts/smoke-desktop.mjs",
     "bundle:all": "npm run build && node scripts/package-all.mjs",
     "clean:artifacts": "node scripts/clean-artifacts.mjs",
-    "test:release": "node --test scripts/release-integrity.check.mjs",
+    "test:release": "node --test scripts/release-integrity.check.mjs scripts/generate-release-notes.check.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "test:projects": "node --test server/projects.check.mjs",
     "test:nginx": "node --test server/nginx.check.mjs server/nginx-inspection.check.mjs",
