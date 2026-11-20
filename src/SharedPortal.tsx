@@ -1,4 +1,5 @@
 import SegmentedControl from './SegmentedControl';
+import { clearPortalPickups } from './publisher-pickups';
 import { themeStyles, normalizeThemeStyle } from './themes';
 import {
   useCallback,
@@ -346,6 +347,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       : value;
     const grants = (current: Session) => JSON.stringify(sharingServices({ services: current.services }));
     if (session?.authenticated && (!normalized.authenticated || (session.visitor || '') !== (normalized.visitor || '') || grants(session) !== grants(normalized))) {
+      if (!normalized.authenticated || session.visitor !== normalized.visitor) clearPortalPickups();
       if (history.state?.creation) history.replaceState(null, '');
       setWorkspaceEpoch(epoch => epoch + 1);
       resetOverlays();

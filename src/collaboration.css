@@ -389,6 +389,19 @@
   border-bottom: 0;
   padding-bottom: 0;
 }
+.publisher-pickup {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.publisher-pickup code {
+  user-select: all;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .entry-glyph {
   width: 36px;
   height: 40px;

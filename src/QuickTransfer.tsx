@@ -20,6 +20,8 @@ import { useConfirmation } from './Confirmation';
 import { RelatedLink, useRelatedCreation } from './related-workspaces';
 import { parseWorkspaceLink } from './workspace-links';
 import { DirectSender, receiveDirect } from './direct-transfer';
+import PublisherPickup from './PublisherPickup';
+import { publisherPickups, type PublishedTransfer } from './publisher-pickups';
 
 type Entry = {
   id: string;
@@ -58,6 +60,7 @@ function sharedDestination(text: string | undefined, origin: string | undefined)
 }
 export function QuickTransfer({ active, edit, directory, origin, quickLink = false }: PageProps & { directory?: string; origin?: string; quickLink?: boolean }) {
   const feed = useCollabList<Entry>('transfer', active);
+  const [pickups] = useState(() => publisherPickups(!window.devkitCollab && !quickLink));
   const op = useOperation(),
     confirm = useConfirmation(),
     picker = useRef<HTMLInputElement>(null),
@@ -135,27 +138,32 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           currentFile = file;
           if (direct) {
             if (typeof RTCPeerConnection === 'undefined') throw new Error('当前浏览器不支持 WebRTC 直传。');
-            const { id } = await collab<{ id: string }>('transfer', 'publish', {
+            const published = await collab<PublishedTransfer>('transfer', 'publish', {
+              rememberPickup: true,
               name: file.name,
               size: file.size,
               hours,
               password,
             });
+            const { id } = published;
             if (cancelled.current) {
               await collab('transfer', 'remove', { id });
               break;
             }
             sender.add(id, file);
+            pickups.remember(published);
             setFiles((current) => current.slice(1));
             sent++;
             continue;
           }
-          const { id } = await collab<{ id: string }>('transfer', 'begin', {
+          const published = await collab<PublishedTransfer>('transfer', 'begin', {
+            rememberPickup: true,
             name: file.name,
             size: file.size,
             hours,
             password,
           });
+          const { id } = published;
           try {
             for (let offset = 0; offset < file.size; offset += 1048576) {
               if (cancelled.current) break;
@@ -167,7 +175,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
               await collab('transfer', 'cancel', { id });
               break;
             }
-            await collab('transfer', 'finish', { id });
+            const finished = await collab<PublishedTransfer>('transfer', 'finish', { id });
+            pickups.remember({ ...published, ...finished });
             sent++;
             setFiles((current) => current.slice(1));
           } catch (error) {
@@ -177,7 +186,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
         }
         currentFile = undefined;
         if (!direct && !cancelled.current && text.trim()) {
-          await collab('transfer', 'send', { text, hours, password });
+          const published = await collab<PublishedTransfer>('transfer', 'send', { text, hours, password, rememberPickup: true });
+          pickups.remember(published);
           setText('');
           sent++;
         }
@@ -385,6 +395,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           </p>
         )}
         {entries.map(item => {
+          const receipt = active && edit && item.locked ? pickups.key(item.id) : undefined;
           const visibleText = item.locked ? (revealed?.id === item.id ? revealed.text : undefined) : item.text;
           const destination = !quickLink && item.kind === 'link' ? sharedDestination(visibleText, origin) : undefined;
           return <article className="collab-entry" key={item.id}>
@@ -486,6 +497,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                       )
                         return;
                       await collab('transfer', 'remove', { id: item.id });
+                      pickups.forget(item.id);
                       if (item.direct) sender.remove(item.id);
                       await feed.refresh();
                     })
@@ -496,6 +508,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 </button>
               )}
             </div>
+            {receipt && <PublisherPickup id={item.id} receipt={receipt} />}
             {pickupId === item.id && (
               <form
                 className="collab-bar"

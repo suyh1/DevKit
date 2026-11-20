@@ -251,7 +251,7 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   await writeFile(path.join(dist, '.vite/manifest.json'), JSON.stringify({ 'transfer.html': { file: 'transfer.js' } }));
   await writeFile(path.join(dist, 'transfer.html'), 'quick page');
   await writeFile(path.join(dist, 'transfer.js'), 'quick script');
-  const store = await createCollabStore(directory);
+  let store = await createCollabStore(directory);
   let links = await createTransferLinks(directory, dist, store);
   t.after(async () => { await links.close(); await store.close(); });
   assert.deepEqual(links.status(), []);
@@ -300,7 +300,15 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   assert.equal((await fetch(new URL(a.pathname, b.origin))).status, 404);
   assert.equal((await post(a, '', 'list')).status, 401);
   assert.equal((await post(a, alice, 'send', { text: 'blocked', hours: 1 }, b.origin)).status, 403);
-  const { id } = await ok(a, alice, 'send', { text: 'secret', hours: 1, password: 'pickup' });
+  const { id, publisherKey } = await ok(a, alice, 'send', { text: 'secret', hours: 1, password: 'pickup', rememberPickup: true });
+  const proof = { id, key: publisherKey };
+  assert.equal((await ok(a, alice, 'recall', proof)).password === 'pickup', true);
+  assert.equal((await post(a, alice, 'recall', { id, key: randomBytes(32).toString('hex') })).status, 403);
+  assert.equal((await post(a, eve, 'recall', proof)).status, 403);
+  const inbox = await ok(b, bob, 'list');
+  assert.equal(inbox.some(row => row.protection || row.publisherKey || row.password), false);
+  const index = await readFile(path.join(directory, 'collaboration', 'transfer.json'), 'utf8');
+  assert.equal(index.includes(publisherKey) || index.includes('"pickup"'), false);
   assert.equal((await store.request('transfer', 'list'))[0].id, id);
   assert.equal((await ok(b, bob, 'list'))[0].text, undefined);
   assert.equal((await post(b, bob, 'unlock', { id, password: 'wrong' })).status, 403);
@@ -317,8 +325,11 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   await assert.rejects(fetch('http://127.0.0.1:' + unused));
   assert.equal((await ok(a, alice, 'list')).length, 1);
   await links.close();
+  await store.close();
+  store = await createCollabStore(directory);
   links = await createTransferLinks(directory, dist, store);
   assert.deepEqual(links.status(), configured);
+  assert.equal((await ok(a, alice, 'recall', proof)).password === 'pickup', true);
   assert.equal((await ok(b, await client(b), 'list'))[0].id, id);
   await links.save({ ports: [portA, portB], shorten: [portB] });
   assert.equal(links.status()[1].short, true);

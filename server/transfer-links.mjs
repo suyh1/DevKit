@@ -19,6 +19,7 @@ const operations = new Set([
   'finish',
   'cancel',
   'unlock',
+  'recall',
   'publish',
   'presence',
   'claim',
@@ -63,11 +64,8 @@ async function openLink({ port, token }, dist, manager, active) {
       const hasClient = /^[a-f0-9]{48}$/.test(client || '');
       if (request.method === 'GET' || request.method === 'HEAD') {
         if (route === '') {
-          if (!hasClient)
-            response.setHeader(
-              'Set-Cookie',
-              cookieName + '=' + randomBytes(24).toString('hex') + '; HttpOnly; SameSite=Strict; Path=' + base,
-            );
+          const identity = hasClient ? client : randomBytes(24).toString('hex');
+          response.setHeader('Set-Cookie', cookieName + '=' + identity + '; HttpOnly; SameSite=Strict; Max-Age=604800; Path=' + base);
           return await serveAsset(dist, page, request, response);
         }
         if (assets.has('/' + route)) return await serveAsset(dist, route, request, response);
@@ -78,6 +76,7 @@ async function openLink({ port, token }, dist, manager, active) {
       if (!hasClient) fail(401, '请重新打开快速链接。');
       const access = {
         owner: scope + client,
+        publisherSession: 'quick:' + port + ':' + client,
         attemptKey: 'quick:' + request.socket.remoteAddress,
         authorize,
         actor: '快传访客',
@@ -97,6 +96,7 @@ async function openLink({ port, token }, dist, manager, active) {
       if (request.headers.origin !== url.origin) fail(403, '拒绝跨来源操作。');
       const data = await manager.request('transfer', action, await jsonBody(request), access);
       authorize();
+      if (data?.publisherKey) response.setHeader('Set-Cookie', cookieName + '=' + client + '; HttpOnly; SameSite=Strict; Max-Age=604800; Path=' + base);
       json(200, data ?? null);
     } catch (error) {
       if (response.headersSent) response.destroy();

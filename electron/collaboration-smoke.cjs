@@ -108,6 +108,13 @@ module.exports = async function collaborationSmoke(window, output) {
       await click(send, sendScope, direct ? '发布直传文件（1）' : '发送所选内容（1）');
       const article = `[...document.querySelectorAll(${JSON.stringify(receiveScope + '.collab-entry')})].find(el=>el.innerText.includes(${JSON.stringify(name)}))`;
       await wait(receive, '!!' + article);
+      const own = `[...document.querySelectorAll(${JSON.stringify(sendScope + '.collab-entry')})].find(el=>el.innerText.includes(${JSON.stringify(name)}))`;
+      await wait(send, '!!' + own + '?.querySelector(".publisher-pickup button")');
+      assert.equal(await receive('!!' + article + '.querySelector(".publisher-pickup")'), false);
+      await send(own + '.querySelector(".publisher-pickup button").click()');
+      await wait(send, own + '?.querySelector(".publisher-pickup code")?.textContent === "file-pass"');
+      await send(own + '.querySelector(".publisher-pickup button").click()');
+      await wait(send, '!' + own + '.querySelector(".publisher-pickup code")');
       await receive(article + '.querySelector("button").click()');
       await fill(receive, receiveScope + 'input[aria-label="输入取件密码"]', 'file-pass');
       if (direct) await click(receive, receiveScope, '确认取件');
@@ -324,6 +331,13 @@ module.exports = async function collaborationSmoke(window, output) {
     assert.equal(await web('document.querySelector("h1").innerText'), '局域网快传');
     assert.equal(await web('!!document.querySelector(".portal-login, .transfer-link-settings")'), false);
     await exchange(web, standalone, desktop, main, window, 'quick-to-desktop.bin');
+    await browser.loadURL(quick);
+    const sentFile = "[...document.querySelectorAll('.collab-entry')].find(el => el.innerText.includes('quick-to-desktop.bin'))";
+    await wait(web, '!!' + sentFile + '?.querySelector(".publisher-pickup button")');
+    assert.equal(await web('!!' + sentFile + '.querySelector(".publisher-pickup code")'), false);
+    await web(sentFile + '.querySelector(".publisher-pickup button").click()');
+    await wait(web, sentFile + '?.querySelector(".publisher-pickup code")?.textContent === "file-pass"');
+    await web(sentFile + '.querySelector(".publisher-pickup button").click()');
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick-stored.bin');
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick.bin', true);
     await fill(desktop, '.transfer-link-settings input', '');
