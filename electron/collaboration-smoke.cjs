@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const path = require('node:path');
 const fs = require('node:fs/promises');
-const { BrowserWindow, dialog } = require('electron');
+const { BrowserWindow, clipboard, dialog } = require('electron');
 
 module.exports = async function collaborationSmoke(window, output) {
   const desktop = (code) => window.webContents.executeJavaScript(code, true);
@@ -296,11 +296,35 @@ module.exports = async function collaborationSmoke(window, output) {
       path.join(output, 'collab-transfer-mobile.png'),
       (await browser.webContents.capturePage()).toPNG(),
     );
+
+    await desktop('window.devkitProjects.request("stop")');
+    await openWorkspace('局域网快传');
+    await desktop('document.querySelector(".transfer-link-settings summary").click()');
+    await wait(desktop, '!!document.querySelector(".transfer-link-settings input:not(:disabled)")');
+    await fill(desktop, '.transfer-link-settings input', String(port));
+    await click(desktop, '.transfer-link-settings ', '保存端口');
+    await wait(desktop, '!!document.querySelector(".transfer-port-links code")');
+    const quick = await desktop('document.querySelector(".transfer-port-links code").textContent');
+    await click(desktop, '.transfer-port-links ', '复制链接');
+    await wait(desktop, 'document.querySelector(".transfer-link-settings").innerText.includes("已复制快速链接")');
+    assert.equal(await clipboard.readText(), quick);
+    await browser.webContents.session.setProxy({ mode: 'direct' });
+    await browser.loadURL(quick);
+    const standalone = '.transfer-link-page .collab-page ';
+    await wait(web, '!!document.querySelector(".transfer-link-page .collab-entry")');
+    assert.equal(await web('document.querySelector("h1").innerText'), '局域网快传');
+    assert.equal(await web('!!document.querySelector(".portal-login, .transfer-link-settings")'), false);
+    await exchange(web, standalone, desktop, main, window, 'quick-to-desktop.bin');
+    await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick-stored.bin');
+    await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick.bin', true);
+    await fill(desktop, '.transfer-link-settings input', '');
+    await click(desktop, '.transfer-link-settings ', '保存端口');
+    await wait(desktop, '!document.querySelector(".transfer-port-links code")');
   } finally {
     browser.destroy();
     await desktop('window.devkitProjects.request("stop")');
   }
   console.log(
-    'Desktop and portal password pickup, published Mock response, shared canvas drawing and mobile layout passed.',
+    'Desktop, portal and independent quick-link transfers, Mock response, shared canvas drawing and mobile layout passed.',
   );
 };

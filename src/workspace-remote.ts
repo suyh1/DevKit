@@ -31,7 +31,8 @@ export async function remoteRequest<T>(
   payload?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await remoteResponse(`/api/${module}/${action}`, {
+  const route = module === 'transfer' ? `api/transfer/${action}` : `/api/${module}/${action}`;
+  const response = await remoteResponse(route, {
     method: "POST",
     signal,
     keepalive: module === 'transfer' && action === 'remove' || module === 'jar' && action === 'console-release' || module === 'lan-hosts' && ['terminal-close', 'scan-cancel', 'rdp-close'].includes(action),

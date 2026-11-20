@@ -27,9 +27,11 @@ export function createDirectDirectory(changed) {
   return {
     sweep,
     remove,
-    release(owner) {
-      for (const [id, listing] of listings) if (listing.owner === owner) remove(id);
-      for (const [key, req] of requests) if (req.owner === owner) requests.delete(key);
+    ownedBy: (id, owner) => listings.get(id)?.owner === owner,
+    release(owner, scope = false) {
+      const matches = value => scope ? typeof value === 'string' && value.startsWith(owner) : value === owner;
+      for (const [id, listing] of listings) if (matches(listing.owner)) remove(id);
+      for (const [key, req] of requests) if (matches(req.owner)) requests.delete(key);
     },
     rows: () => Array.from(listings.values(), (item) => item.row),
     get: (id) => listings.get(id)?.row,

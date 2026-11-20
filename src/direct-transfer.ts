@@ -79,6 +79,9 @@ export class DirectSender {
     this.files.set(id, file);
     if (!this.polling && !this.timer) void this.poll();
   }
+  owns(id: string) {
+    return this.files.has(id);
+  }
   remove(id: string) {
     this.files.delete(id);
     for (const [key, entry] of this.peers)

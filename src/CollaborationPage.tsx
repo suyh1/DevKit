@@ -6,6 +6,7 @@ import { SharingButton, useSharingStatus } from './Sharing';
 import { copyText } from './motion-primitives';
 import { useWorkspaceResource, workspaceHash } from './workspace-links';
 import { type CollabModule, type PageProps } from './collab-api';
+import { TransferLinkSettings } from './TransferLinkSettings';
 import { QuickTransfer } from './QuickTransfer';
 import { MockService } from './MockService';
 import { ScreenshotBoard } from './ScreenshotBoard';
@@ -64,6 +65,7 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
           邀请设备
         </button>
       </header>
+      {module === 'transfer' && window.devkitCollab && <TransferLinkSettings />}
       {invite && (
         <div className="collab-invite">
           {addresses.length > 1 && (

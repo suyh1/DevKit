@@ -156,7 +156,9 @@ test('Node wrapper and direct Python server packager ship the freshly generated 
       await cp(path.join(root, 'node_modules', name), path.join(directory, 'node_modules', name), { recursive: true });
     }
     await writeFile(path.join(directory, 'dist/portal.html'), '<!doctype html><title>Fixture</title>');
-    await writeFile(path.join(directory, 'dist/.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
+    await writeFile(path.join(directory, 'dist/transfer.html'), '<!doctype html><title>Transfer</title>');
+    await writeFile(path.join(directory, 'dist/transfer.js'), '');
+    await writeFile(path.join(directory, 'dist/.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' }, 'transfer.html': { file: 'transfer.js' } }));
     await writeFile(path.join(directory, 'docs/project-center.md'), '# Fixture guide');
     await writeFile(path.join(directory, 'scripts/stage-ssh-node.mjs'), `
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -189,7 +191,7 @@ for (const target of ['win32-x64', 'linux-x64', 'linux-arm64']) {
       assert.equal(await readFile(path.join(release, 'LICENSE'), 'utf8'), await readFile(path.join(root, 'LICENSE'), 'utf8'));
       assert.equal(await readFile(path.join(release, 'docs/project-center.md'), 'utf8'), '# Fixture guide');
       const { stdout } = await execute(python, ['-c',
-        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("LICENSE")== (root/"LICENSE").read_bytes()\n metadata = json.loads(z.read("package.json"))\n assert metadata["author"] == {"name": "suyh1", "email": "suyhem@163.com"}\n assert metadata["license"] == "MIT"\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert "node_modules/ssh2/lib/index.js" in z.namelist()\n assert not any(name.endswith(".node") for name in z.namelist())\n assert z.testzip() is None\nprint("ZIP verified")',
+        'import sys,zipfile,json\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith zipfile.ZipFile(sys.argv[2]) as z:\n assert z.read("README.md")== (root/"README.md").read_bytes()\n assert z.read("LICENSE")== (root/"LICENSE").read_bytes()\n metadata = json.loads(z.read("package.json"))\n assert metadata["author"] == {"name": "suyh1", "email": "suyhem@163.com"}\n assert metadata["license"] == "MIT"\n assert z.read("docs/project-center.md")== (root/"docs/project-center.md").read_bytes()\n assert "docs/README.template.md" not in z.namelist()\n assert "dist/transfer.html" in z.namelist()\n assert "dist/index.html" not in z.namelist()\n assert "node_modules/ssh2/lib/index.js" in z.namelist()\n assert not any(name.endswith(".node") for name in z.namelist())\n assert z.testzip() is None\nprint("ZIP verified")',
         directory, path.join(release, `DevKit_ProjectCenter_${manifest.version}_node24.zip`),
       ], { windowsHide: true });
       assert.match(stdout, /ZIP verified/);

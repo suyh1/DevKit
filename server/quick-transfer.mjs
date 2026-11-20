@@ -68,7 +68,7 @@ export async function createTransferService(folder, initial, changed) {
     if (action === 'unlock') {
       const item = direct.get(input.id) || requireRecord(live, input.id);
       if (!item.protection) fail(400, '此项无需取件密码。');
-      const key = item.id + ':' + (access.owner || '');
+      const key = item.id + ':' + (access.attemptKey || access.owner || '');
       const attempt = attempts.get(key) || { count: 0, until: now + 60000 };
       if (attempt.count >= 5 || (attempts.size >= 4096 && !attempts.has(key))) fail(429, '尝试次数过多，请稍后再试。');
       if (typeof input.password !== 'string' || !input.password.length || input.password.length > 128)
@@ -119,6 +119,7 @@ export async function createTransferService(folder, initial, changed) {
       }
     }
     if (action === 'remove') {
+      if (access.ownDirectOnly && !direct.ownedBy(input.id, access.owner)) fail(403, '快速链接仅可撤回自己发布的直传文件。');
       if (direct.get(input.id)) { direct.remove(input.id); return {}; }
       const item = requireRecord(live, input.id);
       await commit(live.filter((row) => row !== item));

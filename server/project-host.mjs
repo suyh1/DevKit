@@ -3,7 +3,8 @@ import https from "node:https";
 import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
-import { networkInterfaces } from "node:os";
+import { browserAssets, csp, jsonBody, localAddresses, serveAsset } from './browser-http.mjs';
+import { downloadTransfer } from './transfer-download.mjs';
 import path from "node:path";
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
@@ -26,24 +27,6 @@ function normalizeTls(tls) {
   return { cert: tls.cert, key: tls.key, hostname };
 }
 
-const csp =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
-const mime = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-};
-const localAddresses = () => [
-  ...new Set([
-    "127.0.0.1",
-    ...Object.values(networkInterfaces())
-      .flat()
-      .filter((item) => item && item.family === "IPv4")
-      .map((item) => item.address),
-  ]),
-];
 export async function createProjectHost(store, dist, managers = { nginx: () => null, library: () => null }) {
   const workspaces = createSharedWorkspaces(managers);
   const audit = createSharingAudit(store.directory);
@@ -133,26 +116,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
     if (!next.allowDefault && !next.visitors.some(visitor => Object.values(visitorServices(services, visitor.services)).some(service => service.enabled))) throw new Error('请给至少一名访客开放一个已启用的共享服务。');
     const tls = next.tls && { cert: await readFile(next.tls.cert), key: await readFile(next.tls.key), minVersion: 'TLSv1.2' };
     const tlsVersion = tls && createHash('sha256').update(tls.cert).update(tls.key).digest('hex');
-    const manifest = JSON.parse(
-      await readFile(path.join(dist, ".vite", "manifest.json"), "utf8"),
-    );
-    const allowed = new Set();
-    function include(key) {
-      const entry = manifest[key];
-      if (!entry || allowed.has(`/${entry.file}`)) return;
-      allowed.add(`/${entry.file}`);
-      for (const asset of [...(entry.css || []), ...(entry.assets || [])])
-        allowed.add(`/${asset}`);
-      for (const dependency of [
-        ...(entry.imports || []),
-        ...(entry.dynamicImports || []),
-      ])
-        include(dependency);
-    }
-    if (!manifest["portal.html"])
-      throw new Error("缺少共享工作台网页构建，请先构建应用。");
-    include("portal.html");
-    allowed.delete("/portal.html");
+    const allowed = await browserAssets(dist, "portal.html");
     const hosts = new Set(["localhost", ...localAddresses(), ...(next.tls?.hostname ? [next.tls.hostname] : [])]);
     if (server?.listening && settings.host === next.host && server.address().port === next.port && tlsVersion === activeContext.tlsVersion) {
       await store.saveSettings(next);
@@ -224,27 +188,9 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             role: authorized && next.canEdit ? "editor" : "viewer",
           });
         async function body() {
-          if (
-            !/^application\/json(?:;|$)/i.test(
-              request.headers["content-type"] || "",
-            )
-          )
-            throw Object.assign(new Error("需要 JSON 请求。"), { status: 415 });
-          const chunks = [];
-          let size = 0;
-          for await (const chunk of request) {
-            size += chunk.length;
-            const largeDocument = ['/api/http/save-library', '/api/project-todos/save', '/api/project-todos/create'].includes(url.pathname);
-            const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
-            if (size > limit)
-              throw Object.assign(new Error("请求过大。"), { status: 413 });
-            chunks.push(chunk);
-          }
-          try {
-            return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-          } catch {
-            throw new Error("JSON 格式无效。");
-          }
+          const largeDocument = ['/api/http/save-library', '/api/project-todos/save', '/api/project-todos/create'].includes(url.pathname);
+          const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
+          return jsonBody(request, limit);
         }
         if (
           sessionPath(url.pathname) === "/api/projects/login" &&
@@ -317,14 +263,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (request.method !== 'GET') return json(405, { error: '需要 GET 请求。' });
             const manager = managers.collab?.();
             if (!manager) return json(503, { error: '收件箱暂不可用。' });
-            const { file, name, size } = await manager.openTransfer({ id: download[1], ticket: url.searchParams.get('ticket') }, { owner: token, authorize: ensureCurrentSession });
-            try {
-              ensureCurrentSession();
-              const encoded = encodeURIComponent(name.toWellFormed()).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16));
-              response.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': size, 'Content-Disposition': `attachment; filename*=UTF-8''${encoded}` });
-              await pipeline(file.createReadStream(), response, { signal: session.abort.signal });
-            } finally { await file.close(); }
-            return;
+            return await downloadTransfer(manager, { id: download[1], ticket: url.searchParams.get('ticket') }, { owner: token, authorize: ensureCurrentSession }, response, session.abort.signal);
           }
           const collaboration = /^\/api\/(transfer|mock|whiteboard)\/([a-z]+)$/.exec(url.pathname);
           if (collaboration) {
@@ -488,20 +427,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
         if (requested !== "/" && !context.allowed.has(requested))
           return json(404, { error: "这里只提供共享工作台。" });
         const file = requested === "/" ? "portal.html" : requested.slice(1);
-        const absolute = path.resolve(dist, file),
-          relative = path.relative(dist, absolute);
-        if (
-          relative.startsWith("..") ||
-          path.isAbsolute(relative) ||
-          file.includes("\\")
-        )
-          return json(403, { error: "路径无效。" });
-        const content = await readFile(absolute);
-        response.writeHead(200, {
-          "Content-Type":
-            mime[path.extname(file)] || "application/octet-stream",
-        });
-        response.end(request.method === "HEAD" ? undefined : content);
+        await serveAsset(dist, file, request, response);
       } catch (error) {
         if (!response.headersSent)
           json(error.status || 400, { error: error.message || "请求失败。" });

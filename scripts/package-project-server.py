@@ -13,7 +13,7 @@ subprocess.run([os.environ.get('DEVKIT_NODE', 'node'), str(root / 'scripts/updat
 metadata = json.loads((root / 'package.json').read_text(encoding='utf-8'))
 version = metadata['version']
 manifest = json.loads((root / 'dist/.vite/manifest.json').read_text(encoding='utf-8'))
-entries, assets = {}, {'portal.html'}
+entries, assets = {}, {'portal.html', 'transfer.html'}
 
 
 def include(key):
@@ -29,6 +29,7 @@ def include(key):
 
 
 include('portal.html')
+include('transfer.html')
 output = root / f'artifacts/release-{version}'
 output.mkdir(parents=True, exist_ok=True)
 archive = output / f'DevKit_ProjectCenter_{version}_node24.zip'

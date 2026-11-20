@@ -7,6 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { createCollabStore } from './collab-store.mjs';
 import { createDirectDirectory } from './direct-transfer.mjs';
+import { createTransferLinks } from './transfer-links.mjs';
 import { createProjectStore } from './project-store.mjs';
 import { createProjectHost } from './project-host.mjs';
 import { emptySharingServices } from '../shared/sharing.mjs';
@@ -240,4 +241,82 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
     await store?.close();
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+test('quick links isolate ports and clients while serving the desktop inbox without the portal', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-quick-links-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const dist = path.join(directory, 'dist');
+  await mkdir(path.join(dist, '.vite'), { recursive: true });
+  await writeFile(path.join(dist, '.vite/manifest.json'), JSON.stringify({ 'transfer.html': { file: 'transfer.js' } }));
+  await writeFile(path.join(dist, 'transfer.html'), 'quick page');
+  await writeFile(path.join(dist, 'transfer.js'), 'quick script');
+  const store = await createCollabStore(directory);
+  let links = await createTransferLinks(directory, dist, store);
+  t.after(async () => { await links.close(); await store.close(); });
+  assert.deepEqual(links.status(), []);
+  const sockets = await Promise.all(Array.from({ length: 4 }, async () => {
+    const socket = net.createServer();
+    await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
+    return socket;
+  }));
+  const ports = sockets.map(socket => socket.address().port);
+  const busy = sockets.pop();
+  t.after(() => new Promise(resolve => busy.close(resolve)));
+  await Promise.all(sockets.map(socket => new Promise(resolve => socket.close(resolve))));
+  const [portA, portB, unused, occupied] = ports;
+  for (const invalid of [[0], [65536], [1.5], [portA, portA]]) await assert.rejects(links.save(invalid), { status: 400 });
+  const configured = await links.save([portA, portB]);
+  const [a, b] = configured.map(link => {
+    const url = new URL(link.addresses[0]);
+    url.hostname = '127.0.0.1';
+    return url;
+  });
+  const client = async url => {
+    const page = await fetch(url);
+    assert.equal(await page.text(), 'quick page');
+    return page.headers.get('set-cookie').split(';')[0];
+  };
+  const alice = await client(a), bob = await client(b), eve = await client(a);
+  const post = (url, cookie, action, input = {}, origin = url.origin) => fetch(new URL('api/transfer/' + action, url), {
+    method: 'POST', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  });
+  const ok = async (...args) => {
+    const res = await post(...args);
+    const data = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(data));
+    return data;
+  };
+  assert.equal((await fetch(new URL('transfer.js', a))).status, 200);
+  for (const route of ['/', '/api/sharing/session', 'portal.html', 'api/projects/state', 'api/whiteboard/list'])
+    assert.equal((await fetch(new URL(route, a), { headers: { cookie: alice } })).status, 404);
+  assert.equal((await fetch(new URL(a.pathname, b.origin))).status, 404);
+  assert.equal((await post(a, '', 'list')).status, 401);
+  assert.equal((await post(a, alice, 'send', { text: 'blocked', hours: 1 }, b.origin)).status, 403);
+  const { id } = await ok(a, alice, 'send', { text: 'secret', hours: 1, password: 'pickup' });
+  assert.equal((await store.request('transfer', 'list'))[0].id, id);
+  assert.equal((await ok(b, bob, 'list'))[0].text, undefined);
+  assert.equal((await post(b, bob, 'unlock', { id, password: 'wrong' })).status, 403);
+  assert.deepEqual(await ok(b, bob, 'unlock', { id, password: 'pickup' }), { text: 'secret' });
+  assert.equal((await post(a, alice, 'remove', { id })).status, 403);
+  const direct = await ok(a, alice, 'publish', { name: 'direct', size: 8, hours: 1, password: 'pickup' });
+  assert.equal((await post(a, eve, 'remove', direct)).status, 403);
+  assert.equal((await post(b, bob, 'remove', direct)).status, 403);
+  assert.equal((await post(a, alice, 'remove', direct)).status, 200);
+  for (const action of ['links-save', 'links-get', 'sweep']) assert.equal((await post(a, alice, action)).status, 404);
+  await assert.rejects(links.save([portB, unused, occupied]), /已被占用/);
+  assert.deepEqual(links.status(), configured);
+  await assert.rejects(fetch('http://127.0.0.1:' + unused));
+  assert.equal((await ok(a, alice, 'list')).length, 1);
+  await links.close();
+  links = await createTransferLinks(directory, dist, store);
+  assert.deepEqual(links.status(), configured);
+  assert.equal((await ok(b, await client(b), 'list'))[0].id, id);
+  await links.save([portB]);
+  await assert.rejects(fetch(a));
+  await links.save([portA, portB]);
+  assert.equal((await fetch(a)).status, 404);
+  assert.equal(await (await fetch(b)).text(), 'quick page');
+  await links.save([]);
+  await assert.rejects(fetch(b));
 });

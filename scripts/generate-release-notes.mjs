@@ -22,42 +22,17 @@ const previousTag = git('tag', '--merged', `${ref(tag)}^{commit}`).trim().split(
   .filter(name => stableTag.test(name) && compareVersions(name, tag) < 0 && (!publishedTags || publishedTags.has(name)))
   .sort((a, b) => compareVersions(b, a))[0];
 
-function tagNotes(name) {
-  const [type, contents, rawSignature] = git(
-    'for-each-ref', '--format=%(objecttype)%00%(contents)%00%(contents:signature)', ref(name),
-  ).split('\0');
-  if (type !== 'tag') return '';
-  const signature = rawSignature.trimEnd();
-  const message = signature ? contents.trimEnd().slice(0, -signature.length) : contents;
-  return message.trim();
-}
-
-function escapeMarkdown(subject) {
-  return subject.replace(/[\\`*_\[\]<>~&]/g, '\\$&');
+const notesPath = `docs/releases/${version(tag)}.md`;
+const notes = git('show', `${ref(tag)}:${notesPath}`).trim();
+if (!notes.split(/\r?\n/).some(line => !/^\s*#/.test(line) && /\p{Script=Han}/u.test(line))) {
+  throw new Error(`${notesPath} 需要用中文介绍本版本的用户可见变化。`);
 }
 
 const { GITHUB_SERVER_URL, GITHUB_REPOSITORY } = process.env;
 const repository = GITHUB_SERVER_URL && GITHUB_REPOSITORY
   ? `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}`
   : '';
-const range = previousTag ? `${ref(previousTag)}..${ref(tag)}` : ref(tag);
-const commits = git('log', '--format=%H%x00%s', range, '--').trimEnd();
-const lines = [];
-const notes = tagNotes(tag);
-if (notes && (!previousTag || notes !== tagNotes(previousTag))) {
-  lines.push('## 本次更新', '', notes, '');
-}
-lines.push('## 提交记录', '');
-if (commits) {
-  for (const commit of commits.split('\n')) {
-    const [sha, subject] = commit.split('\0');
-    const shortSha = sha.slice(0, 7);
-    const reference = repository ? `[${shortSha}](${repository}/commit/${sha})` : `\`${shortSha}\``;
-    lines.push(`- ${escapeMarkdown(subject || '无标题提交')} (${reference})`);
-  }
-} else {
-  lines.push('此版本与上一已发布版本之间没有新增提交。');
-}
+const lines = ['## 本次更新', '', notes];
 if (previousTag) {
   const comparison = `${previousTag}...${tag}`;
   lines.push('', repository

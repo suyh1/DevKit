@@ -24,7 +24,7 @@ let projectStore, projectHost, projectError = '', closing = false;
 let nginxManager, nginxError = '';
 let jarManager, jarError = '';
 let lan, lanError = '';
-let collab, collabError = '';
+let collab, collabError = '', transferLinks, transferLinksError = '';
 let fileShares, fileSharesError = '', projectTodos, projectTodosError = '';
 let monitorManager, monitorError = '';
 let logCenter;
@@ -199,6 +199,12 @@ app.whenReady().then(async () => {
     catch (error) { projectTodosError = error.message; }
     try { collab = await (await import('./server/collab-store.mjs')).createCollabStore(projectStorage.directory); }
     catch (error) { collabError = error.message; }
+    if (collab) {
+      try {
+        const { createTransferLinks } = await import('./server/transfer-links.mjs');
+        transferLinks = await createTransferLinks(projectStorage.directory, path.join(__dirname, 'dist'), collab);
+      } catch (error) { transferLinksError = error.message; }
+    }
     projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, collab: () => collab });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
@@ -318,6 +324,10 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的请求。');
     try {
       if (!collab) throw new Error(collabError || '共享工具尚未准备好。');
+      if (module === 'transfer' && ['links-get', 'links-save'].includes(action)) {
+        if (!transferLinks) throw new Error(transferLinksError || '快速链接尚未准备好。');
+        return { data: action === 'links-get' ? transferLinks.status() : await transferLinks.save(value) };
+      }
       if (module === 'transfer' && ['directsave', 'directwrite', 'directfinish', 'directabort'].includes(action)) {
         directSave ??= require('./direct-save.cjs')(window);
         return { data: await directSave(action, value) };
@@ -462,6 +472,6 @@ app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await transferLinks?.close(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

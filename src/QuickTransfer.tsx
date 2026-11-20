@@ -46,7 +46,7 @@ function base64(blob: Blob) {
     reader.readAsDataURL(blob);
   });
 }
-export function QuickTransfer({ active, edit, directory }: PageProps & { directory?: string }) {
+export function QuickTransfer({ active, edit, directory, quickLink = false }: PageProps & { directory?: string; quickLink?: boolean }) {
   const feed = useCollabList<Entry>('transfer', active);
   const op = useOperation(),
     confirm = useConfirmation(),
@@ -166,7 +166,7 @@ export function QuickTransfer({ active, edit, directory }: PageProps & { directo
   }
   async function download(item: Entry, ticket?: string) {
     if (window.devkitCollab) return collab<string>('transfer', 'save-file', { id: item.id, ticket });
-    const url = new URL('/api/transfer/download/' + item.id, location.origin);
+    const url = new URL('api/transfer/download/' + item.id, document.baseURI);
     if (ticket) url.searchParams.set('ticket', ticket);
     const link = document.createElement('a');
     link.href = url.href;
@@ -439,7 +439,7 @@ export function QuickTransfer({ active, edit, directory }: PageProps & { directo
                   复制{item.kind === 'link' ? '链接' : '文字'}
                 </button>
               )}
-              {edit && (
+              {edit && (!quickLink || sender.owns(item.id)) && (
                 <button
                   className="icon-action"
                   title={item.direct ? '撤回直传' : '移除'}

@@ -1,3 +1,4 @@
+import { listen, closeListener } from './http-listener.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import http from 'node:http';
@@ -41,25 +42,6 @@ function directListener(share, active, protectedRoot) {
     }
   });
   return server;
-}
-
-function listen(server, share) {
-  return new Promise((resolve, reject) => {
-    const failed = error => {
-      server.off('listening', ready);
-      reject(new Error(error.code === 'EADDRINUSE' ? `端口 ${share.port} 已被占用。` : `无法监听端口 ${share.port}（${error.code || '未知错误'}）。`));
-    };
-    const ready = () => { server.off('error', failed); resolve(); };
-    server.once('error', failed);
-    server.once('listening', ready);
-    server.listen(share.port, share.lan ? '0.0.0.0' : '127.0.0.1');
-  });
-}
-function closeListener(server) {
-  return new Promise(resolve => {
-    server.close(() => resolve());
-    server.closeAllConnections();
-  });
 }
 
 export async function createFileShares(directory) {
@@ -115,7 +97,7 @@ export async function createFileShares(directory) {
       const entry = running.get(share.id);
       return entry?.server === server ? { ...entry.share, signal: entry.abort.signal } : null;
     }, protectedRoot);
-    await listen(server, share);
+    await listen(server, share.port, share.lan ? '0.0.0.0' : '127.0.0.1');
     return server;
   };
   const activate = (share, server) => running.set(share.id, { share, server, abort: new AbortController() });

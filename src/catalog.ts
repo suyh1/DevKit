@@ -9,7 +9,7 @@ export const workspaceModules = [
   { id: 'projects', name: '项目中心', description: '管理项目入口、环境档案与局域网共享。', category: '工作台', badge: '共享' },
   { id: 'project-todos', name: '待办清单', description: '像编辑文本文件一样管理待办，支持分组、标签、快捷键、归档、清单导入导出及局域网共享。', category: '工作台', badge: '共享' },
   { id: 'file-shares', name: '本机文件共享管理', description: '通过共享清单和详情查看状态、端口和文件范围，管理多项只读共享并在网页下载文件或文件夹 ZIP。', category: '工作台', badge: '共享' },
-  { id: 'transfer', name: '局域网快传', description: '电脑与手机之间、两台电脑之间均可传送文件。默认凭密码在线直传，需要离线取件或发送文字、链接时可选主机暂存。', category: '工作台', badge: '共享' },
+  { id: 'transfer', name: '局域网快传', description: '电脑与手机之间、两台电脑之间均可传送文件。默认凭密码在线直传，需要离线取件或发送文字、链接时可选主机暂存。支持独立端口快速链接。', category: '工作台', badge: '共享' },
   { id: 'mock', name: '接口模拟服务', description: '发布可直接调用的局域网 HTTP 接口，配置多场景响应、延迟、跨域与调用记录。', category: '工作台', badge: '共享' },
   { id: 'whiteboard', name: '截图协作白板', description: '在共享截图或空白画布上同步绘制、圈选、连箭头和文字标注，可导出 PNG。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
