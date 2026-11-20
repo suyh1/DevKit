@@ -81,12 +81,15 @@ function upsert<T extends { id: string }>(items: T[], value: T): T[] {
     : [...items, value];
 }
 
+import { RelatedLink, useRelatedCreation } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 
 export default function ProjectCenter({
+  visible = true,
   portal = false,
   portalSession,
 }: {
+  visible?: boolean;
   portal?: boolean;
   portalSession?: Session;
 }) {
@@ -332,6 +335,11 @@ export default function ProjectCenter({
     } catch (error) { setMessage((error as Error).message); }
   }
 
+  function addProject() {
+    editEntry({ id: newProjectId(), name: '', code: `project-${Date.now().toString(36)}`, group: '', description: '', url: 'http://{{host}}:8080/', enabled: true, query: [] });
+  }
+  const finishCreation = useRelatedCreation('projects', visible && !!profile && canEdit && !busy, addProject);
+  function closeEntry() { setEntry(null); finishCreation(); }
   function editEntry(project: Project) {
     setError("");
     setEntry(structuredClone(project));
@@ -668,18 +676,7 @@ export default function ProjectCenter({
               <MotionButton outcome={error ? "error" : ""} busy={busy}
                 className="run-button"
                 disabled={busy}
-                onClick={() =>
-                  editEntry({
-                    id: newProjectId(),
-                    name: "",
-                    code: `project-${Date.now().toString(36)}`,
-                    group: "",
-                    description: "",
-                    url: "http://{{host}}:8080/",
-                    enabled: true,
-                    query: [],
-                  })
-                }
+                onClick={addProject}
               >
                 <Plus size={15} />
                 添加项目
@@ -982,6 +979,7 @@ export default function ProjectCenter({
                     </small>
                   )}
                   <div className="pc-card-actions">
+                    <RelatedLink page="monitor" id={`source:projects:${profile.id}:${project.id}`}>关联监控</RelatedLink>
                     <ResourceLink page="projects" id={`${profile.id}:${project.id}`} />
                     {canProbe && <button className="secondary-button"
                       aria-label={`探活 ${project.name}`} disabled={busy || !project.enabled || !!result.error}
@@ -1160,7 +1158,8 @@ export default function ProjectCenter({
         <Modal
           feedback={message}
           title={`项目定义 · ${profile.name}`}
-          close={() => setEntry(null)}
+          active={visible}
+          close={closeEntry}
           draft={entry}
           busy={busy}
           wide
@@ -1170,7 +1169,7 @@ export default function ProjectCenter({
               event.preventDefault();
               void action(async () => {
                 await persist(withProjects(upsert(profile.projects, entry)));
-                setEntry(null);
+                closeEntry();
               });
             }}
           >

@@ -184,6 +184,17 @@ app
       window.webContents.focus();
       await login();
       console.log('Portal: authenticated');
+      await button('排序', '.portal-sidebar button');
+      await wait('document.querySelectorAll(".shared-order-list li").length === 3');
+      await selector('.shared-order-list [aria-label="上移Nginx 配置"]');
+      await button('保存顺序', '.shared-order-dialog button');
+      await wait('document.querySelector(".portal-sidebar nav button")?.textContent === "Nginx 配置"');
+      await window.loadURL(fixture.url + '?audit=order#projects');
+      await wait('document.querySelector(".portal-sidebar nav button")?.textContent === "Nginx 配置"');
+      await button('排序', '.portal-sidebar button');
+      await button('恢复默认', '.shared-order-dialog button');
+      await button('保存顺序', '.shared-order-dialog button');
+      await wait('document.querySelector(".portal-sidebar nav button")?.textContent === "项目中心"');
       await selector('[aria-label="搜索共享资源"]');
       await fill('.command-dialog input', '共享接口定义');
       await wait('[...document.querySelectorAll(".command-dialog button[role=option]")].some(button => button.textContent.includes("共享接口定义"))');
@@ -551,6 +562,10 @@ app
       await login();
       await wait('document.querySelector(".jar-instance")?.textContent.includes("审查测试应用")');
       await wait('[...document.querySelectorAll(".jar-instance button")].some(button => button.textContent.trim() === "设置" && !button.disabled)');
+      await button('添加 JAR', '.jar-heading button');
+      await button('新建主机', '.jar-dialog button');
+      await wait('location.hash === "#jar" && document.querySelector(".jar-dialog[open] .workspace-access-bubble")?.textContent.includes("未向当前访客共享")');
+      await button('取消', '.jar-dialog button');
       await selector('.jar-instance .jar-advanced summary');
       await button('设置', '.jar-instance button');
       await wait('!!document.querySelector(".jar-dialog[open]")');
@@ -575,6 +590,8 @@ app
       await wait('!document.querySelector(".jar-dialog") && !!document.querySelector(".jar-instance")');
       assert.ok(!await js('document.body.innerText.includes("unsaved-audit-secret") || [...document.querySelectorAll("textarea")].some(e=>e.value.includes("audit-secret"))'));
       assert.ok(!await js('[...document.querySelectorAll(".jar-instance button")].some(e=>e.textContent.trim()==="日志"||e.textContent.trim()==="控制台")'));
+      await button('日志中心', '.jar-instance button');
+      await wait('location.hash.startsWith("#jar") && document.querySelector(".workspace-access-bubble")?.textContent.includes("JAR 日志权限")');
       for (const [page, resource] of [['jar', 'JAR 实例'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
         await js(`location.hash=${JSON.stringify('#'+page+'/not-a-resource')}`);
         await wait(`[...document.querySelectorAll('[role=status]')].some(e=>e.textContent.includes(${JSON.stringify(resource+'已移除或当前访客无权访问')}))`);
@@ -634,6 +651,16 @@ app
       }, visitors: [] });
       await window.loadURL(fixture.url + '?audit=lan-hosts#lan-hosts');
       await login();
+      await button('监控中心', '.portal-navigation button');
+      await button('添加监控', '.monitor-center button');
+      await fill('.monitor-form input[maxlength="120"]', 'source draft');
+      await button('新建主机', '.monitor-form button');
+      await wait('location.hash === "#lan-hosts" && !!document.querySelector(".lan-host-dialog[open]")');
+      await button('取消', '.lan-host-dialog button');
+      await wait('location.hash === "#monitor" && document.querySelector("dialog[open] .monitor-form input[maxlength]")?.value === "source draft"');
+      await button('取消', '.monitor-form button');
+      await button('放弃更改', '.pc-discard button');
+      await button('局域网主机', '.portal-navigation button');
       const inventory = '.lan-host-list';
       const selectHost = name => pointer(`[...document.querySelectorAll('.lan-connection-select')].find(button => button.querySelector('strong').textContent === ${JSON.stringify(name)})`);
       await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
@@ -645,7 +672,8 @@ app
       await wait('document.querySelector(".monitor-detail h2")?.textContent==="慢速目标" && location.hash.startsWith("#monitor/lan-")');
       await button('立即检测', '.monitor-detail button');
       await wait('document.querySelector(".monitor-detail")?.textContent.includes("TCP test fixture")');
-      await button('局域网主机', '.portal-sidebar button');
+      await button('查看来源主机', '.monitor-detail button');
+      await wait('location.hash.startsWith("#lan-hosts/") && document.querySelector(".lan-connection-select[aria-expanded=true] strong")?.textContent === "慢速目标"');
       await wait(`document.querySelector('${inventory}')?.textContent.includes('端口可达')`);
       await button('监控历史', `${inventory} button`);
       await wait('location.hash.startsWith("#monitor/lan-")');

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Copy, File, Files, Folder, FolderOpen, Globe2, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { useConfirmation } from './Confirmation';
 import { Modal, ModalCancel } from './project-components';
+import { CreateRelated } from './related-workspaces';
 import { fileShareRequest, publishedShares } from './planning-share-api';
 import type { FileShare, FileShareState, PublishedShare } from './planning-share-api';
 import { copyText } from './motion-primitives';
 import { SharingButton } from './Sharing';
-import { useWorkspaceResource } from './workspace-links';
+import { missingResourceLink, useWorkspaceResource } from './workspace-links';
 import './planning-share.css';
 
 const shareStatus = (share: FileShare) => share.running ? '运行中' : share.enabled ? '启动失败' : '已停止';
@@ -40,12 +41,13 @@ export function PublishedFileShares({ active }: { active: boolean }) {
   useEffect(() => { if (active && resource) { setQuery(''); setSelected(resource); } }, [active, resource]);
   const needle = query.trim().toLowerCase();
   const visible = shares?.filter(share => [share.name, ...share.roots.map(root => root.label)].some(value => value.toLowerCase().includes(needle))) ?? [];
-  const share = visible.find(item => item.id === selected) ?? visible[0];
+  const share = visible.find(item => item.id === selected) ?? (resource && selected === resource ? undefined : visible[0]);
   return <section className="planning-workspace pl-files-workspace">
     <header className="pl-page-head"><h1>本机文件共享管理</h1>
       <button className="pl-icon" type="button" aria-label="刷新共享" title="刷新共享" onClick={refresh}><RefreshCw size={16} /></button>
     </header>
     {error && <p className="pl-message pc-error" role="alert">{error}</p>}
+    {resource && selected === resource && shares && !shares.some(item => item.id === resource) && <p className="pl-message" role="status">{missingResourceLink('文件共享')}</p>}
     {!error && !shares && <p className="pl-panel-empty" role="status">正在读取文件共享…</p>}
     {shares && <>
       <div className="pl-share-summary"><FolderOpen size={16} aria-hidden="true" /><div><strong>{shares.length}</strong><span>项可访问共享</span></div>
@@ -62,6 +64,7 @@ export function PublishedFileShares({ active }: { active: boolean }) {
           <header><div><small>共享详情</small><h2>{share.name}</h2></div></header>
           <div className="pl-share-detail-body">
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>
+            <CreateRelated from="file-shares" page="project-todos" resource={share.id}>新建引用此共享的待办清单</CreateRelated>
             <ShareRoots roots={share.roots} />
           </div>
         </section>}
@@ -189,6 +192,7 @@ export default function FileShares({ active }: { active: boolean }) {
                 aria-label={`复制 ${new URL(link).host} 的共享链接`} onClick={() => copy(link)}><Copy size={16} />复制链接</button></div>)}
             </div>}
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>
+            <CreateRelated from="file-shares" page="project-todos" resource={share.id}>新建引用此共享的待办清单</CreateRelated>
             <ShareRoots roots={share.roots} />
           </div>
         </section>}

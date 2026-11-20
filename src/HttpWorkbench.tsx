@@ -30,10 +30,12 @@ function initialCollection() {
   }
 }
 export default function HttpWorkbench({
+  active,
   initial,
   onNotice,
   onGenerate
 }: {
+  active: boolean;
   initial: { config: string; key: number } | null;
   onNotice: (message: string) => void;
   onGenerate: (config: string) => void;
@@ -126,6 +128,21 @@ export default function HttpWorkbench({
       })
     );
   }
+  useEffect(() => {
+    const prepare = (event: Event) => {
+      if (!canSendHttp()) return;
+      if (apiBusy) { onNotice('请先完成当前接口操作。'); return; }
+      const { name, method, url } = (event as CustomEvent<{ name: string; method: string; url: string }>).detail;
+      void allowReplace().then(allowed => {
+        if (allowed) {
+          setWorkspaceMode('quick');
+          reset(JSON.stringify({ method, url, headers: {} }, null, 2), name);
+        }
+      });
+    };
+    window.addEventListener('devkit:prepare-http-request', prepare);
+    return () => window.removeEventListener('devkit:prepare-http-request', prepare);
+  }, [apiBusy, onNotice, confirm]);
   useEffect(() => {
     if (initial) { setWorkspaceMode('quick'); }
     if (initial)
@@ -230,7 +247,7 @@ export default function HttpWorkbench({
     }
   }
   return (
-    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
+    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading workspace-banner">
         <div className="page-title">
           <h1>HTTP 调试</h1>

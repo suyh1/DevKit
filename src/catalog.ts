@@ -20,6 +20,11 @@ export const workspaceModules = [
 export type WorkspaceModule = typeof workspaceModules[number];
 export type WorkspaceModuleId = WorkspaceModule['id'];
 
+export function normalizeSharedModuleOrder(value: unknown, defaults: readonly WorkspaceModuleId[] = workspaceModules.map(item => item.id)): WorkspaceModuleId[] {
+  const saved = Array.isArray(value) ? value.filter((id): id is WorkspaceModuleId => defaults.includes(id)) : [];
+  return [...new Set([...saved, ...defaults])];
+}
+
 export const categories = [
   { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: ['json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'mock-data', 'env', 'properties'] },
   { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: ['json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status'] },

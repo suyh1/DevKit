@@ -5,6 +5,7 @@ import { Modal, ModalCancel } from "./project-components";
 import HttpKeyValues from "./HttpKeyValues";
 
 export default function ApiProjectSettings({
+  active,
   draft,
   onChange,
   onSave,
@@ -12,6 +13,7 @@ export default function ApiProjectSettings({
   busy,
   error,
 }: {
+  active: boolean;
   draft: ApiProject;
   onChange: (project: ApiProject) => void;
   onSave: () => void;
@@ -20,7 +22,7 @@ export default function ApiProjectSettings({
   error: string;
 }) {
   return (
-    <Modal
+    <Modal active={active}
       title="API项目设置"
       closeLabel="关闭API项目设置"
       close={onClose}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, Plus, RefreshCw, Search, Pencil, Trash2, Play, Pause, ShieldCheck } from 'lucide-react';
-import { monitorRequest } from './monitor-api';
+import { monitorRequest, monitorSourceKey, monitorSourceLink } from './monitor-api';
 import type { Monitor, MonitorConfig, MonitorSource, MonitorState } from './monitor-api';
 import { canOperateMonitor, canWriteWorkspace } from './workspace-remote';
 import { Modal, ModalCancel, Field } from './project-components';
@@ -8,6 +8,7 @@ import { MotionButton, MotionPresence } from './Motion';
 import { SharingButton } from './Sharing';
 import { usePerformanceMode } from './DisplayMode';
 import './monitor.css';
+import { CreateRelated, RelatedLink, useWorkspaceGuard } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 
 const labels: Record<string, string> = { up: '正常', down: '故障', pending: '待确认', unknown: '待检测 / 已过期', paused: '已暂停', maintenance: '维护中' };
@@ -37,6 +38,8 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
     return () => { generation.current++; clearInterval(timer); };
   }, [active, statusSeconds]);
   const linked = useWorkspaceResource('monitor');
+  const sourceFilter = linked?.startsWith('source:') ? linked : undefined;
+  const guard = useWorkspaceGuard();
   useEffect(() => {
     const id = linked || focus?.id;
     if (active && id) { setSelected(id); setSearch(''); setFilter('all'); }
@@ -48,13 +51,37 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
     catch (failure) { setError((failure as Error).message); }
     finally { working.current = false; setBusy(false); }
   }
-  function open(item?: Monitor) {
+  function open(item?: Monitor, source?: MonitorSource) {
     const config = item ? structuredClone(item) : empty();
+    if (source) config.source = source;
     setDraft(config); setRevision(data?.revision || 0); setStart(localDate(config.maintenance?.start)); setEnd(localDate(config.maintenance?.end)); setError('');
     setSources([]); setSourceError('');
-    void monitorRequest<typeof sources>('sources').then(setSources).catch(error => setSourceError(error.message));
   }
-  const visible = data?.monitors.filter(item => (!search || [item.name, item.url, item.host, item.sourceHost, item.executionHost].join(' ').toLowerCase().includes(search.toLowerCase())) && (filter === 'all' || filter === item.state)) || [];
+  const editing = !!draft;
+  useEffect(() => {
+    if (!active || !editing) return;
+    let current = true;
+    void monitorRequest<typeof sources>('sources').then(items => {
+      if (current) { setSources(items); setSourceError(''); }
+    }).catch(error => { if (current) setSourceError(error.message); });
+    return () => { current = false; };
+  }, [active, editing]);
+  const related = sourceFilter ? data?.monitors.filter(item => item.source && monitorSourceKey(item.source) === sourceFilter) : data?.monitors;
+  const visible = related?.filter(item => (!search || [item.name, item.url, item.host, item.sourceHost, item.executionHost].join(' ').toLowerCase().includes(search.toLowerCase())) && (filter === 'all' || filter === item.state)) || [];
+  function addMonitor() {
+    if (!guard('monitor', 'edit')) return;
+    if (sourceFilter?.startsWith('source:projects:')) {
+      if (!guard('projects')) return;
+      const [profileId, projectId] = sourceFilter.slice('source:projects:'.length).split(':');
+      if (profileId && projectId) return open(undefined, { type: 'project', profileId, projectId });
+    }
+    if (sourceFilter?.startsWith('source:jar:')) {
+      const id = sourceFilter.slice('source:jar:'.length);
+      if (!(id.includes(':') ? guard('jar', 'control') : guard('jar'))) return;
+      return open(undefined, { type: 'jar', id });
+    }
+    open();
+  }
   const current = visible.find(item => item.id === selected) || visible[0];
   const timeline = current ? [
     ...current.incidents.flatMap(item => [
@@ -69,20 +96,21 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
   const restrictedSource = draft?.source && data?.monitors.find(item => item.id === draft.id && JSON.stringify(item.source) === JSON.stringify(draft.source))?.runRestriction;
   const frozen = !!draft?.enabled && (!operate || !!restrictedSource);
   return <section className="monitor-center">
-    <header className="monitor-heading workspace-banner"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{edit && !!data?.monitors.length && <button className="run-button" onClick={() => open()}><Plus size={15} />添加监控</button>}</div></header>
+    <header className="monitor-heading workspace-banner"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{(edit || sourceFilter) && !!related?.length && <button className="run-button" onClick={addMonitor}><Plus size={15} />添加监控</button>}</div></header>
     <div className="monitor-note"><ShieldCheck size={15} /><span>检测从主机发起，切换页面后继续。退出主机应用或独立服务后停止。状态每 {statusSeconds} 秒刷新。</span></div>
     {error && !draft && !remove && <p className="pc-error" role="alert">{error}</p>}
-    {linked && data && !data.monitors.some(item => item.id === linked) && <p className="pc-notice" role="status">{missingResourceLink('监控')}</p>}
+    {sourceFilter && <div className="monitor-note"><span>正在查看此来源的关联监控</span><RelatedLink page="monitor">查看全部监控</RelatedLink></div>}
+    {linked && !sourceFilter && data && !data.monitors.some(item => item.id === linked) && <p className="pc-notice" role="status">{missingResourceLink('监控')}</p>}
     {data?.storageError && <p className="pc-error" role="alert">监控记录保存失败：{data.storageError}。请检查主机配置目录权限与磁盘空间。</p>}
     {!!data?.monitors.length && <div className="monitor-metrics">{[['全部监控', data?.monitors.length || 0], ['正常', data?.monitors.filter(item => item.state === 'up').length || 0], ['故障 / 待确认', data?.monitors.filter(item => ['down', 'pending'].includes(item.state)).length || 0], ['暂停 / 维护', data?.monitors.filter(item => ['paused', 'maintenance'].includes(item.state)).length || 0]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>}
     {!!data?.monitors.length && <div className="monitor-toolbar"><label><Search size={15} /><input aria-label="搜索监控" placeholder="搜索名称或地址…" value={search} onChange={event => setSearch(event.target.value)} /></label><select aria-label="监控状态筛选" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">全部状态</option>{Object.entries(labels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><small>最近 24 小时的已保存检测样本；最多保留 1,440 次 / 7 天</small></div>}
-    {!data ? <div className="monitor-empty">{error ? '监控数据暂不可用，请刷新重试。' : '正在读取主机监控…'}</div> : !visible.length ? <div className="monitor-empty"><Activity size={32} /><h2>{data.monitors.length ? '没有匹配的监控' : '暂无监控'}</h2><p>{data.monitors.length ? '调整关键词或状态筛选。' : '添加 HTTP 或 TCP 检测，也可关联已有项目入口和 JAR 健康地址。'}</p>{edit && !data.monitors.length && <button className="run-button" onClick={() => open()}><Plus size={15} />添加监控</button>}</div> : <div className="monitor-layout">
+    {!data ? <div className="monitor-empty">{error ? '监控数据暂不可用，请刷新重试。' : '正在读取主机监控…'}</div> : !visible.length ? <div className="monitor-empty"><Activity size={32} /><h2>{sourceFilter && !related?.length ? '此来源尚无关联监控' : data.monitors.length ? '没有匹配的监控' : '暂无监控'}</h2><p>{sourceFilter && !related?.length ? '添加监控时将自动选中当前来源。' : data.monitors.length ? '调整关键词或状态筛选。' : '添加 HTTP 或 TCP 检测，也可关联已有项目入口和 JAR 健康地址。'}</p>{(edit || sourceFilter) && !related?.length && <button className="run-button" onClick={addMonitor}><Plus size={15} />添加监控</button>}</div> : <div className="monitor-layout">
       <div className="monitor-list" aria-label="监控列表">{visible.map(item => <article key={item.id} className={`monitor-card ${current?.id === item.id ? 'selected' : ''}`}>
         <button className="monitor-card-select" aria-pressed={current?.id === item.id} onClick={() => setSelected(item.id)}><span className={`monitor-status ${item.state}`}>{labels[item.state]}</span><h2>{item.name}</h2><p>{item.source ? [sourceLabels[item.source.type], item.sourceHost || item.executionHost].filter(Boolean).join(' · ') : item.type === 'http' ? item.url : `${item.host}:${item.port}`}</p><div className="monitor-beats" aria-label="最近60次检测">{item.samples.slice(-60).map((sample, index) => <i key={index} className={sample.ok ? 'up' : 'down'} title={`${time(sample.at)} · ${sample.elapsed} ms · ${sample.detail}`} />)}</div><div className="monitor-card-stats"><span>样本可用率 <strong>{item.availability === null ? '—' : `${item.availability}%`}</strong></span><span>平均 <strong>{item.average === null ? '—' : `${item.average} ms`}</strong></span></div></button>
         <footer><span>{item.checking ? '正在检测…' : `${item.interval} 秒 / 次`}</span><div>{operate && <button title={item.enabled ? '暂停监控' : item.runRestriction || '启用监控'} aria-label={`${item.enabled ? '暂停' : '启用'} ${item.name}`} disabled={busy || (!item.enabled && !!item.runRestriction)} onClick={() => void action('toggle', { id: item.id, revision: data.revision, enabled: !item.enabled })}>{item.enabled ? <Pause size={15} /> : <Play size={15} />}</button>}{edit && <><button aria-label={`编辑 ${item.name}`} disabled={busy} onClick={() => open(item)}><Pencil size={15} /></button><button aria-label={`删除 ${item.name}`} disabled={busy || (!operate && item.enabled)} onClick={() => { setRemove(item); setRevision(data.revision); setError(''); }}><Trash2 size={15} /></button></>}</div></footer>
       </article>)}</div>
       {current && <aside className="monitor-detail"><div className="monitor-detail-heading"><h2>{current.name}</h2><span className={`monitor-status ${current.state}`}>{labels[current.state]}</span></div><p>{current.detail || '启用后将由主机自动检测。'}</p><dl><div><dt>最近检测</dt><dd>{time(current.checkedAt)}</dd></div><div><dt>24 小时已保存样本</dt><dd>{current.sampleCount} 次</dd></div><div><dt>故障确认</dt><dd>连续失败 {current.failures} 次</dd></div><div><dt>超时</dt><dd>{current.timeout} 秒</dd></div></dl>{operate && (current.runRestriction ? <p>{current.runRestriction}</p> : <button className="secondary-button" disabled={busy || current.checking || !current.enabled || current.state === 'maintenance'} onClick={() => void action('check', { id: current.id })}><RefreshCw size={14} />立即检测</button>)}
-        {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}<ResourceLink page="monitor" id={current.id} />
+        {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}{current.source && <RelatedLink {...monitorSourceLink(current.source)}>{current.source.type === 'project' ? '查看来源项目' : current.source.type === 'jar' ? '查看来源 JAR' : '查看来源主机'}</RelatedLink>}<ResourceLink page="monitor" id={current.id} />
         <h3>响应耗时</h3>{current.samples.length ? <Latency monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
         <h3>事件时间线</h3>
         {timeline.length ? <ol className="monitor-incidents">{timeline.map(item => <li key={item.key}>
@@ -92,11 +120,17 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
         <details className="monitor-samples"><summary>最近检测记录</summary><ul>{current.samples.slice(-30).reverse().map((sample, index) => <li key={index}><span>{sample.ok ? '正常' : '失败'} · {sample.elapsed} ms</span><small>{time(sample.at)} · {sample.detail}</small></li>)}</ul></details>
       </aside>}
     </div>}
-    <MotionPresence kind="dialog" present={!!draft}>{draft && <Modal title={draft.id ? '编辑监控' : '添加监控'} close={() => setDraft(null)} draft={{ ...draft, start, end }} busy={busy}>
+    <MotionPresence kind="dialog" present={!!draft}>{draft && <Modal active={active} title={draft.id ? '编辑监控' : '添加监控'} close={() => setDraft(null)} draft={{ ...draft, start, end }} busy={busy}>
       <form className="monitor-form" onSubmit={event => { event.preventDefault(); if (!!start !== !!end) { setError('请同时填写维护开始与结束时间。'); return; } void action('upsert', { revision, monitor: { ...draft, maintenance: start && end ? { start: new Date(start).toISOString(), end: new Date(end).toISOString() } : null } }, () => setDraft(null)); }}>
         {error && <p className="pc-error" role="alert">{error}</p>}{restrictedSource ? <p className="pc-notice">{restrictedSource}</p> : frozen && <p className="pc-notice">编辑运行中的监控需要运行权限，请联系主机管理者。</p>}
         <Field label="监控名称"><input required maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></Field>
         <Field label="检测来源"><select value={draft.source ? JSON.stringify(draft.source) : ''} onChange={event => setDraft({ ...draft, source: event.target.value ? JSON.parse(event.target.value) : null })}><option value="">自定义地址</option>{draft.source && !sources.some(item => JSON.stringify(item.source) === JSON.stringify(draft.source)) && <option value={JSON.stringify(draft.source)}>当前关联（来源未开放或已删除）</option>}{sources.map(item => <option key={JSON.stringify(item.source)} value={JSON.stringify(item.source)}>{item.label}</option>)}</select></Field>
+        <div className="monitor-actions" aria-label="新建检测来源">
+          {draft.source && <RelatedLink {...monitorSourceLink(draft.source)}>查看所选来源</RelatedLink>}
+          <CreateRelated from="monitor" page="projects">添加项目</CreateRelated>
+          <CreateRelated from="monitor" page="jar">添加 JAR</CreateRelated>
+          <CreateRelated from="monitor" page="lan-hosts">新建主机</CreateRelated>
+        </div>
         {sourceError && <p role="alert">关联来源读取失败：{sourceError}。仍可填写自定义地址。</p>}
         {!draft.source && <><Field label="检测类型"><select value={draft.type} onChange={event => setDraft({ ...draft, type: event.target.value as 'http' | 'tcp' })}><option value="http">HTTP / HTTPS</option><option value="tcp">TCP 端口</option></select></Field>{draft.type === 'http' ? <Field label="检测地址"><input required type="url" placeholder="https://example.com/health" value={draft.url} onChange={event => setDraft({ ...draft, url: event.target.value })} /></Field> : <div className="monitor-form-row"><Field label="主机名 / IP"><input required value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} /></Field><Field label="端口"><input required type="number" min={1} max={65535} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></Field></div>}</>}
         {(draft.source?.type === 'project' || !draft.source && draft.type === 'http') && <Field label="预期 HTTP 状态码"><input required type="number" min={100} max={599} value={draft.status} onChange={event => setDraft({ ...draft, status: Number(event.target.value) })} /></Field>}

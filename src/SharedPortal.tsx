@@ -6,9 +6,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download, Menu, X, Search } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, Search, ListOrdered } from "lucide-react";
 import { workspaceModuleNav } from './ui';
-import { workspaceModules } from './catalog';
+import { normalizeSharedModuleOrder, workspaceModules } from './catalog';
+import { WorkspaceFeedback } from './related-workspaces';
+import SharedWorkspaceOrder from './SharedWorkspaceOrder';
 import CommandPalette from './CommandPalette';
 import { openWorkspaceLink, parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
@@ -231,6 +233,14 @@ export default function SharedPortal() {
 }
 
 function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: DisplayMode) => void }) {
+  const [order, setOrder] = useState<Page[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(preference('devkit:portal-order', '[]'));
+      return normalizeSharedModuleOrder(saved, portalOrder);
+    } catch { return [...portalOrder]; }
+  });
+  const orderedModules = order.map(id => modules.find(module => module.id === id)!);
+  const [orderTrigger, setOrderTrigger] = useState<HTMLButtonElement | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -314,7 +324,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         next =
           requested && session.services?.[requested].enabled
             ? requested
-            : modules.find((module) => session.services?.[module.id].enabled)
+            : orderedModules.find((module) => session.services?.[module.id].enabled)
                 ?.id;
       if (next) {
         if (next === page && requested === next) return;
@@ -331,7 +341,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       window.removeEventListener("popstate", changed);
       window.removeEventListener("hashchange", changed);
     };
-  }, [session, page]);
+  }, [session, page, order]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 7000);
@@ -347,11 +357,13 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       : value;
     const grants = (current: Session) => JSON.stringify(sharingServices({ services: current.services }));
     if (session?.authenticated && (!normalized.authenticated || (session.visitor || '') !== (normalized.visitor || '') || grants(session) !== grants(normalized))) {
+      if (history.state?.creation) history.replaceState(null, '');
       setWorkspaceEpoch(epoch => epoch + 1);
       resetOverlays();
       setSearchOpen(false);
       setSource(null);
       setDrawerOpen(false);
+      setOrderTrigger(null);
       setNotice('');
       positions.current = {};
     }
@@ -363,7 +375,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       if (linked && !normalized.services?.[linked]?.enabled) setNotice(`目标主机未开放${modules.find(module => module.id === linked)?.name || '所选服务'}。`);
       const next = normalized.services?.[requested]?.enabled
         ? requested
-        : modules.find((module) => normalized.services?.[module.id].enabled)
+        : orderedModules.find((module) => normalized.services?.[module.id].enabled)
             ?.id;
       if (next) {
         setPage(next);
@@ -446,7 +458,9 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   }
   const services = session?.services || emptySharingServices(),
     active = services[page],
-    available = modules.filter((module) => services[module.id].enabled);
+    available = orderedModules.filter(module => services[module.id].enabled);
+  const sortAction = available.length > 1 && <button type="button" className="shared-sort-action" aria-haspopup="dialog"
+    onClick={event => setOrderTrigger(event.currentTarget)}><ListOrdered size={16} />排序</button>;
   const summary = !active?.enabled
     ? "没有可访问的服务"
     : [
@@ -524,8 +538,16 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       </header>
       {session?.authenticated && <CommandPalette key={workspaceEpoch} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
       {session?.authenticated && <>
-        <aside className="portal-sidebar"><span className="portal-nav-caption">共享工作台</span><PortalNavigation modules={available} page={page} navigate={navigate} /><p>共享主机 <strong>{location.host}</strong></p></aside>
-        <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong><button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
+        <aside className="portal-sidebar"><div className="portal-nav-heading"><span className="portal-nav-caption">共享工作台</span>{sortAction}</div><PortalNavigation modules={available} page={page} navigate={navigate} /><p>共享主机 <strong>{location.host}</strong></p></aside>
+        <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong>{sortAction}<button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
+        {orderTrigger && <SharedWorkspaceOrder modules={available} defaultModules={modules.filter(item => services[item.id].enabled)}
+          onClose={() => { setOrderTrigger(null); orderTrigger.focus(); }}
+          onSave={sorted => {
+            let index = 0;
+            const next = order.map(id => services[id].enabled ? sorted[index++] : id);
+            remember('devkit:portal-order', JSON.stringify(next));
+            setOrder(next);
+          }} />}
       </>}
       <div key={workspaceEpoch} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
         {!session?.authenticated ? (
@@ -535,7 +557,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             {loginForm}
           </section>
         ) : (
-          <>
+          <WorkspaceFeedback>
             {active?.enabled && <details className="portal-access">
               <summary>主机与权限 <span>{location.host}</span></summary>
               <p>{summary}。{{
@@ -578,7 +600,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 hidden={page !== "projects"}
                 inert={page !== "projects"}
               >
-                <ProjectCenter portal portalSession={session} />
+                <ProjectCenter visible={page === 'projects'} portal portalSession={session} />
               </div>
             )}
             {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><TodoLists portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
@@ -606,7 +628,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 hidden={page !== "http"}
                 inert={page !== "http"}
               >
-                <HttpWorkbench
+                <HttpWorkbench active={page === 'http'}
                   initial={null}
                   onNotice={notify}
                   onGenerate={setSource}
@@ -629,7 +651,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             {source !== null && (
               <RequestCode source={source} close={() => setSource(null)} />
             )}
-          </>
+          </WorkspaceFeedback>
         )}
       </div>
     </main>

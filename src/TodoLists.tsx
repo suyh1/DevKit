@@ -9,7 +9,9 @@ import { SharingButton } from './Sharing';
 import type { TodoEditorHandle } from './TodoTextEditor';
 import TodoOutline, { needsTodoFollowUp } from './TodoOutline';
 import TodoSyntaxActions from './TodoSyntaxActions';
+import { RelatedLink, useRelatedCreation, useWorkspaceFeedback, useWorkspaceGuard } from './related-workspaces';
 import { openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
+import { workspaceModules } from './catalog';
 import { tools } from './tools';
 import type { ToolId } from './tools';
 import { parseTodo, todoDateKey, todoReferences, todoStorageLimit, todoTaskTitle } from '../shared/todo-text.mjs';
@@ -18,10 +20,12 @@ import './todo-lists.css';
 
 const TodoTextEditor = lazy(() => import('./TodoTextEditor'));
 type Draft = { base: TodoDocument; body: string };
-type SettingsDraft = { current?: TodoDocument; name: string; published: boolean; imported?: string };
+type SettingsDraft = { current?: TodoDocument; name: string; published: boolean; reference?: string; imported?: string };
 export default function TodoLists({ active, portal = false, canEdit = !portal, onOpenTool }: {
   active: boolean; portal?: boolean; canEdit?: boolean; onOpenTool?: (tool: ToolId) => void;
 }) {
+  const guard = useWorkspaceGuard();
+  const feedback = useWorkspaceFeedback();
   const [documents, setDocuments] = useState<TodoDocument[] | null>(null), [selectedId, setSelected] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null), [settings, setSettings] = useState<SettingsDraft | null>(null);
   const [error, setError] = useState(''), [formError, setFormError] = useState(''), [message, setMessage] = useState('');
@@ -96,7 +100,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         setSelected(''); setDraft(null); setLine(1); setJumpTo(0);
       } else if (action === 'save') setDraft(null);
       else if (action === 'settings' && updated) setDraft(current => current && { ...current, base: updated });
-      if (closeSettings) setSettings(null);
+      if (closeSettings) closeSettingsForm();
       setMessage(success);
     } catch (failure) {
       (closeSettings ? setFormError : setError)((failure as Error).message);
@@ -115,10 +119,14 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     });
     setMessage('');
   }
-  async function newList() {
-    if (!await discard('新建清单？')) return;
+  const finishCreation = useRelatedCreation('project-todos', active && !!documents && canEdit && !busy, (_from, share) => {
+    if (share) void newList(`[[共享:${share}]]`);
+  });
+  function closeSettingsForm() { setSettings(null); finishCreation(); }
+  async function newList(reference?: string) {
+    if (!await discard('新建清单？')) { if (reference) finishCreation(); return; }
     setFormError('');
-    setSettings({ name: '', published: portal });
+    setSettings({ name: '', published: portal, reference });
   }
   async function importList(file?: File) {
     if (!file || !canEdit || busy) return;
@@ -155,19 +163,22 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     const request = ++referenceSequence.current;
     if (reference.kind === 'tool') {
       const query = reference.name.toLowerCase();
+      const module = workspaceModules.find(item => item.id === query || item.name.toLowerCase() === query);
+      if (module) { if (guard(module.id)) openWorkspaceLink(module.id); return; }
       const tool = tools.find(item => item.id === query || item.name.toLowerCase() === query);
-      if (!onOpenTool) setMessage('此工具可在 DevKit 桌面端打开。');
+      if (!onOpenTool) feedback('此工具可在 DevKit 桌面端打开。');
       else if (tool) onOpenTool(tool.id);
       else setMessage(`找不到工具“${reference.name}”。`);
       return;
     }
+    if (!guard('file-shares')) return;
     try {
       const { shares } = await (portal ? publishedShares() : fileShareRequest<FileShareState>('get'));
       if (request !== referenceSequence.current) return;
       const exact = shares.find(item => item.id === reference.name);
       const matches = exact ? [exact] : shares.filter(item => item.name === reference.name);
       if (matches.length === 1) openWorkspaceLink('file-shares', matches[0].id);
-      else setMessage(matches.length ? '存在同名共享，请在引用中填写共享 ID。' : '共享不存在，或当前访客无权访问。');
+      else (portal ? feedback : setMessage)(matches.length ? '存在同名共享，请在引用中填写共享 ID。' : '共享不存在，或当前访客无权访问。');
     } catch (failure) {
       if (request === referenceSequence.current) setMessage((failure as Error).message);
     }
@@ -241,7 +252,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
               <dt>验收条件</dt><dd>任务下缩进 <code>? ZIP 能解压</code>。方框可点击勾选</dd>
               <dt>续做点</dt><dd>记录停在哪里或回来从哪接上，例如 <code>:: 续做 已测管理员，下次从只读账号开始</code></dd>
               <dt>自定义视图</dt><dd><code>:: 视图 待验收 @tag(验收) @state(open)</code></dd>
-              <dt>工作台引用</dt><dd><code>[[共享:发布材料]]</code> 或 <code>[[工具:JSON 格式化]]</code></dd>
+              <dt>工作台引用</dt><dd><code>[[共享:发布材料]]</code> 、<code>[[工具:日志中心]]</code> 或 <code>[[工具:JSON 格式化]]</code>。<RelatedLink page="file-shares">查找文件共享</RelatedLink></dd>
               <dt>等待回访</dt><dd><code>@wait(小周) @review(2026-12-04)</code></dd>
               <dt>前置任务</dt><dd>前置任务写 <code>@id(build)</code>，当前任务写 <code>@after(build)</code></dd>
               <dt>周期任务</dt><dd><code>@repeat(每周一)</code>。支持每天、每周、每周几、每月和每月几日</dd>
@@ -251,7 +262,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
             <p><kbd>Alt+S</kbd> 开始　<kbd>Alt+O</kbd> 打开引用　<kbd>Ctrl/⌘+Shift+A</kbd> 归档　<kbd>Ctrl/⌘+S</kbd> 保存</p>
           </div></details>
         </div>
-        {canEdit && <TodoSyntaxActions key={sheet.id} model={model} editor={editor} line={line} locked={locked} portal={portal} />}
+        {canEdit && <TodoSyntaxActions active={active} key={sheet.id} model={model} editor={editor} line={line} locked={locked} portal={portal} />}
         <div className="td-editor-layout" data-outline={outline}>
           <Suspense fallback={<p className="td-editor-loading" role="status">正在加载编辑器…</p>}>
             <TodoTextEditor key={sheet.id} editorRef={setEditor} body={text} readOnly={locked} sourceMode={sourceMode} onChange={edit} onSave={save} onLine={setLine}
@@ -274,13 +285,14 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     </div>}
     {settings && <Modal title={settings.current ? '清单设置' : settings.imported !== undefined ? '导入清单' : '新建清单'} closeLabel="关闭清单设置"
       description={settings.imported === undefined ? undefined : portal ? '文件将作为一份新清单发布到共享工作台。' : '文件将保存为一份新清单。'}
-      close={() => setSettings(null)} draft={{ name: settings.name, published: settings.published }} busy={busy} className="td-settings-dialog">
+      active={active} close={closeSettingsForm} draft={{ name: settings.name, published: settings.published }} busy={busy} className="td-settings-dialog">
       <form className="td-settings" onSubmit={event => {
         event.preventDefault();
         void request(settings.current ? 'settings' : 'create', {
-          id: settings.current?.id, revision: settings.current?.revision, name: settings.name, published: settings.published, body: settings.imported,
+          id: settings.current?.id, revision: settings.current?.revision, name: settings.name, published: settings.published, body: settings.imported ?? (settings.reference ? `待办:\n- 查看共享资料 ${settings.reference}\n` : undefined),
         }, settings.current ? '清单设置已保存' : settings.imported !== undefined ? '清单已导入' : '清单已创建', true);
       }}>
+        {settings.reference && <p>清单将包含引用 <code>{settings.reference}</code></p>}
         <label className="pc-field">清单名称<input required maxLength={120} value={settings.name} onChange={event => setSettings({ ...settings, name: event.target.value })} /></label>
         {!portal && <label className="pc-check"><input type="checkbox" checked={settings.published} onChange={event => setSettings({ ...settings, published: event.target.checked })} />发布到共享工作台</label>}
         {settings.current?.published && <ResourceLink page="project-todos" id={settings.current.id} />}

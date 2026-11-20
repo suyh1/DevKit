@@ -16,6 +16,8 @@ import {
 import { collab, useCollabList, useOperation, type PageProps } from './collab-api';
 import { copyText } from './motion-primitives';
 import { useConfirmation } from './Confirmation';
+import { RelatedLink, useRelatedCreation } from './related-workspaces';
+import { parseWorkspaceLink } from './workspace-links';
 import { DirectSender, receiveDirect } from './direct-transfer';
 
 type Entry = {
@@ -46,7 +48,14 @@ function base64(blob: Blob) {
     reader.readAsDataURL(blob);
   });
 }
-export function QuickTransfer({ active, edit, directory, quickLink = false }: PageProps & { directory?: string; quickLink?: boolean }) {
+function sharedDestination(text: string | undefined, origin: string | undefined) {
+  if (!text || !origin) return;
+  try {
+    const url = new URL(text);
+    if (url.origin === new URL(origin).origin && url.pathname === '/' && !url.search && !url.username && !url.password) return parseWorkspaceLink(url.hash);
+  } catch { /* Other links can still be copied. */ }
+}
+export function QuickTransfer({ active, edit, directory, origin, quickLink = false }: PageProps & { directory?: string; origin?: string; quickLink?: boolean }) {
   const feed = useCollabList<Entry>('transfer', active);
   const op = useOperation(),
     confirm = useConfirmation(),
@@ -69,6 +78,18 @@ export function QuickTransfer({ active, edit, directory, quickLink = false }: Pa
   const [revealed, setRevealed] = useState<{ id: string; text: string }>();
   const [files, setFiles] = useState<File[]>([]);
   const [direct, setDirect] = useState(true);
+  const stagedInvite = useRef('');
+  const finishInvite = useRelatedCreation('transfer', active && edit && !quickLink && !op.busy, (_from, invite) => {
+    if (!invite) return;
+    setPane('send');
+    if (files.length || text.trim()) {
+      void op.run(async () => '快传已有待发送的内容。处理完成后可从邀请入口再次加入链接。');
+      return;
+    }
+    stagedInvite.current = invite;
+    setDirect(false);
+    setText(invite);
+  });
   const [sender] = useState(() => new DirectSender());
   const [ready, setReady] = useState<{ id: string; ticket: string }>();
   const [receiving, setReceiving] = useState('');
@@ -154,6 +175,8 @@ export function QuickTransfer({ active, edit, directory, quickLink = false }: Pa
         if (!cancelled.current) {
           setPassword('');
           setPane('receive');
+          if (stagedInvite.current && text === stagedInvite.current && !files.length) finishInvite();
+          stagedInvite.current = '';
         }
         return direct
           ? '已发布 ' + sent + ' 个直传文件，请保持此页面在线。'
@@ -356,8 +379,10 @@ export function QuickTransfer({ active, edit, directory, quickLink = false }: Pa
             {receiving} <button onClick={() => receiver.current?.abort()}>取消接收</button>
           </p>
         )}
-        {entries.map((item) => (
-          <article className="collab-entry" key={item.id}>
+        {entries.map(item => {
+          const visibleText = item.locked ? (revealed?.id === item.id ? revealed.text : undefined) : item.text;
+          const destination = !quickLink && item.kind === 'link' ? sharedDestination(visibleText, origin) : undefined;
+          return <article className="collab-entry" key={item.id}>
             <div className="entry-glyph" aria-hidden="true">
               {item.kind === 'file' ? <File /> : item.kind === 'link' ? <Link2 /> : <AlignLeft />}
             </div>
@@ -368,7 +393,7 @@ export function QuickTransfer({ active, edit, directory, quickLink = false }: Pa
                 <pre>
                   {item.locked
                     ? revealed?.id === item.id
-                      ? revealed.text
+                      ? visibleText
                       : '需密码领取的' + (item.kind === 'link' ? '链接' : '文字')
                     : item.text}
                 </pre>
@@ -510,9 +535,10 @@ export function QuickTransfer({ active, edit, directory, quickLink = false }: Pa
                 </button>
               </form>
             )}
+            {destination && <RelatedLink {...destination}>打开共享资源</RelatedLink>}
             {revealed?.id === item.id && <button onClick={() => setRevealed(undefined)}>隐藏内容</button>}
-          </article>
-        ))}
+          </article>;
+        })}
         {!entries.length && (
           <div className="collab-empty">
             <Inbox size={32} />

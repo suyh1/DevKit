@@ -26,6 +26,7 @@ import {
   validateApiState,
 } from "../shared/api-workspace.mjs";
 import { apiLibrary } from "./api-library";
+import { CreateRelated, useRelatedCreation } from './related-workspaces';
 import { ResourceLink, useWorkspaceResource } from './workspace-links';
 import type { ApiLibrary } from "./api-library";
 import {
@@ -63,11 +64,15 @@ const writePreference = (key: string, value: string) => {
 };
 
 export default function ApiWorkspace({
+  active,
   onBusy,
   onGenerate,
+  showApi,
   onNotice,
 }: {
+  active: boolean;
   onBusy: (busy: boolean) => void;
+  showApi: () => void;
   onGenerate: (config: string) => void;
   onNotice: (message: string) => void;
 }) {
@@ -240,16 +245,29 @@ export default function ApiWorkspace({
       }
     });
   }
+  function newEndpoint(target: ApiProject, group = '') {
+    const endpoint = newApiEndpoint(newProjectId(), group);
+    let i = 1;
+    while (target.endpoints.some(item => item.path === endpoint.path)) endpoint.path = `/new-endpoint-${i++}`;
+    changeDraft(endpoint);
+    setView('design');
+    setError('');
+    return endpoint.id;
+  }
+  const relatedEndpoint = useRef('');
+  const finishCreation = useRelatedCreation('http', active && !!library && !busy && !sending && canWriteWorkspace('http'), () => {
+    showApi();
+    void allowChange().then(allowed => {
+      if (!allowed) { finishCreation(); return; }
+      if (project) relatedEndpoint.current = newEndpoint(project);
+      else { relatedEndpoint.current = 'project'; setProjectDraft(newApiProject()); }
+    });
+  });
+  function finishEndpoint() { relatedEndpoint.current = ''; finishCreation(); }
   function addEndpoint(group = "") {
     void allowChange().then((allowed) => {
       if (!allowed || !project) return;
-      const endpoint = newApiEndpoint(newProjectId(), group);
-      let i = 1;
-      while (project.endpoints.some((item) => item.path === endpoint.path))
-        endpoint.path = `/new-endpoint-${i++}`;
-      changeDraft(endpoint);
-      setView("design");
-      setError("");
+      newEndpoint(project, group);
     });
   }
   function openProject(item?: ApiProject) {
@@ -277,6 +295,7 @@ export default function ApiWorkspace({
           : item,
       ),
     );
+    if (relatedEndpoint.current === draft.id) finishEndpoint();
   }
   function stageImport(text: string) {
     const result = importApiProject(text),
@@ -707,6 +726,10 @@ export default function ApiWorkspace({
                       </code>
                     </div>
                     <div className="api-actions">
+                      {relatedEndpoint.current === draft.id && <button type="button" className="text-button" onClick={() => void allowChange().then(allowed => {
+                        if (allowed) { changeDraft(project.endpoints[0] ? structuredClone(project.endpoints[0]) : null); finishEndpoint(); }
+                      })}>取消新建</button>}
+                      {saved && <CreateRelated from="http" page="mock" resource={`${project.id}:${saved.id}`}>从此接口创建模拟</CreateRelated>}
                       {saved && <ResourceLink page="http" id={`${project.id}:${saved.id}`} />}
                       <button
                         className="icon-button"
@@ -881,10 +904,10 @@ export default function ApiWorkspace({
         </div>
       )}
       {projectDraft && (
-        <ApiProjectSettings
+        <ApiProjectSettings active={active}
           draft={projectDraft}
           onChange={setProjectDraft}
-          onClose={() => setProjectDraft(null)}
+          onClose={() => { setProjectDraft(null); if (relatedEndpoint.current) finishEndpoint(); }}
           busy={busy}
           error={error}
           onSave={() =>
@@ -899,6 +922,7 @@ export default function ApiWorkspace({
                 next.id,
               );
               setProjectDraft(null);
+              if (relatedEndpoint.current === 'project') relatedEndpoint.current = newEndpoint(next);
             })
           }
         />

@@ -10,6 +10,7 @@ import { TransferLinkSettings } from './TransferLinkSettings';
 import { QuickTransfer } from './QuickTransfer';
 import { MockService } from './MockService';
 import { ScreenshotBoard } from './ScreenshotBoard';
+import { CreateRelated } from './related-workspaces';
 import './collaboration.css';
 
 export function CollaborationPage({ module, active, edit }: PageProps & { module: CollabModule }) {
@@ -102,6 +103,7 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
                 >
                   {copyStatus || '复制邀请链接'}
                 </button>
+                {module !== 'transfer' && <CreateRelated from={module} page="transfer" resource={href}>在快传中填写邀请链接</CreateRelated>}
               </div>
             </>
           ) : (
@@ -113,7 +115,7 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
         </div>
       )}
       {module === 'transfer' ? (
-        <QuickTransfer active={active} edit={edit} directory={window.devkitCollab ? status?.directory : undefined} />
+        <QuickTransfer origin={origin} active={active} edit={edit} directory={window.devkitCollab ? status?.directory : undefined} />
       ) : module === 'mock' ? (
         <MockService active={active} edit={edit} origin={origin} />
       ) : (

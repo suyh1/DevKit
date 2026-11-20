@@ -6,6 +6,7 @@ import { copyText } from './motion-primitives';
 import { saveText } from './files';
 import { SharingButton } from './Sharing';
 import { usePerformanceMode } from './DisplayMode';
+import { CreateRelated, RelatedLink, useWorkspaceGuard } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 import './logs.css';
 
@@ -13,6 +14,7 @@ type Stream = LogRead & { text: string; notice?: string };
 function mask(text: string) { return text.replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[已隐藏]').replace(/((?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s,"'}&]+/gi, '$1[已隐藏]'); }
 
 export default function LogCenter({ active = true }: { active?: boolean }) {
+  const guard = useWorkspaceGuard();
   const refreshSeconds = usePerformanceMode() ? 6 : 2;
   const [catalog, setCatalog] = useState<LogCatalog>({ sources: [], warnings: [] }), [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState(''), [message, setMessage] = useState('');
@@ -93,6 +95,8 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     <div className="log-layout">
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><input aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
         <select aria-label="按主机筛选日志来源" value={hostFilter} onChange={event => setHostFilter(event.target.value)}><option value="">全部主机</option><option value="local">{localName}</option>{catalog.hosts?.map(host => <option key={host.id} value={host.id}>{host.name}</option>)}{missingHost && <option value={hostFilter}>{loading ? '正在读取目标主机…' : '目标主机不可用'}</option>}</select>
+        {hostFilter && hostFilter !== 'local' && <RelatedLink page="lan-hosts" id={hostFilter}>查看主机档案</RelatedLink>}
+        <div className="log-actions"><CreateRelated from="logs" page="lan-hosts">新建主机</CreateRelated><CreateRelated from="logs" page="jar" beforeOpen={() => guard('logs', 'jar')}>添加 JAR 来源</CreateRelated><CreateRelated from="logs" page="nginx" beforeOpen={() => guard('logs', 'nginx')}>添加 Nginx 来源</CreateRelated></div>
         <div className="log-source-list">{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : hostLoad === 'pending' || loading && !hostLoad ? '正在读取来源…' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
@@ -155,6 +159,6 @@ function LogPane({ source, focused, tracking, refreshSeconds, query, regex, leve
     <div className="log-pane-tools"><label><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} />自动滚动</label><div><button title="回到底部" aria-label={`回到底部 ${source.name}`} onClick={() => { setFollow(true); if (output.current) output.current.scrollTop = output.current.scrollHeight; }}><ArrowDown size={14} /></button><button title="清空本页显示" aria-label={`清空 ${source.name}`} onClick={clear}><Eraser size={14} /></button><button title="复制已筛选显示内容" aria-label={`复制 ${source.name}`} disabled={!!filterError} onClick={() => { void copyText(filtered).then(() => setNotice('已复制当前筛选内容。')).catch(error => setNotice(error.message)); }}><Copy size={14} /></button>{canExportLogs() && <button title="导出来源最近的有界内容（不应用筛选）" aria-label={`导出 ${source.name}`} onClick={exportLog}><Download size={14} /></button>}</div></div>
     {(stream?.error || filterError) && <p className="log-pane-error" role="alert">{stream?.error || filterError}{stream?.error && stream?.text && ' 当前保留上次内容，状态可能已过期。'}</p>}
     <pre ref={output} tabIndex={0} aria-label={`${source.name} 日志内容`}>{filterError ? '' : filtered || (stream ? '暂无匹配的日志行。' : '正在连接来源…')}</pre>
-    <footer><span>{notice || stream?.notice || '只读追踪 · 不修改原文件'}</span><ResourceLink page="logs" id={source.id} /><small>{stream?.checkedAt ? new Date(stream.checkedAt).toLocaleTimeString() : '等待读取'}</small></footer>
+    <footer><span>{notice || stream?.notice || '只读追踪 · 不修改原文件'}</span>{source.instanceId && <RelatedLink page={source.kind} id={source.instanceId}>{source.kind === 'jar' ? '查看 JAR 实例' : '查看 Nginx 实例'}</RelatedLink>}{source.hostId && <RelatedLink page="lan-hosts" id={source.hostId}>查看主机档案</RelatedLink>}<ResourceLink page="logs" id={source.id} /><small>{stream?.checkedAt ? new Date(stream.checkedAt).toLocaleTimeString() : '等待读取'}</small></footer>
   </section>;
 }

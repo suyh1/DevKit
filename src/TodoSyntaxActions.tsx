@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import { CalendarDays, GitBranch, Layers, LayoutList, Link2, ListChecks, Play, Repeat2 } from 'lucide-react';
 import { todoGroupAt, todoTaskTitle } from '../shared/todo-text.mjs';
 import type { TodoModel } from '../shared/todo-text.mjs';
+import { workspaceModules } from './catalog';
+import { RelatedLink, useWorkspaceGuard } from './related-workspaces';
+import { fileShareRequest, publishedShares, type FileShareState } from './planning-share-api';
 import { Modal, ModalCancel } from './project-components';
 import type { TodoEditorHandle } from './TodoTextEditor';
 import { planTodoSyntax, todoRepeatRules, todoSyntaxFields, todoViewStates } from './todo-syntax-actions';
@@ -12,16 +15,26 @@ const actions = [
   ['wait', '等待回访', CalendarDays], ['dependency', '前置任务', GitBranch], ['repeat', '周期任务', Repeat2], ['defaults', '分组默认', Layers],
 ] as const;
 
-type Props = { model: TodoModel; editor: TodoEditorHandle | null; line: number; locked: boolean; portal: boolean };
+type Props = { active: boolean; model: TodoModel; editor: TodoEditorHandle | null; line: number; locked: boolean; portal: boolean };
 
-export default function TodoSyntaxActions({ model, editor, line, locked, portal }: Props) {
+export default function TodoSyntaxActions({ active, model, editor, line, locked, portal }: Props) {
   const [draft, setDraft] = useState<{ action: TodoSyntaxAction; fields: TodoSyntaxFields; model: TodoModel } | null>(null);
   const [error, setError] = useState('');
+  const [shares, setShares] = useState<{ id: string; name: string }[]>();
+  const guard = useWorkspaceGuard();
+  async function loadShares() {
+    if (!guard('file-shares')) return;
+    try {
+      const result = portal ? await publishedShares() : await fileShareRequest<FileShareState>('get');
+      setShares(result.shares);
+    } catch (failure) { setError((failure as Error).message); }
+  }
   const tasks = useMemo(() => model.tasks.map(task => ({ task, title: todoTaskTitle(task) })).filter(item => item.title), [model]);
   const editable = useMemo(() => tasks.filter(item => !item.task.archived), [tasks]);
   const groups = useMemo(() => model.sections.filter(section => !section.archived), [model]);
 
   function begin(action: TodoSyntaxAction) {
+    setShares(undefined);
     const task = editable.filter(item => item.task.line <= line && item.task.endLine >= line).at(-1)?.task ?? editable[0]?.task;
     const group = todoGroupAt(model, line);
     const target = action === 'defaults' ? (group && !group.archived ? group.line : groups[0]?.line) : task?.line;
@@ -69,7 +82,7 @@ export default function TodoSyntaxActions({ model, editor, line, locked, portal 
       {actions.filter(([name]) => primary.includes(name)).map(actionButton)}
       <details className="td-more"><summary>扩展语法</summary><div>{actions.filter(([name]) => !primary.includes(name)).map(actionButton)}</div></details>
     </div>
-    {draft && fields && <Modal title={label!} closeLabel="关闭待办扩展操作" close={() => setDraft(null)} draft={fields} className="td-settings-dialog">
+    {draft && fields && <Modal active={active} title={label!} closeLabel="关闭待办扩展操作" close={() => setDraft(null)} draft={fields} className="td-settings-dialog">
       <form className="td-settings td-syntax-form" onSubmit={event => { event.preventDefault(); submit(); }}>
         {action !== 'view' && <label className="pc-field">{action === 'defaults' ? '分组' : '应用到任务'}
           <select value={fields.target} required onChange={event => {
@@ -92,8 +105,17 @@ export default function TodoSyntaxActions({ model, editor, line, locked, portal 
         </>}
         {action === 'reference' && <>
           <label className="pc-field">引用类型<select value={fields.option} onChange={event => update({ option: event.target.value })}>
-            <option value="共享">文件共享</option><option value="工具">桌面工具</option>
+            <option value="共享">文件共享</option><option value="工具">工作台栏目或桌面工具</option>
           </select></label>
+          {fields.option === '共享' ? <>
+            <button type="button" className="text-button" onClick={() => void loadShares()}>选择文件共享</button>
+            {shares && (shares.length ? <label className="pc-field">可引用的共享<select value={shares.some(item => item.id === fields.primary) ? fields.primary : ''} onChange={event => update({ primary: event.target.value })}>
+              <option value="">选择共享</option>{shares.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select></label> : <p>暂无可引用的共享。</p>)}
+            <RelatedLink page="file-shares">查看文件共享</RelatedLink>
+          </> : <label className="pc-field">工作台栏目<select value={workspaceModules.some(item => item.id === fields.primary) ? fields.primary : ''} onChange={event => update({ primary: event.target.value })}>
+            <option value="">选择栏目</option>{workspaceModules.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></label>}
           {input('引用名称或 ID', fields.option === '共享' ? '例如 发布材料' : '例如 JSON 格式化')}
         </>}
         {action === 'wait' && input('等待对象', '例如 测试同事', false)}

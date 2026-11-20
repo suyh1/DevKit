@@ -3,14 +3,15 @@ import { ArrowUp, File, FolderOpen } from 'lucide-react';
 import { Field, Modal } from './project-components';
 import type { HostGroup, RemoteDirectory } from './lan-api';
 import { hostAccessLabel, hostRole } from './lan-api';
+import { CreateRelated, RelatedLink } from './related-workspaces';
 import './lan-hosts.css';
 
 export type RemotePickKind = 'file' | 'jar' | 'directory';
-export function HostSelect({ groups, id, change, locked }: { groups?: HostGroup[]; id: string; change: (id: string) => void; locked: boolean }) {
+export function HostSelect({ module, groups, id, change, locked }: { module: 'jar' | 'nginx'; groups?: HostGroup[]; id: string; change: (id: string) => void; locked: boolean }) {
   const hint = useId();
   return <><label>目标主机<select value={id} aria-describedby={hint} onChange={event => change(event.target.value)} disabled={locked}>
     {(groups?.length ? groups : [{ id: '', name: '本机', edit: true }]).map(group => <option key={group.id} value={group.id} disabled={!group.edit}>{group.name}{'error' in group && group.error ? '（连接不可用）' : !group.edit ? '（只读）' : ''}</option>)}
-  </select></label><span id={hint} className="sr-only">文件路径和运行操作均指向所选主机。</span>{groups?.filter(group => group.id === id).map(group => <p className="jar-help" key={group.id}>{hostRole(group)} · {hostAccessLabel(group)}{group.error && ` · ${group.error}`}</p>)}</>;
+  </select></label>{id && <RelatedLink page="lan-hosts" id={id}>查看主机档案</RelatedLink>}{!locked && <CreateRelated from={module} page="lan-hosts">新建主机</CreateRelated>}<span id={hint} className="sr-only">文件路径和运行操作均指向所选主机。</span>{groups?.filter(group => group.id === id).map(group => <p className="jar-help" key={group.id}>{hostRole(group)} · {hostAccessLabel(group)}{group.error && ` · ${group.error}`}</p>)}</>;
 }
 
 export default function HostPathPicker({ name, kind, request, close, select }: { name: string; kind: RemotePickKind; request: (directory: string) => Promise<RemoteDirectory>; close: () => void; select: (path: string) => void }) {

@@ -13,6 +13,7 @@ import { groupInstances, targetGroup, hostAccessLabel, hostRole } from './lan-ap
 import type { RemoteDirectory } from './lan-api';
 import { usePerformanceMode } from './DisplayMode';
 import { HostProgress, useHostInventory } from './HostInventory';
+import { CreateRelated, RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import { inventoryLinkStatus, missingResourceLink, openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 import { canWriteWorkspace, canOperateJar, canReadWorkspaceLogs, remoteAccess } from './workspace-remote';
 import type { JarInstance, JarState, JarStatus, JavaDetection, JarLog, JarCommand } from './jar-api';
@@ -25,7 +26,7 @@ const labels = { running: '运行中', stopped: '已停止', exited: '已退出'
 const healthLabels = { disabled: '未检测', unknown: '待检测', starting: '启动宽限中', stopped: '未运行', healthy: '健康', degraded: '检测波动', unhealthy: '不健康' };
 const supervisionLabels: Record<string, string> = { starting: '正在启动', running: '独立守护中', backoff: '等待重试', exhausted: '重试已达上限', exited: '进程已退出', blocked: '需要处理', stopping: '正在停止' };
 
-function JarForm({ instance, state, close, saved }: { instance?: JarInstance; state: JarState; close: () => void; saved: () => void }) {
+function JarForm({ active, instance, state, close, saved }: { active: boolean; instance?: JarInstance; state: JarState; close: () => void; saved: () => void }) {
   const initial = { name: instance?.name || '', jar: instance?.jar || '', executable: instance?.executable || '', jvm: instance?.jvmArgs.join('\n') || '', args: instance?.appArgs.join('\n') || '', pidName: instance?.pidName || '', logName: instance?.logName || '', logMode: instance?.logMode || 'file', stopTimeout: instance?.stopTimeout || 15 };
   const initialRuntime = useRef(runtimeDraft(instance));
   const [runtime, setRuntime] = useState(initialRuntime.current);
@@ -36,7 +37,14 @@ function JarForm({ instance, state, close, saved }: { instance?: JarInstance; st
   const dialog = useRef<HTMLDialogElement>(null), heading = useId(), confirm = useConfirmation();
   const dirty = JSON.stringify([draft, runtime]) !== baseline.current;
   useBeforeUnload(dirty);
-  useEffect(() => { const previous = document.activeElement; dialog.current?.showModal(); dialog.current?.querySelector('input')?.focus(); return () => { dialog.current?.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); }; }, []);
+  useEffect(() => {
+    const surface = dialog.current;
+    if (!active || !surface) return;
+    const previous = document.activeElement;
+    surface.showModal();
+    surface.querySelector('input')?.focus();
+    return () => { surface.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+  }, [active]);
   const patch = (values: Partial<typeof draft>) => setDraft(current => ({ ...current, ...values }));
   async function task(action: () => Promise<void>) { if (busy) return; setBusy(true); setError(''); try { await action(); } catch (failure) { setError((failure as Error).message); } finally { setBusy(false); } }
   async function cancel() {
@@ -60,7 +68,7 @@ function JarForm({ instance, state, close, saved }: { instance?: JarInstance; st
       baseline.current = JSON.stringify([draft, runtime]); saved();
     }); }}>
       <fieldset disabled={busy}>
-        <HostSelect groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ jar: '', executable: '' }); setJava(null); }} />
+        <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ jar: '', executable: '' }); setJava(null); }} />
         <label>显示名称<input required maxLength={120} value={draft.name} onChange={event => patch({ name: event.target.value })} placeholder="例如：订单服务 · 测试环境" /></label>
         <label>JAR 文件绝对路径<span className="jar-path-input"><input required value={draft.jar} onChange={event => patch({ jar: event.target.value })} onBlur={() => { if (!draft.name && draft.jar) patch({ name: basename(draft.jar).replace(/\.jar$/i, '') }); }} placeholder={hostId || !window.devkitJar ? '填写目标主机上的绝对路径' : '选择已有 .jar 文件'} /><button className="secondary-button" type="button" disabled={!hostId && !window.devkitJar} onClick={() => pick('jar')}><FolderOpen size={15} />选择文件</button></span></label>
         <p className="jar-help">自动获取目录和文件名；工作目录、日志与 PID 都在 JAR 同级。每个文件仅登记一次。</p>
@@ -100,6 +108,9 @@ export default function JarCenter({ active }: { active: boolean }) {
   const polling = useRef(false), operating = useRef(false), confirm = useConfirmation();
   const operationVersion = useRef(0);
   const desktop = !!window.devkitJar, available = desktop || !!remoteAccess(), write = canWriteWorkspace('jar'), control = canOperateJar();
+  const guard = useWorkspaceGuard();
+  const finishCreation = useRelatedCreation('jar', active && !!state && write && !busy, () => setForm('new'));
+  function closeForm() { setForm(null); finishCreation(); }
   const readLogs = canReadWorkspaceLogs('jar');
   useEffect(() => {
     if (!workspace.current) return;
@@ -111,7 +122,10 @@ export default function JarCenter({ active }: { active: boolean }) {
     return () => observer.disconnect();
   }, []);
   const javaTarget = targetGroup(state?.groups, javaHost);
-  const linked = useWorkspaceResource('jar');
+  const resource = useWorkspaceResource('jar');
+  const hostLink = resource?.startsWith('host:') ? resource.slice(5) : undefined;
+  const linked = hostLink ? undefined : resource;
+  useEffect(() => { if (active && hostLink) { setListHost(hostLink); setQuery(''); } }, [active, hostLink]);
   const linkStatus = linked && state ? inventoryLinkStatus(linked, state.instances, state.groups) : undefined;
   const linkedRow = useRef<HTMLTableRowElement>(null);
   useEffect(() => { if (active && linkStatus === 'found') { setQuery(''); setListHost(null); } }, [active, linked, linkStatus]);
@@ -166,12 +180,12 @@ export default function JarCenter({ active }: { active: boolean }) {
     });
   }
   const hostOptions = state?.groups || [];
-  const selectedListHost = hostOptions.some(group => group.id === listHost) ? listHost : null;
+  const selectedListHost = listHost === hostLink || hostOptions.some(group => group.id === listHost) ? listHost : null;
   const filtered = state?.instances.filter(item => (selectedListHost === null || (item.hostId || '') === selectedListHost)
     && `${item.name} ${item.jar} ${targetGroup(state.groups, item.hostId)?.name || ''}`.toLowerCase().includes(query.toLowerCase())) || [];
   const consoleItem = state?.instances.find(item => item.id === consoleId);
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
-    <header className="jar-heading workspace-banner"><div><span className="jar-eyebrow"><Coffee size={17} />Java 应用</span><h1>JAR 管理</h1><p>按主机管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><label className="jar-java-target">Java 检测主机<select disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>{(state?.groups || []).map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}</select></label><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
+    <header className="jar-heading workspace-banner"><div><span className="jar-eyebrow"><Coffee size={17} />Java 应用</span><h1>JAR 管理</h1><p>按主机管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><label className="jar-java-target">Java 检测主机<select disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>{(state?.groups || []).map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}</select></label>{javaHost && <RelatedLink page="lan-hosts" id={javaHost}>查看检测主机</RelatedLink>}<CreateRelated from="jar" page="lan-hosts">登记检测主机</CreateRelated><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用 JAR 管理。</p>}
     {java && <div className={java.found ? 'jar-java' : 'jar-warning'}><strong>{javaTarget ? hostRole(javaTarget) + ' · ' : ''}{java.found ? java.version : '未检测到 Java'}</strong><p>{java.found ? java.executable : java.output}</p></div>}
     <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-java-target">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
@@ -180,6 +194,7 @@ export default function JarCenter({ active }: { active: boolean }) {
     {error && <p className="jar-error" role="alert">{error}</p>}{notice && <p className="jar-notice" role="status">{notice}</p>}
     {monitorError && <p className="jar-warning" role="alert">状态刷新失败，以下显示上次结果：{monitorError}</p>}
     <HostProgress groups={state?.groups} retry={id => void hosts.retry(id)} />
+    {hostLink && state && !hostOptions.some(host => host.id === hostLink) && <p className="pc-notice" role="status">{missingResourceLink('主机')}</p>}
     {linkStatus === 'missing' && <p className="pc-notice" role="status">{missingResourceLink(' JAR 实例')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的 JAR 实例，请重试连接目标主机。</p>}
     {desktop && state && <LegacySshImport module="jar" groups={state.groups} disabled={busy} refresh={() => void task(refresh)} />}
@@ -187,11 +202,12 @@ export default function JarCenter({ active }: { active: boolean }) {
     {!state && available && !error && <p className="jar-help">正在读取 JAR 列表…</p>}
     {state && !state.instances.length && <div className="jar-empty"><Coffee size={35} /><h2>添加第一个 Java 应用</h2><p>选择 JAR 文件，起一个方便辨认的名字，即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />选择 JAR 文件</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的 JAR。</p>}
-    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="JAR 应用"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
+    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="JAR 应用"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
       const write = canEdit(item), control = canControl(item);
       const status = statuses.find(status => status.id === item.id), running = status?.state === 'running', stopped = status && ['stopped', 'exited'].includes(status.state), supervised = status?.supervision?.active;
       const hostName = targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机');
       const extraActions = <>
+          <RelatedLink page="monitor" id={`source:jar:${item.id}`}>关联监控</RelatedLink>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
           {write && <button className="text-button" disabled={busy} onClick={() => setConfig(item)}><FileText size={14} />配置文件</button>}
@@ -212,7 +228,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           <button className="text-button" disabled={busy || !control || !stopped || status.fileMissing} onClick={() => void command(item, 'start')}><Play size={14} />启动</button>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
-          {readLogs && item.logMode !== 'silent' && <button className="text-button" onClick={() => openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
+          {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
         </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{item.jar}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>Java：{status?.executable || item.executable || '自动检测'}</p><p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
@@ -224,7 +240,7 @@ export default function JarCenter({ active }: { active: boolean }) {
     {readLogs && logId && <section className="jar-log"><header><div><h2>{state?.instances.find(item => item.id === logId)?.name} · 日志</h2><p>{log?.path}</p></div><button className="icon-button" aria-label="关闭日志" onClick={() => setLogId('')}><X size={17} /></button></header><p className="jar-help">{state?.instances.find(item => item.id === logId)?.logMode === 'silent' ? '静默模式不会写入标准输出；已有文件可能是历史日志。' : `显示最近 128 KB，自动刷新开启时每 ${logSeconds} 秒重新读取。`} {log?.truncated ? '前部内容已截断。' : ''}</p>{logError && <p className="jar-error" role="alert">{logError}</p>}<pre tabIndex={0} aria-label="JAR 日志内容">{log ? log.text || '暂无日志。' : '正在读取日志…'}</pre></section>}
     {readLogs && consoleItem && <JarConsole key={consoleId} id={consoleId} name={consoleItem.name} control={canControl(consoleItem)} active={active} close={() => setConsoleId('')} stop={() => void command(consoleItem, 'stop')} />}
     <p className="jar-help jar-footer">路径、进程和文件均属于各应用登记的主机。关闭控制台或网页后，JAR 会继续运行。只读访客无法查看环境变量值和启动参数。</p>
-    {form && state && <JarForm instance={form === 'new' ? undefined : form} state={state} close={() => setForm(null)} saved={() => { setForm(null); void task(refresh); }} />}
+    {form && state && <JarForm active={active} instance={form === 'new' ? undefined : form} state={state} close={closeForm} saved={() => { closeForm(); void task(refresh); }} />}
     {startup && <JarStartupDialog item={startup} control={canControl(startup)} platform={targetGroup(state?.groups, startup.hostId)?.platform ?? state?.platform ?? ''} close={() => setStartup(null)} />}
     {config && <ConfigFilesDialog item={{ ...config, path: config.jar }} editable={write} close={() => setConfig(null)} />}
   </section>;

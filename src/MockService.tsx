@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import type { ApiEndpoint } from '../shared/api-workspace.mjs';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
 import {
   Braces,
@@ -18,7 +19,7 @@ import { copyText } from './motion-primitives';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { useWorkspaceResource, openWorkspaceLink } from './workspace-links';
 import { apiLibrary } from './api-library';
-import { remoteAccess } from './workspace-remote';
+import { CreateRelated, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 
 type Scenario = {
   name: string;
@@ -57,9 +58,29 @@ const sample = (): Route => ({
     { name: '服务异常', status: 503, delay: 800, format: 'json', body: '{"error":"temporarily unavailable"}' },
   ],
 });
+function mockTemplate(projectName: string, endpoint: ApiEndpoint): Route {
+  const next = {
+    ...sample(),
+    name: projectName + ' / ' + endpoint.name,
+    method: endpoint.method,
+    path: endpoint.path.split('?')[0],
+  };
+  if (endpoint.responses.length)
+    next.scenarios = endpoint.responses.slice(0, 12).map((r) => ({
+      name: r.description.slice(0, 60) || r.status,
+      status: Number(r.status) || 200,
+      delay: 0,
+      format: r.contentType.includes('json') ? 'json' : 'text',
+      body: r.example || (r.contentType.includes('json') ? '{}' : ''),
+    }));
+  return next;
+}
+
 export function MockService({ active, edit, origin }: PageProps & { origin?: string }) {
+  const guard = useWorkspaceGuard();
   const list = useCollabList<Summary>('mock', active);
   const resource = useWorkspaceResource('mock');
+  const lastResource = useRef(resource);
   const [draft, setDraft] = useState<Route>(),
     [dirty, setDirty] = useState(false),
     [tab, setTab] = useState(0),
@@ -86,7 +107,8 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
       ? new URL('/mock/' + saved.key + saved.path.replace(/\/(?:\{\w+\}|:\w+)(?=\/|$)/g, '/1'), origin).href
       : '';
   useEffect(() => {
-    if (resource) {
+    if (resource && resource !== lastResource.current) {
+      lastResource.current = resource;
       setDirty(false);
       setTab(0);
     }
@@ -104,14 +126,27 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
     !dirty ||
     confirm({ title: '放弃未保存的接口修改？', detail: '主机仍保留最近保存的接口定义。', confirm: '放弃修改' });
   async function start(template: Route) {
-    if (!(await leave())) return;
+    if (!(await leave())) return false;
     setPanel('response');
     setListOpen(false);
     setDraft(template);
     setDirty(true);
     setTab(0);
     setImports([]);
+    return true;
   }
+  const finishCreation = useRelatedCreation('mock', active && edit && !op.busy, (_from, resource) => {
+    if (!resource || !guard('http')) return;
+    void op.run(async () => {
+      const [projectId, endpointId] = resource.split(':');
+      const library = await apiLibrary('get-library');
+      const project = library.state.projects.find(item => item.id === projectId);
+      const endpoint = project?.endpoints.find(item => item.id === endpointId);
+      if (!project || !endpoint) throw new Error('接口已移除或当前访客无权访问。');
+      if (!verbs.includes(endpoint.method)) throw new Error('模拟服务不支持此请求方法。');
+      if (!await start(mockTemplate(project.name, endpoint))) finishCreation();
+    });
+  });
   const notice = list.error || detail.error || op.message;
   return (
     <div className="collab-layout mock-layout">
@@ -171,31 +206,15 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
               <small>{item.published ? '已发布 · ' + item.scenario : '未发布'}</small>
             </button>
           ))}
-        {edit && (window.devkitCollab || remoteAccess()?.services?.http.enabled) && (
+        {edit && <>
           <button
-            onClick={() =>
+            onClick={() => guard('http') &&
               void op.run(async () => {
                 const library = await apiLibrary('get-library');
                 const choices = library.state.projects.flatMap((project) =>
                   project.endpoints
                     .filter((endpoint) => verbs.includes(endpoint.method))
-                    .map((endpoint) => {
-                      const next = {
-                        ...sample(),
-                        name: project.name + ' / ' + endpoint.name,
-                        method: endpoint.method,
-                        path: endpoint.path.split('?')[0],
-                      };
-                      if (endpoint.responses.length)
-                        next.scenarios = endpoint.responses.slice(0, 12).map((r) => ({
-                          name: r.description.slice(0, 60) || r.status,
-                          status: Number(r.status) || 200,
-                          delay: 0,
-                          format: r.contentType.includes('json') ? 'json' : 'text',
-                          body: r.example || (r.contentType.includes('json') ? '{}' : ''),
-                        }));
-                      return next;
-                    }),
+                    .map(endpoint => mockTemplate(project.name, endpoint)),
                 );
                 setImports(choices);
                 return choices.length ? '选择接口以载入响应示例' : 'HTTP 工作台中暂无可导入的接口';
@@ -204,7 +223,8 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
           >
             <FileInput size={15} />从 HTTP 工作台导入
           </button>
-        )}
+          <CreateRelated from="mock" page="http">新建 HTTP 接口</CreateRelated>
+        </>}
         {imports.map((item, i) => (
           <button key={i} onClick={() => void start(item)}>
             {item.name}
@@ -431,7 +451,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                           const result = await collab<Route>('mock', row.id ? 'save' : 'create', row);
                           setDirty(false);
                           setPanel(result.published ? 'calls' : 'response');
-                          openWorkspaceLink('mock', result.id);
+                          if (!finishCreation()) openWorkspaceLink('mock', result.id);
                           await list.refresh();
                           if (selected === result.id) await detail.refresh();
                           return '接口已保存';
@@ -441,7 +461,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       <Save size={16} />
                       保存接口
                     </button>
-                    {dirty && <button onClick={() => setDirty(false)}>放弃草稿</button>}
+                    {dirty && <button onClick={() => { setDirty(false); finishCreation(); }}>放弃草稿</button>}
                     {!dirty && saved && (
                       <button
                         onClick={() =>
@@ -474,6 +494,11 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                   <>
                     <code className="collab-url">{href}</code>
                     <div className="collab-actions">
+                      <button onClick={() => {
+                        if (!guard('http', 'send')) return;
+                        openWorkspaceLink('http');
+                        window.dispatchEvent(new CustomEvent('devkit:prepare-http-request', { detail: { name: saved.name, method: saved.method, url: href } }));
+                      }}>用 HTTP 调试打开</button>
                       <button
                         onClick={() =>
                           void op.run(async () => {

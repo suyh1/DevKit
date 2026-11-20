@@ -1,4 +1,5 @@
 import { SharingButton } from './Sharing';
+import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import HostPathPicker, { HostSelect } from './HostPathPicker';
 import LegacySshImport from './LegacySshImport';
 import { groupInstances, lanHostRevision, targetGroup, hostAccessLabel, hostRole } from './lan-api';
@@ -32,19 +33,20 @@ const dirname = (file: string) => file.replace(/[\\/][^\\/]*$/, '');
 const statusNames = { running: '运行中', stopped: '已停止', unknown: '待确认', platform: '其他系统' };
 
 type Confirmation = { title: string; detail: string; confirm: string; cancel?: string; action: () => void };
-function Modal({ title, children, close, description, className = '', busy = false }: { title: string; children: React.ReactNode; close: () => void; description?: string; className?: string; busy?: boolean }) {
+function Modal({ title, children, close, description, className = '', busy = false, active = true }: { active?: boolean; title: string; children: React.ReactNode; close: () => void; description?: string; className?: string; busy?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const heading = useId();
   useEffect(() => {
+    if (!active) return;
     const previous = document.activeElement, dialog = ref.current;
     dialog?.showModal(); if (className === 'ng-form-modal') dialog?.querySelector<HTMLInputElement>('input')?.focus();
     return () => { dialog?.close(); if (previous instanceof HTMLElement && previous.isConnected && !document.querySelector('dialog[open]')) previous.focus({ preventScroll: true }); };
-  }, []);
+  }, [active]);
   return <dialog className={`ng-modal ${className}`} aria-labelledby={heading} ref={ref} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close(); } }} onCancel={event => { event.preventDefault(); close(); }}><header>{description && <span className="ng-dialog-icon"><Server size={21} /></span>}<div><h2 id={heading}>{title}</h2>{description && <p>{description}</p>}</div><MotionButton busy={busy} type="button" className="icon-button"  aria-label="关闭对话框" disabled={busy} onClick={close}><X size={18} /></MotionButton></header><div className="ng-modal-content">{children}</div></dialog>;
 }
 
-function InstanceForm({ instance, platform, groups, busy, error, submit, create, close, task, initialSetup = 'existing' }: {
-  instance?: NginxInstance; platform: string; groups?: HostGroup[]; busy: boolean; error: string; submit: (instance: Partial<NginxInstance>, hostId: string) => Promise<void>; create: (settings: NginxCreation, hostId: string) => Promise<void>; close: () => void;
+function InstanceForm({ active, instance, platform, groups, busy, error, submit, create, close, task, initialSetup = 'existing' }: {
+  active: boolean; instance?: NginxInstance; platform: string; groups?: HostGroup[]; busy: boolean; error: string; submit: (instance: Partial<NginxInstance>, hostId: string) => Promise<void>; create: (settings: NginxCreation, hostId: string) => Promise<void>; close: () => void;
   initialSetup?: 'existing' | 'create';
   task: (action: () => Promise<void>) => Promise<void>;
 }) {
@@ -88,9 +90,9 @@ function InstanceForm({ instance, platform, groups, busy, error, submit, create,
     void task(async () => applyPaths(kind, await nginxRequest<string[]>('pick', { kind })));
   }
   const pickKind = picker === 'directory' || picker === 'prefix' ? 'directory' : 'file';
-  return <Modal title={instance ? '实例设置' : '添加 Nginx 实例'} description={instance ? '管理此实例的配置文件与运行环境。' : '新建一套配置，或将已有配置加入工作区。'} className="ng-form-modal" busy={busy} close={() => void closeForm()}><form className="ng-instance-form" onSubmit={event => { event.preventDefault(); void task(() => setup === 'create' ? create({ name: draft.name || '', platform: draft.platform!, executable: draft.executable || '', directory, mainName, commonName, port: Number(port) }, hostId) : submit({ ...draft, files: manualFiles.split(/\r?\n/).map(file => file.trim()).filter(Boolean) }, hostId)); }}><div className="ng-form-scroll">
+  return <Modal active={active} title={instance ? '实例设置' : '添加 Nginx 实例'} description={instance ? '管理此实例的配置文件与运行环境。' : '新建一套配置，或将已有配置加入工作区。'} className="ng-form-modal" busy={busy} close={() => void closeForm()}><form className="ng-instance-form" onSubmit={event => { event.preventDefault(); void task(() => setup === 'create' ? create({ name: draft.name || '', platform: draft.platform!, executable: draft.executable || '', directory, mainName, commonName, port: Number(port) }, hostId) : submit({ ...draft, files: manualFiles.split(/\r?\n/).map(file => file.trim()).filter(Boolean) }, hostId)); }}><div className="ng-form-scroll">
     <fieldset disabled={busy}>
-      {!!groups?.length && <HostSelect groups={groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ platform: (targetGroup(groups, id)?.platform ?? platform) === 'win32' ? 'win32' : 'linux', main: '', prefix: '', executable: '', files: [] }); setDirectory(''); setManualFiles(''); setWarnings([]); setDetection(''); }} />}
+      {!!groups?.length && <HostSelect module="nginx" groups={groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ platform: (targetGroup(groups, id)?.platform ?? platform) === 'win32' ? 'win32' : 'linux', main: '', prefix: '', executable: '', files: [] }); setDirectory(''); setManualFiles(''); setWarnings([]); setDetection(''); }} />}
       {(hostId || remoteAccess()) && <p className="ng-warning">文件、目录和程序路径均属于 {hostName}。</p>}
       {error && <p className="ng-error" role="alert">{error}</p>}
       {!instance && <MotionGroup className="ng-setup-tabs" role="group" aria-label="配置来源"><button type="button" aria-pressed={setup === 'existing'} className="text-button"  onClick={() => setSetup('existing')}>使用已有文件</button><button type="button" aria-pressed={setup === 'create'} className="text-button"  onClick={() => setSetup('create')}>新建配置</button></MotionGroup>}
@@ -175,17 +177,23 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   const locked = useRef(false), loadedHostRevision = useRef<number | null>(null), polling = useRef(false);
   const current = state?.instances.find(instance => instance.id === selected), rawStatus = statuses.find(item => item.id === selected);
   const [listHost, setListHost] = useState<string | null>(null);
-  const hostGroups = groupInstances(state?.instances || [], state?.groups).filter(group => group.items.length);
-  const selectedListHost = hostGroups.some(group => group.id === listHost) ? listHost : null;
+  const hostGroups = groupInstances(state?.instances || [], state?.groups);
   const hostFor = (item?: NginxInstance) => targetGroup(state?.groups, item?.hostId);
 
   const canEdit = (item?: NginxInstance) => canWriteWorkspace('nginx') && (hostFor(item)?.edit ?? true);
   const currentEdit = canEdit(current), currentControl = canOperateNginx() && (hostFor(current)?.control ?? true);
+  const guard = useWorkspaceGuard();
+  const finishCreation = useRelatedCreation('nginx', active && !!state && !busy && canWriteWorkspace('nginx'), () => discardThen(() => setInstanceForm('new')));
+  function closeInstanceForm() { setInstanceForm(null); finishCreation(); }
   const readLogs = canReadWorkspaceLogs('nginx');
   const status = statusStale && rawStatus ? { ...rawStatus, state: 'unknown' as const, detail: '状态尚未重新确认；下方为上次读取的信息。' } : rawStatus;
   const content = drafts[file] ?? '', dirtyFiles = documents.filter(doc => drafts[doc.path] !== doc.content), pendingFields = Object.values(fieldPending).some(Boolean);
   const dirty = dirtyFiles.length > 0 || pendingFields;
-  const linked = useWorkspaceResource('nginx'), linkedHandled = useRef('');
+  const resource = useWorkspaceResource('nginx'), linkedHandled = useRef('');
+  const hostLink = resource?.startsWith('host:') ? resource.slice(5) : undefined;
+  const linked = hostLink ? undefined : resource;
+  const selectedListHost = listHost === hostLink || hostGroups.some(group => group.id === listHost) ? listHost : null;
+  useEffect(() => { if (active && hostLink) setListHost(hostLink); }, [active, hostLink]);
   useEffect(() => { if (active && linked) setListHost(null); }, [active, linked]);
   const linkStatus = linked && state ? inventoryLinkStatus(linked, state.instances, state.groups) : undefined;
   useEffect(() => {
@@ -373,6 +381,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
     {error && <p className="ng-error ng-message" role="alert">{error}</p>}{notice && <p className="ng-notice ng-message" role="status">{notice}</p>}
     {busy && <p className="ng-busy" role="status">正在处理…</p>}
     <HostProgress groups={state?.groups} retry={id => void hosts.retry(id)} />
+    {hostLink && state && !state.groups?.some(group => group.id === hostLink) && <p className="pc-notice" role="status">{missingResourceLink('主机')}</p>}
     {linkStatus === 'missing' && <p className="pc-notice" role="status">{missingResourceLink(' Nginx 实例')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的 Nginx 实例，请重试连接目标主机。</p>}
     {window.devkitNginx && state && <LegacySshImport module="nginx" groups={state.groups} disabled={busy || dirty} refresh={() => void task(() => refresh())} />}
@@ -380,11 +389,11 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
       {hostGroups.length > 1 && <label className="ng-list-host">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
         <option value="all">全部主机</option>{hostGroups.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
       </select></label>}
-      {hostGroups.filter(group => selectedListHost === null || group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.name}</h3>{group.items.map(instance => {
+      {hostGroups.filter(group => selectedListHost === null ? group.items.length : group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{group.name}</RelatedLink> : group.name}</h3>{!group.items.length && <p>此主机暂无可查看的实例。</p>}{group.items.map(instance => {
       const itemStatus = statusStale ? undefined : statuses.find(item => item.id === instance.id);
       return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => { if (selected !== instance.id) discardThen(() => void task(() => load(instance.id))); }}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code>{basename(instance.main)}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
     })}</section>)}<p className="ng-help">{remoteAccess() ? '共享主机' : '本机'}的实例登记与备份保存在 {state.directory}。各实例的配置文件在所属主机的原路径编辑。</p></aside>
-    {current && <div className="ng-detail">
+    {current && (selectedListHost === null || selectedListHost === (current.hostId || '')) && <div className="ng-detail">
       <NginxControlDock active={active} scrollRoot={scrollRoot}>{stuck => <>
         <div className="ng-dock-details" inert={stuck}>
           <div>
@@ -429,7 +438,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
         </div>
       </>}</NginxControlDock>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
-      <div className="feature-toolbar">{readLogs && <><button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button><button className="text-button" onClick={() => openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button></>}<ResourceLink page="nginx" id={current.id} /></div>{readLogs && <MotionPresence kind="panel" present={logsOpen}>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}</MotionPresence>}
+      <div className="feature-toolbar">{readLogs && <button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button>}<button className="text-button" onClick={() => guard('logs', 'nginx') && openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button><ResourceLink page="nginx" id={current.id} /></div>{readLogs && <MotionPresence kind="panel" present={logsOpen}>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}</MotionPresence>}
       <MotionGroup className="ng-file-tabs" role="tablist" aria-label="配置文件">{documents.map(doc => <button key={doc.path}  role="tab" aria-selected={file === doc.path} disabled={busy || pendingFields} onClick={() => { setFile(doc.path); setFieldPending({}); setQuery(''); }}><FileCode2 size={14} /><span>{basename(doc.path)}</span><small>{doc.path === current.main ? '主' : '附属'}{drafts[doc.path] !== doc.content ? ' ●' : ''}</small></button>)}</MotionGroup>
       {file && <><div className="ng-editor-heading"><code title={file}>{file}</code><span className="sr-only" id={editorHelpId}>全文编辑填写完整指令；字段编辑只填参数，Enter或离开字段提交草稿，保存后再检查与重载。附属文件是否生效由include决定。</span><MotionGroup className="ng-actions" role="group" aria-label="配置编辑方式">{content.startsWith('\uFEFF') && <MotionButton busy={busy} className="text-button" disabled={busy || pendingFields || !currentEdit}  onClick={() => changeContent(content.slice(1))}>移除 UTF-8 BOM</MotionButton>}<button className={`text-button ${mode === 'fields' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'fields'} onClick={() => setMode('fields')}>字段配置</button><button className={`text-button ${mode === 'source' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'source'} onClick={() => setMode('source')}>全文编辑</button></MotionGroup></div>
       <fieldset className="ng-editor-fieldset" aria-describedby={editorHelpId} disabled={busy || !currentEdit}>
@@ -438,12 +447,12 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
         </div>
       </fieldset></>}
     </div>}</div>}
-    <MotionPresence kind="dialog" present={!!(instanceForm)}>{instanceForm && <InstanceForm instance={typeof instanceForm === 'string' ? undefined : instanceForm} initialSetup={instanceForm === 'create' ? 'create' : 'existing'} platform={state?.platform || 'win32'} groups={state?.groups} busy={busy} error={error} task={task} close={() => setInstanceForm(null)} create={async (settings, hostId) => {
+    <MotionPresence kind="dialog" present={!!(instanceForm)}>{instanceForm && <InstanceForm active={active} instance={typeof instanceForm === 'string' ? undefined : instanceForm} initialSetup={instanceForm === 'create' ? 'create' : 'existing'} platform={state?.platform || 'win32'} groups={state?.groups} busy={busy} error={error} task={task} close={closeInstanceForm} create={async (settings, hostId) => {
       const result = await nginxRequest<NginxState>('create', { ...settings, hostId, revision: targetGroup(state?.groups, hostId)?.revision ?? state?.revision });
-      setInstanceForm(null); await refresh(result.instances.at(-1)?.id); setNotice('主文件、附属文件和运行目录已创建，可直接编辑，检查后启动。');
+      closeInstanceForm(); await refresh(result.instances.at(-1)?.id); setNotice('主文件、附属文件和运行目录已创建，可直接编辑，检查后启动。');
     }} submit={async (instance, hostId) => {
       const result = await nginxRequest<NginxState>('upsert', { hostId, revision: targetGroup(state?.groups, hostId)?.revision ?? state?.revision, instance });
-      const id = instance.id || result.instances.at(-1)?.id; setInstanceForm(null); await refresh(id);
+      const id = instance.id || result.instances.at(-1)?.id; closeInstanceForm(); await refresh(id);
     }} />}</MotionPresence>
     <MotionPresence kind="dialog" present={!!(snippet)}>{snippet && <Modal title={`添加到 ${snippet.parent?.name || '主层级'}`} close={() => setSnippet(null)}><form onSubmit={event => { event.preventDefault(); try { changeContent(insertNginx(content, snippet.parent, snippet.value)); setSnippet(null); setError(''); } catch (failure) { setError((failure as Error).message); } }}><label>指令或配置块<NginxHelpTip label="新增指令的填写规则" id={snippetHelpId}>这里填写完整语法，例如 <code>include common_proxy.conf;</code>，普通指令以分号结束，配置块使用花括号。当前层级为 {snippet.parent?.name || '主层级'}；http 下可加 server，server 下可加 location，location 内可加 proxy_pass。示例需按实际情况调整；“加入草稿”不写入磁盘，之后还需保存并检查配置。</NginxHelpTip><textarea required rows={10} aria-label="新增 Nginx 指令" aria-describedby={snippetHelpId} value={snippet.value} onChange={event => setSnippet({ ...snippet, value: event.target.value })} /></label>{error && <p className="ng-error" role="alert">{error}</p>}<footer><button className="text-button"  type="button" onClick={() => setSnippet(null)}>取消</button><MotionButton className="run-button"  type="submit">加入草稿</MotionButton></footer></form></Modal>}</MotionPresence>
     <MotionPresence kind="dialog" present={!!(review)}>{review && <Modal title={review.title} close={() => setReview(null)} className="ng-review-modal"><p className="ng-help">草稿对比以当前磁盘为基准；仅扫描已登记实例的实际 include，动态引用或扫描失败会列出提示。保存仍会再次检查文件版本。</p>{review.data.warnings.map((warning, i) => <p key={i} className="ng-warning">{warning}</p>)}{!review.files.length && <p>尚无草稿修改。以下展示当前文件的引用关系。</p>}{review.files.map(item => <section key={item.path}><h3>{item.path}</h3>{item.conflict && <p className="ng-error">文件已被外部修改或当前不可读取，请先合并，不能直接保存。</p>}<ChangePreview before={item.before} after={item.after} /></section>)}<h3>配置引用与影响范围</h3>{review.data.impacts.map(item => <section className="ng-impact" key={item.id}><strong>{item.name}</strong>{item.files.filter(path => !review.files.length || review.files.some(file => file.path === path)).map(path => <div key={path}><button className="text-button" onClick={() => { setReview(null); if (item.id === selected && documents.some(doc => doc.path === path)) { setFile(path); setQuery(''); } else discardThen(() => void task(async () => { const loaded = await load(item.id); if (loaded.files.some(doc => doc.path === path)) setFile(path); else setNotice('引用目标未登记为可编辑文件，请先在实例设置中添加：' + path); })); }}>{path}</button>{item.references.filter(ref => ref.to === path).map((ref, i) => <small key={i}>{ref.context} · {ref.from}:{ref.line}</small>)}</div>)}</section>)}<footer><button className="text-button" onClick={() => void saveText(JSON.stringify(review, null, 2), 'nginx-change-review.json').catch(error => setError(String(error)))}>导出审阅报告</button><button className="secondary-button" onClick={() => setReview(null)}>返回编辑</button></footer></Modal>}</MotionPresence>

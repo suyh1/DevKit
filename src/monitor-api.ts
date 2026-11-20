@@ -1,5 +1,13 @@
 import { remoteRequest } from './workspace-remote';
 export type MonitorSource = { type: 'project'; profileId: string; projectId: string } | { type: 'jar' | 'lan'; id: string };
+export function monitorSourceLink(source: MonitorSource) {
+  if (source.type === 'project') return { page: 'projects' as const, id: `${source.profileId}:${source.projectId}` };
+  return { page: source.type === 'jar' ? 'jar' as const : 'lan-hosts' as const, id: source.id };
+}
+export const monitorSourceKey = (source: MonitorSource) => {
+  const { page, id } = monitorSourceLink(source);
+  return `source:${page}:${id}`;
+};
 export type MonitorConfig = { id: string; name: string; type: 'http' | 'tcp'; url: string; host: string; port: number; status: number; enabled: boolean; interval: number; timeout: number; failures: number; source: MonitorSource | null; maintenance: { start: string; end: string } | null; webhook?: { url: string; down: boolean; up: boolean } | null };
 export type MonitorSample = { at: string; ok: boolean; elapsed: number; detail: string };
 export type Monitor = MonitorConfig & { state: string; detail?: string; checkedAt?: string; executionHost?: string; sourceHost?: string; runRestriction?: string; notification?: { event: 'down' | 'up'; at: string; state: 'pending' | 'failed' | 'sent'; detail: string }; checking: boolean; availability: number | null; average: number | null; sampleCount: number; samples: MonitorSample[]; incidents: { id: string; start: string; end: string | null; detail: string; reason?: string }[] };

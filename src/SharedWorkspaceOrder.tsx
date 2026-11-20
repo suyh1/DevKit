@@ -5,6 +5,7 @@ import {
 import type { CollisionDetection, UniqueIdentifier } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ArrowDown, ArrowUp, GripVertical, X } from 'lucide-react';
+import './shared-navigation.css';
 import { workspaceModules } from './catalog';
 import type { WorkspaceModule, WorkspaceModuleId } from './catalog';
 import { workspaceModuleNav } from './ui';
@@ -43,8 +44,9 @@ function OrderRow({ item, index, count, onMove }: {
   </li>;
 }
 
-export default function SharedWorkspaceOrder({ modules, onClose, onSave }: {
+export default function SharedWorkspaceOrder({ modules, defaultModules = workspaceModules, onClose, onSave }: {
   modules: WorkspaceModule[];
+  defaultModules?: readonly WorkspaceModule[];
   onClose: () => void;
   onSave: (order: WorkspaceModuleId[]) => void;
 }) {
@@ -61,7 +63,7 @@ export default function SharedWorkspaceOrder({ modules, onClose, onSave }: {
   const draggedItem = draft.find(item => item.id === draggedId);
   const DraggedIcon = draggedItem && workspaceModuleNav[draggedItem.id].Icon;
   const changed = draft.some((item, index) => item.id !== modules[index]?.id);
-  const isDefault = draft.every((item, index) => item.id === workspaceModules[index]?.id);
+  const isDefault = draft.every((item, index) => item.id === defaultModules[index]?.id);
 
   useLayoutEffect(() => { dialog.current?.showModal(); }, []);
   useLayoutEffect(() => {
@@ -123,7 +125,7 @@ export default function SharedWorkspaceOrder({ modules, onClose, onSave }: {
     <p className="sr-only" role="status">{announcement}</p>
     <footer className="shared-order-footer">
       <button className="text-button" disabled={isDefault} onClick={() => {
-        setDraft([...workspaceModules]);
+        setDraft([...defaultModules]);
         setAnnouncement('已恢复默认顺序');
         list.current?.scrollTo({ top: 0 });
       }}>恢复默认</button>

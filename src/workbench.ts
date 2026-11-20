@@ -4,7 +4,7 @@ import { defaultOptions, tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { validateGeoOptions } from './geo-config';
 import type { DisplayMode } from './DisplayMode';
-import { workspaceModules } from './catalog';
+import { normalizeSharedModuleOrder, workspaceModules } from './catalog';
 import type { WorkspaceModuleId } from './catalog';
 
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'cancelled';
@@ -27,10 +27,6 @@ export function normalizeToolId(value: unknown): ToolId | undefined {
 }
 export function normalizeFavorites(value: unknown): ToolId[] {
   return Array.isArray(value) ? [...new Set(value.map(normalizeToolId).filter((id): id is ToolId => !!id))] : [];
-}
-function normalizeSharedModuleOrder(value: unknown): WorkspaceModuleId[] {
-  const saved = Array.isArray(value) ? value.filter((id): id is WorkspaceModuleId => defaultSharedModuleOrder.includes(id)) : [];
-  return [...new Set([...saved, ...defaultSharedModuleOrder])];
 }
 export function createTask(toolId: ToolId, indent = '2', input?: string): Task {
   return { id: crypto.randomUUID(), toolId, input: input ?? (['uuid', 'ulid'].includes(toolId) ? '5' : ''), output: '', options: { ...defaultOptions[toolId], ...(['json', 'xml', 'sql', 'code-format'].includes(toolId) ? { indent } : {}) }, error: '', elapsed: null, status: 'idle' };

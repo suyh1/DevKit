@@ -19,6 +19,7 @@ export function Modal({
   children,
   draft,
   busy = false,
+  active = true,
   wide = false,
   savedKey = 0,
   feedback,
@@ -32,6 +33,7 @@ export function Modal({
   children: React.ReactNode;
   draft?: unknown;
   busy?: boolean;
+  active?: boolean;
   wide?: boolean;
   savedKey?: number;
   feedback?: string;
@@ -58,15 +60,18 @@ export function Modal({
     }
   };
   useEffect(() => {
+    const dialog = ref.current;
+    if (!active || !dialog) return;
     const before = document.activeElement;
-    ref.current?.showModal();
+    dialog.showModal();
     const initial = ref.current?.querySelector<HTMLElement>("[data-modal-focus]") ||
       ref.current?.querySelector<HTMLElement>("input:not([type=checkbox]), select");
     initial?.focus();
     return () => {
+      dialog.close();
       if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus();
     };
-  }, []);
+  }, [active]);
   useEffect(() => {
     if (discard)
       ref.current
