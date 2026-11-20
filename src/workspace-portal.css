@@ -12,7 +12,11 @@
 .portal-navigation>button[aria-current=page] { background:var(--tint); color:var(--accent); border-color:var(--line); }
 .portal-navigation>button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .portal-bar .portal-menu-button { display:none; }
-.portal-drawer { padding:18px; margin:0; border:0; border-right:1px solid var(--line); height:100dvh; max-height:100dvh; width:min(280px,calc(100vw - 40px)); max-width:none; background:var(--surface); color:var(--text); }
+.portal-drawer { position:fixed; inset:auto 0 0; padding:0 18px max(18px,env(safe-area-inset-bottom)); margin:0 auto; box-sizing:border-box; border:1px solid var(--line); border-radius:18px 18px 0 0; height:52dvh; max-height:100dvh; width:min(100%,620px); max-width:none; background:var(--surface); color:var(--text); }
+.portal-drawer[open] { display:flex; flex-direction:column; overflow:hidden; }
+.portal-drawer nav { overflow-y:auto; overscroll-behavior:contain; min-height:0; }
+.sheet-handle { flex:none; width:100%; height:36px; display:grid; place-items:center; background:transparent; touch-action:none; cursor:ns-resize; }
+.sheet-handle span { width:38px; height:4px; background:var(--muted); border-radius:999px; }
 .portal-drawer::backdrop { background:#09111f66; }
 .portal-drawer>header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:20px; }
 .portal-drawer>header>button { background:var(--soft); color:var(--text); border:1px solid var(--line); padding:7px; border-radius:6px; }

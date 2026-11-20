@@ -146,6 +146,11 @@ export function flipChildren(
   const after = measureChildren(container);
   // Search changes are immediate and never replay a whole result set.
   if (filtering) return after;
+  // Unit spring sampled over 380 ms (damping ratio .74, angular frequency 22).
+  const entryCurve = typeof CSS !== 'undefined' && CSS.supports('animation-timing-function', 'linear(0, 1)')
+    ? 'linear(0, .17, .473, .734, .904, .993, 1.027, 1.031, 1.023, 1.014, 1.006, 1.002, 1)'
+    : 'cubic-bezier(.2,.85,.3,1.1)';
+  let entering = 0;
   if (!reducedMotion() && container.getClientRects().length)
     for (const [element, rect] of after) {
       const old = visual.get(element) || before.get(element);
@@ -154,10 +159,10 @@ export function flipChildren(
         motion = animate(
           element,
           [
-            { opacity: 0, transform: "translateY(5px) scale(.98)" },
-            { opacity: 1, transform: "none" },
+            { opacity: 0, translate: "0 9px" },
+            { opacity: 1, translate: "0 0" },
           ],
-          { duration: 200 },
+          { duration: 380, delay: Math.min(entering++, 6) * 24, fill: "backwards", easing: entryCurve },
         );
       else if (Math.abs(old.x - rect.x) + Math.abs(old.y - rect.y) > 1)
         motion = animate(

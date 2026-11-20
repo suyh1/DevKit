@@ -101,6 +101,14 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js('document.querySelector(".home-launch").inert'), true);
   assert.equal(await js('document.querySelector(".home-catalog .category-filters, .home-catalog .library-scope")'), null);
   assert.equal(await js('document.querySelectorAll(".tool-card").length'), 46);
+  const firstCard = await js(`(() => {
+    const rect = document.querySelector('.home-catalog .tool-card').getBoundingClientRect();
+    return { x: Math.round(rect.left + rect.width * .7), y: Math.round(rect.top + rect.height * .35) };
+  })()`);
+  window.webContents.sendInputEvent({ type: 'mouseMove', ...firstCard });
+  await wait('!!document.querySelector(".tool-card[data-lit]")');
+  window.webContents.sendInputEvent({ type: 'mouseMove', x: 1, y: 1 });
+  await wait('!document.querySelector(".tool-card[data-lit]")');
   await fs.writeFile(path.join(output, 'design-library-light.png'), (await window.webContents.capturePage()).toPNG());
   await settle();
   await wheel(320);
@@ -144,6 +152,7 @@ module.exports = async function designSmoke(window, output) {
   await js('document.querySelector(".top-search").click()');
   await wait('!!document.querySelector(".command-dialog[open] input")');
   assert.equal(await js('document.activeElement.matches(".command-dialog input")'), true);
+  assert.equal(await js('document.querySelector(".command-dialog").hasAttribute("data-capsule")'), true);
   window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
   window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
   await wait('!document.querySelector(".command-dialog[open]")');
@@ -194,8 +203,14 @@ module.exports = async function designSmoke(window, output) {
   await wait('!!document.querySelector(".overview-workspace:not([hidden])")');
   await js('document.querySelector(".overview-library-entry").click()');
   await wait(atLibrary);
-  await js('[...document.querySelectorAll(".tool-card-open")].find(button => button.textContent.startsWith("调色板与色阶")).click()');
+  const expanding = await js(`(() => {
+    const button = [...document.querySelectorAll(".tool-card-open")].find(item => item.textContent.startsWith("调色板与色阶"));
+    button.click();
+    return getComputedStyle(button.closest('.tool-card')).viewTransitionName;
+  })()`);
+  assert.equal(expanding, 'tool-detail');
   await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "调色板与色阶"');
+  await wait('!document.documentElement.hasAttribute("data-expanding-card")');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   for (const name of ['日志中心', '监控中心', 'HTTP 调试', 'Nginx 配置', 'JAR 管理', '局域网主机', '项目中心']) {

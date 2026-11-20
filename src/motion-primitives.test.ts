@@ -11,6 +11,7 @@ import {
 } from "./motion-primitives";
 import { MotionButton, MotionPresence } from "./Motion";
 import SegmentedControl from "./SegmentedControl";
+import { expandedOnRelease, resistedHeight } from "./NavigationSheet";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -46,6 +47,19 @@ function frames() {
 }
 
 describe("motion lifecycle and real outcomes", () => {
+  it("selects opposite sheet anchors for opposite flicks from the same height", () => {
+    expect(expandedOnRelease(480, 0, 400, 700)).toBe(false);
+    expect(expandedOnRelease(480, 0.8, 400, 700)).toBe(true);
+    expect(expandedOnRelease(590, 0, 400, 700)).toBe(true);
+    expect(expandedOnRelease(590, -0.8, 400, 700)).toBe(false);
+  });
+  it("tracks the handle between anchors and resists overdrag in both directions", () => {
+    expect(resistedHeight(500, 400, 700)).toBe(500);
+    expect(resistedHeight(800, 400, 700)).toBeGreaterThan(700);
+    expect(resistedHeight(800, 400, 700)).toBeLessThan(750);
+    expect(resistedHeight(300, 400, 700)).toBeLessThan(400);
+    expect(resistedHeight(300, 400, 700)).toBeGreaterThan(350);
+  });
   it("retargets a spring continuously, settles exactly and cancels its frame on disposal", () => {
     const clock = frames(),
       spring = createSpring(0),

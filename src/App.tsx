@@ -217,7 +217,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       <div className="breadcrumb"><button className="icon-button" aria-label={collapsed ? '展开导航' : '收起导航'} onClick={() => setCollapsed(current => !current)}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button><button onClick={() => navigate('home')}>工作台</button><span>/</span><strong>{workspaceModules.find(item => item.id === page)?.name || (page === 'task' ? currentTool?.category : page === 'settings' ? '偏好设置' : page === 'favorites' ? '我的收藏' : page === 'recent' ? '最近使用' : '总览')}</strong></div>
       {collapsed && !narrow && <SharedWorkspaceNavigation page={page} onChoose={navigate} modules={sharedModules} onEditOrder={setSharedOrderSource} />}
       <div className="top-actions">
-        <button className="top-search secondary-button" aria-label="打开工具搜索" onClick={() => setSearchOpen(true)}><Search size={16} /><span>搜索</span><kbd>Ctrl K</kbd></button>
+        <button data-search-capsule className="top-search secondary-button" aria-label="打开工具搜索" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /><span>搜索</span><kbd>Ctrl K</kbd></button>
         <button className="text-button" onClick={() => workspaceFile.current?.click()} aria-label="恢复工作区" title="恢复工作区"><FolderOpen size={16} /><span>恢复</span></button>
         <button className="text-button" disabled={!tasks.some(task => !isColorTool(task.toolId))} onClick={() => { setIncludeSensitive(false); setSaveOpen(true); }} aria-label="保存工作区" title="保存工作区"><Save size={16} /><span>保存工作区</span></button>
         <SharingButton global />

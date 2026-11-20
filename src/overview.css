@@ -225,3 +225,53 @@
 @media (prefers-reduced-motion: reduce) {
   .overview-deck { transition: none; }
 }
+
+@property --card-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes card-rim { to { --card-angle: 360deg; } }
+@keyframes card-backlight {
+  from { box-shadow: 0 5px 10px -6px color-mix(in srgb, var(--category-color) 28%, transparent); }
+  to { box-shadow: 0 9px 19px -6px color-mix(in srgb, var(--category-color) 45%, transparent); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-display-mode=performance]) .tool-grid:not(.tool-list) > .tool-card {
+    position: relative;
+    transform: perspective(780px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    transition: transform 430ms var(--press-spring), border-color 160ms;
+  }
+  :root:not([data-display-mode=performance]) .tool-grid > .tool-card[data-lit] {
+    transition-duration: 85ms;
+    animation: card-backlight 1.8s ease-in-out infinite alternate;
+  }
+  .tool-card[data-lit]::before, .tool-card[data-lit]::after {
+    content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit;
+  }
+  .tool-card[data-lit]::before {
+    background:
+      radial-gradient(ellipse at var(--light-x) var(--light-y), #ffffff35, transparent 58%),
+      radial-gradient(ellipse 16% 85% at calc(100% - var(--light-x)) calc(100% - var(--light-y)), #ffffff21, transparent);
+  }
+  .tool-card[data-lit]::after {
+    padding: 1px;
+    background: conic-gradient(from var(--card-angle), transparent 12%, var(--category-color), transparent 55%, var(--category-color), transparent);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: card-rim 2.8s linear infinite;
+  }
+}
+:root[data-display-mode=performance] .tool-card[data-lit]::before,
+:root[data-display-mode=performance] .tool-card[data-lit]::after { content: none; }
+
+:root[data-expanding-card] .task-pane:not([hidden]) { view-transition-name: tool-detail; }
+:root[data-expanding-card] .workspace[data-motion-page] { transition: none; }
+::view-transition-group(tool-detail) { animation-duration: 380ms; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+::view-transition-image-pair(tool-detail) { overflow: clip; border-radius: 12px; }
+::view-transition-old(tool-detail), ::view-transition-new(tool-detail) { height: 100%; object-fit: cover; object-position: top left; }
+@keyframes card-background-away { to { opacity: 0; transform: scale(.985); } }
+:root[data-expanding-card]::view-transition-old(root) { animation: card-background-away 320ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 0s !important; }
+}

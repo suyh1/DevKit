@@ -1,5 +1,6 @@
 import { MotionReveal, MotionGroup } from './Motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { animate, reducedMotion } from './motion-primitives';
 import { Search, ArrowUp, ArrowDown, CornerDownLeft, X, SearchX } from 'lucide-react';
 import type { ToolId } from './tools';
 import { toolIcons, categoryMeta } from './ui';
@@ -26,10 +27,29 @@ export default function CommandPalette({ open, onClose, onChoose, favorites = []
   const pasted = hashAt >= 0 ? parseWorkspaceLink(query.slice(hashAt).trim()) : undefined;
   const shared = pasted && pages.includes(pasted.page) ? [{ ...pasted, label: '打开资源链接', detail: pasted.page }] : resources.filter(item => (query || !item.id) && terms.every(term => `${item.label} ${item.detail} ${item.page}`.toLowerCase().includes(term))).slice(0, 70);
   const total = matches.length + shared.length;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
-    if (open) { setQuery(''); setIndex(0); if (element && !element.open) element.showModal(); input.current?.focus(); }
-    else if (element?.open) element.close();
+    if (!element) return;
+    if (!open) { if (element.open) element.close(); return; }
+    setQuery(''); setIndex(0);
+    const trigger = document.activeElement;
+    const origin = trigger?.matches('[data-search-capsule]') && !reducedMotion() ? trigger.getBoundingClientRect() : null;
+    element.toggleAttribute('data-capsule', !!origin);
+    if (!element.open) element.showModal();
+    input.current?.focus();
+    if (!origin) return;
+    const panel = element.getBoundingClientRect();
+    const dx = origin.left + origin.width / 2 - panel.left - panel.width / 2;
+    const dy = origin.top + origin.height / 2 - panel.top - panel.height / 2;
+    // Clip the full-size panel so the type inside never stretches.
+    const clip = `inset(calc(50% - ${origin.height / 2}px) calc(50% - ${origin.width / 2}px) round ${origin.height / 2}px)`;
+    element.style.setProperty('--capsule-clip', clip);
+    element.style.setProperty('--capsule-offset', `${dx}px ${dy}px`);
+    const motion = animate(element, [
+      { clipPath: clip, translate: `${dx}px ${dy}px` },
+      { clipPath: `inset(0px round ${getComputedStyle(element).borderRadius})`, translate: '0px 0px' },
+    ], { duration: 360, easing: 'cubic-bezier(.22,.82,.23,1)' });
+    return () => motion?.cancel();
   }, [open]);
   useEffect(() => { if (dialog.current?.open) results.current?.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' }); }, [index, query]);
   function choose(position: number, fresh = false) {

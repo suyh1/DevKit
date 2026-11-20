@@ -657,6 +657,7 @@ export function useMotionList(
   ref: RefObject<HTMLElement | null>,
   signature: unknown,
   filtering = false,
+  animateEntry?: boolean,
 ) {
   const performanceMode = usePerformanceMode();
   const previous = useRef<LayoutSnapshot>(new Map()),
@@ -664,7 +665,7 @@ export function useMotionList(
     pending = useRef(new Map<Animation, HTMLElement | undefined>());
   useLayoutEffect(() => {
     const element = ref.current;
-    if (performanceMode || !element) {
+    if (performanceMode || !element || animateEntry === false) {
       previous.current.clear();
       initialized.current = false;
       return;
@@ -672,7 +673,7 @@ export function useMotionList(
     previous.current = flipChildren(
       element,
       previous.current,
-      filtering || !initialized.current,
+      filtering || (!initialized.current && !animateEntry),
       (animation, ghost) => {
         pending.current.set(animation, ghost);
         animation.finished.then(
@@ -682,7 +683,7 @@ export function useMotionList(
       },
     );
     initialized.current = true;
-  }, [ref, signature, filtering, performanceMode]);
+  }, [ref, signature, filtering, performanceMode, animateEntry]);
   useEffect(
     () => () => {
       for (const [animation, ghost] of pending.current) {

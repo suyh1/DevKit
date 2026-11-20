@@ -32,6 +32,14 @@ module.exports = async (window, output) => {
     healthy = true; await ipc('check', { id }); state = await ipc('get'); assert.equal(state.monitors[0].state, 'up'); assert.ok(state.monitors[0].incidents[0].end);
     await openWorkspace('监控中心'); await click('刷新'); await wait(window.webContents, `document.querySelector('.monitor-card .monitor-status')?.textContent==='正常'`);
     await wait(window.webContents, `document.querySelector('.shared-sidebar-trigger small')?.textContent==='监控中心'`);
+    await js("document.querySelector('.monitor-chart input').focus()");
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Home' });
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Home' });
+    await wait(window.webContents, `document.querySelector('.monitor-chart input').value==='0'`);
+    assert.equal(await js("document.querySelector('.monitor-chart time').dateTime"), state.monitors[0].samples[0].at);
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'End' });
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'End' });
+    await wait(window.webContents, `document.querySelector('.monitor-chart input').value===document.querySelector('.monitor-chart input').max`);
     await new Promise(resolve => setTimeout(resolve, 550));
     await fs.writeFile(path.join(output, 'monitor-desktop.png'), (await window.webContents.capturePage()).toPNG());
     await js(`document.querySelector('.monitor-card button[aria-label="编辑 共享健康检测"]').click()`); await fill('监控名称', '未保存修改'); await click('取消');
@@ -56,7 +64,23 @@ module.exports = async (window, output) => {
       assert.equal(await remote.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.monitor-center').scrollWidth<=document.querySelector('.monitor-center').clientWidth`), true, 'Monitor page fits width ' + width);
       remote.show(); remote.focus(); await fs.writeFile(path.join(output, `monitor-shared-${width}.png`), (await remote.webContents.capturePage()).toPNG());
     }
+    await remote.webContents.executeJavaScript(`document.querySelector('.portal-menu-button').click()`);
+    await wait(remote.webContents, `!!document.querySelector('.portal-drawer[open]')`);
+    remote.webContents.debugger.attach('1.3');
+    try {
+      const debug = remote.webContents.debugger;
+      await debug.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+      const point = await remote.webContents.executeJavaScript(`(() => { const r = document.querySelector('.sheet-handle').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      await debug.sendCommand('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await debug.sendCommand('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x, y: 50 }] });
+      await debug.sendCommand('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await wait(remote.webContents, `document.querySelector('.sheet-handle').getAttribute('aria-expanded')==='true' && Math.abs(document.querySelector('.portal-drawer').offsetHeight - innerHeight * .89)<2`);
+    } finally {
+      await remote.webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: false });
+      remote.webContents.debugger.detach();
+    }
     remote.setContentSize(1440, 900);
+    await wait(remote.webContents, `!document.querySelector('.portal-drawer[open]')`);
     for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) for (const theme of ['light', 'dark']) {
       await remote.webContents.executeJavaScript(`document.documentElement.dataset.themeStyle=${JSON.stringify(style)};document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
       assert.equal(await remote.webContents.executeJavaScript(`document.querySelector('.monitor-center').scrollWidth<=document.querySelector('.monitor-center').clientWidth`), true, style + '/' + theme);

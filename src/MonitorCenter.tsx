@@ -9,6 +9,7 @@ import { Modal, ModalCancel, Field } from './project-components';
 import { MotionButton, MotionPresence } from './Motion';
 import { SharingButton } from './Sharing';
 import { usePerformanceMode } from './DisplayMode';
+import { createSpring } from './motion-primitives';
 import './monitor.css';
 import { CreateRelated, RelatedLink, useWorkspaceGuard } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
@@ -113,7 +114,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
       </article>)}</div>
       {current && <aside className="monitor-detail"><div className="monitor-detail-heading"><h2>{current.name}</h2><span className={`monitor-status ${current.state}`}>{labels[current.state]}</span></div><p>{current.detail || '启用后将由主机自动检测。'}</p><dl><div><dt>最近检测</dt><dd>{time(current.checkedAt)}</dd></div><div><dt>24 小时已保存样本</dt><dd>{current.sampleCount} 次</dd></div><div><dt>故障确认</dt><dd>连续失败 {current.failures} 次</dd></div><div><dt>超时</dt><dd>{current.timeout} 秒</dd></div></dl>{operate && (current.runRestriction ? <p>{current.runRestriction}</p> : <button className="secondary-button" disabled={busy || current.checking || !current.enabled || current.state === 'maintenance'} onClick={() => void action('check', { id: current.id })}><RefreshCw size={14} />立即检测</button>)}
         {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}{current.source && <RelatedLink {...monitorSourceLink(current.source)}>{current.source.type === 'project' ? '查看来源项目' : current.source.type === 'jar' ? '查看来源 JAR' : '查看来源主机'}</RelatedLink>}<ResourceLink page="monitor" id={current.id} />
-        <h3>响应耗时</h3>{current.samples.length ? <Latency monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
+        <h3>响应耗时</h3>{current.samples.length ? <Latency key={current.id} monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
         <h3>事件时间线</h3>
         {timeline.length ? <ol className="monitor-incidents">{timeline.map(item => <li key={item.key}>
           <span className={`monitor-status ${item.state}`}>{item.label}</span>
@@ -151,7 +152,44 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
 }
 
 function Latency({ monitor }: { monitor: Monitor }) {
-  const samples = monitor.samples.slice(-60), max = Math.max(1, ...samples.map(item => item.elapsed));
-  const points = samples.map((item, index) => `${8 + index / Math.max(1, samples.length - 1) * 284},${76 - item.elapsed / max * 64}`);
-  return <figure className="monitor-chart"><svg viewBox="0 0 300 88" role="img" aria-label={`最近 ${samples.length} 次检测耗时，最高 ${max} 毫秒`}><path d="M8 76H292" stroke="var(--line)" /><polyline points={points.join(' ')} fill="none" stroke="var(--accent)" strokeWidth="2" />{samples.map((item, index) => <circle key={index} cx={8 + index / Math.max(1, samples.length - 1) * 284} cy={76 - item.elapsed / max * 64} r="2" fill={item.ok ? 'var(--accent)' : 'var(--danger, #d66a77)'}><title>{time(item.at)} · {item.elapsed} ms</title></circle>)}</svg><figcaption>最近 {samples.length} 次 · 最高 {max} ms</figcaption></figure>;
+  const samples = monitor.samples.slice(-60);
+  const last = samples.length - 1;
+  const [selectedAt, select] = useState<string | null>(null);
+  const selected = samples.findIndex(item => item.at === selectedAt);
+  const index = selected < 0 ? last : selected;
+  const sample = samples[index];
+  const max = Math.max(...samples.map(item => item.elapsed));
+  const x = (i: number) => 8 + i / Math.max(1, last) * 284;
+  const y = (elapsed: number) => 76 - elapsed / Math.max(1, max) * 64;
+  return <figure className="monitor-chart">
+    <div className="monitor-chart-reading"><strong><RollingMilliseconds value={sample.elapsed} /> ms</strong><time dateTime={sample.at}>{time(sample.at)}</time></div>
+    <div className="monitor-chart-plot"><svg viewBox="0 0 300 88" role="img" aria-label={`最近 ${samples.length} 次检测耗时，最高 ${max} 毫秒`}>
+      <path d="M8 76H292" stroke="var(--line)" />
+      <polyline points={samples.map((item, i) => `${x(i)},${y(item.elapsed)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth="2" />
+      <path d={`M${x(index)} 5V78`} stroke="var(--muted)" strokeDasharray="2 3" />
+      {samples.map((item, i) => <circle key={i} cx={x(i)} cy={y(item.elapsed)} r={i === index ? 4 : 2} fill={item.ok ? 'var(--accent)' : 'var(--danger, #d66a77)'}><title>{time(item.at)} · {item.elapsed} ms</title></circle>)}
+    </svg>{last > 0 && <input type="range" min={0} max={last} step={1} value={index} aria-label="选择检测样本" aria-valuetext={`${time(sample.at)}，${sample.elapsed} 毫秒`}
+      onChange={event => { const i = event.currentTarget.valueAsNumber; select(i === last ? null : samples[i].at); }} />}</div>
+    <figcaption>最近 {samples.length} 次 · 最高 {max} ms</figcaption>
+  </figure>;
+}
+
+function RollingMilliseconds({ value }: { value: number }) {
+  const [spring] = useState(() => createSpring(value, { stiffness: 370, damping: 38 }));
+  const [reading, setReading] = useState(value);
+  useEffect(() => {
+    spring.subscribe(next => setReading(next));
+    return () => spring.stop();
+  }, [spring]);
+  useEffect(() => spring.set(value), [spring, value]);
+  const whole = Math.floor(Math.max(0, reading));
+  const digits = String(whole);
+  return <><span className="sr-only">{value}</span><span className="monitor-odometer" aria-hidden="true">
+    {Array.from(digits, (char, i) => {
+      const place = 10 ** (digits.length - i - 1);
+      // Carry the next wheel only as the lower places roll through their last unit.
+      const fraction = Math.max(0, reading % place - (place - 1));
+      return <span className="monitor-digit" key={place}><span style={{ transform: `translateY(-${fraction}em)` }}>{char}<br />{(Number(char) + 1) % 10}</span></span>;
+    })}
+  </span></>;
 }

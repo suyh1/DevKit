@@ -13,6 +13,7 @@ import { normalizeSharedModuleOrder, workspaceModules } from './catalog';
 import { WorkspaceFeedback } from './related-workspaces';
 import SharedWorkspaceOrder from './SharedWorkspaceOrder';
 import CommandPalette from './CommandPalette';
+import NavigationSheet from './NavigationSheet';
 import { openWorkspaceLink, parseWorkspaceLink, workspaceHash } from './workspace-links';
 import ProjectCenter from "./ProjectCenter";
 import { CollaborationPage } from './CollaborationPage';
@@ -234,11 +235,6 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   const orderedModules = order.map(id => modules.find(module => module.id === id)!);
   const [orderTrigger, setOrderTrigger] = useState<HTMLButtonElement | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const drawer = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (drawerOpen) drawer.current?.showModal();
-    else if (drawer.current?.open) drawer.current.close();
-  }, [drawerOpen]);
   useEffect(() => {
     const desktop = matchMedia('(min-width:781px)'), resize = () => { if (desktop.matches) setDrawerOpen(false); };
     desktop.addEventListener('change', resize); return () => desktop.removeEventListener('change', resize);
@@ -515,7 +511,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         {session?.authenticated && <button className="portal-menu-button secondary-button" aria-label="打开共享导航" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={18} /></button>}
         <div className="portal-current"><strong>{session?.authenticated ? modules.find(item => item.id === page)?.name || '共享工作台' : 'DevKit 共享工作台'}</strong>{session?.authenticated && <small><span title={summary}>{summary}</span>{session.visitor && <span title={session.visitor}>{session.visitor}</span>}</small>}</div>
         <div className="portal-account">
-          {session?.authenticated && <button className="secondary-button" aria-label="搜索共享资源" onClick={() => setSearchOpen(true)}><Search size={16} /></button>}
+          {session?.authenticated && <button data-search-capsule className="secondary-button" aria-label="搜索共享资源" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /></button>}
           <PortalTheme mode={mode} setMode={setMode} />
           {session?.authenticated && (
             <button
@@ -531,7 +527,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       {session?.authenticated && <CommandPalette key={workspaceEpoch} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
       {session?.authenticated && <>
         <aside className="portal-sidebar"><div className="portal-nav-heading"><span className="portal-nav-caption">共享工作台</span>{sortAction}</div><PortalNavigation modules={available} page={page} navigate={navigate} /><p>共享主机 <strong>{location.host}</strong></p></aside>
-        <dialog className="portal-drawer" ref={drawer} aria-label="共享导航" onCancel={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)}><header><strong>共享工作台</strong>{sortAction}<button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></dialog>
+        <NavigationSheet open={drawerOpen} close={() => setDrawerOpen(false)}><header><strong>共享工作台</strong>{sortAction}<button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></NavigationSheet>
         {orderTrigger && <SharedWorkspaceOrder modules={available} defaultModules={modules.filter(item => services[item.id].enabled)}
           onClose={() => { setOrderTrigger(null); orderTrigger.focus(); }}
           onSave={sorted => {

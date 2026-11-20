@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
 import { ArrowUp, ArrowUpRight, ChevronDown, Clock3, LayoutGrid, List, Plus, Search, SearchX, Star } from 'lucide-react';
 import { MotionGroup, useMotionList } from './Motion';
+import { expandToolCard, useCardLight } from './tool-card-motion';
 import SegmentedControl from './SegmentedControl';
 import SmartOpen from './SmartOpen';
 import { searchTools } from './discovery';
@@ -40,7 +41,9 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
   const visible = searchTools(query, favorites, recent).filter(tool =>
     (!scopeIds || scopeIds.includes(tool.id)) && (category === '全部' || tool.category === category));
   const grid = useRef<HTMLDivElement>(null);
-  useMotionList(grid, visible.map(tool => tool.id).join('|') + library, !!query);
+  const libraryVisible = !home || catalogOpen;
+  useCardLight(grid, libraryVisible && library === 'grid');
+  useMotionList(grid, visible.map(tool => tool.id).join('|') + library, !!query, libraryVisible);
 
   const viewport = useRef<HTMLDivElement>(null);
   const launchPane = useRef<HTMLElement>(null);
@@ -169,7 +172,7 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
         const meta = categoryMeta[tool.category];
         const favorite = favorites.includes(tool.id);
         return <article className={`tool-card category-${meta.key}`} key={tool.id} data-motion-key={tool.id}>
-          <button type="button" className="tool-card-open" onClick={() => onChoose(tool.id)}>
+          <button type="button" className="tool-card-open" onClick={event => expandToolCard(event.currentTarget.closest('article')!, () => onChoose(tool.id))}>
             <div className="tool-card-top"><span className="tool-icon"><Icon size={21} aria-hidden="true" /></span><ArrowUpRight className="card-arrow" size={16} aria-hidden="true" /></div>
             <div className="tool-card-copy">
               <div className="tool-card-title"><h3>{tool.name}</h3><span className="card-english">{tool.english}</span></div>
