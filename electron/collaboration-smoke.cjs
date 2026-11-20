@@ -313,6 +313,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await click(desktop, '.transfer-link-settings ', '保存端口');
     await wait(desktop, '!!document.querySelector(".transfer-port-links code")');
     const quick = await desktop('document.querySelector(".transfer-port-links code").textContent');
+    assert.equal(quick, new URL(quick).origin, 'Only the LAN address and listening port are needed');
     await click(desktop, '.transfer-port-links ', '复制链接');
     await wait(desktop, 'document.querySelector(".transfer-link-settings").innerText.includes("已复制快速链接")');
     assert.equal(await clipboard.readText(), quick);

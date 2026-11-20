@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react';
 import { collab, useOperation } from './collab-api';
 import { copyText } from './motion-primitives';
 
-type Link = { port: number; addresses: string[]; error?: string };
+type Link = { port: number; short: boolean; addresses: string[]; error?: string };
 
 export function TransferLinkSettings() {
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<Link[]>();
   const [ports, setPorts] = useState('');
+  const [shorten, setShorten] = useState<number[]>([]);
   const [loadError, setLoadError] = useState('');
   const op = useOperation();
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoadError('');
+    setShorten([]);
     setLinks(undefined);
     collab<Link[]>('transfer', 'links-get').then(
       (result) => {
@@ -35,7 +37,7 @@ export function TransferLinkSettings() {
       <summary>快速链接设置</summary>
       {open && (
         <div>
-          <p>持有链接的人可直接进入这个收件箱收发内容。已设取件密码的内容仍需凭密码领取。</p>
+          <p>新端口只需告诉对方局域网 IP 和端口，例如 192.168.1.20:8780。能连到该端口的人可直接收发同一收件箱的内容，无需共享口令或访客账号。已设取件密码的内容仍需凭密码领取。</p>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -43,8 +45,12 @@ export function TransferLinkSettings() {
                 const values = ports.trim() ? ports.trim().split(/[，,、\s]+/u) : [];
                 if (values.some((value) => !/^\d+$/.test(value)))
                   throw new Error('请输入端口数字，多个端口用逗号分隔。');
-                const result = await collab<Link[]>('transfer', 'links-save', values.map(Number));
+                const selected = values.map(Number);
+                const result = await collab<Link[]>('transfer', 'links-save', {
+                  ports: selected, shorten: shorten.filter(port => selected.includes(port)),
+                });
                 setLinks(result);
+                setShorten([]);
                 setPorts(result.map((link) => link.port).join(', '));
                 return result.length ? '快速链接已生效' : '已关闭全部快速链接';
               });
@@ -60,6 +66,16 @@ export function TransferLinkSettings() {
               />
               <small>多个端口用逗号分隔。移除端口并保存即可关闭对应链接。</small>
             </label>
+            {links?.filter(link => !link.short).map(link => (
+              <label key={link.port}>
+                <input type="checkbox" disabled={op.busy} checked={shorten.includes(link.port)}
+                  onChange={event => {
+                    const checked = event.target.checked;
+                    setShorten(current => checked ? [...current, link.port] : current.filter(port => port !== link.port));
+                  }} />
+                为旧端口 {link.port} 开启短地址（原长链接仍可用）
+              </label>
+            ))}
             <button type="submit" disabled={!links || op.busy}>
               保存端口
             </button>
@@ -75,6 +91,7 @@ export function TransferLinkSettings() {
                 <div key={address}>
                   <code>{address}</code>
                   <button
+                    type="button"
                     disabled={op.busy}
                     onClick={() =>
                       void op.run(async () => {

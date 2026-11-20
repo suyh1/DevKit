@@ -257,7 +257,7 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   assert.deepEqual(links.status(), []);
   const sockets = await Promise.all(Array.from({ length: 4 }, async () => {
     const socket = net.createServer();
-    await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
+    await new Promise(resolve => socket.listen(0, '0.0.0.0', resolve));
     return socket;
   }));
   const ports = sockets.map(socket => socket.address().port);
@@ -265,8 +265,12 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   t.after(() => new Promise(resolve => busy.close(resolve)));
   await Promise.all(sockets.map(socket => new Promise(resolve => socket.close(resolve))));
   const [portA, portB, unused, occupied] = ports;
+  await links.close();
+  // Model a pre-upgrade installation. Saving another port must preserve its existing access mode.
+  await writeFile(path.join(directory, 'transfer-links.json'), JSON.stringify([{ port: portB, token: randomBytes(24).toString('hex') }]));
+  links = await createTransferLinks(directory, dist, store);
   for (const invalid of [[0], [65536], [1.5], [portA, portA]]) await assert.rejects(links.save(invalid), { status: 400 });
-  const configured = await links.save([portA, portB]);
+  const configured = await links.save({ ports: [portA, portB], shorten: [] });
   const [a, b] = configured.map(link => {
     const url = new URL(link.addresses[0]);
     url.hostname = '127.0.0.1';
@@ -278,6 +282,9 @@ test('quick links isolate ports and clients while serving the desktop inbox with
     return page.headers.get('set-cookie').split(';')[0];
   };
   const alice = await client(a), bob = await client(b), eve = await client(a);
+  assert.equal(configured[0].addresses[0], new URL(configured[0].addresses[0]).origin);
+  assert.equal(a.pathname, '/');
+  assert.match(b.pathname, /^\/t\/[a-f0-9]{48}\/$/);
   const post = (url, cookie, action, input = {}, origin = url.origin) => fetch(new URL('api/transfer/' + action, url), {
     method: 'POST', headers: { cookie, origin, 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   });
@@ -288,7 +295,7 @@ test('quick links isolate ports and clients while serving the desktop inbox with
     return data;
   };
   assert.equal((await fetch(new URL('transfer.js', a))).status, 200);
-  for (const route of ['/', '/api/sharing/session', 'portal.html', 'api/projects/state', 'api/whiteboard/list'])
+  for (const route of ['/api/sharing/session', 'portal.html', 'api/projects/state', 'api/whiteboard/list'])
     assert.equal((await fetch(new URL(route, a), { headers: { cookie: alice } })).status, 404);
   assert.equal((await fetch(new URL(a.pathname, b.origin))).status, 404);
   assert.equal((await post(a, '', 'list')).status, 401);
@@ -304,19 +311,30 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   assert.equal((await post(b, bob, 'remove', direct)).status, 403);
   assert.equal((await post(a, alice, 'remove', direct)).status, 200);
   for (const action of ['links-save', 'links-get', 'sweep']) assert.equal((await post(a, alice, action)).status, 404);
-  await assert.rejects(links.save([portB, unused, occupied]), /已被占用/);
+  await assert.rejects(links.save({ ports: [portB, unused, occupied], shorten: [portB] }), /已被占用/);
   assert.deepEqual(links.status(), configured);
+  assert.equal((await fetch(b.origin)).status, 404);
   await assert.rejects(fetch('http://127.0.0.1:' + unused));
   assert.equal((await ok(a, alice, 'list')).length, 1);
   await links.close();
   links = await createTransferLinks(directory, dist, store);
   assert.deepEqual(links.status(), configured);
   assert.equal((await ok(b, await client(b), 'list'))[0].id, id);
+  await links.save({ ports: [portA, portB], shorten: [portB] });
+  assert.equal(links.status()[1].short, true);
+  assert.equal((await ok(new URL(b.origin), await client(b.origin), 'list'))[0].id, id);
+  assert.equal((await ok(b, bob, 'list'))[0].id, id);
+  await links.close();
+  links = await createTransferLinks(directory, dist, store);
+  assert.equal((await fetch(b.origin)).status, 200);
+  assert.equal((await fetch(b)).status, 200);
   await links.save([portB]);
   await assert.rejects(fetch(a));
-  await links.save([portA, portB]);
-  assert.equal((await fetch(a)).status, 404);
-  assert.equal(await (await fetch(b)).text(), 'quick page');
+  await links.save([portA]);
+  assert.equal(await (await fetch(a)).text(), 'quick page');
+  await links.save([portB]);
+  assert.equal((await fetch(b)).status, 404);
+  assert.equal((await fetch(b.origin)).status, 200);
   await links.save([]);
   await assert.rejects(fetch(b));
 });

@@ -30,7 +30,7 @@ const linkPath = (token) => '/t/' + token + '/';
 
 async function openLink({ port, token }, dist, manager, active) {
   const assets = await browserAssets(dist, page);
-  const base = linkPath(token);
+  const legacyBase = token && linkPath(token);
   const scope = 'quick:' + randomUUID() + ':';
   const abort = new AbortController();
   const authorize = () => {
@@ -52,16 +52,21 @@ async function openLink({ port, token }, dist, manager, active) {
       if (!['localhost', ...localAddresses()].some((ip) => host === ip + ':' + port || (port === 80 && host === ip)))
         fail(403, '请使用主机提供的快速链接。');
       const url = new URL(request.url, 'http://' + host);
-      if (url.origin !== new URL('http://' + host).origin || !url.pathname.startsWith(base))
+      const base = legacyBase && url.pathname.startsWith(legacyBase) ? legacyBase : active()?.short ? '/' : undefined;
+      if (url.origin !== new URL('http://' + host).origin || !base)
         fail(404, '快速链接无效。');
       const route = url.pathname.slice(base.length);
-      const client = /(?:^|;\s*)devkit_transfer_client=([a-f0-9]{48})(?:;|$)/.exec(request.headers.cookie || '')?.[1];
+      // Preserve existing path-scoped sessions. Browsers share root-path cookies across ports.
+      const cookieName = base === '/' ? 'devkit_transfer_client_' + port : 'devkit_transfer_client';
+      const client = (request.headers.cookie || '').split(';').map(part => part.trim())
+        .find(part => part.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
+      const hasClient = /^[a-f0-9]{48}$/.test(client || '');
       if (request.method === 'GET' || request.method === 'HEAD') {
         if (route === '') {
-          if (!client)
+          if (!hasClient)
             response.setHeader(
               'Set-Cookie',
-              'devkit_transfer_client=' + randomBytes(24).toString('hex') + '; HttpOnly; SameSite=Strict; Path=' + base,
+              cookieName + '=' + randomBytes(24).toString('hex') + '; HttpOnly; SameSite=Strict; Path=' + base,
             );
           return await serveAsset(dist, page, request, response);
         }
@@ -70,7 +75,7 @@ async function openLink({ port, token }, dist, manager, active) {
       const download = /^api\/transfer\/download\/([a-f0-9-]{36})$/.exec(route);
       const action = /^api\/transfer\/([a-z]+)$/.exec(route)?.[1];
       if (!download && !operations.has(action)) fail(404, '快传接口不存在。');
-      if (!client) fail(401, '请重新打开快速链接。');
+      if (!hasClient) fail(401, '请重新打开快速链接。');
       const access = {
         owner: scope + client,
         attemptKey: 'quick:' + request.socket.remoteAddress,
@@ -117,13 +122,15 @@ export async function createTransferLinks(directory, dist, manager) {
   }
   if (
     !Array.isArray(links) ||
-    links.some((link) => !validPort(link?.port) || !/^[a-f0-9]{48}$/.test(link.token)) ||
+    links.some((link) => !validPort(link?.port)
+      || (link.short !== undefined && link.short !== true)
+      || (link.token === undefined ? !link.short : !/^[a-f0-9]{48}$/.test(link.token))) ||
     new Set(links.map((link) => link.port)).size !== links.length
   )
     throw new Error('快速链接配置无效。');
   const running = new Map(),
     errors = new Map();
-  const open = (link) => openLink(link, dist, manager, () => running.get(link.port)?.token === link.token);
+  const open = (link) => openLink(link, dist, manager, () => running.get(link.port));
   for (const link of links) {
     try {
       running.set(link.port, { ...link, close: await open(link) });
@@ -134,21 +141,29 @@ export async function createTransferLinks(directory, dist, manager) {
   const status = () => {
     const ips = localAddresses();
     const lan = ips.filter((ip) => !ip.startsWith('127.'));
-    return links.map(({ port, token }) => ({
+    return links.map(({ port, token, short }) => ({
       port,
+      short: short === true,
       error: errors.get(port),
       addresses: running.has(port)
-        ? (lan.length ? lan : ips).map((ip) => 'http://' + ip + ':' + port + linkPath(token))
+        ? (lan.length ? lan : ips).map((ip) => 'http://' + ip + ':' + port + (short ? '' : linkPath(token)))
         : [],
     }));
   };
   let queue = Promise.resolve();
   let closed = false;
-  async function apply(ports) {
+  async function apply(settings) {
+    const ports = Array.isArray(settings) ? settings : settings?.ports;
+    const shorten = Array.isArray(settings) ? [] : settings?.shorten;
     if (!Array.isArray(ports) || !ports.every(validPort) || new Set(ports).size !== ports.length)
       fail(400, '请输入 1 到 65535 之间的端口，端口不能重复。');
+    if (!Array.isArray(shorten) || !shorten.every(port => ports.includes(port))) fail(400, '短地址端口必须在监听列表中。');
     const existing = new Map(links.map((link) => [link.port, link]));
-    const next = ports.map((port) => existing.get(port) ?? { port, token: randomBytes(24).toString('hex') });
+    const next = ports.map(port => {
+      const link = existing.get(port);
+      if (!link) return { port, short: true };
+      return shorten.includes(port) ? { ...link, short: true } : link;
+    });
     const added = new Map();
     try {
       for (const link of next) if (!running.has(link.port)) added.set(link.port, { ...link, close: await open(link) });
@@ -160,6 +175,7 @@ export async function createTransferLinks(directory, dist, manager) {
     links = next;
     errors.clear();
     for (const [port, link] of added) running.set(port, link);
+    for (const link of next) running.get(link.port).short = link.short;
     const removed = [...running.values()].filter((link) => !ports.includes(link.port));
     for (const link of removed) running.delete(link.port);
     await Promise.all(removed.map((link) => link.close()));
