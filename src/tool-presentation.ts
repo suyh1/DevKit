@@ -2,6 +2,8 @@ import type { ToolId, Options } from './tools';
 import type { EditorLanguage } from './CodeEditor';
 
 export function developerPresentation(id: ToolId, options: Options): { input: EditorLanguage; output: EditorLanguage; extension: string; preview?: boolean; sample?: string } | undefined {
+  if (id === 'json' && options.mode === 'parse') return { input: 'json', output: 'json', extension: 'json', preview: true, sample: JSON.stringify('{"name":"DevKit","tags":["开发","测试"]}') };
+  if (id === 'json' && options.mode === 'stringify') return { input: 'json', output: 'json', extension: 'json', preview: false };
   if (id === 'diff' && options.mode === 'json') return { input: 'json', output: 'json', extension: 'json', preview: true, sample: '{"id":9007199254740993,"name":"张三","active":true}' };
   if (id === 'mock-data') return { input: 'json', output: options.format === 'csv' ? 'text' : 'json', extension: options.format === 'csv' ? 'csv' : 'json', preview: true, sample: options.source === 'schema' ? '{"type":"object","properties":{"id":{"type":"integer","minimum":1,"maximum":10000},"email":{"type":"string","format":"email"},"active":{"type":"boolean"}},"required":["id","email"]}' : undefined };
   if (id === 'xml') return { input: 'xml', output: 'xml', extension: 'xml' };

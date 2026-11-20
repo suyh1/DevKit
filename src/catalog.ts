@@ -47,7 +47,7 @@ export const aliases: Partial<Record<ToolId, string>> = {
   cron: '定时 调度 crontab schedule', env: '环境 变量 dotenv 配置', properties: 'java spring 配置',
   hmac: '签名 密钥 sha 认证 signature', unicode: '转义 中文 unicode escape',
   'css-unit': '前端 单位 px rem em vw 响应式', 'http-status': '接口 状态码 response status',
-  json: '格式化 压缩 校验 美化 formatter pretty', yaml: 'yml 配置 config',
+  json: '格式化 压缩 校验 美化 字符串 转义 反转义 formatter pretty stringify parse', yaml: 'yml 配置 config',
   'csv-json': '表格 导入 excel tsv', 'json-csv': '表格 导出 excel tsv',
   'json-code': 'json java typescript ts 实体类 pojo record bean interface 类型 生成',
   'type-json': 'java typescript ts interface record 实体类 转json mock 示例 反向',

@@ -37,7 +37,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   const presentation = developerPresentation(active, task.options);
   const inputLanguage: EditorLanguage = presentation?.input ?? (active === 'yaml' ? task.options.mode === 'json-yaml' ? 'json' : 'yaml' : active === 'sql' ? 'sql' : ['json', 'json-code', 'json-csv'].includes(active) ? 'json' : 'text');
   const outputLanguage: EditorLanguage = presentation?.output ?? (active === 'yaml' ? task.options.mode === 'json-yaml' ? 'yaml' : 'json' : active === 'sql' ? 'sql' : active === 'diff' ? 'diff' : ['json', 'jwt', 'regex', 'csv-json', 'url-inspect'].includes(active) ? 'json' : 'text');
-  const canPreview = (presentation?.preview || previewTools.includes(active)) && !(active === 'yaml' && outputLanguage === 'yaml') && !!task.output;
+  const canPreview = (presentation?.preview ?? previewTools.includes(active)) && !(active === 'yaml' && outputLanguage === 'yaml') && !!task.output;
   const currentResult = task.status === 'success';
   const showPreview = preview && canPreview && currentResult;
   const wrapping = wrap ?? preferences.wrap, arrangement = layout ?? preferences.layout;

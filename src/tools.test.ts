@@ -15,6 +15,27 @@ describe('offline tools', () => {
     expect(await transform('json', output, { mode: 'compact' })).toBe(input);
     expect(await transform('json', '{"a":[],"b":{}}')).toBe('{\n  "a": [],\n  "b": {}\n}');
   });
+  it('encodes JSON source text and parses exactly one string layer', async () => {
+    const source = String.raw`{"id":9007199254740993,"id":1.2300e+2,"text":"中文\n\"x\"\\path"}`;
+    const document = '\n  ' + source + '\n';
+    const encoded = await transform('json', document, { mode: 'stringify' });
+    expect(JSON.parse(encoded)).toBe(document);
+    const decoded = await transform('json', encoded, { mode: 'parse', indent: '4' });
+    expect(decoded).toContain('\n    "id": 9007199254740993');
+    expect(await transform('json', decoded, { mode: 'compact' })).toBe(source);
+    expect(await transform('json', JSON.stringify(encoded), { mode: 'parse' })).toBe(encoded);
+    expect(await transform('json', encoded)).toBe(encoded);
+  });
+  it.each(['[true]', 'null', '1e400', '"hello"'])('decodes a string containing %s', async source => {
+    const decoded = await transform('json', JSON.stringify(source), { mode: 'parse' });
+    expect(await transform('json', decoded, { mode: 'compact' })).toBe(source);
+  });
+  it('reports invalid outer strings, inner documents and stringify input', async () => {
+    await expect(transform('json', '{}', { mode: 'parse' })).rejects.toThrow('外层双引号');
+    await expect(transform('json', '"unterminated', { mode: 'parse' })).rejects.toThrow();
+    await expect(transform('json', '"{oops}"', { mode: 'parse' })).rejects.toThrow('字符串内容');
+    await expect(transform('json', '{oops}', { mode: 'stringify' })).rejects.toThrow();
+  });
   it('round-trips UTF-8 including astral symbols and rejects invalid bytes', async () => {
     const text = '中文 / 😄 / café';
     const encoded = await transform('base64', text);

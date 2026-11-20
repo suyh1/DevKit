@@ -11,6 +11,8 @@ export function resultInputOptions(source: ToolId, options: Options, target: Too
   if (source === 'json-csv' && target === 'csv-json') return { delimiter: options.delimiter, headers: 'first', types: 'strings' };
   if (source !== target) return {};
   if (['base64', 'url', 'html', 'unicode', 'query-string', 'env', 'properties'].includes(source)) return { mode: options.mode === 'encode' ? 'decode' : 'encode' };
+  if (source === 'json' && options.mode === 'stringify') return { mode: 'parse' };
+  if (source === 'json' && options.mode === 'parse') return { mode: 'stringify' };
   if (source === 'gzip') return { mode: options.mode === 'compress' ? 'decompress' : 'compress' };
   return {};
 }

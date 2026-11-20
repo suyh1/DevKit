@@ -36,7 +36,7 @@ const definitions: { id: ToolId; name: string; english: string; category: string
   ...practicalTools,
   ...developerTools,
   ...extendedTools,
-  { id: 'json', name: 'JSON 格式化', english: 'JSON Formatter', category: '数据处理', description: '让结构清晰，让调试轻松。格式化、压缩与校验 JSON。', sample: '{"name":"DevKit","version":"0.3.0","offline":true,"platforms":["Windows","Linux ARM64","Linux AMD64"]}' },
+  { id: 'json', name: 'JSON 格式化', english: 'JSON Formatter', category: '数据处理', description: '格式化、压缩与校验 JSON，支持 JSON 文档与带转义的字符串互转。', sample: '{"name":"DevKit","version":"0.3.0","offline":true,"platforms":["Windows","Linux ARM64","Linux AMD64"]}' },
   { id: 'json-code', name: 'JSON 转类型', english: 'JSON to Java / TypeScript', category: '代码生成', description: '在同一工具切换 Java POJO / Record 与 TypeScript interface / type，保留各语言选项，从全部 JSON 样本推断嵌套类型。', sample: '{"id":10001,"user_name":"Alice","active":true,"profile":{"city":"上海","score":98.5},"roles":["admin","developer"],"orders":[{"id":1,"note":"加急"},{"id":2,"amount":19.9}]}' },
   { id: 'type-json', name: '类型转 JSON', english: 'Java / TypeScript to JSON', category: '代码生成', description: '从 Java 类 / Record 或 TS interface / type 生成 JSON 示例。支持嵌套、集合、本地继承与泛型；循环引用和未知值类型输出 null。不会执行源码或还原真实数据；外部类型需同时提供定义。最多 200,000 字符、500 类型、10,000 示例节点、60 层。', sample: 'export interface User {\n  id: number;\n  name: string;\n  active: boolean;\n  profile: { city: string };\n  tags: string[];\n  nickname?: string;\n}' },
   { id: 'json-csv', name: 'JSON 转 CSV', english: 'JSON to CSV', category: '数据处理', description: '合并对象数组的所有列，支持 CSV / TSV 和表格公式转义。', sample: '[{"name":"Alice","city":"上海","note":"hello, world"},{"name":"Bob","city":"北京","active":true}]' },
@@ -100,6 +100,20 @@ export async function transform(id: ToolId | LegacyToolId, input: string, option
   if (isExtendedTool(id)) return extendedTransform(id, input, options);
   switch (id) {
     case 'json': {
+      if (options.mode === 'stringify') {
+        JSON.parse(input);
+        return JSON.stringify(input);
+      }
+      if (options.mode === 'parse') {
+        const decoded: unknown = JSON.parse(input);
+        if (typeof decoded !== 'string') throw new Error('请输入带外层双引号的 JSON 字符串。普通 JSON 文档可直接使用“格式化”。');
+        try {
+          return formatJson(decoded, options);
+        } catch (error) {
+          if (error instanceof SyntaxError) throw new Error(`字符串内容不是有效的 JSON：${error.message}`);
+          throw error;
+        }
+      }
       return formatJson(input, options);
     }
     case 'json-code': {
