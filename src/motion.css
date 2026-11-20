@@ -376,7 +376,7 @@ dialog.motion-native[open] {
 }
 .motion-group.segmented-control > .motion-pill {
   background: var(--surface);
-  box-shadow: 0 2px 5px #17203310;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 10%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, var(--line));
   border-radius: 7px;
 }
 .motion-group > .motion-pill {
@@ -712,6 +712,18 @@ details.motion-details[data-motion-expanding="false"] > :not(summary) {
   filter: none !important;
   transform: none !important;
 }
+.motion-editor-stage .code-editor { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .motion-editor-stage[data-waited=true] .code-editor { animation: editor-ready 160ms ease-out; }
+}
+@keyframes editor-ready { from { opacity: 0; } to { opacity: 1; } }
+.skeleton-editor {
+  min-height: 0; height: 100%; overflow: hidden;
+  padding: 18px 18px 0 62px;
+  background: linear-gradient(to right, var(--editor-gutter) 45px, var(--line) 45px 46px, var(--surface) 46px);
+}
+.skeleton-editor .skeleton-lines { gap: .8em; font-size: var(--code-size,14px); }
+.skeleton-editor .skeleton-lines > span { height: .62em; max-width: calc(100% - 20px); }
 @keyframes motion-skeleton-arrive {
   from {
     opacity: 0.25;

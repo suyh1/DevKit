@@ -148,8 +148,8 @@ module.exports = async (window, output) => {
     await wait('!document.querySelector(".jar-table tbody tr")');
     assert.match(await fs.readFile(jar, 'utf8'), /Not executable/);
     await js('document.querySelector(\'.nav-item[title="设置"]\').click()');
-    await wait('!!document.querySelector(\'.settings-page option[value="performance"]\')');
-    await js(`{const select=document.querySelector('.settings-page option[value="performance"]').parentElement; select.value='performance'; select.dispatchEvent(new Event('change',{bubbles:true}));}`);
+    await wait('!!document.querySelector(\'.settings-page button[value="performance"]\')');
+    await js(`document.querySelector('.settings-page button[value="performance"]').click()`);
     await wait('document.documentElement.dataset.displayMode === "performance"');
     assert.equal(await js('JSON.parse(localStorage.getItem("devkit:preferences")).displayMode'), 'performance');
     await openShared(window, 'JAR 管理', wait);
@@ -188,11 +188,7 @@ module.exports = async (window, output) => {
   } finally {
     dialog.showOpenDialog = previousDialog;
     await js(`{
-      const select = document.querySelector('.settings-page option[value="performance"]')?.parentElement;
-      if (select && select.value !== ${JSON.stringify(previousMode)}) {
-        select.value = ${JSON.stringify(previousMode)};
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+      document.querySelector('.settings-page [aria-label="运行模式"] button[value=${JSON.stringify(previousMode)}]')?.click();
     }`);
     await wait(`document.documentElement.dataset.displayMode === ${JSON.stringify(previousMode)}`);
     window.webContents.setBackgroundThrottling(previousThrottling);

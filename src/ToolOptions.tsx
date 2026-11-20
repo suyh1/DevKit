@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { ShieldCheck } from 'lucide-react';
 import type { Options, ToolId } from './tools';
 
@@ -66,7 +67,17 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
   ] : toolId === 'type-json' && options.language !== 'java' ? [{ key: 'optional', label: '可选字段', entries: [['include', '包含示例'], ['exclude', '忽略']] } as Field] : [])];
   const showIndent = toolId !== 'json' || !['stringify', 'compact'].includes(options.mode);
   const notice = toolId === 'type-json' ? '生成示例值 · 不执行源码或还原真实数据' : toolId === 'hmac' ? '密钥仅在内存，默认不保存工作区' : toolId === 'http-code' ? '只生成代码，不发送请求' : toolId === 'cron' ? 'UTC · 五字段 Unix Cron' : toolId === 'jwt' ? '仅解码，不验证签名或可信性' : toolId === 'url-inspect' ? '保留重复参数，不访问地址' : toolId === 'uuid' ? '安全随机 UUID v4 · 最多 1,000 个' : '';
-  return <div className="options">{visibleFields.filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (field.key !== 'arrayKey' || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : field.min !== undefined ? 'number' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} min={field.min} max={field.max} step={field.min !== undefined ? 1 : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>)}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
+  return <div className="options">{visibleFields.filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (field.key !== 'arrayKey' || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => {
+    if (field.entries && field.entries.length <= 4) {
+      return <div className={`option field-${field.key}`} key={field.key}>
+        <span>{field.label}</span>
+        <SegmentedControl label={field.label} disabled={busy} value={options[field.key]}
+          options={field.entries.map(([value, label]) => ({ value, label }))}
+          onChange={value => onChange(field.key, value)} />
+      </div>;
+    }
+    return <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : field.min !== undefined ? 'number' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} min={field.min} max={field.max} step={field.min !== undefined ? 1 : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>;
+  })}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
 }
 
 

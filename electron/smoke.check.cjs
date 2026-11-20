@@ -125,7 +125,7 @@ app.on('browser-window-created', (_event, window) => {
       window.setMinimumSize(...originalMinimum);
       await window.webContents.executeJavaScript('[...document.querySelectorAll(".smart-suggestion")].find(button => button.textContent.includes("YAML")).click()');
       await waitFor('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "JSON ↔ YAML"');
-      assert.equal(await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .field-mode select").value'), 'json-yaml');
+      assert.equal(await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .field-mode button[aria-pressed=true]").value'), 'json-yaml');
       await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .run-button").click()');
       await waitFor('document.querySelector(".task-pane:not([hidden]) .status-success") !== null');
       await waitFor('document.querySelector(".task-pane:not([hidden]) .output-card .cm-content")?.textContent.includes("9007199254740993")');
@@ -194,8 +194,8 @@ app.on('browser-window-created', (_event, window) => {
       await waitFor('document.querySelector(".task-pane:not([hidden]) .output-card .cm-content")?.textContent.includes("const users")');
       await fs.writeFile(path.join(output, 'preview-developer-tools.png'), (await window.webContents.capturePage()).toPNG());
       const option = async (key, value) => {
-        await window.webContents.executeJavaScript(`{ const select = document.querySelector('.task-pane:not([hidden]) .field-${key} select'); select.value = ${JSON.stringify(value)}; select.dispatchEvent(new Event('change', {bubbles:true})); }`);
-        await waitFor(`document.querySelector('.task-pane:not([hidden]) .field-${key} select')?.value === ${JSON.stringify(value)}`);
+        await window.webContents.executeJavaScript(`document.querySelector('.task-pane:not([hidden]) .field-${key} button[value=${JSON.stringify(value)}]').click()`);
+        await waitFor(`document.querySelector('.task-pane:not([hidden]) .field-${key} button[aria-pressed=true]')?.value === ${JSON.stringify(value)}`);
       };
       const sampleAndRun = async () => {
         await window.webContents.executeJavaScript('[...document.querySelectorAll(".task-pane:not([hidden]) .editor-footer button")].find(button => button.textContent.includes("示例"))?.click()');
@@ -212,7 +212,7 @@ app.on('browser-window-created', (_event, window) => {
       await option('tsStyle', 'type'); await sampleAndRun();
       await waitFor('document.querySelector(".task-pane:not([hidden]) .output-card .cm-content")?.textContent.includes("export type Root")');
       await option('language', 'java');
-      assert.equal(await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .field-javaStyle select").value'), 'record');
+      assert.equal(await window.webContents.executeJavaScript('document.querySelector(".task-pane:not([hidden]) .field-javaStyle button[aria-pressed=true]").value'), 'record');
       await openTool('类型转 JSON');
       await sampleAndRun();
       await option('language', 'java'); await sampleAndRun();

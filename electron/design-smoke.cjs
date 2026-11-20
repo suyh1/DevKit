@@ -29,8 +29,8 @@ module.exports = async function designSmoke(window, output) {
   const report = [];
   for (const theme of ['light', 'dark']) {
     await js(`document.documentElement.dataset.theme = '${theme}'`);
-    for (const width of [1440, 1024, 768, 620, 375]) {
-      window.setContentSize(width, 1000);
+    for (const width of [1920, 1440, 1024, 768, 620, 375]) {
+      window.setContentSize(width, width === 1920 ? 1080 : 1000);
       await settle();
       const geometry = await js(`(() => {
         const workspace = document.querySelector('.overview-workspace');
@@ -56,17 +56,17 @@ module.exports = async function designSmoke(window, output) {
       assert.equal(geometry.workspaceOverflow, false, `${theme} ${width}: workspace overflow`);
       assert.equal(geometry.navbarOutside, false, `${theme} ${width}: navbar outside viewport`);
       assert.equal(geometry.floating, true);
-      assert.equal(geometry.background, theme === 'dark' ? '#141518' : '#f2f4f7');
-      assert.equal(geometry.panel, theme === 'dark' ? 'rgb(28, 30, 34)' : 'rgb(255, 255, 255)');
-      assert.equal(geometry.text, theme === 'dark' ? 'rgb(232, 233, 237)' : 'rgb(37, 48, 71)');
-      assert.equal(geometry.accent, theme === 'dark' ? '#a6b8f4' : '#305aa6');
+      assert.equal(geometry.background, theme === 'dark' ? '#161d28' : '#eef2f6');
+      assert.equal(geometry.panel, theme === 'dark' ? 'rgb(32, 42, 56)' : 'rgb(255, 255, 255)');
+      assert.equal(geometry.text, theme === 'dark' ? 'rgb(237, 242, 251)' : 'rgb(32, 51, 78)');
+      assert.equal(geometry.accent, theme === 'dark' ? '#b4caff' : '#365fae');
       assert.equal(geometry.appGradient, 'none');
       assert.equal(geometry.catalogHidden, true, `${theme} ${width}: library is off-screen and inert on arrival`);
       assert.equal(geometry.launchScrollbar, 'none');
       assert.equal(geometry.workspaceOverflowY, 'clip');
       assert.equal(geometry.launchFits, true);
       report.push({ theme, ...geometry });
-      if ([1440, 375].includes(width)) await fs.writeFile(path.join(output, `design-home-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
+      if ([1920, 1440, 375].includes(width)) await fs.writeFile(path.join(output, `design-home-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG());
     }
   }
   window.setContentSize(1440, 1000);
@@ -181,13 +181,13 @@ module.exports = async function designSmoke(window, output) {
   window.webContents.sendInputEvent({ type: 'mouseMove', x: 1, y: 1 });
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .status-success")).color'), 'rgb(138, 197, 160)');
-  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(166, 184, 244)');
-  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(24, 26, 30)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(180, 202, 255)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(38, 49, 65)');
   await fs.writeFile(path.join(output, 'design-editor-dark.png'), (await window.webContents.capturePage()).toPNG());
   await js("document.documentElement.dataset.theme = 'light'");
   await settle();
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .status-success")).color'), 'rgb(40, 119, 70)');
-  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(48, 90, 166)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .run-button")).backgroundColor'), 'rgb(54, 95, 174)');
   assert.equal(await js('getComputedStyle(document.querySelector(".task-pane:not([hidden]) .cm-gutters")).backgroundColor'), 'rgb(248, 249, 251)');
   await fs.writeFile(path.join(output, 'design-editor-light.png'), (await window.webContents.capturePage()).toPNG());
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
@@ -207,7 +207,7 @@ module.exports = async function designSmoke(window, output) {
   await wait('!!document.querySelector(".project-workspace:not([hidden]) .pc-shell")');
   await js("document.documentElement.dataset.theme = 'dark'");
   await settle();
-  assert.equal(await js('getComputedStyle(document.querySelector(".pc-shell")).backgroundColor'), 'rgb(28, 30, 34)');
+  assert.equal(await js('getComputedStyle(document.querySelector(".pc-shell")).backgroundColor'), 'rgb(32, 42, 56)');
   await fs.writeFile(path.join(output, 'design-projects-dark.png'), (await window.webContents.capturePage()).toPNG());
   await js("document.documentElement.dataset.theme = 'light'");
   await js('document.querySelector(\'.sidebar button[title="我的收藏"]\').click()');
@@ -251,7 +251,7 @@ module.exports = async function designSmoke(window, output) {
   for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
     await js(`document.querySelector('input[name="theme-style"][value="${style}"]').click()`);
     for (const mode of ['light', 'dark']) {
-      await js(`{ const select = document.querySelector('.settings-page select[aria-label="明暗模式"]'); select.value = '${mode}'; select.dispatchEvent(new Event('change', { bubbles: true })); }`);
+      await js(`document.querySelector('.settings-page [aria-label="明暗模式"] button[value="${mode}"]').click()`);
       await wait(`document.documentElement.dataset.themeStyle === '${style}' && document.documentElement.dataset.theme === '${mode}'`);
       for (const width of [1440, 768, 375]) {
         window.setContentSize(width, 1000); await settle();
@@ -291,5 +291,5 @@ module.exports = async function designSmoke(window, output) {
   await js(`document.querySelector('.sidebar button[title="工作台"]').click()`);
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'design-report.json'), JSON.stringify(report, null, 2));
-  console.log('Design smoke passed: graphite palette, semantic success, editor, projects, responsive themes, navigation, keyboard and reduced motion.');
+  console.log('Design smoke passed: light and dark palettes, semantic success, editor, projects, responsive themes, navigation, keyboard and reduced motion.');
 };

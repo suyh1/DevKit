@@ -61,7 +61,7 @@ module.exports = async function workflowsSmoke(window, output) {
         await wait(`document.querySelector('${pane} .digest-result')?.textContent.includes('值不一致')`);
       }
       if (id === 'ulid') {
-        await js(`{ const select = document.querySelector('${pane} .field-mode select'); select.value = 'parse'; select.dispatchEvent(new Event('change', {bubbles:true})); }`);
+        await js(`document.querySelector('${pane} .field-mode button[value=parse]').click()`);
         await wait(`!!document.querySelector('${pane} .workflow-inspect')`);
         await js(`document.querySelector('${pane} .run-button').click()`);
         await wait(`!!document.querySelector('${pane} .status-success')`);

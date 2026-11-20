@@ -16,7 +16,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
   const [selection, setSelection] = useState(false), [feedback, setFeedback] = useState('');
   useEffect(() => {
     const node = container.current!;
-    const terminal = new Terminal({ cursorBlink: true, scrollback: 5000, fontFamily: 'Consolas, monospace', theme: { background: '#101720' } });
+    const terminal = new Terminal({ cursorBlink: true, scrollback: 5000, fontFamily: getComputedStyle(node).getPropertyValue('--font-mono').trim(), theme: { background: '#101720' } });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(node);

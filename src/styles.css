@@ -139,7 +139,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-he
 .option>span { white-space: nowrap; }
 select, .option input { border: 1px solid var(--line); background: var(--soft); border-radius: 7px; padding: 9px 10px; color: var(--text); font-size: 12px; }
 select { cursor: pointer; padding-right: 24px; }
-.option input { font-family: "Cascadia Code", Consolas, monospace; }
+.option input { font-family: var(--font-mono); }
 .name-option input { width: 120px; }
 .regex-option input { width: 270px; }
 .flags-option input { width: 55px; }

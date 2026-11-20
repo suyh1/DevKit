@@ -3,11 +3,12 @@ import { MotionGroup } from './Motion';
 
 type Choice<T extends string> = { value: T; label: string; content?: ReactNode };
 
-export default function SegmentedControl<T extends string>({ label, value, options, onChange, className = '' }: {
-  label: string; value: T; options: Choice<T>[]; onChange: (value: T) => void; className?: string;
+export default function SegmentedControl<T extends string>({ label, value, options, onChange, disabled = false, className = '' }: {
+  label: string; value: T; options: Choice<T>[]; onChange: (value: T) => void; className?: string; disabled?: boolean;
 }) {
+  const selected = options.find(option => option.value === value) ?? options[0];
   return <MotionGroup className={`segmented-control ${className}`} role="group" aria-label={label}>
-    {options.map((option, index) => <button key={option.value} type="button" tabIndex={value === option.value ? 0 : -1} aria-label={option.label} aria-pressed={value === option.value}
+    {options.map((option, index) => <button key={option.value} type="button" value={option.value} disabled={disabled} tabIndex={option === selected ? 0 : -1} aria-label={option.label} aria-pressed={option === selected}
       onClick={() => onChange(option.value)} onKeyDown={event => {
         let next = index;
         if (event.key === 'ArrowRight') next = (index + 1) % options.length;

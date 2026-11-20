@@ -749,16 +749,11 @@ export default function ProjectCenter({
               <option value="group">按分组</option>
             </select>
             <SegmentedControl label="项目显示方式" className="pc-view-toggle" value={view} onChange={setView} options={[{ value: 'grid', label: '卡片视图', content: <LayoutGrid size={16} /> }, { value: 'list', label: '列表视图', content: <List size={16} /> }]} />
-            <select
-              aria-label="筛选项目状态"
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-            >
-              <option value="all">全部状态</option>
-              <option value="enabled">已启用</option>
-              <option value="disabled">已停用</option>
-              <option value="invalid">配置异常</option>
-            </select>
+            <SegmentedControl label="筛选项目状态" className="pc-state-filter" value={filter} onChange={setFilter}
+              options={[
+                { value: 'all', label: '全部状态' }, { value: 'enabled', label: '已启用' },
+                { value: 'disabled', label: '已停用' }, { value: 'invalid', label: '配置异常' },
+              ]} />
           </div>
           <div className={selectedProjects.length ? "pc-selection pc-bulk" : "pc-selection"} hidden={!profile.projects.length}>
             <label className="pc-select-all">

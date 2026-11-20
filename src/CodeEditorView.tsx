@@ -34,7 +34,7 @@ const highlighting = HighlightStyle.define([
   { tag: tags.function(tags.variableName), color: 'var(--syntax-function)' },
 ]);
 
-export default function CodeEditorView(props: CodeEditorProps & { onReady?: () => void }) {
+export default function CodeEditorView(props: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null), view = useRef<EditorView | null>(null);
   const initial = useRef(props), change = useRef(props.onChange), syncing = useRef(false);
   const compartments = useRef({ editable: new Compartment(), wrapping: new Compartment(), language: new Compartment(), indent: new Compartment() });
@@ -58,7 +58,6 @@ export default function CodeEditorView(props: CodeEditorProps & { onReady?: () =
       }),
     });
     view.current = editor;
-    values.onReady?.();
     return () => { view.current = null; editor.destroy(); };
   }, []);
   useEffect(() => {

@@ -18,7 +18,7 @@ export type Preferences = {
   sharedModuleOrder: WorkspaceModuleId[];
 };
 const defaultSharedModuleOrder = workspaceModules.map(module => module.id);
-export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 13, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home', displayMode: 'normal', sharedModuleOrder: defaultSharedModuleOrder };
+export const defaultPreferences: Preferences = { themeStyle: 'default', theme: 'system', fontSize: 14, indent: '2', wrap: true, layout: 'split', density: 'comfortable', library: 'grid', startup: 'home', displayMode: 'normal', sharedModuleOrder: defaultSharedModuleOrder };
 export const MAX_TASKS = 12;
 export function isToolId(value: unknown): value is ToolId { return tools.some(tool => tool.id === value); }
 export function normalizeToolId(value: unknown): ToolId | undefined {

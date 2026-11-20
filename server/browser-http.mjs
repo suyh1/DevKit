@@ -10,6 +10,7 @@ const mime = {
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
 };
 export const localAddresses = () => [
   ...new Set([

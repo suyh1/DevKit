@@ -99,11 +99,11 @@ module.exports = async function checkCloseBehavior(window, output) {
     app.emit('second-instance');
     assert.equal(window.isVisible(), true);
     await js('document.querySelector(".sidebar-bottom .nav-item").click()');
-    await wait(`document.querySelector('select[aria-label="窗口关闭行为"]')?.value==="tray"`);
+    await wait(`document.querySelector('[aria-label="窗口关闭行为"] button[aria-pressed=true]')?.value==="tray"`);
     await js(
-      `{ const select=document.querySelector('select[aria-label="窗口关闭行为"]');select.value="ask";select.dispatchEvent(new Event("change",{bubbles:true})); }`
+      `document.querySelector('[aria-label="窗口关闭行为"] button[value=ask]').click()`
     );
-    await wait(`!document.querySelector('select[aria-label="窗口关闭行为"]').disabled`);
+    await wait(`!document.querySelector('[aria-label="窗口关闭行为"] button[value=ask]').disabled`);
     assert.equal((await preferences()).closeAction, 'ask');
     const saved = JSON.parse(await fs.readFile(path.join(app.getPath('userData'), 'desktop-settings.json'), 'utf8'));
     assert.equal(saved.closeAction, 'ask');

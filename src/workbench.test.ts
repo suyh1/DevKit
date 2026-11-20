@@ -73,7 +73,7 @@ describe('workbench workflows', () => {
   });
   it('validates corrupted preferences rather than trusting local storage', () => {
     const prefs = validatePreferences({ theme: 'invalid', fontSize: 2000, indent: '4', wrap: 'false', startup: 'missing' });
-    expect(prefs.theme).toBe('system'); expect(prefs.fontSize).toBe(13);
+    expect(prefs.theme).toBe('system'); expect(prefs.fontSize).toBe(14);
     expect(prefs.indent).toBe('4'); expect(prefs.wrap).toBe(true); expect(prefs.startup).toBe('home');
   });
   it('keeps the saved shared navigation order and appends missing catalog entries', () => {

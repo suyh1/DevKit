@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import SegmentedControl from './SegmentedControl';
 import { Monitor, X } from 'lucide-react';
 
 export function CloseChoice({ onDone }: { onDone: () => void }) {
@@ -120,22 +121,16 @@ export function WindowCloseSetting() {
         <Monitor size={17} />
         窗口与托盘
       </h2>
-      <label className="setting-row">
+      <div className="setting-row">
         <span>
           <strong>点击关闭按钮时</strong>
           <small>{window.devkitDesktop ? '托盘菜单可重新打开或退出；退出时仍保护未保存的草稿' : '此设置仅支持桌面端'}</small>
         </span>
-        <select
-          aria-label="窗口关闭行为"
-          value={action}
-          disabled={busy || !window.devkitDesktop}
-          onChange={(event) => void change(event.target.value as typeof action)}
-        >
-          <option value="ask">每次询问</option>
-          <option value="tray">最小化到托盘</option>
-          <option value="quit">退出软件</option>
-        </select>
-      </label>
+        <SegmentedControl label="窗口关闭行为" value={action} disabled={busy || !window.devkitDesktop}
+          onChange={value => void change(value)} options={[
+            { value: 'ask', label: '每次询问' }, { value: 'tray', label: '最小化到托盘' }, { value: 'quit', label: '退出软件' },
+          ]} />
+      </div>
       {error && (
         <p className="task-error" role="alert">
           {error}

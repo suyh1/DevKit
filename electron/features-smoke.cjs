@@ -23,7 +23,6 @@ module.exports = async function featuresSmoke(window, output) {
     await js(`{const e=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));}`);
     await js('new Promise(resolve=>requestAnimationFrame(resolve))');
   };
-  const select = async (selector, value) => js(`{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));}`);
   const editor = async (selector, value) => {
     await wait(`!!document.querySelector(${JSON.stringify(selector)})`);
     await js(`document.querySelector(${JSON.stringify(selector)}).focus()`);
@@ -38,7 +37,7 @@ module.exports = async function featuresSmoke(window, output) {
   const { openTool, openWorkspace } = require('./navigation-helpers.cjs')(window);
   const pane = '.task-pane:not([hidden])';
   await openTool('文本与 JSON 差异');
-  await select(`${pane} .field-mode select`, 'json'); await wait(`!!document.querySelector('${pane} .field-arrayKey')`);
+  await js(`document.querySelector('${pane} .field-mode button[value=json]').click()`); await wait(`!!document.querySelector('${pane} .field-arrayKey')`);
   await click('示例', `${pane} .input-card`); await click('对比结构', pane);
   await wait(`document.querySelector('${pane} .json-diff-result')?.textContent.includes('9007199254740993')===false && document.querySelector('${pane} .status-success')`);
   assert.match(await js(`document.querySelector('${pane} .json-diff-result').textContent`), /name/);

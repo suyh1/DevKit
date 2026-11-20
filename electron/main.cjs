@@ -17,7 +17,7 @@ if (previewProfile) {
   app.setPath('userData', previewProfile);
   app.setPath('sessionData', previewProfile);
 }
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 let window;
 let saving = false;
 let projectStore, projectHost, projectError = '', closing = false;
