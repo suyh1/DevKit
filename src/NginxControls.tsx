@@ -20,9 +20,17 @@ export function NginxControlDock({ active, children, scrollRoot }: {
   useEffect(() => {
     const root = scrollRoot || dock.current?.closest<HTMLElement>('.nginx-workspace'), panel = dock.current;
     if (!root || !panel || !active) return;
-    const resize = new ResizeObserver(() => root.style.setProperty('--ng-dock-height', `${Math.ceil(panel.getBoundingClientRect().height) + 12}px`));
+    const resize = new ResizeObserver(() => {
+      root.style.setProperty('--ng-scrollport-height', `${root.clientHeight}px`);
+      root.style.setProperty('--ng-dock-height', `${Math.ceil(panel.getBoundingClientRect().height) + 12}px`);
+    });
+    resize.observe(root);
     resize.observe(panel);
-    return () => { resize.disconnect(); root.style.removeProperty('--ng-dock-height'); };
+    return () => {
+      resize.disconnect();
+      root.style.removeProperty('--ng-scrollport-height');
+      root.style.removeProperty('--ng-dock-height');
+    };
   }, [active, scrollRoot]);
   return <>
     <div className="ng-dock-anchor" ref={anchor} aria-hidden="true" />

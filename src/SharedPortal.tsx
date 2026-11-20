@@ -549,7 +549,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             setOrder(next);
           }} />}
       </>}
-      <div key={workspaceEpoch} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
+      <div key={workspaceEpoch} data-page={page} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
         {!session?.authenticated ? (
           <section className="portal-login">
             <h1>登录共享工作台</h1>

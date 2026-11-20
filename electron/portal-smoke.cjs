@@ -265,7 +265,11 @@ app
       await wait(
         'document.querySelector(".ng-status-connection")?.textContent.includes("状态信息已更新")',
       );
-      await wheel(1100);
+      const heading = await js(`(() => {
+        const rect = document.querySelector('.ng-instance-heading').getBoundingClientRect();
+        return { x: rect.left + 24, y: rect.top + 24 };
+      })()`);
+      await wheel(1100, heading.x, heading.y);
       await wait(
         'document.querySelector(".ng-control-dock")?.dataset.stuck==="true" && [...document.querySelectorAll(".ng-dock-details")].every(section=>section.inert&&section.clientHeight===0&&getComputedStyle(section).visibility==="hidden")',
       );
@@ -282,6 +286,30 @@ app
         0,
       );
       await screenshot("nginx-sticky");
+      // A short result can lose most of its scroll range when the details disappear.
+      await fill('.ng-field-tools input', 'pid');
+      window.setContentSize(1280, 565);
+      await js("document.querySelector('.portal-content').scrollTop = 0");
+      await wait("document.querySelector('.ng-control-dock').dataset.stuck === 'false'");
+      const pinChanges = await js(`(async () => {
+        const root = document.querySelector('.portal-content');
+        const dock = document.querySelector('.ng-control-dock');
+        const anchor = document.querySelector('.ng-dock-anchor');
+        const changes = [];
+        const observer = new MutationObserver(() => changes.push(dock.dataset.stuck));
+        observer.observe(dock, { attributes: true, attributeFilter: ['data-stuck'] });
+        root.scrollTop += anchor.getBoundingClientRect().top - root.getBoundingClientRect().top + 3;
+        await new Promise(resolve => setTimeout(resolve, 600));
+        observer.disconnect();
+        return changes;
+      })()`);
+      assert.deepEqual(pinChanges, ['true'], 'A filtered config stays pinned without unfolding at the threshold');
+      await js("document.querySelector('.portal-content').scrollTop = 0");
+      await wait("document.querySelector('.ng-control-dock').dataset.stuck === 'false'");
+      await selector('.ng-field-tools input');
+      key('A', ['control']);
+      key('Backspace');
+      await wait("document.querySelector('.ng-field-tools input').value === ''");
       window.setContentSize(390, 844);
       await delay(150);
       await wheel(18000);

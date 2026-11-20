@@ -44,23 +44,19 @@
 @media(max-width:1100px){.ng-directive{grid-template-columns:110px minmax(0,1fr) 28px}}@media(max-width:760px){.ng-directive{grid-template-columns:minmax(0,1fr) 28px}.ng-help-trigger{min-width:22px;width:22px;height:22px;flex-basis:22px}.ng-editor-heading{gap:9px}.ng-form-footer .ng-help-trigger{flex:0 0 22px!important}}
 .nginx-workspace { overflow-anchor: none; scroll-padding-top: var(--ng-dock-height, 64px); }
 .ng-detail { overflow: clip; }
+/* Keep the anchor above the scrollport when collapsing a short or filtered config. */
+.ng-detail:has(> .ng-control-dock[data-stuck=true]) { min-height: var(--ng-scrollport-height); }
 .ng-dock-anchor { height: 1px; margin-bottom: -1px; pointer-events: none; }
 .ng-control-dock {
   position: sticky; top: 0; z-index: 4; background: var(--surface);
   border-radius: 15px 15px 0 0; max-height: min(64dvh, 620px);
-  overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; overflow-anchor: none;
+  overflow: auto; scrollbar-width: thin; overflow-anchor: none;
   transition: box-shadow 140ms var(--ease-out, ease), border-radius 140ms var(--ease-out, ease);
   border-bottom: 1px solid var(--line);
 }
 .ng-control-dock[data-stuck=true] { box-shadow: 0 -30px 0 var(--bg), 0 5px 16px #00000012; border-radius: 0 0 8px 8px; }
-.ng-dock-details {
-  display: grid; grid-template-rows: 1fr; opacity: 1; visibility: visible;
-  transition: grid-template-rows 140ms var(--ease-out, ease), opacity 120ms ease, visibility 0s;
-}
-.ng-dock-details > div { display: flow-root; min-height: 0; overflow: clip; }
-.ng-control-dock[data-stuck=true] .ng-dock-details {
-  grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition-delay: 0s, 0s, 140ms;
-}
+.ng-dock-details > div { display: flow-root; }
+.ng-control-dock[data-stuck=true] .ng-dock-details { display: none; visibility: hidden; }
 .ng-control-dock .ng-toolbar { border-bottom: 0; justify-content: flex-start; gap: 6px; }
 .ng-toolbar > .run-button { margin-inline-start: auto; }
 .ng-control-dock[data-stuck=true] .ng-toolbar {
