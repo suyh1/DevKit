@@ -11,7 +11,7 @@
   font-size: 13px;
   --td-border: color-mix(in srgb, var(--surface), var(--text) 12%);
   --td-soft: color-mix(in srgb, var(--surface), var(--text) 3%);
-  --td-mono: 'Cascadia Code', Consolas, 'SFMono-Regular', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', ui-monospace, monospace;
+  --td-mono: var(--font-mono);
 }
 .td-workspace :is(h1, h2, h3, p) { margin: 0; }
 .td-workspace svg { flex-shrink: 0; stroke-width: 1.65; }

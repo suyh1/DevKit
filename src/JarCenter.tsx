@@ -1,3 +1,4 @@
+import Skeleton from './Skeleton';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Coffee, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, X, Search } from 'lucide-react';
 import { MotionButton } from './Motion';
@@ -199,7 +200,7 @@ export default function JarCenter({ active }: { active: boolean }) {
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的 JAR 实例，请重试连接目标主机。</p>}
     {desktop && state && <LegacySshImport module="jar" groups={state.groups} disabled={busy} refresh={() => void task(refresh)} />}
     <div className="jar-summary"><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>{auto ? `状态每 ${statusSeconds} 秒刷新` : '自动刷新已关闭'} · CPU 为采样间隔占用，可超过 100%</small></div>
-    {!state && available && !error && <p className="jar-help">正在读取 JAR 列表…</p>}
+    {!state && available && !error && <Skeleton kind="list" label="正在读取 JAR 列表…" />}
     {state && !state.instances.length && <div className="jar-empty"><Coffee size={35} /><h2>添加第一个 Java 应用</h2><p>选择 JAR 文件，起一个方便辨认的名字，即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />选择 JAR 文件</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的 JAR。</p>}
     {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="JAR 应用"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {

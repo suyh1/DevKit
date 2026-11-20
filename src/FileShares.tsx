@@ -1,3 +1,5 @@
+import Skeleton from './Skeleton';
+import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Copy, File, Files, Folder, FolderOpen, Globe2, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { useConfirmation } from './Confirmation';
@@ -43,12 +45,12 @@ export function PublishedFileShares({ active }: { active: boolean }) {
   const visible = shares?.filter(share => [share.name, ...share.roots.map(root => root.label)].some(value => value.toLowerCase().includes(needle))) ?? [];
   const share = visible.find(item => item.id === selected) ?? (resource && selected === resource ? undefined : visible[0]);
   return <section className="planning-workspace pl-files-workspace">
-    <header className="pl-page-head"><h1>本机文件共享管理</h1>
+    <header className="pl-page-head workspace-banner"><h1>本机文件共享管理</h1>
       <button className="pl-icon" type="button" aria-label="刷新共享" title="刷新共享" onClick={refresh}><RefreshCw size={16} /></button>
     </header>
     {error && <p className="pl-message pc-error" role="alert">{error}</p>}
     {resource && selected === resource && shares && !shares.some(item => item.id === resource) && <p className="pl-message" role="status">{missingResourceLink('文件共享')}</p>}
-    {!error && !shares && <p className="pl-panel-empty" role="status">正在读取文件共享…</p>}
+    {!error && !shares && <Skeleton kind="list" label="正在读取文件共享…" />}
     {shares && <>
       <div className="pl-share-summary"><FolderOpen size={16} aria-hidden="true" /><div><strong>{shares.length}</strong><span>项可访问共享</span></div>
         <span className="pl-state pl-summary-access" data-tone="doing"><i />只读下载</span></div>
@@ -146,7 +148,7 @@ export default function FileShares({ active }: { active: boolean }) {
   const copy = (link: string) => void copyText(link).then(() => setNotice('共享链接已复制'), () => setError('无法复制共享链接。'));
   const draft = editor?.draft;
   return <section className="planning-workspace pl-files-workspace">
-    <header className="pl-page-head"><h1>本机文件共享管理</h1>
+    <header className="pl-page-head workspace-banner"><h1>本机文件共享管理</h1>
       <div className="pl-actions"><SharingButton />
         <button className="pl-icon" type="button" title="刷新共享" aria-label="刷新共享" disabled={busy} onClick={refresh}><RefreshCw size={16} /></button>
         <button className="pl-button pl-primary" type="button" disabled={busy || !state} onClick={() => edit()}><Plus size={16} />新建共享</button>
@@ -154,7 +156,7 @@ export default function FileShares({ active }: { active: boolean }) {
     </header>
     {error && <p className="pl-message pc-error" role="alert">{error}</p>}
     {notice && <p className="pl-message" role="status">{notice}</p>}
-    {!error && !state && <p className="pl-panel-empty" role="status">正在读取文件共享…</p>}
+    {!error && !state && <Skeleton kind="list" label="正在读取文件共享…" />}
     {state && <>
       <div className="pl-share-summary"><Server size={16} aria-hidden="true" />
         <div><strong>{running}</strong><span>运行中</span></div><div><strong>{published}</strong><span>已发布</span></div><div><strong>{shares.length}</strong><span>全部共享</span></div>
@@ -162,9 +164,8 @@ export default function FileShares({ active }: { active: boolean }) {
       <div className="pl-share-shell">
         <section className="pl-surface pl-share-inventory">
           <header><h2>共享清单</h2><div className="pl-actions"><ShareSearch query={query} change={setQuery} />
-            <select className="pl-select" aria-label="筛选共享状态" value={filter} onChange={event => setFilter(event.target.value)}>
-              <option value="">全部状态</option><option value="done">运行中</option><option value="backlog">已停止</option><option value="late">启动失败</option>
-            </select></div></header>
+            <SegmentedControl label="筛选共享状态" value={filter}
+              options={[{ value: '', label: '全部状态' }, { value: 'done', label: '运行中' }, { value: 'backlog', label: '已停止' }, { value: 'late', label: '启动失败' }]} onChange={setFilter} /></div></header>
           {visible.length > 0 ? <div className="pl-share-inventory-inner">
             <div className="pl-share-labels" aria-hidden="true"><span>名称</span><span>端口</span><span>状态</span></div>
             <ul className="pl-lines file-share-list">{visible.map(item => <li key={item.id}><button className="pl-share-row pl-share-row-admin" type="button"

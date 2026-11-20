@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { MotionButton, MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, Search, ChevronDown, ChevronUp } from 'lucide-react';
@@ -61,5 +62,5 @@ export default function ResultView({ toolId, text, source, onCopy, initialView =
     return <MatchView text={text} source={source} />;
   }
   if (!parsed.node) return <p className="preview-note">{parsed.error}</p>;
-  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <button onClick={() => setView(value => value === 'tree' ? 'table' : 'tree')}>{view === 'tree' ? '表格视图' : '结构视图'}</button>}<small>原始精度 · $ 复制路径</small></div>{view === 'table' ? <TableView node={parsed.node} /> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={query.trim().toLowerCase()} onCopy={onCopy} /></div>}</div>;
+  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>原始精度 · $ 复制路径</small></div>{view === 'table' ? <TableView node={parsed.node} /> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={query.trim().toLowerCase()} onCopy={onCopy} /></div>}</div>;
 }

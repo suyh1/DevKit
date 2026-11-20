@@ -1,3 +1,5 @@
+import Skeleton from './Skeleton';
+import SegmentedControl from './SegmentedControl';
 import { Fragment, lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Coffee, ExternalLink, Eye, EyeOff, Globe, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
 import { Modal, ModalCancel } from './project-components';
@@ -86,9 +88,7 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
             </label>
             {ssh && <label className="lan-field lan-port"><span>端口</span><input required type="number" min={1} max={65535} value={draft.port || ''} onChange={event => patch({ port: Number(event.target.value) })} /></label>}
             <label className="lan-field lan-host-name"><span>显示名称 <small>选填</small></span><input value={draft.name} onChange={event => patch({ name: event.target.value })} maxLength={120} placeholder="例如：测试服务器" /></label>
-            {ssh && <label className="lan-field lan-platform"><span>目标系统</span><span className="lan-select">
-              <select value={draft.platform} onChange={event => patch({ platform: event.target.value as HostDraft['platform'] })}><option value="linux">Linux</option><option value="win32">Windows</option></select><ChevronDown size={15} aria-hidden="true" />
-            </span></label>}
+            {ssh && <div className="lan-field lan-platform"><span>目标系统</span><SegmentedControl label="目标系统" value={draft.platform} options={[{ value: 'linux', label: 'Linux' }, { value: 'win32', label: 'Windows' }]} onChange={platform => patch({ platform })} /></div>}
           </div>
         </fieldset>
 
@@ -355,7 +355,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
       </aside>
       {allowed('terminal') && <section className="lan-terminal-area" aria-label="SSH 终端">
         {!!tabs.length ? <div role="tablist" aria-label="SSH 会话" className="lan-terminal-tabs">{tabs.map(tab => <div key={tab.id} className={selected === tab.id ? 'selected' : ''}><button type="button" role="tab" aria-selected={selected === tab.id} aria-controls={`lan-tab-${tab.id}`} onClick={() => setSelected(tab.id)}><Terminal size={14} />{tab.host.name}<small>{endpoint(tab.host)}</small></button><button type="button" className="icon-button" aria-label={`关闭 ${tab.host.name} 的终端`} onClick={() => closeTab(tab.id)}><X size={14} /></button></div>)}</div> : <div className="lan-terminal-empty"><Terminal size={32} /><h2>SSH 终端</h2><p>从左侧选择一台 SSH 主机打开会话。</p></div>}
-        <Suspense fallback={<p className="lan-note">正在加载终端…</p>}>{tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}><SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={allowed('files')} portal={portal} /></div>)}</Suspense>
+        <Suspense fallback={<Skeleton kind="editor" label="正在加载终端…" />}>{tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}><SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={allowed('files')} portal={portal} /></div>)}</Suspense>
       </section>}
     </div>}
     {notice && <p className="pc-feedback" role="status">{notice}</p>}

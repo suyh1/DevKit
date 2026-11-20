@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import type { ApiEndpoint } from '../shared/api-workspace.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
@@ -371,13 +372,11 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                         onChange={(e) => changeScenario({ delay: Number(e.target.value) })}
                       />
                     </label>
-                    <label>
-                      格式
-                      <select value={scenario.format} onChange={(e) => changeScenario({ format: e.target.value })}>
-                        <option value="json">JSON</option>
-                        <option value="text">纯文本</option>
-                      </select>
-                    </label>
+                    <div className="choice-field">
+                      <span>格式</span>
+                      <SegmentedControl label="响应格式" value={scenario.format}
+                        options={[{ value: 'json', label: 'JSON' }, { value: 'text', label: '纯文本' }]} onChange={format => changeScenario({ format })} />
+                    </div>
                   </div>
                   <details className="mock-match">
                     <summary>

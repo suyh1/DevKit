@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
 import { drawMark, prepareScreenshot, type Board, type BoardInfo, type Brush, type Point } from './board-canvas';
@@ -363,16 +364,11 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
             颜色
             <input type="color" aria-label="标注颜色" value={color} onChange={(e) => setColor(e.target.value)} />
           </label>
-          <label>
-            线宽
-            <select aria-label="线宽" value={width} onChange={(e) => setWidth(+e.target.value)}>
-              {[2, 4, 8].map((w) => (
-                <option key={w} value={w}>
-                  {w} px
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="choice-field">
+            <span>线宽</span>
+            <SegmentedControl label="线宽" value={String(width)}
+              options={[{ value: '2', label: '2 px' }, { value: '4', label: '4 px' }, { value: '8', label: '8 px' }]} onChange={value => setWidth(Number(value))} />
+          </div>
           {tool === 'text' && (
             <input
               autoFocus

@@ -58,9 +58,8 @@ module.exports = async function collaborationSmoke(window, output) {
     await js(node + '.click()');
   }
   async function selectMode(js, scope, value) {
-    const node = 'document.querySelector(' + JSON.stringify(scope + '[aria-label="发送方式"]') + ')';
-    if (await js(node + '.value') !== value)
-      await js(`{const mode=${node}; mode.value=${JSON.stringify(value)}; mode.dispatchEvent(new Event('change',{bubbles:true}));}`);
+    const selector = scope + '[aria-label="发送方式"] button[value="' + value + '"]';
+    await js('document.querySelector(' + JSON.stringify(selector) + ').click()');
   }
   try {
     // The fixture starts the listener via IPC. Opening settings refreshes the same provider used by invitations.
@@ -72,7 +71,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await desktop('document.querySelector(".sharing-panel button[aria-label=关闭共享设置]").click()');
     await wait(desktop, '!document.querySelector(".sharing-panel")');
     await openWorkspace('局域网快传');
-    assert.equal(await desktop('document.querySelector(' + JSON.stringify(main + '[aria-label="发送方式"]') + ').value'), 'direct');
+    assert.equal(await desktop('document.querySelector(' + JSON.stringify(main + '[aria-label="发送方式"] button[aria-pressed=true]') + ').value'), 'direct');
     await selectMode(desktop, main, 'stored');
     await fill(desktop, main + 'textarea', '跨设备取件测试');
     await fill(desktop, main + 'input[type=password]', 'case-pass');
@@ -88,7 +87,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await fill(web, '.portal-login input[type=password]', settings.password);
     await click(web, '.portal-login ', '登录');
     await click(web, current, '凭密码取件');
-    assert.equal(await web('document.querySelector(' + JSON.stringify(current + '[aria-label="发送方式"]') + ').value'), 'direct');
+    assert.equal(await web('document.querySelector(' + JSON.stringify(current + '[aria-label="发送方式"] button[aria-pressed=true]') + ').value'), 'direct');
     await fill(web, current + 'input[aria-label="输入取件密码"]', 'bad');
     await click(web, current, '确认取件');
     await wait(web, 'document.body.innerText.includes("取件密码不正确")');

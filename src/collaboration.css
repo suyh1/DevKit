@@ -6,11 +6,7 @@
   min-width: 0;
   max-width: 1480px;
   margin-inline: auto;
-  font:
-    400 15px/1.55 'Microsoft YaHei UI',
-    'Noto Sans SC',
-    'PingFang SC',
-    var(--font-ui);
+  font: 400 15px/1.55 var(--font-ui);
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }

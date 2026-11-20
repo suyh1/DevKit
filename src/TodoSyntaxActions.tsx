@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { useMemo, useState } from 'react';
 import { CalendarDays, GitBranch, Layers, LayoutList, Link2, ListChecks, Play, Repeat2 } from 'lucide-react';
 import { todoGroupAt, todoTaskTitle } from '../shared/todo-text.mjs';
@@ -104,9 +105,8 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
           </select></label>
         </>}
         {action === 'reference' && <>
-          <label className="pc-field">引用类型<select value={fields.option} onChange={event => update({ option: event.target.value })}>
-            <option value="共享">文件共享</option><option value="工具">工作台栏目或桌面工具</option>
-          </select></label>
+          <div className="pc-field choice-field"><span>引用类型</span><SegmentedControl label="引用类型" value={fields.option}
+            options={[{ value: '共享', label: '文件共享' }, { value: '工具', label: '工作台栏目或桌面工具' }]} onChange={option => update({ option })} /></div>
           {fields.option === '共享' ? <>
             <button type="button" className="text-button" onClick={() => void loadShares()}>选择文件共享</button>
             {shares && (shares.length ? <label className="pc-field">可引用的共享<select value={shares.some(item => item.id === fields.primary) ? fields.primary : ''} onChange={event => update({ primary: event.target.value })}>

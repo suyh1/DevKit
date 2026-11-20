@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import type { JarInstance, JarPolicies } from './jar-api';
 import { newJarClientId } from './jar-api';
 
@@ -25,7 +26,8 @@ export default function JarRuntimeSettings({ value, onChange }: { value: Runtime
   const number = (label: string, content: number, change: (value: number) => void, min: number, max: number) => <label>{label}<input type="number" value={content} min={min} max={max} required onChange={event => change(Number(event.target.value))} /></label>;
   return <div className="jar-runtime-settings">
     <details className="jar-setting-section" open={h.type !== 'none'}><summary>HTTP / TCP 健康检查</summary>
-      <label>检测方式<select value={h.type} onChange={event => patch({ health: { ...h, type: event.target.value as typeof h.type } })}><option value="none">不检测</option><option value="http">HTTP(S) 请求</option><option value="tcp">TCP 端口连接</option></select></label>
+      <div className="choice-field"><span>检测方式</span><SegmentedControl label="检测方式" value={h.type}
+        options={[{ value: 'none', label: '不检测' }, { value: 'http', label: 'HTTP(S) 请求' }, { value: 'tcp', label: 'TCP 端口连接' }]} onChange={type => patch({ health: { ...h, type } })} /></div>
       {h.type === 'http' && <><label>健康检查 URL<input type="url" required value={h.url} onChange={event => patch({ health: { ...h, url: event.target.value } })} /></label>{number('预期 HTTP 状态码', h.status, status => patch({ health: { ...h, status } }), 100, 599)}</>}
       {h.type === 'tcp' && <div className="jar-form-grid"><label>TCP 主机<input required value={h.host} onChange={event => patch({ health: { ...h, host: event.target.value } })} /></label>{number('TCP 端口', h.port, port => patch({ health: { ...h, port } }), 1, 65535)}</div>}
       {h.type !== 'none' && <div className="jar-form-grid">{number('检测间隔（秒）', h.interval, interval => patch({ health: { ...h, interval } }), 2, 3600)}{number('检测超时（秒）', h.timeout, timeout => patch({ health: { ...h, timeout } }), 1, 60)}{number('启动宽限（秒）', h.grace, grace => patch({ health: { ...h, grace } }), 0, 3600)}{number('连续失败阈值', h.failures, failures => patch({ health: { ...h, failures } }), 1, 20)}</div>}

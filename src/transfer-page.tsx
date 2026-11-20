@@ -4,6 +4,15 @@ import { ConfirmationProvider } from './Confirmation';
 import { QuickTransfer } from './QuickTransfer';
 import './theme-tokens.css';
 import './collaboration.css';
+import './segmented-control.css';
+import './motion.css';
+
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+function applySystemTheme() {
+  document.documentElement.dataset.theme = systemTheme.matches ? 'dark' : 'light';
+}
+applySystemTheme();
+systemTheme.addEventListener('change', applySystemTheme);
 
 createRoot(document.getElementById('root')!).render(
   <ConfirmationProvider>

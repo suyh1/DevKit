@@ -363,14 +363,14 @@ app
       );
       await button("接口设计", ".api-tabs button");
       await selector('.portal-appearance summary');
-      await selector('select[aria-label="共享页面主题"]');
+      await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
       key("End");
       key("Return");
       await wait('document.documentElement.dataset.theme==="dark"');
       // Shared portal uses the same paired styles, stored only in this browser.
       for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
         for (const mode of ['light', 'dark']) {
-          await js(`{ const style = document.querySelector('select[aria-label="共享页面主题风格"]'); style.value = '${style}'; style.dispatchEvent(new Event('change', { bubbles: true })); const mode = document.querySelector('select[aria-label="共享页面主题"]'); mode.value = '${mode}'; mode.dispatchEvent(new Event('change', { bubbles: true })); }`);
+          await js(`{ const style = document.querySelector('select[aria-label="共享页面主题风格"]'); style.value = '${style}'; style.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[aria-label="共享页面主题"] button[value="${mode}"]').click(); }`);
           await wait(`document.documentElement.dataset.themeStyle === '${style}' && document.documentElement.dataset.theme === '${mode}'`);
           assert.equal(await js('localStorage.getItem("devkit:portal-theme-style")'), style);
           window.setContentSize(390, 844); await delay(160);
@@ -411,7 +411,7 @@ app
       await delay(150);
       await wheel(-18000);
       await selector('.portal-appearance summary');
-      await selector('select[aria-label="共享页面主题"]');
+      await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
       key("Home");
       key("Return");
       await selector('.portal-appearance summary');
@@ -741,6 +741,14 @@ app
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("portal ssh ready")');
       await window.webContents.insertText('browser-echo');
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("browser-echo")');
+      await selector('.portal-appearance summary');
+      for (const mode of ['light', 'dark']) {
+        await selector(`[aria-label="共享页面主题"] button[value="${mode}"]`);
+        await wait(`document.documentElement.dataset.theme === '${mode}' &&
+          getComputedStyle(document.querySelector('.xterm-rows')).color === getComputedStyle(document.querySelector('.lan-terminal-area')).color &&
+          document.querySelector('.xterm-rows').textContent.includes('browser-echo')`);
+      }
+      await selector('.portal-appearance summary');
       await selector('.lan-host-list button[aria-label="移除 网页 SSH 已编辑"]');
       await button('移除连接', 'dialog[open] button');
       await wait('!document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑") && !document.querySelector(".lan-terminal-tabs")');

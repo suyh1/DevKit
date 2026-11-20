@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { MotionGroup } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import CodeEditor from './CodeEditor';
@@ -250,19 +251,11 @@ export default function HttpRequestInput({
               )}
               {tab === 'auth' && (
                 <div className="http-auth">
-                  <label>
-                    鉴权类型
-                    <select
-                      aria-label="鉴权类型"
-                      value={authKind}
-                      disabled={disabled}
-                      onChange={(event) => setAuthKind(event.target.value)}
-                    >
-                      <option value="bearer">Bearer Token</option>
-                      <option value="basic">Basic Auth</option>
-                      <option value="none">无鉴权</option>
-                    </select>
-                  </label>
+                  <div className="choice-field">
+                    <span>鉴权类型</span>
+                    <SegmentedControl label="鉴权类型" value={authKind} disabled={disabled}
+                      options={[{ value: 'bearer', label: 'Bearer Token' }, { value: 'basic', label: 'Basic Auth' }, { value: 'none', label: '无鉴权' }]} onChange={setAuthKind} />
+                  </div>
                   {authKind === 'bearer' && (
                     <label>
                       Token
@@ -323,31 +316,16 @@ export default function HttpRequestInput({
               {tab === 'body' && (
                 <div className="http-body">
                   <div className="feature-toolbar">
-                    <label>
-                      正文类型
-                      <select
-                        aria-label="正文类型"
-                        value={kind}
-                        disabled={disabled}
-                        onChange={(event) => {
-                          const nextKind = event.target.value as BodyKind;
-                          setKind(nextKind);
-                          setError('');
-                          if (nextKind === 'form') setForm(formRows(body));
-                          if (body) changeBody(body, nextKind);
-                        }}
-                      >
-                        {[
-                          ['json', 'JSON'],
-                          ['text', '纯文本'],
-                          ['form', '表单 URL Encoded']
-                        ].map(([key, label]) => (
-                          <option value={key} key={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="choice-field">
+                      <span>正文类型</span>
+                      <SegmentedControl label="正文类型" value={kind} disabled={disabled}
+                        options={[{ value: 'json', label: 'JSON' }, { value: 'text', label: '纯文本' }, { value: 'form', label: '表单 URL Encoded' }]} onChange={nextKind => {
+                        setKind(nextKind);
+                        setError('');
+                        if (nextKind === 'form') setForm(formRows(body));
+                        if (body) changeBody(body, nextKind);
+                      }} />
+                    </div>
                     <button
                       className="text-button"
                       disabled={disabled}

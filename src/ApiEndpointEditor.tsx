@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { newProjectId } from './project-api';
 import { Plus, Trash2 } from "lucide-react";
 import CodeEditor from "./CodeEditor";
@@ -217,21 +218,11 @@ export function ApiAuthEditor({
     <section className="api-section">
       <h3>鉴权</h3>
       <div className="api-form-grid">
-        <label>
-          鉴权方式
-          <select
-            aria-label="API鉴权方式"
-            value={auth.type}
-            onChange={(event) =>
-              patch({ type: event.target.value as typeof auth.type })
-            }
-          >
-            <option value="none">无鉴权</option>
-            <option value="bearer">Bearer Token</option>
-            <option value="basic">Basic Auth</option>
-            <option value="apiKey">API Key</option>
-          </select>
-        </label>
+        <div className="choice-field">
+          <span>鉴权方式</span>
+          <SegmentedControl label="API鉴权方式" value={auth.type}
+            options={[{ value: 'none', label: '无鉴权' }, { value: 'bearer', label: 'Bearer Token' }, { value: 'basic', label: 'Basic Auth' }, { value: 'apiKey', label: 'API Key' }]} onChange={type => patch({ type })} />
+        </div>
         {auth.type === "bearer" && (
           <label>
             Token
@@ -266,18 +257,11 @@ export function ApiAuthEditor({
         )}
         {auth.type === "apiKey" && (
           <>
-            <label>
-              位置
-              <select
-                value={auth.location}
-                onChange={(event) =>
-                  patch({ location: event.target.value as "header" | "query" })
-                }
-              >
-                <option value="header">Header</option>
-                <option value="query">Query</option>
-              </select>
-            </label>
+            <div className="choice-field">
+              <span>位置</span>
+              <SegmentedControl label="API Key 位置" value={auth.location}
+                options={[{ value: 'header', label: 'Header' }, { value: 'query', label: 'Query' }]} onChange={location => patch({ location })} />
+            </div>
             <label>
               键名
               <input
@@ -315,21 +299,8 @@ export function ApiBodyEditor({
     <section className="api-section">
       <div className="api-section-heading">
         <h3>请求正文</h3>
-        <select
-          aria-label="API正文类型"
-          value={endpoint.bodyKind}
-          onChange={(event) =>
-            onChange({
-              ...endpoint,
-              bodyKind: event.target.value as ApiEndpoint["bodyKind"],
-            })
-          }
-        >
-          <option value="none">无正文</option>
-          <option value="json">JSON</option>
-          <option value="text">纯文本</option>
-          <option value="form">URL Encoded</option>
-        </select>
+        <SegmentedControl label="API正文类型" value={endpoint.bodyKind}
+          options={[{ value: 'none', label: '无正文' }, { value: 'json', label: 'JSON' }, { value: 'text', label: '纯文本' }, { value: 'form', label: 'URL Encoded' }]} onChange={bodyKind => onChange({ ...endpoint, bodyKind })} />
       </div>
       {endpoint.bodyKind !== "none" && (
         <div className="api-code-editor">

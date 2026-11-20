@@ -117,3 +117,39 @@
   .workspace-banner.page-heading h1 { font-size: 20px; }
   .workspace-banner .page-icon { width: 36px; height: 36px; }
 }
+
+/* Keep each workflow's existing grid, with the same reading order and interactive surfaces. */
+:root { --work-panel-radius: 14px; }
+:root[data-theme-style=minimal], :root[data-theme-style=editorial], :root[data-theme-style=retro] { --work-panel-radius: 8px; }
+:root[data-theme-style=brutalist] { --work-panel-radius: 3px; }
+:root[data-theme-style=soft], :root[data-theme-style=organic], :root[data-theme-style=gradient] { --work-panel-radius: 18px; }
+:is(.task-pane, .workspace, .workspace-portal) :is(.workspace-banner, .editor-card, .geo-panel, .color-panel, .log-sources, .log-pane, .monitor-card, .td-documents, .td-sheet, .collab-inbox, .collab-compose, .collab-detail, .board-library, .board-stage) {
+  border-radius: var(--work-panel-radius);
+}
+:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) { padding: 16px clamp(14px, 2vw, 24px); background: var(--surface); border: 1px solid var(--line); border-inline-start: 3px solid var(--workspace-rule); }
+:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) h1 { font-size: clamp(20px, 2.4vw, 28px); font-weight: 600; }
+.skeleton-list { min-height: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--work-panel-radius); }
+.skeleton-list .skeleton-lines { gap: 10px; }
+.skeleton-list .skeleton-lines span { margin: 0; max-width: 100%; height: 9px; }
+.log-center .log-source-list .selected { box-shadow: inset 3px 0 var(--accent); background: var(--tint); }
+.log-center .log-pane > pre, .geo-field textarea { font: var(--code-size, 14px)/1.7 var(--font-mono); }
+.task-pane .editor-title { flex-wrap: wrap; row-gap: 6px; }
+.text-workbench .document-tabs { align-items: center; flex-wrap: wrap; }
+.text-workbench .editor-label { min-width: 0; flex-wrap: wrap; }
+.text-workbench .result-view-choice { padding: 2px; }
+.text-workbench .result-view-choice > button { padding: 3px 9px; min-height: 26px; font-size: 12px; }
+.task-pane :is(.table-preview table,.data-table table,.diff-table,.match-source,.detail-fields code,.generated-list code) {
+  font-family: var(--font-mono); font-size: var(--code-size, 14px); line-height: 1.7; font-variant-numeric: tabular-nums;
+}
+.task-pane :is(.table-preview,.data-table,.geo-table) th { position: sticky; top: 0; z-index: 1; background: var(--soft); color: var(--muted); font: 600 12px/1.6 var(--font-ui); }
+.task-pane :is(.table-preview,.data-table,.geo-table) tbody tr:nth-child(even) { background: color-mix(in srgb, var(--soft) 55%, var(--surface)); }
+.task-pane :is(.generated-list > div,.detail-fields > div,.schedule-timeline li):focus-within { background: var(--tint); }
+.task-pane :is(.conversion-summary,.editor-footer,.detail-fields dt,.preview-note) { font-variant-numeric: tabular-nums; }
+.task-pane .conversion-summary { font-size: 12px; }
+.task-pane :is(.metric-grid > div,.cron-fields > div,.subnet-summary,.permission-value) { background: color-mix(in srgb, var(--soft) 72%, var(--surface)); }
+.task-pane .digest-value { padding: 12px 16px; background: var(--soft); border-inline-start: 3px solid var(--accent); border-radius: 6px; font-size: max(16px, var(--code-size, 14px)); }
+.task-pane .http-results .family-4 > strong { color: var(--warning); }
+.task-pane .http-results .family-5 > strong { color: var(--error); }
+.task-pane .match-source mark { background: var(--tint); color: var(--text); box-shadow: inset 0 -2px var(--accent); }
+.task-pane .geo-point { background: var(--soft); }
+.task-pane .color-panel .color-live { color: var(--success); background: var(--success-tint); }

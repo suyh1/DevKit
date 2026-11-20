@@ -94,3 +94,5 @@
 .jar-instance-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .jar-instance .jar-target { font-size: 12px; }
 .jar-instance .jar-advanced .jar-row-actions { margin-block: 6px; }
+
+.jar-console pre, .jar-console-input > input { font: var(--code-size, 14px)/1.7 var(--font-mono); }

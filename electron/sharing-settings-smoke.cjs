@@ -554,7 +554,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
       await jump('核对网页下载', web);
       await jump('打开共享', web);
       await click('打开引用', toolbar, web);
-      await wait('location.hash === "#project-todos" && document.querySelector(".td-status [role=status]").textContent.includes("未开放本机文件共享")', web);
+      await wait('location.hash === "#project-todos" && document.querySelector(".workspace-access-bubble[role=status]")?.textContent === "「本机文件共享管理」未向当前访客共享。"', web);
       const sheetActions = '.td-sheet-head button';
       const confirmation = '.confirm-dialog[open] button';
       assert.equal(await web('!!document.querySelector(".td-sheet-head .td-delete")'), false);

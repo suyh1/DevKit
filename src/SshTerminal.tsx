@@ -16,7 +16,19 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
   const [selection, setSelection] = useState(false), [feedback, setFeedback] = useState('');
   useEffect(() => {
     const node = container.current!;
-    const terminal = new Terminal({ cursorBlink: true, scrollback: 5000, fontFamily: getComputedStyle(node).getPropertyValue('--font-mono').trim(), theme: { background: '#101720' } });
+    function appearance() {
+      const style = getComputedStyle(node);
+      const token = (name: string) => style.getPropertyValue(name).trim();
+      return {
+        fontFamily: token('--font-mono'),
+        fontSize: parseFloat(token('--code-size')) || 14,
+        theme: {
+          background: token('--surface'), foreground: token('--text'), cursor: token('--accent'),
+          cursorAccent: token('--surface'), selectionBackground: token('--selection'),
+        },
+      };
+    }
+    const terminal = new Terminal({ cursorBlink: true, scrollback: 5000, minimumContrastRatio: 4.5, ...appearance() });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(node);
@@ -24,6 +36,13 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
     fitAddon.current = fit;
     const observer = new ResizeObserver(() => { if (node.offsetWidth) fit.fit(); });
     observer.observe(node);
+    const themeObserver = new MutationObserver(() => {
+      terminal.options = appearance();
+      if (node.offsetWidth) fit.fit();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-theme-style'] });
+    const app = node.closest('.app');
+    if (app) themeObserver.observe(app, { attributes: true, attributeFilter: ['style'] });
     if (node.offsetWidth) fit.fit();
     let disposed = false, session = '', timer: ReturnType<typeof setTimeout> | undefined;
     let inputQueue: Promise<unknown> = Promise.resolve();
@@ -55,7 +74,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
       await lanRequest('terminal-resize', { id: session, cols: terminal.cols, rows: terminal.rows });
       if (!disposed) { setConnectionId(session); if (node.offsetWidth && !document.activeElement?.closest('dialog')) terminal.focus(); void poll(); }
     }).catch(error => { if (!disposed) { setConnectionId(''); setMessage(error.message); } void close(); });
-    return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
+    return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); themeObserver.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
   }, [id, generation]);
   useEffect(() => { if (active) { fitAddon.current?.fit(); controls.current?.focus(); } }, [active]);
   return <div className="lan-ssh-session">

@@ -36,6 +36,11 @@ module.exports = async function httpSmoke(window, output) {
     );
     await js('new Promise(resolve=>requestAnimationFrame(resolve))');
   };
+  const chooseSegment = async (label, value) => {
+    const selector = `[role="group"][aria-label=${JSON.stringify(label)}] button[value=${JSON.stringify(value)}]`;
+    await js(`document.querySelector(${JSON.stringify(selector)}).click()`);
+    await js('new Promise(resolve => requestAnimationFrame(resolve))');
+  };
   const select = async (label, value) => {
     await js(
       `{const e=document.querySelector('select[aria-label=${JSON.stringify(label)}]');e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));}`
@@ -114,7 +119,7 @@ module.exports = async function httpSmoke(window, output) {
       'Changing URL cannot hide an invalid header draft'
     );
     await click('正文');
-    await select('正文类型', 'text');
+    await chooseSegment('正文类型', 'text');
     assert.equal(
       await js('document.querySelector(".http-main .run-button").disabled'),
       true,
@@ -124,7 +129,7 @@ module.exports = async function httpSmoke(window, output) {
     await js('document.querySelector(\'button[aria-label="删除请求头 4"]\').click()');
     await wait('!document.querySelector(".http-main .run-button").disabled');
     await click('正文');
-    await select('正文类型', 'form');
+    await chooseSegment('正文类型', 'form');
     await click('添加表单字段');
     await fill('表单字段 1 名称', 'a');
     await fill('表单字段 1 值', '中文 +');

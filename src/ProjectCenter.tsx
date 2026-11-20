@@ -739,15 +739,8 @@ export default function ProjectCenter({
                 <option key={item}>{item}</option>
               ))}
             </select>
-            <select
-              aria-label="项目排序"
-              value={sort}
-              onChange={(event) => setSort(event.target.value)}
-            >
-              <option value="manual">创建顺序</option>
-              <option value="name">按名称</option>
-              <option value="group">按分组</option>
-            </select>
+            <SegmentedControl label="项目排序" value={sort}
+              options={[{ value: 'manual', label: '创建顺序' }, { value: 'name', label: '按名称' }, { value: 'group', label: '按分组' }]} onChange={setSort} />
             <SegmentedControl label="项目显示方式" className="pc-view-toggle" value={view} onChange={setView} options={[{ value: 'grid', label: '卡片视图', content: <LayoutGrid size={16} /> }, { value: 'list', label: '列表视图', content: <List size={16} /> }]} />
             <SegmentedControl label="筛选项目状态" className="pc-state-filter" value={filter} onChange={setFilter}
               options={[

@@ -101,7 +101,7 @@
 .secondary-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:32px; padding:7px 11px; font-size:11px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:6px; white-space:nowrap; }
 .secondary-button:hover:not(:disabled) { background:var(--soft); color:var(--accent); border-color:var(--accent); }
 .toolbar { gap:16px; border-radius:8px; padding:12px 14px; box-shadow:none; align-items:center; }
-.options { flex:1; gap:12px 18px; }
+.options { flex:1; min-width:0; max-width:100%; gap:12px 18px; }
 .option { font-size:10px; gap:8px; }
 .option input,.option select { padding:7px 9px; font-size:11px; border-radius:5px; min-height:31px; }
 .option input { width:100px; }

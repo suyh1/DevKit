@@ -39,7 +39,7 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
   const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine }[module];
   return (
     <section className="collab-page" data-module={module}>
-      <header className="collab-header">
+      <header className="collab-header workspace-banner">
         <div className="collab-identity">
           <span className="collab-emblem">
             <PageIcon size={25} />

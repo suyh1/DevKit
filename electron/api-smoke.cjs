@@ -44,6 +44,11 @@ module.exports = async function apiSmoke(window, output) {
     );
     await js("new Promise(resolve=>requestAnimationFrame(resolve))");
   };
+  const chooseSegment = async (label, value) => {
+    const selector = `[role="group"][aria-label=${JSON.stringify(label)}] button[value=${JSON.stringify(value)}]`;
+    await js(`document.querySelector(${JSON.stringify(selector)}).click()`);
+    await js('new Promise(resolve => requestAnimationFrame(resolve))');
+  };
   const select = async (label, value) => {
     await js(
       `{const e=document.querySelector('select[aria-label=${JSON.stringify(label)}]');e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));}`,
@@ -128,9 +133,9 @@ module.exports = async function apiSmoke(window, output) {
     await click("添加参数", ".api-definition");
     await input("参数2名称", "q");
     await input("参数2示例", "中文 & value");
-    await select("API鉴权方式", "bearer");
+    await chooseSegment("API鉴权方式", "bearer");
     await input("API Bearer Token", "{{token}}");
-    await select("API正文类型", "json");
+    await chooseSegment("API正文类型", "json");
     const body = '{"id":9007199254740993,"name":"张三"}';
     await edit("API请求正文", body);
     await edit(

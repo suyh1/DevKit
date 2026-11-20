@@ -5,7 +5,7 @@
   --pl-line: color-mix(in srgb, var(--surface), var(--text) 12%);
   --pl-picked: color-mix(in srgb, var(--surface), var(--accent) 11%);
   --pl-quiet: var(--muted);
-  --pl-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --pl-mono: var(--font-mono);
   container-type: inline-size;
   display: grid;
   gap: 12px;

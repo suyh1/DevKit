@@ -1,3 +1,4 @@
+import Skeleton from './Skeleton';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Check, Code2, Download, FileText, Link2, ListPlus, ListTree, Plus, RefreshCw, Save, Settings2, Trash2, Upload, X } from 'lucide-react';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
@@ -193,7 +194,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
   const canAddChild = model.tasksByLine.has(line) || model.resumesByLine.has(line);
   const locked = busy || !canEdit;
   return <section className="td-workspace">
-    <header className="td-heading"><h1>待办清单</h1><div className="td-actions">
+    <header className="td-heading workspace-banner"><h1>待办清单</h1><div className="td-actions">
       {!portal && <SharingButton />}
       <button className="td-icon" type="button" aria-label="刷新清单" title="刷新清单" onClick={refresh} disabled={busy}><RefreshCw size={16} /></button>
       {canEdit && <button className="td-secondary" type="button" disabled={!documents || busy} onClick={() => importInput.current?.click()}><Upload size={16} />导入清单</button>}
@@ -202,7 +203,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     {canEdit && <input ref={importInput} type="file" hidden aria-label="选择清单文件" accept=".todo,.todos,.task,.tasks,.taskpaper,.txt,.md,text/plain" onChange={event => {
       const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void importList(file);
     }} />}
-    {!documents && !error && <p className="td-empty" role="status">正在读取清单…</p>}
+    {!documents && !error && <Skeleton kind="list" label="正在读取清单…" />}
     {error && <p className="td-alert" role="alert">{error}{dirty && <button type="button" onClick={() => void clearDraft()} disabled={busy}>载入主机版本</button>}</p>}
     {outdated && !error && <p className="td-alert" role="status">主机上的清单已变更。可先导出当前草稿，再载入主机版本。<button type="button" onClick={() => void clearDraft()} disabled={busy}>载入主机版本</button></p>}
     {documents && <div className="td-shell">
@@ -264,7 +265,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         </div>
         {canEdit && <TodoSyntaxActions active={active} key={sheet.id} model={model} editor={editor} line={line} locked={locked} portal={portal} />}
         <div className="td-editor-layout" data-outline={outline}>
-          <Suspense fallback={<p className="td-editor-loading" role="status">正在加载编辑器…</p>}>
+          <Suspense fallback={<Skeleton kind="editor" label="正在加载编辑器…" />}>
             <TodoTextEditor key={sheet.id} editorRef={setEditor} body={text} readOnly={locked} sourceMode={sourceMode} onChange={edit} onSave={save} onLine={setLine}
               onOpenReference={reference => void openReference(reference)} onNotice={setMessage}
               onConfirmCompletion={count => confirm({ title: '有验收条件尚未勾选', detail: `仍有 ${count} 项验收条件未勾选。可以继续验收，也可以将任务标为完成。`, confirm: '仍然完成', cancel: '继续验收' })}

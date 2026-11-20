@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { themeStyles, normalizeThemeStyle } from './themes';
 import {
   useCallback,
@@ -110,28 +111,19 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
     }}>
       <summary className="secondary-button"><SunMoon size={16} aria-hidden="true" /><span>外观</span></summary>
       <div className="portal-appearance-options">
-      <label className="portal-theme">运行模式<select aria-label="共享页面运行模式" value={mode} onChange={event => setMode(event.target.value === 'performance' ? 'performance' : 'normal')}>
-        <option value="normal">正常模式</option>
-        <option value="performance">性能模式</option>
-      </select></label>
+      <div className="choice-field portal-theme"><span>运行模式</span><SegmentedControl label="共享页面运行模式" value={mode}
+        options={[{ value: 'normal', label: '正常模式' }, { value: 'performance', label: '性能模式' }]} onChange={setMode} /></div>
       <label className="portal-theme">
         主题风格
         <select aria-label="共享页面主题风格" value={themeStyle} onChange={event => setThemeStyle(normalizeThemeStyle(event.target.value))}>
           {themeStyles.map(style => <option key={style.id} value={style.id}>{style.name}</option>)}
         </select>
       </label>
-      <label className="portal-theme">
-      明暗主题
-      <select
-        aria-label="共享页面主题"
-        value={theme}
-        onChange={(event) => setTheme(event.target.value as Theme)}
-      >
-        <option value="system">跟随系统</option>
-        <option value="light">浅色主题</option>
-        <option value="dark">深色主题</option>
-      </select>
-      </label>
+      <div className="choice-field portal-theme">
+      <span>明暗主题</span>
+      <SegmentedControl label="共享页面主题" value={theme}
+        options={[{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色主题' }, { value: 'dark', label: '深色主题' }]} onChange={setTheme} />
+      </div>
       </div>
     </details>
   );

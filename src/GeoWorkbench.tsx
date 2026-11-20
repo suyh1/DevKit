@@ -41,7 +41,10 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
     catch (error) { onNotice((error as Error).message); }
   }
   const field = (key: string, label: string, placeholder?: string) => <label className="geo-field"><span>{label}</span><input aria-label={label} value={o[key]} placeholder={placeholder} disabled={busy} autoComplete="off" spellCheck={false} onChange={e => update({ [key]: e.target.value })} /></label>;
-  const select = (key: string, label: string, choices: [string, string][]) => <label className="geo-field"><span>{label}</span><select aria-label={label} value={o[key]} disabled={busy} onChange={e => update({ [key]: e.target.value })}>{choices.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>;
+  const select = (key: string, label: string, choices: [string, string][]) => ['unit', 'inputOrder', 'representation', 'order', 'headers', 'delimiter', 'style'].includes(key)
+    ? <div className="geo-field"><span>{label}</span><SegmentedControl label={label} value={o[key]} disabled={busy}
+        options={choices.map(([value, title]) => ({ value, label: title }))} onChange={value => update({ [key]: value })} /></div>
+    : <label className="geo-field"><span>{label}</span><select aria-label={label} value={o[key]} disabled={busy} onChange={e => update({ [key]: e.target.value })}>{choices.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>;
   const outputOptions = (representation: string) => ({ ...o, representation });
   function usePoint(point: GeoPoint, target: 'convert' | 'circle') {
     const fields = coordinateInput(point);

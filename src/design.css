@@ -51,11 +51,6 @@ body { letter-spacing: .05px; }
 .library-heading h2>span { border-radius: 20px; font-size: 10px; padding: 2px 7px; }
 .library-search { border-radius: 10px; min-height: 38px; }
 .library-search input { width: 175px; }
-.segmented-control { position: relative; display: inline-flex; isolation: isolate; padding: 4px; gap: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 11px; }
-.segment-indicator { position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--segment-count)); border-radius: 7px; background: var(--surface); box-shadow: 0 2px 5px #17203310, 0 0 0 1px #17203308; transform: translateX(calc(var(--segment-index) * 100%)); transition: transform 240ms var(--ease-out); pointer-events: none; }
-.segmented-control>button { display: flex; align-items: center; justify-content: center; flex: 1; gap: 7px; padding: 7px 13px; min-height: 30px; background: transparent; border: 0; border-radius: 7px; color: var(--muted); font-size: 11px; white-space: nowrap; }
-.segmented-control>button[aria-pressed=true] { color: var(--accent); background: transparent; box-shadow: none; }
-.segmented-control>button:hover { color: var(--accent); background: transparent; }
 .view-toggle.segmented-control { flex-shrink: 0; }
 .view-toggle.segmented-control>button { width: 31px; min-height: 29px; padding: 6px; }
 .category-filters { gap: 5px; margin-bottom: 18px; }

@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import { useEffect, useRef, useState } from 'react';
 import {
   Upload,
@@ -236,19 +237,12 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             <Send />
             发送内容
           </h2>
-          <label>
-            发送方式
-            <select
-              aria-label="发送方式"
-              disabled={op.busy}
-              value={direct ? 'direct' : 'stored'}
-              onChange={(e) => setDirect(e.target.value === 'direct')}
-            >
-              <option value="direct">在线直传</option>
-              <option value="stored">主机暂存</option>
-            </select>
+          <div className="choice-field">
+            <span>发送方式</span>
+            <SegmentedControl label="发送方式" value={direct ? 'direct' : 'stored'} disabled={op.busy}
+              options={[{ value: 'direct', label: '在线直传' }, { value: 'stored', label: '主机暂存' }]} onChange={value => setDirect(value === 'direct')} />
             {direct && <small>文件从你的设备直接发给取件人。请保持页面在线，手机保持亮屏。</small>}
-          </label>
+          </div>
           <button className="collab-drop" disabled={op.busy} onClick={() => picker.current?.click()}>
             <span className="transfer-upload-icon">
               <Upload size={25} />
@@ -313,14 +307,11 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 placeholder={direct ? '为直传设置密码' : '留空可直接取件'}
               />
             </label>
-            <label>
-              有效期
-              <select disabled={op.busy} value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-                <option value={1}>1 小时</option>
-                <option value={24}>24 小时</option>
-                <option value={168}>7 天</option>
-              </select>
-            </label>
+            <div className="choice-field">
+              <span>有效期</span>
+              <SegmentedControl label="有效期" value={String(hours)} disabled={op.busy}
+                options={[{ value: '1', label: '1 小时' }, { value: '24', label: '24 小时' }, { value: '168', label: '7 天' }]} onChange={value => setHours(Number(value))} />
+            </div>
           </div>
           <div className="transfer-submit">
             <button
@@ -356,12 +347,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             <Inbox />
             共享收件箱 <span className="collab-count">{feed.value?.length ?? 0}</span>
           </h2>
-          <select aria-label="筛选收件箱" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">全部类型</option>
-            <option value="file">文件</option>
-            <option value="text">文字</option>
-            <option value="link">链接</option>
-          </select>
+          <SegmentedControl label="筛选收件箱" value={filter}
+            options={[{ value: 'all', label: '全部类型' }, { value: 'file', label: '文件' }, { value: 'text', label: '文字' }, { value: 'link', label: '链接' }]} onChange={setFilter} />
         </div>
         <details className="transfer-storage">
           <summary>主机存储{storedBytes !== undefined && ' · 暂存文件 ' + sizeOf(storedBytes)}</summary>

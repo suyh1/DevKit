@@ -45,7 +45,7 @@ module.exports = async (window, output) => {
     await click('选择文件'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
     await fill('显示名称', '订单服务 · 测试环境');
     await fill('JVM 参数（每行一个）', '-Xms64m\n-Xmx256m');
-    await js(`{const section=[...document.querySelectorAll('.jar-setting-section')].find(el=>el.querySelector('summary').textContent.includes('HTTP'));section.open=true; const input=section.querySelector('select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(input,'tcp');input.dispatchEvent(new Event('change',{bubbles:true}));}`);
+    await js(`{const section=[...document.querySelectorAll('.jar-setting-section')].find(el=>el.querySelector('summary').textContent.includes('HTTP'));section.open=true; section.querySelector('[aria-label="检测方式"] button[value=tcp]').click();}`);
     await wait('!![...document.querySelectorAll(".jar-dialog label")].find(el=>el.firstChild?.textContent === "TCP 端口")');
     await fill('TCP 端口', '8123');
     await fill('公共环境变量', 'APP_MODE=base\nTOKEN=a=b');
@@ -220,7 +220,7 @@ async function verifyHostEditor(window, output, click, wait) {
       title.left > icon.right && title.height < 30;
     }`), true, 'Host title fits on one line next to the icon');
     assert.equal(await js(`Array.from(document.querySelectorAll('.lan-host-form .lan-field')).every(field => {
-      const label = field.firstElementChild.getBoundingClientRect(), control = field.querySelector('input,select').getBoundingClientRect();
+      const label = field.firstElementChild.getBoundingClientRect(), control = field.querySelector('input,select,[role=group]').getBoundingClientRect();
       return label.bottom < control.top && Math.abs(label.left - control.left) < 2;
     })`), true, 'Host labels sit above left-aligned inputs');
     await capture('lan-host-ssh-dark.png');
