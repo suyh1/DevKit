@@ -78,6 +78,9 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
     [pickup, setPickup] = useState('');
   const [revealed, setRevealed] = useState<{ id: string; text: string }>();
   const [files, setFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [fileIssue, setFileIssue] = useState<{ file: File; message: string }>();
+  const [batchResult, setBatchResult] = useState('');
   const [direct, setDirect] = useState(true);
   const stagedInvite = useRef('');
   const finishInvite = useRelatedCreation('transfer', active && edit && !quickLink && !op.busy, (_from, invite) => {
@@ -123,9 +126,13 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
     void op.run(async () => {
       cancelled.current = false;
       let sent = 0;
+      const total = files.length + Number(!direct && !!text.trim());
+      let currentFile: File | undefined;
+      setBatchResult(''); setFileIssue(undefined);
       try {
         for (const file of files) {
           if (cancelled.current) break;
+          currentFile = file;
           if (direct) {
             if (typeof RTCPeerConnection === 'undefined') throw new Error('当前浏览器不支持 WebRTC 直传。');
             const { id } = await collab<{ id: string }>('transfer', 'publish', {
@@ -168,6 +175,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             throw error;
           }
         }
+        currentFile = undefined;
         if (!direct && !cancelled.current && text.trim()) {
           await collab('transfer', 'send', { text, hours, password });
           setText('');
@@ -182,7 +190,11 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
         return direct
           ? '已发布 ' + sent + ' 个直传文件，请保持此页面在线。'
           : (cancelled.current ? '已取消后续发送，' : '') + '已发送 ' + sent + ' 项';
+      } catch (failure) {
+        if (currentFile) setFileIssue({ file: currentFile, message: failure instanceof Error ? failure.message : String(failure) });
+        throw failure;
       } finally {
+        setBatchResult(`本次${direct ? '已发布直传' : '已发送'} ${sent} 项，剩余 ${total - sent} 项`);
         setProgress('');
         await feed.refresh();
       }
@@ -219,11 +231,13 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
       )}
       {edit && (
         <section
-          className="collab-compose"
+          className="collab-compose" data-dragging={dragging}
+          onDragEnter={e => { if (!op.busy && e.dataTransfer.types.includes('Files')) setDragging(true); }}
+          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            choose(Array.from(e.dataTransfer.files));
+            setDragging(false); choose(Array.from(e.dataTransfer.files));
           }}
           onPaste={(e) => {
             const files = Array.from(e.clipboardData.files);
@@ -265,7 +279,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
               {files.map((file, i) => (
                 <div key={i}>
                   <span>
-                    <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}
+                    <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}{fileIssue?.file === file && <small role="alert">{fileIssue.message}</small>}
                   </span>
                   <button
                     disabled={op.busy}
@@ -327,6 +341,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                   : '发送文字或链接'}
             </button>
           </div>
+          <p className="send-summary">{files.length} 个文件 · {sizeOf(files.reduce((sum,file) => sum + file.size,0) + (!direct ? new Blob([text]).size : 0))}{!direct && text.trim() ? ' · 含文字或链接' : ''} · {direct ? '在线直传' : '主机暂存'}</p>
+          {batchResult && <p role="status">{batchResult}{op.message && !fileIssue && pane === 'send' ? ` · ${op.message}` : ''}</p>}
           {progress && (
             <p role="status">
               {progress}{' '}
@@ -350,8 +366,10 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           <SegmentedControl label="筛选收件箱" value={filter}
             options={[{ value: 'all', label: '全部类型' }, { value: 'file', label: '文件' }, { value: 'text', label: '文字' }, { value: 'link', label: '链接' }]} onChange={setFilter} />
         </div>
+        {batchResult && <p role="status">{batchResult}</p>}
         <details className="transfer-storage">
           <summary>主机存储{storedBytes !== undefined && ' · 暂存文件 ' + sizeOf(storedBytes)}</summary>
+          {!!storedBytes && <><div className="storage-meter" aria-hidden="true">{feed.value?.filter(item => item.kind === 'file' && !item.direct && item.size).map((item,index) => <i key={item.id} style={{flexGrow:item.size,backgroundColor:`hsl(${(index * 61 + 158) % 360} 45% 45%)`}} />)}</div><ul>{feed.value?.filter(item => item.kind === 'file' && !item.direct).map(item => <li key={item.id}>{item.name} · {sizeOf(item.size)} · {(item.size * 100 / storedBytes).toFixed(1)}%</li>)}</ul></>}
           <p>主机暂存的文件在移除或到期时释放空间。在线直传的文件保留在发送设备，由收件人直接下载。</p>
           <small>
             存放位置{' '}

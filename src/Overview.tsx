@@ -1,3 +1,4 @@
+import { animate } from './motion-primitives';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
 import { ArrowUp, ArrowUpRight, ChevronDown, Clock3, LayoutGrid, List, Plus, Search, SearchX, Star } from 'lucide-react';
 import { MotionGroup, useMotionList } from './Motion';
@@ -182,7 +183,11 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
           <footer><span>{tool.category}</span><div>
             <button type="button" className="card-star" title="新建独立任务" aria-label={`新建${tool.name}任务`} onClick={() => onChoose(tool.id, true)}><Plus size={15} /></button>
             <button type="button" className={`card-star ${favorite ? 'is-favorite' : ''}`} aria-label={`${favorite ? '取消收藏' : '收藏'}${tool.name}`}
-              aria-pressed={favorite} onClick={() => onFavorite(tool.id)}><Star size={15} fill={favorite ? 'currentColor' : 'none'} /></button>
+              aria-pressed={favorite} onClick={event => {
+                const star = event.currentTarget.querySelector('svg');
+                if (star) animate(star, [{transform:'scale(1)'}, {transform:favorite ? 'scale(.8)' : 'scale(1.25) rotate(-12deg)'}, {transform:'scale(1)'}], {duration:220});
+                onFavorite(tool.id);
+              }}><Star size={15} fill={favorite ? 'currentColor' : 'none'} /></button>
           </div></footer>
         </article>;
       })}</div>

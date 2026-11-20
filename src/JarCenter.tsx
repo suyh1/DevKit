@@ -167,7 +167,7 @@ export default function JarCenter({ active }: { active: boolean }) {
     return () => { disposed = true; clearInterval(timer); };
   }, [logId, active, auto, available, readLogs, logSeconds]);
   async function command(item: JarInstance, command: JarCommand) {
-    if (command !== 'start' && !await confirm({ title: `${command === 'restart' ? '重启' : command === 'force-stop' ? '强制终止' : '停止'} ${item.name}？`, detail: command === 'force-stop' ? '将强制结束进程，未完成的请求或数据可能无法保存。' : (targetGroup(state?.groups, item.hostId)?.platform ?? state?.platform) === 'win32' ? 'Windows 将终止 Java 进程，无法保证 JVM 关闭钩子执行。重启会在确认进程退出后启动。' : `先发送 TERM，最多等待 ${item.stopTimeout} 秒。超时保留进程，之后可单独强制终止。`, confirm: command === 'restart' ? '重启 JAR' : command === 'force-stop' ? '强制终止' : '停止 JAR' })) return;
+    if (command !== 'start' && !await confirm({ title: `${command === 'restart' ? '重启' : command === 'force-stop' ? '强制终止' : '停止'} ${item.name}？`, slide: command === 'force-stop', detail: command === 'force-stop' ? `目标主机 ${targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')}。将强制结束进程，未完成的请求或数据可能无法保存。` : (targetGroup(state?.groups, item.hostId)?.platform ?? state?.platform) === 'win32' ? 'Windows 将终止 Java 进程，无法保证 JVM 关闭钩子执行。重启会在确认进程退出后启动。' : `先发送 TERM，最多等待 ${item.stopTimeout} 秒。超时保留进程，之后可单独强制终止。`, confirm: command === 'restart' ? '重启 JAR' : command === 'force-stop' ? '强制终止' : '停止 JAR' })) return;
     await task(async () => {
       try {
         const result = await jarRequest<{ output: string; status: JarStatus }>('command', { id: item.id, command });

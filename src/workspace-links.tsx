@@ -53,15 +53,17 @@ export function openWorkspaceLink(page: WorkspacePage, id?: string) {
   if (location.hash === hash) window.dispatchEvent(new Event('hashchange'));
   else location.hash = hash;
 }
-export function ResourceLink({ page, id }: { page: WorkspacePage; id: string }) {
+export function ResourceLink({ page, id, compact = false }: { page: WorkspacePage; id: string; compact?: boolean }) {
   const [status, setStatus] = useState('');
   const sharing = useSharingStatus();
   const addresses = page !== 'lan-hosts' && sharing?.running && sharing.services[page]?.enabled ? sharing.addresses : [];
-  return <button type="button" className="text-button" title={status || '复制资源链接'} aria-label={status || '复制资源链接'} onClick={() => {
-    const url = new URL(addresses.find(address => !/\/\/(?:127\.0\.0\.1|localhost):/.test(address)) || addresses[0] || location.href);
-    url.hash = workspaceHash(page, id);
-    void copyText(url.href).then(() => setStatus('链接已复制'), () => setStatus('复制链接失败'));
-  }}><Link2 size={14} /><span>{status || '复制链接'}</span></button>;
+  const url = new URL(addresses.find(address => !/\/\/(?:127\.0\.0\.1|localhost):/.test(address)) || addresses[0] || location.href);
+  url.hash = workspaceHash(page, id);
+  const field = <input readOnly value={url.href} aria-label="资源链接" onFocus={event => event.target.select()} />;
+  const copy = () => void copyText(url.href).then(() => setStatus('链接已复制'), () => setStatus('复制链接失败'));
+  const button = <button type="button" className="text-button" title={status || '复制资源链接'} aria-label={status || '复制资源链接'} onClick={copy}>
+    <Link2 size={14} /><span aria-live="polite">{status || '复制链接'}</span></button>;
+  return <span className={'resource-copy' + (compact ? ' compact' : '')}>{compact ? <>{button}{field}</> : <>{field}{button}</>}</span>;
 }
 
 export function workspaceSearch(pages: WorkspacePage[], add: (results: WorkspaceResult[]) => void) {

@@ -6,7 +6,7 @@ import { FileWarning, X } from 'lucide-react';
 import './confirmation.css';
 import { CloseChoice } from './DesktopClose';
 
-type Options = { title: string; detail: string; confirm: string; cancel?: string; context?: string };
+type Options = { title: string; detail: string; confirm: string; cancel?: string; slide?: boolean; context?: string };
 type Request = (options: Options) => Promise<boolean>;
 const ConfirmationContext = createContext<Request | null>(null);
 const ResetOverlayContext = createContext(() => {});
@@ -26,6 +26,7 @@ export function useBeforeUnload(dirty: boolean) {
   }, [dirty]);
 }
 function ConfirmationDialog({ options, settle }: { options: Options & { sequence: number }; settle: (allow: boolean) => void }) {
+  const slideStart = useRef<number | null>(null);
   const dialog = useRef<HTMLDialogElement>(null), cancel = useRef<HTMLButtonElement>(null);
   const heading = useId(), description = useId();
   useEffect(() => {
@@ -36,6 +37,7 @@ function ConfirmationDialog({ options, settle }: { options: Options & { sequence
     <button className="icon-button confirm-close" aria-label={options.cancel || '继续编辑'} onClick={() => settle(false)}><X size={17} /></button>
     <div className="confirm-heading"><span className="confirm-icon"><FileWarning size={21} /></span><div>{options.context && <small>{options.context}</small>}<h2 id={heading}>{options.title}</h2></div></div>
     <p id={description}>{options.detail}</p>
+    {options.slide && <label className="slide-confirm">拖到最右端并松开以确认<input aria-label="滑动确认强制终止" type="range" min={0} max={100} defaultValue={0} onPointerDown={e => { const bounds = e.currentTarget.getBoundingClientRect(); slideStart.current = e.clientX <= bounds.left + bounds.width * .2 ? e.pointerId : null; e.currentTarget.setPointerCapture(e.pointerId); }} onPointerCancel={e => { slideStart.current = null; e.currentTarget.value = '0'; }} onPointerUp={e => { if (slideStart.current === e.pointerId && e.currentTarget.valueAsNumber === 100) settle(true); else e.currentTarget.value = '0'; slideStart.current = null; }} onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.valueAsNumber === 100) settle(true); }} /></label>}
     <footer><button ref={cancel} className="confirm-cancel" onClick={() => settle(false)}>{options.cancel || '继续编辑'}</button><button className="confirm-discard" onClick={() => settle(true)}>{options.confirm}</button></footer>
   </dialog>;
 }

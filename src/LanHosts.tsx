@@ -309,9 +309,9 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
             const status = statuses.find(item => item.hostId === host.id);
             const link = portal && host.mode === 'share' ? workbenchLink(host.address) : undefined;
             return <li key={host.id} ref={host.id === linked ? linkedRow : undefined}>
-          <header><button type="button" className="lan-connection-select" aria-expanded={currentHost?.id === host.id} aria-controls={`lan-actions-${host.id}`} onClick={() => setFocusedHost(host.id)}>
+          <header><div className="host-preview"><button type="button" className="lan-connection-select" aria-expanded={currentHost?.id === host.id} aria-controls={`lan-actions-${host.id}`} onClick={() => setFocusedHost(host.id)}>
             {host.mode === 'ssh' ? <Terminal size={17} /> : <Globe size={17} />}<span><strong>{host.name}</strong><small>{endpoint(host)}</small></span>
-          </button>
+          </button><div className="host-preview-card"><strong>{host.name}</strong><span>{host.mode === 'ssh' ? 'SSH 主机' : '共享工作台'} · {endpoint(host)}</span><small>{host.group || '未分组'}{host.pinned ? ' · 已置顶' : ''}</small></div></div>
             {allowed('edit') && <><button className="icon-button" disabled={busy} aria-label={`${host.pinned ? '取消置顶' : '置顶'} ${host.name}`} aria-pressed={!!host.pinned} onClick={() => void task(async () => {
               setHosts(await lanRequest<LanHost[]>('save', { ...host, pinned: !host.pinned }));
             })}><Pin size={14} /></button>

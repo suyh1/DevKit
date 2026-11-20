@@ -33,20 +33,20 @@ export default function HttpKeyValues({
             disabled={disabled}
             onChange={(event) => patch(index, { enabled: event.target.checked })}
           />
-          <input
+          <label className="kv-label"><span>名称</span><input
             aria-label={`${label} ${index + 1} 名称`}
             placeholder="名称"
             value={row.key}
             disabled={disabled}
             onChange={(event) => patch(index, { key: event.target.value })}
-          />
-          <input
+          /></label>
+          <label className="kv-label"><span>值</span><input
             aria-label={`${label} ${index + 1} 值`}
             placeholder="值"
             value={row.value}
             disabled={disabled}
             onChange={(event) => patch(index, { value: event.target.value })}
-          />
+          /></label>
           <button
             type="button"
             className="icon-button"

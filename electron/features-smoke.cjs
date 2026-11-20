@@ -120,9 +120,12 @@ module.exports = async function featuresSmoke(window, output) {
   await snap('features-nginx-log'); await click('收起日志', '.ng-center');
   await js(`[...document.querySelectorAll('.ng-file-tabs button')].find(button=>button.textContent.includes('common.conf')).click()`);
   await click('全文编辑', '.ng-center'); await editor('.ng-source .cm-content', 'location /api/ { proxy_pass http://localhost:9001; }');
-  await js('document.querySelector(".nginx-workspace").scrollTop = 0');
+  // Leave the editor before scrolling back to the expanded configuration controls.
+  await js("document.activeElement?.blur()");
+  await wait("(() => { const root = document.querySelector('.nginx-workspace'); root.scrollTo({top:0,behavior:'instant'}); return document.querySelector('.ng-control-dock')?.dataset.stuck === 'false'; })()");
   await click('变更与引用预览', '.ng-center'); await wait('!!document.querySelector(".ng-review-modal[open] .change-preview")');
-  assert.match(await js('document.querySelector(".ng-review-modal").textContent'), /feature-b/);
+  assert.match(await js('document.querySelector(".impact-flow").textContent'), /feature-b/);
+  assert.match(await js('document.querySelector(".impact-graph select").value'), /common\.conf$/);
   assert.match(await js('document.querySelector(".change-preview").textContent'), /9001/);
   await snap('features-nginx-change-preview'); await click('返回编辑', '.ng-review-modal');
   await wait('!document.querySelector(".ng-review-modal")');

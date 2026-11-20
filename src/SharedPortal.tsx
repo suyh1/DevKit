@@ -245,6 +245,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       () =>
         hashPage() || (preference("devkit:portal-page", "projects") as Page),
     );
+  const [showPassword, setShowPassword] = useState(false);
   const [visitor, setVisitor] = useState(''), [password, setPassword] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(true),
@@ -403,7 +404,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     setMessage("");
     try {
       adopt(await projectRequest<Session>("login", { visitor, password }));
-      setPassword("");
+      setPassword(""); setShowPassword(false);
       setReauth(false);
       rememberLogout(false);
     } catch (error) {
@@ -432,7 +433,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
       offline = true;
     } finally {
       adopt({ authenticated: false, role: "viewer" });
-      setPassword("");
+      setPassword(""); setShowPassword(false);
       setSource(null);
       setReauth(false);
       setNotice("");
@@ -476,17 +477,12 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   const loginForm = (
     <form onSubmit={(event) => void login(event)}>
       <label>访客名称（共享口令登录可留空）<input autoComplete="username" maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} /></label>
-      <label>
-        访问口令
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-      </label>
-      <button className="run-button" disabled={busy}>
+      <div className="portal-password"><label htmlFor="visitor-login-password">访问口令</label>
+        <div className="password-entry"><input id="visitor-login-password" type={showPassword ? "text" : "password"} autoComplete="current-password"
+          required value={password} onChange={event => setPassword(event.target.value)} />
+          <button type="button" className="text-button" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "隐藏口令" : "显示口令"}</button></div>
+      </div>
+      <button type="submit" className="run-button" disabled={busy}>
         {busy ? "正在连接…" : "登录"}
       </button>
       {message && (

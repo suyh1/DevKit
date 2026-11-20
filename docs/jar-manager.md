@@ -127,3 +127,5 @@ Windows 的 Java 启动器还受其版本和系统原生字符集影响：旧版
 扩展参考 [Uptime Kuma](https://github.com/louislam/uptime-kuma)（MIT，独立 HTTP/TCP 监视）、[pm2-logrotate](https://github.com/keymetrics/pm2-logrotate)（MIT，大小与保留策略）及 [PM2 重启策略](https://pm2.keymetrics.io/docs/usage/restart-strategies/)（指数退避）。系统集成依据 [Windows 任务身份](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal)与 [systemd linger](https://www.freedesktop.org/software/systemd/man/257/loginctl.html) 文档自行实现，无新增依赖或外部代码复制。后续可按需增加批量操作、历史健康趋势、应用专用优雅关闭接口。
 
 验证：`npm run test:jar` 覆盖生命周期、PID 复用、环境覆盖、真实 HTTP/TCP、日志字节完整性与保留、退避策略及系统自启命令生成。完整 JDK 可额外编译并运行真实 JAR，验证独立守护、在线轮转、健康失败、重连、重试上限和停止取消；`DEVKIT_TEST_JAVA` 可指定 Java，或用 `JAVA_HOME` / `PATH`。`node scripts/smoke-desktop.mjs --jar-only` 覆盖桌面设置与 Electron Node 模式守护。`DEVKIT_TEST_STARTUP=1` 时可运行临时 Windows 任务注册/移除测试，测试结束清理自身创建的任务，不触发系统重启。
+
+强制终止的确认窗口列出目标主机、实例和未保存数据的风险。可从滑条左端拖至最右并松开，也可用键盘聚焦确认按钮。普通停止仍使用原有确认流程。

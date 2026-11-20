@@ -44,3 +44,5 @@
 对比[Dozzle](https://github.com/amir20/dozzle)（MIT，约14.8k stars，Go/Vue实时容器日志、多窗查看、不存储历史）与[lnav](https://github.com/tstack/lnav)（BSD-2-Clause，约10.8k，原生终端日志分析）。借鉴实时多窗及有界读取，复用现有Node/React与JAR/Nginx注册表；不复制代码，不引入Docker、Go或原生终端依赖。
 
 后端验证：`npm run test:logs`。构建后真实桌面与共享验证：`node scripts/smoke-desktop.mjs --logs-only`，覆盖轮转、拆分UTF-8、暂停/清空、正则超时、脱敏、导出权限、四窗与移动菜单。
+
+在宽屏来源栏右侧拖动分隔条可调整宽度，左右方向键逐步调整，Home 或双击恢复默认宽度。窄屏在来源列表顶部向下拉动、松开后刷新目录；暂停接收时仍可使用“刷新来源”。

@@ -54,7 +54,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
           options={[{ value: 'comfortable', label: '舒适' }, { value: 'compact', label: '紧凑' }]} />
       </div>
       <label className="setting-row"><span><strong>启动页面</strong><small>直接进入指定工具；不自动保存输入内容</small></span><select value={preferences.startup} onChange={event => update({ startup: event.target.value as Preferences['startup'] })}><option value="home">工作台总览</option>{tools.map(tool => <option key={tool.id} value={tool.id}>{tool.name}</option>)}</select></label></section>
-    <section className="settings-section"><h2>编辑器</h2><label className="setting-row"><span><strong>代码字号</strong><small>应用到所有任务和颜色代码区域</small></span><select value={preferences.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })}>{[12, 13, 14, 15, 16, 17, 18].map(size => <option key={size} value={size}>{size} px</option>)}</select></label>
+    <section className="settings-section"><h2>编辑器</h2><label className="setting-row"><span><strong>代码字号</strong><small>应用到所有任务和颜色代码区域</small></span><span className="font-slider"><code style={{ fontSize: preferences.fontSize }}>Aa 01</code><input aria-label="代码字号" list="font-size-ticks" type="range" min={12} max={18} value={preferences.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /><datalist id="font-size-ticks">{[12,13,14,15,16,17,18].map(size => <option key={size} value={size} />)}</datalist><output>{preferences.fontSize} px</output></span></label>
       <div className="setting-row">
         <span><strong>默认缩进</strong><small>Tab 缩进即时生效；格式化默认值用于新任务</small></span>
         <SegmentedControl label="默认缩进" value={preferences.indent} onChange={(indent) => update({ indent })}
@@ -65,7 +65,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
         <SegmentedControl label="默认布局" value={preferences.layout} onChange={(layout) => update({ layout })}
           options={[{ value: 'split', label: '左右分栏' }, { value: 'stack', label: '上下布局' }]} />
       </div>
-      <label className="setting-row"><span><strong>自动换行</strong><small>长行在编辑区内折行显示</small></span><input type="checkbox" checked={preferences.wrap} onChange={event => update({ wrap: event.target.checked })} /></label></section>
+      <label className="setting-row"><span><strong>自动换行</strong><small>长行在编辑区内折行显示</small></span><input className="liquid-toggle" type="checkbox" checked={preferences.wrap} onChange={event => update({ wrap: event.target.checked })} /></label></section>
     <WindowCloseSetting />
     <section className="settings-section">
       <h2><Monitor size={17} />性能</h2>

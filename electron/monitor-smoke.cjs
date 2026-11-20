@@ -49,10 +49,10 @@ module.exports = async (window, output) => {
     const sharing = await js(`window.devkitProjects.request('start',${JSON.stringify(settings)})`); assert.equal(sharing.error, undefined);
     remote = new BrowserWindow({ show: true, width: 1440, height: 900, webPreferences: { partition: 'monitor-smoke', sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     await remote.loadURL(`http://127.0.0.1:${port}/#monitor`);
-    await wait(remote.webContents, `!!document.querySelector('.portal-login input[type=password]')&&!document.querySelector('.portal-login button').disabled`);
+    await wait(remote.webContents, `!!document.querySelector('.portal-login input[type=password]')&&!document.querySelector('.portal-login button[type=submit]').disabled`);
     await remote.webContents.executeJavaScript(`(()=>{const e=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'monitor-smoke-only');e.dispatchEvent(new Event('input',{bubbles:true}))})()`, true);
     await new Promise(resolve => setTimeout(resolve, 100));
-    await remote.webContents.executeJavaScript(`document.querySelector('.portal-login button').click()`, true);
+    await remote.webContents.executeJavaScript(`document.querySelector('.portal-login button[type=submit]').click()`, true);
     await wait(remote.webContents, `document.querySelector('.monitor-card .monitor-status')?.textContent==='正常'`);
     assert.equal(await remote.webContents.executeJavaScript(`!![...document.querySelectorAll('.monitor-center button')].find(e=>e.textContent==='添加监控'||e.textContent==='立即检测')`), false, 'Read-only visitor cannot edit or run checks');
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar nav button').length`), 1, 'Only monitoring service is exposed');

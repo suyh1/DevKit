@@ -80,6 +80,7 @@ export default function ApiDebug({
   useEffect(() => { setOverrides(initialRequest ? debugOverrides(definition, initialRequest.endpoint) : {}); setMultipart(null); }, [initialRequest?.id, resetRequest]);
   useBeforeUnload(hasOverrides);
   useEffect(() => { onDraftChange?.(hasOverrides); return () => onDraftChange?.(false); }, [hasOverrides, onDraftChange]);
+  const [elapsed, setElapsed] = useState(0);
   const timeout = endpoint.timeout;
   const [running, setRunning] = useState(false),
     [response, setResponse] = useState<HttpResponse | null>(null),
@@ -109,6 +110,12 @@ export default function ApiDebug({
       return { value: null, error: String(error) };
     }
   }, [project, endpoint, environment, timeout, multipart]);
+  useEffect(() => {
+    if (!running) return;
+    const start = performance.now();
+    const timer = setInterval(() => setElapsed((performance.now() - start) / 1000), 200);
+    return () => clearInterval(timer);
+  }, [running]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -150,7 +157,7 @@ export default function ApiDebug({
       snapshot = structuredClone(endpoint),
       id = newProjectId();
     live.current = id;
-    setRunning(true);
+    setElapsed(0); setRunning(true);
     onBusy(true);
     setError("");
     setResponse(null);
@@ -314,7 +321,7 @@ export default function ApiDebug({
         )}
       </details>
       {running && (
-        <p role="status">正在发送请求；取消和超时将终止连接、读取或解压。</p>
+        <p><span role="status">正在发送请求</span>（<span role="timer" aria-live="off">{elapsed.toFixed(1)} 秒</span>）；取消和超时将终止连接、读取或解压。</p>
       )}
       {!response && !running && (
         <div className="api-response-empty">

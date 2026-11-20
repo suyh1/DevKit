@@ -6,6 +6,7 @@ import './theme-tokens.css';
 import './collaboration.css';
 import './segmented-control.css';
 import './motion.css';
+import './adaptations.css';
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 function applySystemTheme() {

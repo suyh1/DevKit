@@ -27,6 +27,18 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
   const [draft, setDraft] = useState<MonitorConfig | null>(null), [revision, setRevision] = useState(0), [remove, setRemove] = useState<Monitor | null>(null);
   const [sources, setSources] = useState<{ label: string; source: MonitorSource }[]>([]), [sourceError, setSourceError] = useState('');
   const [start, setStart] = useState(''), [end, setEnd] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  useEffect(() => { if (!draft) setSubmitted(false); }, [!!draft]);
+  const issues: Record<string,string> = {};
+  if (draft && !draft.source && draft.type === 'http') {
+    try { const target = new URL(draft.url); if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) throw new Error(); }
+    catch { issues.url = '请输入不含用户名和密码的完整 HTTP(S) 地址。'; }
+  }
+  if (draft && !draft.source && draft.type === 'tcp') {
+    if (!draft.host.trim() || /[\s/\\?#@]/.test(draft.host.trim())) issues.host = '请输入主机名或 IP，不含协议和路径。';
+    if (!Number.isInteger(draft.port) || draft.port < 1 || draft.port > 65535) issues.port = '端口应为 1–65535 之间的整数。';
+  }
+  if (draft && (draft.source?.type === 'project' || !draft.source && draft.type === 'http') && (!Number.isInteger(draft.status) || draft.status < 100 || draft.status > 599)) issues.status = '预期状态码应为 100–599 之间的整数。';
   const generation = useRef(0), working = useRef(false);
   const edit = canWriteWorkspace('monitor'), operate = canOperateMonitor();
   async function refresh() {
@@ -114,7 +126,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
       </article>)}</div>
       {current && <aside className="monitor-detail"><div className="monitor-detail-heading"><h2>{current.name}</h2><span className={`monitor-status ${current.state}`}>{labels[current.state]}</span></div><p>{current.detail || '启用后将由主机自动检测。'}</p><dl><div><dt>最近检测</dt><dd>{time(current.checkedAt)}</dd></div><div><dt>24 小时已保存样本</dt><dd>{current.sampleCount} 次</dd></div><div><dt>故障确认</dt><dd>连续失败 {current.failures} 次</dd></div><div><dt>超时</dt><dd>{current.timeout} 秒</dd></div></dl>{operate && (current.runRestriction ? <p>{current.runRestriction}</p> : <button className="secondary-button" disabled={busy || current.checking || !current.enabled || current.state === 'maintenance'} onClick={() => void action('check', { id: current.id })}><RefreshCw size={14} />立即检测</button>)}
         {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}{current.source && <RelatedLink {...monitorSourceLink(current.source)}>{current.source.type === 'project' ? '查看来源项目' : current.source.type === 'jar' ? '查看来源 JAR' : '查看来源主机'}</RelatedLink>}<ResourceLink page="monitor" id={current.id} />
-        <h3>响应耗时</h3>{current.samples.length ? <Latency key={current.id} monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
+        <SampleBars monitor={current} /><h3>响应耗时</h3>{current.samples.length ? <Latency key={current.id} monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
         <h3>事件时间线</h3>
         {timeline.length ? <ol className="monitor-incidents">{timeline.map(item => <li key={item.key}>
           <span className={`monitor-status ${item.state}`}>{item.label}</span>
@@ -124,7 +136,12 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
       </aside>}
     </div>}
     <MotionPresence kind="dialog" present={!!draft}>{draft && <Modal active={active} title={draft.id ? '编辑监控' : '添加监控'} close={() => setDraft(null)} draft={{ ...draft, start, end }} busy={busy}>
-      <form className="monitor-form" onSubmit={event => { event.preventDefault(); if (!!start !== !!end) { setError('请同时填写维护开始与结束时间。'); return; } void action('upsert', { revision, monitor: { ...draft, maintenance: start && end ? { start: new Date(start).toISOString(), end: new Date(end).toISOString() } : null } }, () => setDraft(null)); }}>
+      <form className="monitor-form" noValidate onSubmit={event => { event.preventDefault(); setSubmitted(true);
+        const form = event.currentTarget;
+        for (const control of Array.from(form.elements)) {
+          if (!(control instanceof HTMLInputElement) || control.disabled) continue;
+          if (issues[control.name] || !control.validity.valid) { control.focus(); if (!issues[control.name]) control.reportValidity(); return; }
+        } if (!!start !== !!end) { setError('请同时填写维护开始与结束时间。'); return; } void action('upsert', { revision, monitor: { ...draft, maintenance: start && end ? { start: new Date(start).toISOString(), end: new Date(end).toISOString() } : null } }, () => setDraft(null)); }}>
         {error && <p className="pc-error" role="alert">{error}</p>}{restrictedSource ? <p className="pc-notice">{restrictedSource}</p> : frozen && <p className="pc-notice">编辑运行中的监控需要运行权限，请联系主机管理者。</p>}
         <Field label="监控名称"><input required maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></Field>
         <Field label="检测来源"><select value={draft.source ? JSON.stringify(draft.source) : ''} onChange={event => setDraft({ ...draft, source: event.target.value ? JSON.parse(event.target.value) : null })}><option value="">自定义地址</option>{draft.source && !sources.some(item => JSON.stringify(item.source) === JSON.stringify(draft.source)) && <option value={JSON.stringify(draft.source)}>当前关联（来源未开放或已删除）</option>}{sources.map(item => <option key={JSON.stringify(item.source)} value={JSON.stringify(item.source)}>{item.label}</option>)}</select></Field>
@@ -135,8 +152,8 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
           <CreateRelated from="monitor" page="lan-hosts">新建主机</CreateRelated>
         </div>
         {sourceError && <p role="alert">关联来源读取失败：{sourceError}。仍可填写自定义地址。</p>}
-        {!draft.source && <><div className="pc-field choice-field"><span>检测类型</span><SegmentedControl label="检测类型" value={draft.type} options={[{ value: 'http', label: 'HTTP / HTTPS' }, { value: 'tcp', label: 'TCP 端口' }]} onChange={type => setDraft({ ...draft, type })} /></div>{draft.type === 'http' ? <Field label="检测地址"><input required type="url" placeholder="https://example.com/health" value={draft.url} onChange={event => setDraft({ ...draft, url: event.target.value })} /></Field> : <div className="monitor-form-row"><Field label="主机名 / IP"><input required value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} /></Field><Field label="端口"><input required type="number" min={1} max={65535} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></Field></div>}</>}
-        {(draft.source?.type === 'project' || !draft.source && draft.type === 'http') && <Field label="预期 HTTP 状态码"><input required type="number" min={100} max={599} value={draft.status} onChange={event => setDraft({ ...draft, status: Number(event.target.value) })} /></Field>}
+        {!draft.source && <><div className="pc-field choice-field"><span>检测类型</span><SegmentedControl label="检测类型" value={draft.type} options={[{ value: 'http', label: 'HTTP / HTTPS' }, { value: 'tcp', label: 'TCP 端口' }]} onChange={type => setDraft({ ...draft, type })} /></div>{draft.type === 'http' ? <Field label="检测地址"><input name="url" aria-invalid={submitted && !!issues.url} aria-describedby={submitted && issues.url ? "monitor-error-url" : undefined} required type="url" placeholder="https://example.com/health" value={draft.url} onChange={event => setDraft({ ...draft, url: event.target.value })} />{submitted && issues.url && <small id="monitor-error-url" className="pc-error">{issues.url}</small>}</Field> : <div className="monitor-form-row"><Field label="主机名 / IP"><input name="host" aria-invalid={submitted && !!issues.host} aria-describedby={submitted && issues.host ? "monitor-error-host" : undefined} required value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} />{submitted && issues.host && <small id="monitor-error-host" className="pc-error">{issues.host}</small>}</Field><Field label="端口"><input name="port" aria-invalid={submitted && !!issues.port} aria-describedby={submitted && issues.port ? "monitor-error-port" : undefined} required type="number" min={1} max={65535} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} />{submitted && issues.port && <small id="monitor-error-port" className="pc-error">{issues.port}</small>}</Field></div>}</>}
+        {(draft.source?.type === 'project' || !draft.source && draft.type === 'http') && <Field label="预期 HTTP 状态码"><input name="status" aria-invalid={submitted && !!issues.status} aria-describedby={submitted && issues.status ? "monitor-error-status" : undefined} required type="number" min={100} max={599} value={draft.status} onChange={event => setDraft({ ...draft, status: Number(event.target.value) })} />{submitted && issues.status && <small id="monitor-error-status" className="pc-error">{issues.status}</small>}</Field>}
         <div className="monitor-form-row">{([{ key: 'interval', label: '检测间隔（秒）', min: 10, max: 86400 }, { key: 'timeout', label: '超时（秒）', min: 1, max: 60 }, { key: 'failures', label: '连续失败确认次数', min: 1, max: 10 }] as const).map(field => <Field label={field.label} key={field.key}><input required type="number" min={field.min} max={field.max} value={draft[field.key]} onChange={event => setDraft({ ...draft, [field.key]: Number(event.target.value) })} /></Field>)}</div>
         <fieldset><legend>维护窗口（可选，期间暂停检测）</legend><div className="monitor-form-row"><Field label="开始时间"><input type="datetime-local" value={start} onChange={event => setStart(event.target.value)} /></Field><Field label="结束时间"><input type="datetime-local" value={end} onChange={event => setEnd(event.target.value)} /></Field></div></fieldset>
         {operate && <fieldset><legend>Webhook 通知</legend>
@@ -192,4 +209,21 @@ function RollingMilliseconds({ value }: { value: number }) {
       return <span className="monitor-digit" key={place}><span style={{ transform: `translateY(-${fraction}em)` }}>{char}<br />{(Number(char) + 1) % 10}</span></span>;
     })}
   </span></>;
+}
+
+function SampleBars({ monitor }: { monitor: Monitor }) {
+  const samples = monitor.samples.slice(-60);
+  if (!samples.length) return <p>暂无检测分布样本。</p>;
+  const last = Date.parse(samples[samples.length - 1].at), first = Date.parse(samples[0].at);
+  const width = Math.max(60000, Math.ceil((last - first + 1) / 8));
+  const buckets = Array.from({length:8}, (_,index) => ({ from:last + 1 - (8-index)*width, ok:0, fail:0 }));
+  for (const sample of samples) {
+    const index = Math.floor((Date.parse(sample.at) - buckets[0].from) / width);
+    if (buckets[index]) buckets[index][sample.ok ? 'ok' : 'fail']++;
+  }
+  const max = Math.max(1,...buckets.map(bucket => bucket.ok + bucket.fail));
+  return <figure className="sample-bars"><figcaption>检测次数 · 最近 {samples.length} 个样本</figcaption><div>{buckets.map(bucket => {
+    const label = time(new Date(bucket.from).toISOString()) + ' 起 · ' + (bucket.ok + bucket.fail ? `成功 ${bucket.ok}，失败 ${bucket.fail}` : '无样本');
+    return <span key={bucket.from} tabIndex={0} aria-label={label} title={label}><i style={{height:bucket.ok / max * 48}} /><b style={{height:bucket.fail / max * 48}} /><small>{bucket.ok + bucket.fail || '—'}</small><em>{label}</em></span>;
+  })}</div></figure>;
 }

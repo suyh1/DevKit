@@ -1,5 +1,5 @@
 import SegmentedControl from './SegmentedControl';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { CalendarDays, GitBranch, Layers, LayoutList, Link2, ListChecks, Play, Repeat2 } from 'lucide-react';
 import { todoGroupAt, todoTaskTitle } from '../shared/todo-text.mjs';
 import type { TodoModel } from '../shared/todo-text.mjs';
@@ -22,6 +22,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
   const [draft, setDraft] = useState<{ action: TodoSyntaxAction; fields: TodoSyntaxFields; model: TodoModel } | null>(null);
   const [error, setError] = useState('');
   const [shares, setShares] = useState<{ id: string; name: string }[]>();
+  const peopleList = useId();
   const guard = useWorkspaceGuard();
   async function loadShares() {
     if (!guard('file-shares')) return;
@@ -81,7 +82,10 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
   return <>
     <div className="td-toolbar td-syntax-toolbar" role="group" aria-label="待办扩展操作">
       {actions.filter(([name]) => primary.includes(name)).map(actionButton)}
-      <details className="td-more"><summary>扩展语法</summary><div>{actions.filter(([name]) => !primary.includes(name)).map(actionButton)}</div></details>
+      <details className="td-more"><summary>扩展语法</summary><div>{([['任务进展', ['check','resume','dependency','wait','repeat']], ['组织清单', ['view','reference','defaults']]] as const).map(([label, names]) => {
+        const items = actions.filter(([name]) => (names as readonly string[]).includes(name) && !primary.includes(name));
+        return items.length > 0 && <fieldset key={label}><legend>{label}</legend>{items.map(actionButton)}</fieldset>;
+      })}</div></details>
     </div>
     {draft && fields && <Modal active={active} title={label!} closeLabel="关闭待办扩展操作" close={() => setDraft(null)} draft={fields} className="td-settings-dialog">
       <form className="td-settings td-syntax-form" onSubmit={event => { event.preventDefault(); submit(); }}>
@@ -118,7 +122,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
           </select></label>}
           {input('引用名称或 ID', fields.option === '共享' ? '例如 发布材料' : '例如 JSON 格式化')}
         </>}
-        {action === 'wait' && input('等待对象', '例如 测试同事', false)}
+        {action === 'wait' && <label className="pc-field">等待对象<input maxLength={240} list={peopleList} value={fields.primary} onChange={e => update({ primary: e.target.value })} /><datalist id={peopleList}>{[...new Set(tasks.map(({task}) => task.waiting?.person).filter(Boolean))].map(person => <option key={person} value={person} />)}</datalist></label>}
         {action === 'repeat' && <label className="pc-field">重复周期<select required value={fields.option} onChange={event => update({ option: event.target.value })}>
           <option value="">选择周期</option>{todoRepeatRules.map(rule => <option key={rule} value={rule}>{rule}</option>)}
         </select></label>}

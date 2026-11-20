@@ -54,6 +54,13 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
     if (query.startsWith('@')) return hasTag(task, query);
     return !query || `${task.text} ${task.path} ${task.resume?.text ?? ''} ${task.waiting?.person ?? ''}`.toLowerCase().includes(query);
   });
+  const [resumeLine, setResumeLine] = useState(0);
+  const steps = tasks.flatMap(task => !task.archived && task.status === 'open' && task.resume ? [task.resume] : []);
+  const position = steps.findIndex(step => step.line === resumeLine);
+  function navigateStep(delta: number) {
+    const index = position < 0 ? (delta > 0 ? 0 : steps.length - 1) : (position + delta + steps.length) % steps.length;
+    const next = steps[index]; setResumeLine(next.line); jump(next.line);
+  }
   const matched = new Set(tasks.map(task => task.section));
   const rows = [
     ...model.sections.filter(section => (!query && mode === 'all' && !view) || matched.has(section.line)),
@@ -70,6 +77,7 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
         {model.views.length > 0 && <optgroup label="自定义视图">{model.views.map(item => <option key={item.name} value={`view:${item.name}`}>{item.name}</option>)}</optgroup>}
       </select>
     </div>
+    {!!steps.length && <nav className="resume-player" aria-label="浏览续做点"><button aria-label="上一个续做点" onClick={() => navigateStep(-1)}>‹</button><span>{position >= 0 ? steps[position].text : '继续做'} · {position >= 0 ? (position + 1) + '/' : ''}{steps.length}</span><button aria-label="下一个续做点" onClick={() => navigateStep(1)}>›</button></nav>}
     {rows.length ? <ul>{rows.map(item => {
       if (item.kind === 'section') return <li key={item.line}>
         <button type="button" className="td-outline-section" onClick={() => jump(item.line)}><ListTree size={14} /><strong>{item.path}</strong><small>{item.line}</small></button>
@@ -87,7 +95,7 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
             <progress aria-label="验收进度" value={checked} max={item.checks.length} />
           </span> : <small>{item.line}</small>}
         </button>
-        <div className="td-outline-details">
+        <div className="td-outline-details">{item.checks.length > 0 && <details><summary>验收明细</summary>{item.checks.map(check => <button key={check.line} onClick={() => jump(check.line)}>{check.checked ? '已验收' : '待验收'} · {check.text}</button>)}</details>}
           {resume && <button type="button" className="td-outline-resume" onClick={() => jump(resume.line)}><Play size={12} aria-hidden="true" /><span>继续做 · {resume.text}</span></button>}
           {!item.archived && item.status === 'open' && item.waiting && <small data-due={followUp}>
             <CalendarDays size={12} aria-hidden="true" /><span>{followUp ? '回访到期' : '等待回访'}{item.waiting.person && ` · ${item.waiting.person}`}{item.waiting.review && ` · ${item.waiting.review}`}</span>

@@ -137,6 +137,7 @@ function SharingPanel({
   refresh: () => Promise<Sharing>;
   accept: (value: Sharing) => void;
 }) {
+  const published = useSharingStatus();
   const [draft, setDraft] = useState<Sharing | null>(null),
     [password, setPassword] = useState(""),
     [busy, setBusy] = useState(true);
@@ -491,7 +492,7 @@ function SharingPanel({
                             <strong>{service.name}</strong>
                             <small>{service.description}</small>
                           </span>
-                          <em>{policy.enabled ? "已选择" : "未开放"}</em>
+                          <em>{policy.enabled ? "已选择" : "未选择"} · {published?.running && published.services[service.id]?.enabled ? "已发布" : "未发布"}</em>
                         </label>
                         <fieldset
                           className="sharing-service-permissions"
@@ -571,7 +572,7 @@ function SharingPanel({
                     return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
                       <div className="pc-form-grid">
                         <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
-                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /></Field>
+                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /><small aria-live="polite">{!visitor.password && existing ? '留空将保留原口令' : `${visitor.password?.length || 0}/128 位 · ${(visitor.password?.length || 0) >= 8 ? '已满足长度要求' : '至少需要 8 位'}`}</small></Field>
                       </div>
                       {workspaceModules.map(item => {
                         const name = item.id, service = visitor.services[name];

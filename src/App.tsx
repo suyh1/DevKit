@@ -1,9 +1,11 @@
+import ActionPopover from './ActionPopover';
+import { ToastStack, type Notice } from './ToastStack';
 import { SharingProvider, SharingButton } from './Sharing';
-import { MotionPresence, MotionToast, MotionText, useMotionList, MotionGroup, MotionButton } from './Motion';
+import { MotionPresence, useMotionList, MotionGroup, MotionButton } from './Motion';
 import HttpWorkbench from './HttpWorkbench';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, Undo2, Check, CopyPlus, LoaderCircle } from 'lucide-react';
+import { Search, Star, ShieldCheck, PanelLeftClose, PanelLeftOpen, Code2, LayoutGrid, Clock3, Settings2, Plus, X, Save, FolderOpen, CopyPlus, LoaderCircle } from 'lucide-react';
 import { tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { isColorTool } from './colors';
@@ -64,7 +66,19 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [searchOpen, setSearchOpen] = useState(false), [saveOpen, setSaveOpen] = useState(false), [includeSensitive, setIncludeSensitive] = useState(false);
   const [sharedOrderSource, setSharedOrderSource] = useState<HTMLButtonElement | null>(null);
-  const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const noticeId = useRef(0);
+  const [freshSearch, setFreshSearch] = useState(false);
+  const [hint, setHint] = useState<{label:string; left:number; top:number}>();
+  function showSidebarHint(target: EventTarget | null) {
+    const anchor = target instanceof Element && target.closest<HTMLButtonElement>('button[title]');
+    if (!collapsed || narrow || !anchor) { setHint(undefined); return; }
+    const rect = anchor.getBoundingClientRect();
+    setHint({label:anchor.title,left:rect.right + 10, top:rect.top + rect.height / 2});
+  }
+  function chooseTask(fresh: boolean) {
+    setFreshSearch(fresh); setSearchOpen(true);
+  }
   const [sharedColor, setSharedColor] = useState('#147D64');
   const [colorFavorites, setColorFavorites] = useState(savedColors);
   const jobs = useRef(new Map<string, Job>()), execute = useRef<(() => void) | null>(null);
@@ -73,7 +87,8 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   const activeTask = tasks.find(task => task.id === activeId);
   const currentTool = tools.find(tool => tool.id === activeTask?.toolId);
   const sharedModules = preferences.sharedModuleOrder.map(id => workspaceModules.find(item => item.id === id)!);
-  function notice(message: string, undo?: () => void) { setToast({ message, undo }); }
+  const runningTasks = tasks.filter(task => task.status === 'running');
+  function notice(message: string, undo?: () => void) { const entry = { id: ++noticeId.current, message, undo }; setNotices(old => [...old, entry].slice(-3)); }
   function patch(id: string, values: Partial<Task>) { setTasks(current => current.map(task => task.id === id ? { ...task, ...values } : task)); }
   function edit(id: string, values: Partial<Task>) {
     // An asynchronous paste/import may finish after a keyboard-triggered run starts.
@@ -126,6 +141,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     stop(id); setTasks(current => current.filter(item => item.id !== id));
     if (activeId === id) { const next = tasks[index + 1] || tasks[index - 1]; setActiveId(next?.id ?? null); if (!next) setPage('home'); }
     notice(`已关闭 ${tools.find(tool => tool.id === task.toolId)!.name}${isColorTool(task.toolId) ? '，图片与颜色面板临时状态已释放' : ''}`, isColorTool(task.toolId) ? undefined : () => {
+      if (tasksRef.current.some(item => item.id === id)) { focusTask(id); return; }
       if (tasksRef.current.length >= MAX_TASKS) { notice('任务已满，暂时无法恢复。'); return; }
       setTasks(current => [...current.slice(0, index), { ...task, status: task.status === 'running' ? 'cancelled' : task.status }, ...current.slice(index)]); focusTask(id);
     });
@@ -200,14 +216,14 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     document.addEventListener('keydown', trap);
     return () => { document.removeEventListener('keydown', trap); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
   }, [narrow, collapsed]);
-  useEffect(() => { if (!toast) return; const timeout = setTimeout(() => setToast(null), toast.undo ? 12_000 : 6000); return () => clearTimeout(timeout); }, [toast]);
   useEffect(() => { if (saveOpen) saveDialog.current?.showModal(); else saveDialog.current?.close(); }, [saveOpen]);
   useEffect(() => { tabs.current?.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [activeId, page]);
 
   useMotionList(tabs, tasks.map(task => task.id).join('|'));
   return <div className={`app ${collapsed ? narrow ? 'drawer-closed' : 'sidebar-collapsed' : ''}`} data-density={preferences.density} style={{ '--code-size': `${preferences.fontSize}px` } as CSSProperties}>
 <MotionPresence kind="drawer" present={!collapsed && narrow}>{!collapsed && narrow && <button className="sidebar-backdrop" tabIndex={-1} aria-label="关闭工具导航" onClick={() => setCollapsed(true)} />}</MotionPresence>
-    <aside inert={narrow && collapsed} className="sidebar" role={narrow && !collapsed ? 'dialog' : undefined} aria-modal={narrow && !collapsed ? true : undefined} aria-label="工具导航与工作台"><button className="brand" onClick={() => navigate('home')} title="工作台总览"><span className="brand-mark"><Code2 size={23} /></span><span className="brand-word"><strong>DevKit<span>.</span></strong><small>本地开发工作台</small></span></button>
+    {collapsed && !narrow && hint && <div role="tooltip" className="sidebar-hint" style={{left:hint.left,top:hint.top}}>{hint.label}</div>}
+    <aside onPointerOver={e => { if (e.pointerType !== 'touch') showSidebarHint(e.target); }} onPointerLeave={() => setHint(undefined)} onFocus={e => showSidebarHint(e.target)} onBlur={() => setHint(undefined)} onClick={() => setHint(undefined)} inert={narrow && collapsed} className="sidebar" role={narrow && !collapsed ? 'dialog' : undefined} aria-modal={narrow && !collapsed ? true : undefined} aria-label="工具导航与工作台"><button className="brand" onClick={() => navigate('home')} title="工作台总览"><span className="brand-mark"><Code2 size={23} /></span><span className="brand-word"><strong>DevKit<span>.</span></strong><small>本地开发工作台</small></span></button>
       {narrow && <button className="sidebar-search" aria-label="打开工具搜索" onClick={() => { setCollapsed(true); setSearchOpen(true); }}><Search size={15} /><span>搜索工具或用途</span><kbd>Ctrl K</kbd></button>}
       <div className="sidebar-workspace">{([{ id: 'home', label: '工作台', Icon: LayoutGrid, count: tools.length }, { id: 'favorites', label: '我的收藏', Icon: Star, count: favorites.length }, { id: 'recent', label: '最近使用', Icon: Clock3, count: recent.length }] as const).map(item => <button className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined} title={item.label} key={item.id} onClick={() => navigate(item.id)}><item.Icon size={17} /><span>{item.label}</span><small>{item.count}</small></button>)}</div>
       <CategoryNavigation dismissKey={`${collapsed}-${searchOpen}-${page}`} activeToolId={page === 'task' ? activeTask?.toolId : undefined} tasks={tasks} narrow={narrow} onChoose={openTool} page={page} onChooseWorkspace={navigate} sharedModules={sharedModules} onEditSharedOrder={setSharedOrderSource} />
@@ -223,7 +239,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <SharingButton global />
       </div>
     </header>
-      <MotionPresence kind="panel" present={tasks.length > 0}>{tasks.length > 0 && <div className="task-strip"><button className={`home-tab ${page !== 'task' ? 'selected' : ''}`} onClick={() => navigate('home')} title="工作台总览" aria-label="工作台总览"><LayoutGrid size={16} /></button><MotionGroup className="task-tabs" role="tablist" aria-label="已打开的任务" groupRef={tabs}>{tasks.map((task, index) => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId], selected = page === 'task' && task.id === activeId; const sequence = tasks.slice(0, index + 1).filter(item => item.toolId === task.toolId).length; return <div className={`task-tab ${selected ? 'selected' : ''}`} key={task.id} data-motion-key={task.id}><button role="tab" id={`tab-${task.id}`} aria-controls={`task-${task.id}`} aria-selected={selected} tabIndex={selected || page !== 'task' && index === 0 ? 0 : -1} onClick={() => focusTask(task.id)} onKeyDown={event => { let next = index; if (event.key === 'ArrowRight') next = (index + 1) % tasks.length; else if (event.key === 'ArrowLeft') next = (index + tasks.length - 1) % tasks.length; else if (event.key === 'Home') next = 0; else if (event.key === 'End') next = tasks.length - 1; else if (event.key === 'Delete') { event.preventDefault(); closeTask(task.id); return; } else return; event.preventDefault(); focusTask(tasks[next].id); document.getElementById(`tab-${tasks[next].id}`)?.focus(); }}>{task.status === 'running' ? <LoaderCircle size={14} className="spin" /> : <Icon size={14} />}<span>{tool.name}{sequence > 1 ? ` ${sequence}` : ''}</span>{['stale', 'idle'].includes(task.status) && task.input && <i title="未更新的输入" />}</button><button className="tab-close" tabIndex={selected ? 0 : -1} aria-label={`关闭${tool.name}任务 ${sequence}`} onClick={() => closeTask(task.id)}><X size={12} /></button></div>; })}</MotionGroup><button className="icon-button" aria-label="新建任务" onClick={() => setSearchOpen(true)}><Plus size={16} /></button></div>}</MotionPresence>
+      <MotionPresence kind="panel" present={tasks.length > 0}>{tasks.length > 0 && <div className="task-strip"><button className={`home-tab ${page !== 'task' ? 'selected' : ''}`} onClick={() => navigate('home')} title="工作台总览" aria-label="工作台总览"><LayoutGrid size={16} /></button><MotionGroup className="task-tabs" role="tablist" aria-label="已打开的任务" groupRef={tabs}>{tasks.map((task, index) => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId], selected = page === 'task' && task.id === activeId; const sequence = tasks.slice(0, index + 1).filter(item => item.toolId === task.toolId).length; return <div className={`task-tab ${selected ? 'selected' : ''}`} key={task.id} data-motion-key={task.id}><button role="tab" id={`tab-${task.id}`} aria-controls={`task-${task.id}`} aria-selected={selected} tabIndex={selected || page !== 'task' && index === 0 ? 0 : -1} onClick={() => focusTask(task.id)} onKeyDown={event => { let next = index; if (event.key === 'ArrowRight') next = (index + 1) % tasks.length; else if (event.key === 'ArrowLeft') next = (index + tasks.length - 1) % tasks.length; else if (event.key === 'Home') next = 0; else if (event.key === 'End') next = tasks.length - 1; else if (event.key === 'Delete') { event.preventDefault(); closeTask(task.id); return; } else return; event.preventDefault(); focusTask(tasks[next].id); document.getElementById(`tab-${tasks[next].id}`)?.focus(); }}>{task.status === 'running' ? <LoaderCircle size={14} className="spin" /> : <Icon size={14} />}<span>{tool.name}{sequence > 1 ? ` ${sequence}` : ''}</span>{['stale', 'idle'].includes(task.status) && task.input && <i title="未更新的输入" />}</button><button className="tab-close" tabIndex={selected ? 0 : -1} aria-label={`关闭${tool.name}任务 ${sequence}`} onClick={() => closeTask(task.id)}><X size={12} /></button></div>; })}</MotionGroup><ActionPopover className="task-create" label="新建任务" trigger={<Plus size={16} />}><button onClick={() => chooseTask(false)}>打开工具</button><button onClick={() => chooseTask(true)}>新建独立任务</button></ActionPopover></div>}</MotionPresence>
       <div className="workspace-stage">
         <div data-motion-page inert={page !== 'logs'} hidden={page !== 'logs'} className="workspace"><LogCenter active={page === 'logs'} /></div>
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench active={page === 'http'} initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
@@ -239,7 +255,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>
 {tasks.map(task => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId]; return <div data-motion-page inert={page !== 'task' || task.id !== activeId} key={task.id} id={`task-${task.id}`} role="tabpanel" aria-labelledby={`tab-${task.id}`} hidden={page !== 'task' || task.id !== activeId} className={`workspace task-pane ${isColorTool(task.toolId) ? 'color-workspace-shell' : 'text-workspace-shell'}`}><div className="page-heading workspace-banner"><span className={`tool-icon page-icon category-${categoryMeta[tool.category].key}`}><Icon size={23} /></span><div className="page-title"><h1>{tool.name}</h1></div><button className="secondary-button" title="新建同类独立任务" onClick={() => openTool(task.toolId, true)}><CopyPlus size={14} /><span>新任务</span></button><button className={`icon-button ${favorites.includes(task.toolId) ? 'is-favorite' : ''}`} title="收藏工具" aria-label={`${favorites.includes(task.toolId) ? '取消收藏' : '收藏'}${tool.name}`} aria-pressed={favorites.includes(task.toolId)} onClick={() => toggleFavorite(task.toolId)}><Star size={17} fill={favorites.includes(task.toolId) ? 'currentColor' : 'none'} /></button></div>{isColorTool(task.toolId) ? <ColorWorkbench mode={task.toolId} primary={sharedColor} onPrimary={setSharedColor} favorites={colorFavorites} onFavorites={setColorFavorites} /> : task.toolId === 'geo-coordinates' ? <GeoWorkbench task={task} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} /> : <ToolWorkspace onDebug={config => { setHttpInitial({ config, key: Date.now() }); navigate('http'); }} task={task} preferences={preferences} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} onSend={(toolId, text, options) => openTool(toolId, true, text, options)} />}</div>; })}
       </div>
-      <footer className="app-statusbar"><span><ShieldCheck size={12} />输入与结果仅保留在内存，主动保存除外</span><span>{tasks.length} / {MAX_TASKS} 个任务 · DevKit {packageInfo.version}</span></footer>
+      <footer className="app-statusbar">{runningTasks.length > 0 && <ActionPopover className="running-tasks" label="运行中的任务" above trigger={`运行中 · ${runningTasks.length}`}>{runningTasks.map(task => <button key={task.id} onClick={() => focusTask(task.id)}>{tools.find(tool => tool.id === task.toolId)?.name}</button>)}</ActionPopover>}<span><ShieldCheck size={12} />输入与结果仅保留在内存，主动保存除外</span><span>{tasks.length} / {MAX_TASKS} 个任务 · DevKit {packageInfo.version}</span></footer>
     </main>
     {sharedOrderSource && <SharedWorkspaceOrder modules={sharedModules} onClose={() => {
       setSharedOrderSource(null);
@@ -249,9 +265,9 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
       notice('共享栏目顺序已保存');
     }} />}
     <input ref={workspaceFile} type="file" className="sr-only" aria-label="恢复工作区文件" accept=".json" onChange={event => { void restoreWorkspace(event.target.files?.[0]); event.target.value = ''; }} />
-    <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} onChoose={openTool} favorites={favorites} recent={recent} pages={workspaceModules.map(item => item.id)} />
+    <CommandPalette open={searchOpen} onClose={() => { setSearchOpen(false); setFreshSearch(false); }} onChoose={(id, fresh) => openTool(id, freshSearch || fresh)} favorites={favorites} recent={recent} pages={freshSearch ? [] : workspaceModules.map(item => item.id)} />
     <dialog className="save-dialog motion-native" ref={saveDialog} aria-labelledby="save-title" onCancel={() => setSaveOpen(false)}><div className="dialog-heading"><h2 id="save-title">保存当前工作区</h2><button className="icon-button" aria-label="关闭保存窗口" onClick={() => setSaveOpen(false)}><X size={17} /></button></div><p>文件将包含文本任务的输入、参数和结果。请妥善保管，文件未加密。</p><div className="snapshot-summary"><strong>{tasks.filter(task => !isColorTool(task.toolId) && (includeSensitive || !['jwt', 'password', 'hmac'].includes(task.toolId))).length}</strong> 个文本任务将被保存</div><label className="sensitive-toggle"><input type="checkbox" checked={includeSensitive} onChange={event => setIncludeSensitive(event.target.checked)} />同时包含密码、JWT 和 HMAC 任务（可能含敏感信息）</label><p className="preview-note">颜色任务、图片和正在执行的任务状态不保存。恢复后请重新运行验证结果。</p><MotionButton className="run-button" onClick={async () => { try { const snapshot = workspaceSnapshot(tasksRef.current, activeId, includeSensitive); setSaveOpen(false); notice(await saveText(snapshot, 'devkit-workspace.json')); } catch (error) { notice(`保存失败：${String(error)}`); } }}><Save size={15} />选择位置并保存</MotionButton></dialog>
-    <MotionPresence kind="toast" present={!!toast}>{toast && <MotionToast onClose={() => setToast(null)}><Check size={16} /><MotionText text={toast.message} />{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null); }}><Undo2 size={14} />撤销</button>}<button aria-label="关闭通知" onClick={() => setToast(null)}><X size={14} /></button></MotionToast>}</MotionPresence>
+    <ToastStack items={notices} dismiss={id => setNotices(old => old.filter(item => item.id !== id))} />
   </div>;
 }
 

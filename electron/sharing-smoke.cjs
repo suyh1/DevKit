@@ -141,7 +141,7 @@ app
         console.log("Loading shared portal:", url);
         await window.loadURL(url);
         await wait(
-          '!!document.querySelector(".portal-login button:not(:disabled)")',
+          '!!document.querySelector(".portal-login button[type=submit]:not(:disabled)")',
         );
         await js(
           `Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true});let input=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'sharing-ui-test');input.dispatchEvent(new Event('input',{bubbles:true}));`,

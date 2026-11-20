@@ -302,7 +302,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                     </div>
                   </fieldset>
                 </details>
-                <h3>响应场景</h3>
+                <h3>响应场景</h3><details className="scenario-picker"><summary>{dirty ? '草稿场景' : row.published ? '已发布场景' : '未发布场景'} · {row.scenarios[row.active]?.name}</summary>{dirty && saved?.published && <small>当前已发布 · {saved.scenarios[saved.active]?.name}</small>}{row.scenarios.map((item, i) => <button key={i} onClick={e => { setTab(i); e.currentTarget.closest('details')!.open = false; }}>{item.status} · {item.name}{row.active === i ? '（当前配置）' : ''}</button>)}</details>
                 <div className="collab-tools">
                   {row.scenarios.map((item, i) => (
                     <button key={i} aria-pressed={index === i} onClick={() => setTab(i)}>
@@ -372,6 +372,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                         onChange={(e) => changeScenario({ delay: Number(e.target.value) })}
                       />
                     </label>
+                    <div className="delay-stepper"><button type="button" aria-label="减少延迟" onClick={() => changeScenario({ delay: Math.max(0, scenario.delay - 50) })}>−</button><input aria-label="拖动调整延迟" type="range" min={0} max={10000} value={scenario.delay} onChange={e => changeScenario({ delay: Number(e.target.value) })} /><button type="button" aria-label="增加延迟" onClick={() => changeScenario({ delay: Math.min(10000, scenario.delay + 50) })}>＋</button></div>
                     <div className="choice-field">
                       <span>格式</span>
                       <SegmentedControl label="响应格式" value={scenario.format}

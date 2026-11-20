@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { parseApiSchema } from "../shared/api-workspace.mjs";
 export type SchemaField = {
   path: string;
@@ -113,7 +114,12 @@ export function schemaFields(text: string): SchemaField[] {
   return rows;
 }
 export default function ApiSchemaView({ value }: { value: string }) {
+  return <SchemaTable key={value} value={value} />;
+}
+function SchemaTable({ value }: { value: string }) {
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   try {
+    let hiddenBelow = Infinity;
     const fields = schemaFields(value);
     return fields.length ? (
       <div className="api-table-scroll">
@@ -127,16 +133,22 @@ export default function ApiSchemaView({ value }: { value: string }) {
             </tr>
           </thead>
           <tbody>
-            {fields.map((field, index) => (
+            {fields.map((field, index) => {
+              if (field.depth > hiddenBelow) return null;
+              const closed = collapsed.has(index);
+              hiddenBelow = closed ? field.depth : Infinity;
+              return (
               <tr key={index}>
                 <td style={{ paddingLeft: 12 + field.depth * 15 }}>
-                  <code>{field.path}</code>
+                  {fields[index + 1]?.depth > field.depth ? <button aria-expanded={!closed} onClick={() => setCollapsed(current => {
+                    const next = new Set(current); if (next.has(index)) next.delete(index); else next.add(index); return next;
+                  })}>{closed ? '▸' : '▾'} <code>{field.path}</code></button> : <code>{field.path}</code>}
                 </td>
                 <td>{field.type}</td>
                 <td>{field.required ? "是" : "否"}</td>
                 <td>{field.description || "—"}</td>
               </tr>
-            ))}
+            ); })}
           </tbody>
         </table>
         {fields.length >= 500 && (

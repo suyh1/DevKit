@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { MotionButton } from './Motion';
 import type { JsonChange } from './structured-diff';
 import { Copy, Check, AlertCircle } from 'lucide-react';
@@ -14,6 +15,14 @@ function Fields({ data, onCopy }: { data: Record<string, unknown>; onCopy: (valu
 }
 function Table({ rows }: { rows: string[][] }) {
   return <div className="data-table"><p className="preview-note">共 {Math.max(0, rows.length - 1)} 行 · 预览前 100 行、30 列</p><table><thead><tr>{rows[0]?.slice(0, 30).map((cell, index) => <th key={index}>{cell || '空列名'}</th>)}</tr></thead><tbody>{rows.slice(1, 101).map((row, index) => <tr key={index}>{row.slice(0, 30).map((cell, column) => <td key={column}>{cell}</td>)}</tr>)}</tbody></table></div>;
+}
+function TimeScrubber({ times, zone }: { times: string[]; zone: string }) {
+  const [index, setIndex] = useState(0);
+  if (!times.length) return null;
+  const selected = Math.min(index, times.length - 1);
+  return <label className="time-scrubber">触发点 {selected + 1} / {times.length}
+    <input aria-label="选择触发时间" type="range" min={0} max={times.length - 1} value={selected} onChange={e => setIndex(Number(e.target.value))} />
+    <output>{times[selected]} · {zone}</output></label>;
 }
 export default function ToolResult({ id, text, source, options, expected, onExpected, onCopy }: Props) {
   const fallback = <ResultView toolId={id} text={text} source={source} onCopy={onCopy} initialView={id === 'csv-json' ? 'table' : 'tree'} />;
@@ -38,7 +47,7 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   let data: Record<string, unknown>;
   try { data = JSON.parse(text); } catch { return fallback; }
   if (id === 'http-status') return <div className="http-results">{(data as unknown as { code: number; name: string; description: string }[]).map(item => <article key={item.code} className={`http-status-family family-${Math.floor(item.code / 100)}`}><strong>{item.code}</strong><div><h3>{item.name}</h3><p>{item.description}</p></div><MotionButton variant="copy" className="icon-button" aria-label={`复制状态码 ${item.code}`} onClick={() => onCopy(String(item.code))}><Copy size={14} /></MotionButton></article>)}</div>;
-  if (id === 'cron') return <div className="schedule-result"><Fields data={{ '表达式': data.expression, '时区': data.timezone, '严格晚于': data.after }} onCopy={onCopy} /><ol className="schedule-timeline">{(data.matches as string[]).map((time, index) => <li key={time}><span>{String(index + 1).padStart(2, '0')}</span><time dateTime={time}>{time.replace('T', ' ').replace('.000Z', ' UTC')}</time><MotionButton variant="copy" className="icon-button" aria-label={`复制触发时间 ${index + 1}`} onClick={() => onCopy(time)}><Copy size={13} /></MotionButton></li>)}</ol><p className="preview-note">{data.complete ? '已找到全部预览时间。' : '搜索窗口内未找到足够的触发时间。'}{display(data.note)}</p></div>;
+  if (id === 'cron') return <div className="schedule-result"><Fields data={{ '表达式': data.expression, '时区': data.timezone, '严格晚于': data.after }} onCopy={onCopy} /><TimeScrubber times={data.matches as string[]} zone={String(data.timezone)} /><ol className="schedule-timeline">{(data.matches as string[]).map((time, index) => <li key={time}><span>{String(index + 1).padStart(2, '0')}</span><time dateTime={time}>{time.replace('T', ' ').replace('.000Z', ' UTC')}</time><MotionButton variant="copy" className="icon-button" aria-label={`复制触发时间 ${index + 1}`} onClick={() => onCopy(time)}><Copy size={13} /></MotionButton></li>)}</ol><p className="preview-note">{data.complete ? '已找到全部预览时间。' : '搜索窗口内未找到足够的触发时间。'}{display(data.note)}</p></div>;
   if (id === 'text-stats') {
     const labels: Record<string, string> = { utf8Bytes: 'UTF-8 字节', utf16Units: 'UTF-16 单元', unicodeCodePoints: 'Unicode 码点', graphemeClusters: '可见字符簇', words: '单词', lines: '行数', nonEmptyLines: '非空行', whitespaceCodePoints: '空白码点' };
     return <div className="stats-result"><div className="metric-grid">{Object.entries(labels).map(([key, label]) => <div key={key}><span>{label}</span><strong>{Number(data[key]).toLocaleString()}</strong></div>)}</div><Fields data={{ '换行统计': data.lineEndings }} onCopy={onCopy} /><p className="preview-note">{display(data.note)}</p></div>;

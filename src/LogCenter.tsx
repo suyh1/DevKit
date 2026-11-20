@@ -15,6 +15,9 @@ type Stream = LogRead & { text: string; notice?: string };
 function mask(text: string) { return text.replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[已隐藏]').replace(/((?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?)[^\s,"'}&]+/gi, '$1[已隐藏]'); }
 
 export default function LogCenter({ active = true }: { active?: boolean }) {
+  const [sourceWidth, setSourceWidth] = useState(220), [pullDistance, setPullDistance] = useState(0);
+  const touchStart = useRef<{y:number; x:number} | null>(null);
+  const resize = (width: number) => setSourceWidth(Math.min(480,Math.max(160,width)));
   const guard = useWorkspaceGuard();
   const refreshSeconds = usePerformanceMode() ? 6 : 2;
   const [catalog, setCatalog] = useState<LogCatalog>({ sources: [], warnings: [] }), [selected, setSelected] = useState<string[]>([]);
@@ -93,14 +96,30 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     {linkStatus === 'ready' && <p className="pc-notice" role="status">{missingResourceLink('日志来源')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的日志来源，请刷新来源重试。</p>}
     <div className="log-toolbar"><label className="log-query"><Search size={14} /><input aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input type="checkbox" checked={!rawAllowed} disabled={!canReadRawLogs()} onChange={event => setRaw(!event.target.checked)} />主机脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
-    <div className="log-layout">
+    <div className="log-layout" style={{'--source-width':sourceWidth+'px'} as React.CSSProperties}>
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><input aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
         <select aria-label="按主机筛选日志来源" value={hostFilter} onChange={event => setHostFilter(event.target.value)}><option value="">全部主机</option><option value="local">{localName}</option>{catalog.hosts?.map(host => <option key={host.id} value={host.id}>{host.name}</option>)}{missingHost && <option value={hostFilter}>{loading ? '正在读取目标主机…' : '目标主机不可用'}</option>}</select>
         {hostFilter && hostFilter !== 'local' && <RelatedLink page="lan-hosts" id={hostFilter}>查看主机档案</RelatedLink>}
         <div className="log-actions"><CreateRelated from="logs" page="lan-hosts">新建主机</CreateRelated><CreateRelated from="logs" page="jar" beforeOpen={() => guard('logs', 'jar')}>添加 JAR 来源</CreateRelated><CreateRelated from="logs" page="nginx" beforeOpen={() => guard('logs', 'nginx')}>添加 Nginx 来源</CreateRelated></div>
-        <div className="log-source-list">{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && (hostLoad === 'pending' || loading && !hostLoad) ? <Skeleton kind="list" label="正在读取日志来源…" /> : !matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
+        <div className="log-source-list" onTouchStart={e => {
+          const layout = e.currentTarget.closest('.log-layout');
+          touchStart.current = !paused && !loading && layout && getComputedStyle(layout).display === 'block' && e.currentTarget.scrollTop <= 0 && e.touches.length === 1 ? {y:e.touches[0].clientY,x:e.touches[0].clientX} : null;
+        }} onTouchMove={e => {
+          const start = touchStart.current;
+          if (!start) return;
+          const dy = e.touches[0].clientY - start.y;
+          if (dy < 0 || e.touches.length !== 1 || Math.abs(e.touches[0].clientX - start.x) > 40 || e.currentTarget.scrollTop > 0) { touchStart.current = null; setPullDistance(0); return; }
+          setPullDistance(dy);
+        }} onTouchCancel={() => { touchStart.current = null; setPullDistance(0); }} onTouchEnd={e => {
+          if (touchStart.current && !paused && !loading && e.currentTarget.scrollTop <= 0 && e.changedTouches[0].clientY - touchStart.current.y >= 64) void refresh();
+          touchStart.current = null; setPullDistance(0);
+        }}>{pullDistance > 10 && <small>{pullDistance >= 64 ? '松开刷新来源' : '下拉刷新来源'}</small>}{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <label key={item.id} className={selected.includes(item.id) ? 'selected' : ''}><input type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><small>{item.kind === 'jar' ? 'JAR' : 'Nginx'} · {item.mode === 'console' ? '标准输出 / 错误' : item.path}</small></span></label>)}</section>)}{!matching.length && (hostLoad === 'pending' || loading && !hostLoad) ? <Skeleton kind="list" label="正在读取日志来源…" /> : !matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
+      <div className="source-resizer" role="separator" aria-orientation="vertical" aria-label="调整日志来源宽度" aria-valuenow={sourceWidth} aria-valuemin={160} aria-valuemax={480} tabIndex={0}
+        onDoubleClick={() => setSourceWidth(220)} onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); resize(sourceWidth + (e.key === 'ArrowRight' ? 10 : -10)); } else if (e.key === 'Home') setSourceWidth(220); }}
+        onPointerDown={e => { if (e.button === 0) e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) resize(e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left); }} />
       {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>从左侧选择最多 4 个来源。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className="log-streams">
         {panes.length > 1 && <div className="log-switcher" role="group" aria-label="切换日志流">
           {panes.map(source => <button key={source.id} type="button" aria-pressed={paneId === source.id}

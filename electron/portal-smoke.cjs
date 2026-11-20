@@ -564,7 +564,7 @@ app
       await fixture.host.start(fixture.options);
       await button("重试连接");
       await wait(
-        '!document.querySelector(".portal-bar nav")&&!document.querySelector(".portal-login button").disabled',
+        '!document.querySelector(".portal-bar nav")&&!document.querySelector(".portal-login button[type=submit]").disabled',
       );
       assert.equal(fixture.calls.commands, 0);
       assert.deepEqual(errors, []);

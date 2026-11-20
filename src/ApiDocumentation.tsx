@@ -64,7 +64,7 @@ export default function ApiDocumentation({
                         {row.required || row.location === "path" ? "是" : "否"}
                       </td>
                       <td>
-                        {row.description || "—"}
+                        {(row.description?.length || 0) > 64 ? <details><summary>{row.name} · {row.type} · 参数说明</summary><p className="api-prose">{row.description}</p></details> : row.description || "—"}
                         {row.schema && (
                           <details>
                             <summary>Schema约束</summary>

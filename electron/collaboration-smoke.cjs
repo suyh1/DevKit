@@ -237,6 +237,15 @@ module.exports = async function collaborationSmoke(window, output) {
       'Array.from(document.querySelector("canvas[aria-label=共享标注画布]").getContext("2d").getImageData(0,0,1,1).data)',
     );
     assert.deepEqual(pixels, [237, 242, 247, 255]);
+    const canvasPixels = "document.querySelector('canvas[aria-label=共享标注画布]').toDataURL()";
+    const annotated = await web(canvasPixels);
+    await click(web, current, '原图对照');
+    await fill(web, current + '[aria-label="原图对照分界"]', '100');
+    await wait(web, "document.querySelector('.board-comparison output')?.textContent === '100%'");
+    assert.notEqual(await web(canvasPixels), annotated);
+    await click(web, current, '原图对照');
+    await wait(web, canvasPixels + ' === ' + JSON.stringify(annotated));
+
     const exported = path.join(output, 'collab-export.png');
     const done = new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('PNG export timed out')), 8000);

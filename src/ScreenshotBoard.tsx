@@ -35,6 +35,8 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
   const list = useCollabList<BoardInfo>('whiteboard', active);
   const resource = useWorkspaceResource('whiteboard'),
     selected = resource || list.value?.[0]?.id;
+  const [aspect, setAspect] = useState('landscape');
+  const blankSize = aspect === 'portrait' ? { width:800,height:1280 } : aspect === 'square' ? { width:1024,height:1024 } : { width:1280,height:800 };
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [title, setTitle] = useState(''),
     [query, setQuery] = useState('');
@@ -43,7 +45,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
   function create(file?: File) {
     if (!edit) return;
     void op.run(async () => {
-      const image = file ? await prepareScreenshot(file) : { width: 1280, height: 800 };
+      const image = file ? await prepareScreenshot(file) : blankSize;
       const board = await collab<BoardInfo>('whiteboard', 'create', {
         ...image,
         name: title.trim() || file?.name || '未命名白板',
@@ -105,6 +107,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
                   <ImagePlus size={17} />
                   从截图新建
                 </button>
+                <label className="board-ratio">空白画板比例<select value={aspect} onChange={e => setAspect(e.target.value)}><option value="landscape">横屏</option><option value="square">方形</option><option value="portrait">竖屏</option></select><span aria-hidden="true" style={{ width: 26 * blankSize.width / blankSize.height, height:26 }} />{blankSize.width} × {blankSize.height}</label>
                 <button disabled={op.busy} onClick={() => create()}>
                   <Plus size={17} />
                   新建空白画板
@@ -187,6 +190,9 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
   const [preview, setPreview] = useState<Brush>(),
     [history, setHistory] = useState<string[]>([]),
     [zoom, setZoom] = useState(false);
+  const [compare, setCompare] = useState(false), [split, setSplit] = useState(50);
+  const [decodeAttempt, setDecodeAttempt] = useState(0), [shape, setShape] = useState<'rect' | 'ellipse'>('rect');
+  const comparePointer = useRef<number | null>(null);
   const [rename, setRename] = useState<string>();
   const canvas = useRef<HTMLCanvasElement>(null),
     stroke = useRef<{ pointer: number; brush: Brush } | null>(null);
@@ -211,7 +217,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     return () => {
       alive = false;
     };
-  }, [id, board?.image, active, image]);
+  }, [id, board?.image, active, image, decodeAttempt]);
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d');
     if (!ctx || !board) return;
@@ -220,7 +226,13 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     if (image) ctx.drawImage(image, 0, 0);
     for (const mark of board.marks) drawMark(ctx, mark);
     if (preview) drawMark(ctx, preview);
-  }, [board, image, preview]);
+    if (compare && image) {
+      const edge = Math.round(board.width * split / 100);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, edge, board.height); ctx.clip();
+      ctx.fillStyle = 'white'; ctx.fillRect(0,0,edge,board.height); ctx.drawImage(image,0,0); ctx.restore();
+      ctx.fillStyle = '#147d64'; ctx.fillRect(edge,0,2,board.height);
+    }
+  }, [board, image, preview, compare, split]);
   function point(e: PointerEvent<HTMLCanvasElement>): Point {
     const r = e.currentTarget.getBoundingClientRect();
     return [
@@ -229,6 +241,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     ];
   }
   function begin(e: PointerEvent<HTMLCanvasElement>) {
+    if (compare && board && e.button === 0) { comparePointer.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); setSplit(point(e)[0] / board.width * 100); return; }
     if (
       !edit ||
       op.busy ||
@@ -246,6 +259,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     setPreview(brush);
   }
   function move(e: PointerEvent<HTMLCanvasElement>) {
+    if (comparePointer.current === e.pointerId && board) { setSplit(point(e)[0] / board.width * 100); return; }
     const current = stroke.current;
     if (current?.pointer !== e.pointerId) return;
     const brush = current.brush,
@@ -256,6 +270,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     setPreview(current.brush);
   }
   function finish(e: PointerEvent<HTMLCanvasElement>) {
+    if (comparePointer.current === e.pointerId) { comparePointer.current = null; return; }
     if (stroke.current?.pointer !== e.pointerId) return;
     move(e);
     const mark = stroke.current.brush;
@@ -284,6 +299,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
           )}
         </div>
         <div className="collab-actions">
+          {image && <button aria-pressed={compare} disabled={!!preview} onClick={() => setCompare(!compare)}>原图对照</button>}
           <button onClick={() => setZoom(!zoom)}>
             <Scan size={16} />
             {zoom ? '适应宽度' : '原始尺寸'}
@@ -292,8 +308,14 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
             disabled={!ready || !!preview}
             onClick={() =>
               void op.run(async () => {
+                let output = canvas.current!;
+                if (compare && board && image) {
+                  output = document.createElement('canvas'); output.width = board.width; output.height = board.height;
+                  const ctx = output.getContext('2d')!; ctx.fillStyle = 'white'; ctx.fillRect(0,0,board.width,board.height); ctx.drawImage(image,0,0);
+                  for (const mark of board.marks) drawMark(ctx,mark);
+                }
                 const blob = await new Promise<Blob>((resolve, reject) =>
-                  canvas.current!.toBlob((b) => (b ? resolve(b) : reject(new Error('导出失败。'))), 'image/png'),
+                  output.toBlob((b) => (b ? resolve(b) : reject(new Error('导出失败。'))), 'image/png'),
                 );
                 return downloadBlob(blob, board!.name + '.png');
               })
@@ -305,23 +327,29 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
         </div>
       </div>
       {(op.message || live.error || imageError) && <p role="status">{op.message || live.error || imageError}</p>}
+      {compare && <label className="board-comparison">原图 / 标注<input type="range" min={0} max={100} aria-label="原图对照分界" value={split} onChange={e => setSplit(Number(e.target.value))} /><output>{Math.round(split)}%</output></label>}
+      {imageError && <button onClick={() => { setImageError(''); setDecodeAttempt(n => n + 1); }}>重试读取截图</button>}
       <div className="board-stage">
         {edit && (
-          <div className="board-tools" role="group" aria-label="绘图工具">
+          <div className="board-tools" inert={compare} role="group" aria-label="绘图工具">
             {(Object.keys(tools) as Brush['tool'][]).map((t) => {
               const Icon = brushIcons[t];
               return (
                 <button
+                  className={t === 'rect' || t === 'ellipse' ? 'individual-shape' : undefined}
                   key={t}
                   aria-label={tools[t]}
                   title={tools[t]}
                   aria-pressed={tool === t}
-                  onClick={() => setTool(t)}
+                  onClick={() => { setTool(t); if (t === 'rect' || t === 'ellipse') setShape(t); }}
                 >
                   <Icon size={19} />
                 </button>
               );
             })}
+            <button
+              className="compact-shape" aria-pressed={tool === shape} onClick={() => setTool(shape)}>{tools[shape]}</button>
+            <select className="compact-shape" aria-label="选择形状" value={shape} onChange={e => { const next = e.target.value as 'rect' | 'ellipse'; setShape(next); setTool(next); }}><option value="rect">矩形</option><option value="ellipse">椭圆</option></select>
             <button
               className="board-undo"
               title="撤销我的上一笔"
@@ -341,16 +369,18 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
         {board && (
           <div className={'collab-canvas' + (zoom ? ' native' : '')}>
             <canvas
+              className={board.image && !image && !imageError ? 'image-loading' : undefined}
+              aria-busy={!!board.image && !image && !imageError}
               ref={canvas}
               width={board.width}
               height={board.height}
               aria-label="共享标注画布"
-              style={{ touchAction: edit ? 'none' : 'auto' }}
+              style={{ touchAction: edit || compare ? 'none' : 'auto' }}
               onPointerDown={begin}
               onPointerMove={move}
               onPointerUp={finish}
               onPointerCancel={() => {
-                stroke.current = null;
+                comparePointer.current = null; stroke.current = null;
                 setPreview(undefined);
               }}
             />

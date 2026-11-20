@@ -70,3 +70,5 @@
 对比[Uptime Kuma](https://github.com/louislam/uptime-kuma)（MIT、约93.2k stars，Node/Vue常驻服务）与[Upptime](https://github.com/upptime/upptime)（MIT、约17.2k，依赖GitHub Actions和Git记录）。前者更符合内网主机调度，后者的GitHub依赖不适合离线部署。本项目借鉴探测、故障确认和状态展示流程，复用已有Node基础，不复制第三方代码、不增加运行依赖。
 
 主要边界是重定向环、证书失败、慢响应、配置与检测同时更新、多个访客重复提交、历史容量和主机停机期间的未知状态，分别通过截止时间、并发上限、结果代次和有界记录处理。测试：`npm run test:monitor`；真实桌面/共享只读界面：构建后 `node scripts/smoke-desktop.mjs --monitor-only`。
+
+检测分布取最近 60 个已有样本，划为八个连续时段。每柱标记样本数，聚焦或悬停可核对成功、失败次数与时段起点。空时段显示“—”。保存时会定位第一个有误的输入。

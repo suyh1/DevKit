@@ -35,7 +35,7 @@ export default function ProjectComparison({
         个独立档案，按项目编码对齐，比较项目有无、名称、分组、说明、启停、地址模板、查询参数和最终入口，以及各方案的变量。这里只读取已保存的数据。
       </p>
       <fieldset className="pc-compare-picks">
-        <legend>参与对比的档案</legend>
+        <legend>参与对比的档案 · {ids.length}/4</legend><div className="selected-profiles" role="status">{ids.map(id => <span key={id}>{data.profiles.find(profile => profile.id === id)?.name}</span>)}{ids.length >= 2 && <button type="button" onClick={() => document.getElementById('project-comparison-result')?.scrollIntoView({ block: 'nearest' })}>查看对比</button>}</div>
         {data.profiles.map((profile) => (
           <label key={profile.id}>
             <input
@@ -64,7 +64,7 @@ export default function ProjectComparison({
       </label>
       {!report && <p role="status">请选择至少两个方案。</p>}
       {report && (
-        <div className="pc-comparison">
+        <div className="pc-comparison" id="project-comparison-result">
           <table>
             <thead>
               <tr>

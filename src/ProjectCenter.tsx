@@ -117,6 +117,7 @@ export default function ProjectCenter({
     [password, setPassword] = useState("");
   const [entry, setEntry] = useState<Project | null>(null),
     [profileDraft, setProfileDraft] = useState<Profile | null>(null);
+  const [importStage, setImportStage] = useState(0);
   const [imported, setImported] = useState<ProjectState | null>(null),
     [history, setHistory] = useState<Snapshot[] | null>(null);
   const [health, setHealth] = useState<Record<string, Health>>({});
@@ -968,7 +969,7 @@ export default function ProjectCenter({
                   )}
                   <div className="pc-card-actions">
                     <RelatedLink page="monitor" id={`source:projects:${profile.id}:${project.id}`}>关联监控</RelatedLink>
-                    <ResourceLink page="projects" id={`${profile.id}:${project.id}`} />
+                    <ResourceLink compact page="projects" id={`${profile.id}:${project.id}`} />
                     {canProbe && <button className="secondary-button"
                       aria-label={`探活 ${project.name}`} disabled={busy || !project.enabled || !!result.error}
                       title={result.error || (!project.enabled ? "项目已停用" : "由主机检测当前档案的项目入口")}
@@ -1136,7 +1137,9 @@ export default function ProjectCenter({
                   if (selected.size > 4_100_000)
                     throw new Error("导入文件过大。");
                   setImportMode("merge");
-                  setImported(importState(await selected.text()));
+                  setImportStage(1);
+                  try { setImported(importState(await selected.text())); setImportStage(2); }
+                  catch (failure) { setImportStage(0); throw failure; }
                 });
             }}
           />
@@ -1509,6 +1512,8 @@ export default function ProjectCenter({
           </form>
         </Modal>
       )}</MotionPresence>
+      {!imported && importStage === 1 && busy && <ImportSteps stage={1} />}
+      {!imported && importStage === 4 && <ImportSteps stage={4} />}
       <MotionPresence kind="dialog" present={!!(imported)}>{imported && (
         <Modal
           feedback={message}
@@ -1522,6 +1527,7 @@ export default function ProjectCenter({
             {imported.profiles.length}{" "}
             个配置档案。确认前不会写入数据；导入前自动备份，访问口令和共享设置不变。
           </p>
+          <ImportSteps stage={importStage} />
           <fieldset className="pc-import-modes">
             <legend>导入方式</legend>
             <label>
@@ -1582,7 +1588,9 @@ export default function ProjectCenter({
               disabled={busy || !importTarget}
               onClick={() =>
                 void action(async () => {
-                  await persist({ ...importTarget!, revision: data.revision });
+                  setImportStage(3);
+                  try { await persist({ ...importTarget!, revision: data.revision }); } catch (failure) { setImportStage(2); throw failure; }
+                  setImportStage(4);
                   setImported(null);
                   setSelected([]);
                   setActive(
@@ -1849,4 +1857,9 @@ export default function ProjectCenter({
       )}</MotionPresence>
     </section>
   );
+}
+
+function ImportSteps({ stage }: { stage: number }) {
+  return <ol className="import-steps" aria-label="导入进度">{['读取文件','核对预览','备份并导入','导入完成'].map((label, i) =>
+    <li key={label} data-complete={i + 1 < stage || stage === 4} aria-current={i + 1 === stage ? 'step' : undefined}>{label}</li>)}</ol>;
 }
