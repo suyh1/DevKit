@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { root } from "./desktop-files.mjs";
 import { sha256 } from "./release-integrity.mjs";
 import { sshNodeRuntimes } from '../server/ssh-node-runtimes.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip } from 'node:zlib';
@@ -59,14 +59,18 @@ with zipfile.ZipFile(sys.argv[1]) as z:
   }
 }
 const password = "portable-check-password-only";
-async function launch(directory, reusePassword = false) {
-  const port = await new Promise((resolve) => {
+async function freePort() {
+  return new Promise((resolve) => {
     const socket = net.createServer();
     socket.listen(0, "127.0.0.1", () => {
       const port = socket.address().port;
       socket.close(() => resolve(port));
     });
   });
+}
+async function launch(directory, reusePassword = false, excludePort) {
+  let port = await freePort();
+  while (port === excludePort) port = await freePort();
   const env = {
     ...process.env,
     HOST: "127.0.0.1",
@@ -172,12 +176,6 @@ try {
   );
   assert.equal((await fetch(host.base + "/index.html")).status, 404);
   assert.equal((await fetch(host.base + "/")).status, 200);
-  const build = JSON.parse(
-    await readFile(path.join(installation, "dist/.vite/manifest.json"), "utf8"),
-  );
-  for (const item of Object.values(build))
-    for (const asset of [item.file, ...(item.css || []), ...(item.assets || [])])
-      assert.equal((await fetch(host.base + "/" + asset)).status, 200);
   const api = await host.workspace('http', 'get-library');
   await host.workspace('http', 'save-library', { revision: api.state.revision, data: api.state });
   const configDirectory = path.join(installation, 'nginx-fixture');
@@ -191,7 +189,33 @@ try {
   const copied = path.join(folder, "second");
   await cp(installation, copied, { recursive: true, filter: source => path.basename(source) !== 'configs' });
   await cp(path.join(installation,'configs'),path.join(copied,'configs'),{recursive:true});
-  host = await launch(copied, true);
+  const quickPort = await freePort();
+  const token = randomBytes(24).toString('hex');
+  await writeFile(path.join(copied, 'configs/transfer-links.json'), JSON.stringify([{ port: quickPort, token }]));
+  host = await launch(copied, true, quickPort);
+  const quick = `http://127.0.0.1:${quickPort}/t/${token}/`;
+  const build = JSON.parse(await readFile(path.join(copied, 'dist/.vite/manifest.json'), 'utf8'));
+  for (const [entry, base] of [['portal.html', host.base + '/'], ['transfer.html', quick]]) {
+    const page = await fetch(base);
+    assert.equal(page.status, 200);
+    assert.ok((await page.text()).includes(build[entry].file), entry);
+    const visited = new Set();
+    async function verifyEntry(key) {
+      if (visited.has(key)) return;
+      visited.add(key);
+      const item = build[key];
+      for (const asset of [item.file, ...(item.css || []), ...(item.assets || [])]) {
+        const response = await fetch(new URL(asset, base));
+        assert.equal(response.status, 200, `${entry} asset: ${asset}`);
+        await response.arrayBuffer();
+      }
+      for (const dependency of [...(item.imports || []), ...(item.dynamicImports || [])]) await verifyEntry(dependency);
+    }
+    await verifyEntry(entry);
+  }
+  assert.equal((await fetch(new URL(build['portal.html'].file, quick))).status, 404);
+  assert.equal((await fetch(new URL(build['transfer.html'].file, host.base))).status, 404);
+
   assert.equal((await host.request("state")).profiles[0].projects[0].name, "目录迁移验收");
   assert.equal((await host.request("snapshots"))[0].name, "可迁移快照");
   assert.equal((await host.workspace('http', 'get-library')).state.revision, api.state.revision + 1);
@@ -207,6 +231,8 @@ try {
     snapshotsTransferred: true,
     storedPasswordReused: true,
     allPortalAssets: true,
+    allQuickTransferAssets: true,
+    isolatedBrowserEntries: true,
     schemaWorkerAsset: true,
     httpWorkspaceSavedAndTransferred: true,
     remoteNginxCreatedOnHost: true,
