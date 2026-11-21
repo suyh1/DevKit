@@ -148,6 +148,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
       if (!await start(mockTemplate(project.name, endpoint))) finishCreation();
     });
   });
+  const matches = (list.value || []).filter(item => (item.name + item.path).toLowerCase().includes(query.toLowerCase()));
   const notice = list.error || detail.error || op.message;
   return (
     <div className="collab-layout mock-layout">
@@ -183,9 +184,8 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        {(list.value || [])
-          .filter((item) => (item.name + item.path).toLowerCase().includes(query.toLowerCase()))
-          .map((item) => (
+        {!!list.value?.length && !matches.length && <p role="status">没有匹配的接口。</p>}
+        {matches.map((item) => (
             <button
               className="collab-record"
               key={item.id}

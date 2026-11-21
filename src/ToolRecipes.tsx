@@ -15,6 +15,8 @@ const allowed: ToolId[] = [
   'json-csv',
   'text',
 ];
+const previewLimit = 8192;
+const previewLength = (text: string) => text.length > previewLimit ? `（预览前 ${previewLimit.toLocaleString()} / 共 ${text.length.toLocaleString()} 字符）` : '';
 const prefix = 'devkit:recipe:';
 type Step = { tool: ToolId; options: Options };
 const makeStep = (tool: ToolId): Step => ({ tool, options: { ...defaultOptions[tool] } });
@@ -208,10 +210,10 @@ export default function ToolRecipes({ input }: { input: string }) {
           <summary>
             {i + 1}. {row.name} · {row.error ? '失败' : '完成'}
           </summary>
-          <p>输入</p>
-          <pre>{row.input.slice(0, 8192)}</pre>
-          <p>{row.error || '输出'}</p>
-          <pre>{row.output.slice(0, 8192)}</pre>
+          <p>输入{previewLength(row.input)}</p>
+          <pre>{row.input.slice(0, previewLimit)}</pre>
+          <p>{row.error || '输出'}{previewLength(row.output)}</p>
+          <pre>{row.output.slice(0, previewLimit)}</pre>
           {!row.error && (
             <button
               onClick={() =>

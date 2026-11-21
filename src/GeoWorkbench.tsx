@@ -1,3 +1,4 @@
+import type { Notify } from './ToastStack';
 import { copyText } from './motion-primitives';
 import { MotionButton, MotionPresence, MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { coordinateCells, coordinateInput, coordinatesText, decimalText, dmsText
 import type { GeoPoint } from './geography';
 import { readText, saveText } from './files';
 
-type Props = { task: Task; onEdit: (patch: Partial<Task>) => void; onRun: () => void; onCancel: () => void; onNotice: (message: string) => void };
+type Props = { task: Task; onEdit: (patch: Partial<Task>) => void; onRun: () => void; onCancel: () => void; onNotice: Notify };
 const names: Record<string, string> = { north: '正北', east: '正东', south: '正南', west: '正西' };
 const statuses = { idle: '等待处理', running: '正在处理', success: '已完成', error: '处理失败', stale: '参数已修改', cancelled: '已取消' };
 export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }: Props) {
@@ -26,8 +27,8 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
   useEffect(() => setPage(0), [task.output, mode]);
   function update(patch: Options) { onEdit({ options: { ...task.options, ...patch } }); }
   async function copy(text: string) {
-    try { await copyText(text); onNotice('已复制坐标'); }
-    catch { onNotice('剪贴板不可用，请选中结果后手动复制。'); }
+    try { await copyText(text); onNotice('已复制坐标', 'success'); }
+    catch { onNotice('剪贴板不可用，请选中结果后手动复制。', 'error'); }
   }
   function sample() {
     setUndo(task);
@@ -38,7 +39,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
   async function load(source?: File) {
     if (!source) return;
     try { const { text, encoding } = await readText(source); if (text.length > 300_000) throw new Error('文本提取最多支持 300,000 字符。'); setUndo(task); onEdit({ input: text, fileName: source.name, encoding }); }
-    catch (error) { onNotice((error as Error).message); }
+    catch (error) { onNotice((error as Error).message, 'error'); }
   }
   const field = (key: string, label: string, placeholder?: string) => <label className="geo-field"><span>{label}</span><input aria-label={label} value={o[key]} placeholder={placeholder} disabled={busy} autoComplete="off" spellCheck={false} onChange={e => update({ [key]: e.target.value })} /></label>;
   const select = (key: string, label: string, choices: [string, string][]) => ['unit', 'inputOrder', 'representation', 'order', 'headers', 'delimiter', 'style'].includes(key)
@@ -63,7 +64,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
     <section className="geo-panel" aria-label="坐标输入">
       {mode !== 'extract' ? <>
         <div className="geo-input-grid">{field(mode === 'circle' ? 'centerLon' : 'lon', mode === 'circle' ? '圆心经度' : '经度', '116.3913 或 116°23′28.68″E')}{field(mode === 'circle' ? 'centerLat' : 'lat', mode === 'circle' ? '圆心纬度' : '纬度', '39.9075 或 39°54′27″N')}</div>
-        <div className="geo-paste-pair"><label className="geo-field"><span>粘贴坐标对（仅拆分，保留原文格式）</span><input aria-label="粘贴坐标对" value={pairInput} disabled={busy} onChange={e => setPairInput(e.target.value)} placeholder="116.3913, 39.9075" /></label><button className="secondary-button" disabled={busy || !pairInput.trim()} onClick={() => { try { const p = splitCoordinatePair(pairInput, o.inputOrder); setUndo(task); update(mode === 'circle' ? { centerLon: p.lon, centerLat: p.lat } : p); } catch (error) { onNotice((error as Error).message); } }}>填入经纬字段</button></div>
+        <div className="geo-paste-pair"><label className="geo-field"><span>粘贴坐标对（仅拆分，保留原文格式）</span><input aria-label="粘贴坐标对" value={pairInput} disabled={busy} onChange={e => setPairInput(e.target.value)} placeholder="116.3913, 39.9075" /></label><button className="secondary-button" disabled={busy || !pairInput.trim()} onClick={() => { try { const p = splitCoordinatePair(pairInput, o.inputOrder); setUndo(task); update(mode === 'circle' ? { centerLon: p.lon, centerLat: p.lat } : p); } catch (error) { onNotice((error as Error).message, 'error'); } }}>填入经纬字段</button></div>
         {mode === 'circle' && <><div className="geo-input-grid">
           {field('radius', '半径', '例如 1000')}{select('unit', '半径单位', [['m', '米'], ['km', '千米']])}
           {select('algorithm', '圆周算法', [['ellipsoid', '椭球测地线 · WGS84（默认）'], ['sphere', '球面大圆 · 平均半径']])}
@@ -72,7 +73,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
       </> : <><label className="geo-field"><span>包含度分秒坐标的文本</span><textarea aria-label="包含度分秒坐标的文本" value={task.input} disabled={busy} rows={8} spellCheck={false} placeholder="点位：东经116度23分28.68秒，北纬39度54分27秒" onChange={e => onEdit({ input: e.target.value })} /></label><div className="geo-inline">
         {select('dedupe', '重复点', [['off', '保留原文顺序与重复点'], ['on', '按未舍入坐标去重']])}
         <button className="secondary-button" disabled={busy} onClick={() => file.current?.click()}><Upload size={14} />导入文本</button>
-        <input className="sr-only" type="file" ref={file} aria-label="导入坐标文本" accept=".txt,.csv,.tsv,.log,.md" onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />
+        <input hidden type="file" ref={file} aria-label="导入坐标文本" accept=".txt,.csv,.tsv,.log,.md" onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />
         <span className="preview-note">{task.input.length.toLocaleString()} / 300,000 字符 · 最多 5,000 对</span>
       </div></>}
       <div className="geo-inline geo-settings">
@@ -93,7 +94,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
         {select('delimiter', '分隔符', [['comma', '逗号 CSV'], ['tab', '制表符 TSV']])}
         {select('headers', '表头', [['off', '不带表头'], ['on', '带表头']])}
       </div>
-      <div className="geo-copy-actions">{([['全部坐标', undefined], ['经度列', 'lon'], ['纬度列', 'lat']] as const).map(([name, column]) => <MotionButton variant="copy" className="secondary-button" aria-label={`复制${name}`} key={name} disabled={!ready} onClick={() => void copy(coordinatesText(result!.points, o, column))}><Copy size={14} />复制{name}</MotionButton>)}<button className="secondary-button" disabled={!ready} onClick={async () => { try { onNotice(await saveText(coordinatesText(result!.points, o), `devkit-coordinates.${o.delimiter === 'tab' ? 'tsv' : 'csv'}`)); } catch (error) { onNotice(`导出失败：${String(error)}`); } }}><Download size={14} />导出坐标</button></div>
+      <div className="geo-copy-actions">{([['全部坐标', undefined], ['经度列', 'lon'], ['纬度列', 'lat']] as const).map(([name, column]) => <MotionButton variant="copy" className="secondary-button" aria-label={`复制${name}`} key={name} disabled={!ready} onClick={() => void copy(coordinatesText(result!.points, o, column))}><Copy size={14} />复制{name}</MotionButton>)}<button className="secondary-button" disabled={!ready} onClick={async () => { try { await saveText(coordinatesText(result!.points, o), `devkit-coordinates.${o.delimiter === 'tab' ? 'tsv' : 'csv'}`, onNotice); } catch (error) { onNotice(`导出失败：${String(error)}`, 'error'); } }}><Download size={14} />导出坐标</button></div>
       {result?.points.length ? mode !== 'extract' ? <div className="geo-point-grid">{result.points.map((point, i) => <article className="geo-point" key={i}><h3>{point.direction ? names[point.direction] : '转换结果'}</h3>{(['lon', 'lat'] as const).map(axis => <div className="geo-value" key={axis}><span>{axis === 'lon' ? '经度' : '纬度'}</span><div>{(['decimal', 'dms'] as const).map(format => {
         const value = format === 'decimal' ? decimalText(point[axis], Number(o.decimals)) : dmsText(point[axis], axis, Number(o.seconds), o.style);
         return <div className={`geo-value-row geo-${format}`} key={format}><small>{format === 'decimal' ? '十进制度' : '度分秒'}</small><code>{value}</code><MotionButton variant="copy" className="icon-button" title={`复制${format === 'decimal' ? '十进制度' : '度分秒'}`} aria-label={`复制${axis === 'lon' ? '经度' : '纬度'}${format === 'decimal' ? '十进制度' : '度分秒'}`} disabled={!current} onClick={() => void copy(value)}><Copy size={14} /></MotionButton></div>;

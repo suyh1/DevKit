@@ -223,12 +223,18 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
         ),
         count,
       );
+    if (window === desktop) {
+      assert.match(await run('document.querySelector(".app-statusbar").textContent'), /写作草稿保存在本机/);
+      await run('document.querySelector(".kb-reader .resource-copy button").click()');
+      await until('document.querySelector(".kb-reader .resource-copy button").textContent !== "复制链接"');
+    }
     await run('document.querySelector(\'.kb-reader .kb-prose a[href^="#knowledge/"]\').click()');
     await until(
       'location.hash===' +
         q(glossaryHash) +
         ' && document.querySelector(".kb-backlinks")?.textContent.includes("订单服务发布指南")',
     );
+    assert.equal(await run('document.querySelector(".kb-reader .resource-copy button").textContent'), '复制链接');
     await field('input[aria-label=知识库全文搜索]', '确认服务可用');
     await until('document.querySelector(".kb-card small")?.textContent.includes("确认服务可用")');
     await run('document.querySelector(".kb-card").click()');

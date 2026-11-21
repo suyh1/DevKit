@@ -1128,7 +1128,7 @@ export default function ProjectCenter({
           <input
             ref={file}
             type="file"
-            className="sr-only"
+            hidden
             accept=".json"
             aria-label="导入项目中心 JSON"
             onChange={(event) => {

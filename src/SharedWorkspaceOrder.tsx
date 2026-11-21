@@ -32,6 +32,13 @@ function OrderRow({ item, index, count, onMove }: {
     <Icon size={16} aria-hidden="true" />
     <span className="shared-order-name">{item.name}</span>
     <select className="shared-order-position" aria-label={`${item.name}的位置`} value={index}
+      onKeyDown={event => {
+        if (event.key !== 'Home' && event.key !== 'End') return;
+        const select = event.currentTarget;
+        if (!CSS.supports('selector(select:open)') || select.matches(':open') || event.target !== select) return;
+        event.preventDefault();
+        onMove(index, event.key === 'Home' ? 0 : count - 1, select);
+      }}
       onChange={event => onMove(index, Number(event.currentTarget.value), event.currentTarget)}>
       {Array.from({ length: count }, (_, position) => <option key={position} value={position}>第 {position + 1} 位</option>)}
     </select>

@@ -128,6 +128,11 @@ module.exports = async function navigationSmoke(window, output) {
   assert.equal(await js('document.querySelector(\'.category-tool[data-tool-id="json"] .category-task-count\').textContent'), '1');
   await key('K', ['control']);
   await wait('!!document.querySelector(".command-dialog[open]") && !document.querySelector(".category-panel")');
+  assert.ok(await js('[...document.querySelectorAll(".command-result")].every(option => option.tabIndex === -1)'));
+  await key('Down');
+  assert.ok(await js('document.getElementById(document.activeElement.getAttribute("aria-activedescendant"))?.matches("[aria-selected=true]")'));
+  await key('Tab');
+  assert.equal(await js('document.activeElement.getAttribute("aria-label")'), '关闭搜索');
   await key('Escape');
 
   const sharedTrigger = '.shared-sidebar-trigger';

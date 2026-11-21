@@ -72,11 +72,16 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
       if (disposed) { await close(); return; }
       setMessage('');
       await lanRequest('terminal-resize', { id: session, cols: terminal.cols, rows: terminal.rows });
-      if (!disposed) { setConnectionId(session); if (node.offsetWidth && !document.activeElement?.closest('dialog')) terminal.focus(); void poll(); }
+      if (!disposed) { setConnectionId(session); if (node.offsetWidth && !document.activeElement?.closest('dialog, .lan-terminal-tabs')) terminal.focus(); void poll(); }
     }).catch(error => { if (!disposed) { setConnectionId(''); setMessage(error.message); } void close(); });
     return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); themeObserver.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
   }, [id, generation]);
-  useEffect(() => { if (active) { fitAddon.current?.fit(); controls.current?.focus(); } }, [active]);
+  useEffect(() => {
+    if (active) {
+      fitAddon.current?.fit();
+      if (!document.activeElement?.closest('dialog, .lan-terminal-tabs')) controls.current?.focus();
+    }
+  }, [active]);
   return <div className="lan-ssh-session">
     <div className="lan-terminal-message"><span role="status">{message || feedback || '已连接'}</span>
       {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); }}>重新连接</button>}

@@ -58,19 +58,19 @@ export default function CommandPalette({ open, onClose, onChoose, favorites = []
     if (match) onChoose?.(match.id, fresh);
     else if (resource) openWorkspaceLink(resource.page, resource.id);
   }
-  return <dialog ref={dialog} className="command-dialog motion-native" aria-label="搜索工具" onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return <dialog ref={dialog} className="command-dialog motion-native" aria-label={onChoose ? '搜索工具与资源' : '搜索共享资源'} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="command-search"><Search size={21} /><input ref={input} aria-label={onChoose ? '搜索全部工具' : '搜索共享资源'} role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={index < total ? `command-${index}` : undefined} autoComplete="off" placeholder={onChoose ? '搜索工具、共享栏目或资源…' : '搜索栏目、实例、接口或监控…'} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} onKeyDown={event => {
       if (event.key === 'ArrowDown') { event.preventDefault(); setIndex(old => Math.max(0, Math.min(old + 1, total - 1))); }
       if (event.key === 'ArrowUp') { event.preventDefault(); setIndex(old => Math.max(old - 1, 0)); }
       if (event.key === 'Enter' && index < total) { event.preventDefault(); choose(index, event.shiftKey); }
     }} /><button className="icon-button" aria-label="关闭搜索" onClick={onClose}><X size={17} /></button></div>
-    <div className="command-section-label">{query ? `找到 ${total} 项` : '快速打开'}{onChoose && ' · Shift + Enter 新建任务'}</div>
+    <div className="command-section-label">{query ? `找到 ${total} 项` : '快速打开'}{matches[index] && ' · Shift + Enter 新建任务'}</div>
     <MotionReveal><MotionGroup groupRef={results} className="command-results" id="command-results" role="listbox" aria-label="搜索结果">
       {!total && <div className="command-empty"><SearchX size={30} /><strong>暂时没有匹配结果</strong></div>}
-      {matches.map((tool, position) => { const Icon = toolIcons[tool.id]; return <button key={tool.id} id={`command-${position}`} role="option" aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className={`tool-icon category-${categoryMeta[tool.category].key}`}><Icon size={19} /></span><span><strong>{tool.name}</strong><small>{tool.english}</small></span><span className="command-category">{tool.category}</span><CornerDownLeft size={15} /></button>; })}
+      {matches.map((tool, position) => { const Icon = toolIcons[tool.id]; return <button key={tool.id} id={`command-${position}`} role="option" tabIndex={-1} onMouseDown={event => event.preventDefault()} aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className={`tool-icon category-${categoryMeta[tool.category].key}`}><Icon size={19} /></span><span><strong>{tool.name}</strong><small>{tool.english}</small></span><span className="command-category">{tool.category}</span><CornerDownLeft size={15} /></button>; })}
       {shared.map((resource, offset) => {
         const position = matches.length + offset, { Icon } = workspaceModuleNav[resource.page];
-        return <button key={`${resource.page}/${resource.id || ''}`} id={`command-${position}`} role="option" aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className="tool-icon"><Icon size={19} /></span><span><strong>{resource.label}</strong><small>{resource.detail}</small></span><CornerDownLeft size={15} /></button>;
+        return <button key={`${resource.page}/${resource.id || ''}`} id={`command-${position}`} role="option" tabIndex={-1} onMouseDown={event => event.preventDefault()} aria-selected={index === position} className={`command-result ${index === position ? 'selected' : ''}`} onMouseMove={() => setIndex(position)} onClick={() => choose(position)}><span className="tool-icon"><Icon size={19} /></span><span><strong>{resource.label}</strong><small>{resource.detail}</small></span><CornerDownLeft size={15} /></button>;
       })}
     </MotionGroup></MotionReveal>
     <div className="command-footer"><span><ArrowUp size={12} /><ArrowDown size={12} />选择</span><span><CornerDownLeft size={12} />打开</span><span><kbd>Esc</kbd>关闭</span></div>

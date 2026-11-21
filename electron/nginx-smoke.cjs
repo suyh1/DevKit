@@ -113,6 +113,9 @@ module.exports = async function checkNginx(window, output) {
   const original = `\uFEFF# 保留此注释\r\nworker_processes 1;\r\npid logs/ui.pid;\r\nerror_log logs/error.log;\r\nevents { worker_connections 64; }\r\nhttp {\r\n    server {\r\n        listen 127.0.0.1:${port};\r\n        server_name localhost;\r\n        location / { return 200 "before"; }\r\n        include common_proxy.conf;\r\n    }\r\n${Array.from({length:7},(_,index)=>`    server { listen 127.0.0.1:${port}; server_name site${index+1}.ui; location / { return 200 \"site${index+1}\"; } include common_proxy.conf; }\r\n`).join('')}}\r\n`;
   const commonOriginal = '# 公共代理\nlocation /api/ {\n    proxy_pass http://127.0.0.1:9000;\n    proxy_set_header Host $host;\n}\n';
   await fs.writeFile(main, original); await fs.writeFile(common, commonOriginal);
+  const extra = path.join(dir, 'alternate', 'common_proxy.conf');
+  await fs.mkdir(path.dirname(extra), { recursive: true });
+  await fs.writeFile(extra, '# alternate include\n');
   const executable = process.env.DEVKIT_NGINX_TEST_EXECUTABLE || '';
   let instanceId, createdId;
   let upstream;
@@ -171,11 +174,21 @@ module.exports = async function checkNginx(window, output) {
     }
     await click('解析附属文件');
     assert.equal(await js(`document.querySelector('.ng-modal textarea').value.includes(${JSON.stringify(common)})`), true);
+    await js(`{const field = document.querySelector('.ng-modal textarea');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, field.value + '\\n' + ${JSON.stringify(extra)});
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    }`);
     await click('保存实例');
     await wait('document.querySelector(".ng-instance-heading h2")?.textContent.includes("界面回归")');
     const state = await ipc('get'); instanceId = state.instances.find(item => item.main === main).id;
     assert.equal(await js('document.querySelector(\'button[aria-pressed=true]\')?.textContent === "字段配置" || !!document.querySelector(".ng-tree")'), true);
-    assert.equal(await js('document.querySelectorAll(".ng-file-tabs button").length'), 2);
+    assert.equal(await js('document.querySelectorAll(".ng-file-tabs button").length'), 3);
+    const tabLabels = await js(`[...document.querySelectorAll('.ng-file-tabs [role=tab]')].filter(el=>el.title.endsWith('common_proxy.conf')).map(el=>el.textContent)`);
+    assert.equal(new Set(tabLabels).size, 2);
+    await wait('!document.querySelector("dialog[open]") && !!document.querySelector(".ng-file-tabs [aria-selected=true]:enabled")');
+    await js(`const fileTab = document.querySelector('.ng-file-tabs [aria-selected=true]'); fileTab.focus(); fileTab.dispatchEvent(new KeyboardEvent('keydown', {key:'End', bubbles:true}))`);
+    await wait(`document.activeElement === [...document.querySelectorAll('.ng-file-tabs [role=tab]')].at(-1) && document.activeElement.tabIndex === 0`);
+    await js(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:'Home', bubbles:true}))`);
     assert.equal(await js(`[...document.querySelectorAll('.ng-argument input')].every(input=>!!document.getElementById(input.getAttribute('aria-describedby'))?.textContent)`), true);
     await helpFor('.ng-argument input[aria-label^="pid 第"]', dir);
     for (const theme of ['light', 'dark']) {

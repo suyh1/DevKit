@@ -1,3 +1,4 @@
+import type { NoticeKind } from './ToastStack';
 import SegmentedControl from './SegmentedControl';
 import { themeStyles } from './themes';
 import { useRef } from 'react';
@@ -13,12 +14,12 @@ import { copyText } from './motion-primitives';
 import { isProjectDesktop, openProjectUrl } from './project-api';
 import packageInfo from '../package.json';
 
-export default function Settings({ preferences, onChange, favorites, onFavorites, onNotice }: { preferences: Preferences; onChange: (value: Preferences) => void; favorites: ToolId[]; onFavorites: (value: ToolId[]) => void; onNotice: (message: string, undo?: () => void) => void }) {
+export default function Settings({ preferences, onChange, favorites, onFavorites, onNotice }: { preferences: Preferences; onChange: (value: Preferences) => void; favorites: ToolId[]; onFavorites: (value: ToolId[]) => void; onNotice: (message: string, kind?: NoticeKind, undo?: () => void) => void }) {
   const file = useRef<HTMLInputElement>(null);
   const update = (patch: Partial<Preferences>) => onChange({ ...preferences, ...patch });
   async function exportSettings() {
-    try { onNotice(await saveText(JSON.stringify({ format: 'devkit-preferences', version: 1, preferences, favorites }, null, 2), 'devkit-settings.json')); }
-    catch (error) { onNotice(`导出失败：${String(error)}`); }
+    try { await saveText(JSON.stringify({ format: 'devkit-preferences', version: 1, preferences, favorites }, null, 2), 'devkit-settings.json', onNotice); }
+    catch (error) { onNotice(`导出失败：${String(error)}`, 'error'); }
   }
   async function importSettings(source?: File) {
     if (!source) return;
@@ -28,8 +29,8 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
       if (data?.format !== 'devkit-preferences' || data.version !== 1 || !data.preferences || !Array.isArray(data.favorites)) throw new Error('不是有效的 DevKit 设置文件');
       const old = preferences, oldFavorites = favorites;
       onChange(validatePreferences(data.preferences)); onFavorites(normalizeFavorites(data.favorites));
-      onNotice('设置已导入', () => { onChange(old); onFavorites(oldFavorites); });
-    } catch (error) { onNotice(`导入失败：${String(error)}`); }
+      onNotice('设置已导入', 'success', () => { onChange(old); onFavorites(oldFavorites); });
+    } catch (error) { onNotice(`导入失败：${String(error)}`, 'error'); }
   }
   return <div className="settings-page"><div className="settings-heading"><h1>偏好设置</h1><p>偏好设置保存在本机，任务内容默认只留在内存中。</p></div>
     <section className="settings-section"><h2><Monitor size={17} />外观</h2><fieldset className="theme-picker">
@@ -75,7 +76,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
           options={[{ value: 'normal', label: '正常模式' }, { value: 'performance', label: '性能模式' }]} />
       </div>
     </section>
-    <section className="settings-section"><h2><ShieldCheck size={17} />数据与偏好</h2><p>主题、编辑器设置、共享栏目顺序和收藏会自动保存。任务需通过顶部“保存工作区”主动导出，恢复时作为新任务打开。密码和 JWT 默认从工作区文件中排除；颜色任务与图片不写入工作区文件。</p><div className="settings-buttons"><button className="secondary-button" onClick={() => void exportSettings()}><Download size={14} />导出设置与收藏</button><button className="secondary-button" onClick={() => file.current?.click()}><Upload size={14} />导入设置</button><button className="text-button" onClick={() => { const old = preferences; onChange(defaultPreferences); onNotice('偏好设置已恢复默认', () => onChange(old)); }}><RotateCcw size={14} />恢复默认偏好</button></div><input ref={file} className="sr-only" type="file" accept=".json" aria-label="导入设置文件" onChange={event => { void importSettings(event.target.files?.[0]); event.target.value = ''; }} /></section>
+    <section className="settings-section"><h2><ShieldCheck size={17} />数据与偏好</h2><p>主题、编辑器设置、共享栏目顺序和收藏会自动保存。任务需通过顶部“保存工作区”主动导出，恢复时作为新任务打开。密码、JWT 和 HMAC 默认从工作区文件中排除；颜色任务与图片不写入工作区文件。</p><div className="settings-buttons"><button className="secondary-button" onClick={() => void exportSettings()}><Download size={14} />导出设置与收藏</button><button className="secondary-button" onClick={() => file.current?.click()}><Upload size={14} />导入设置</button><button className="text-button" onClick={() => { const old = preferences; onChange(defaultPreferences); onNotice('偏好设置已恢复默认', 'success', () => onChange(old)); }}><RotateCcw size={14} />恢复默认偏好</button></div><input ref={file} hidden type="file" accept=".json" aria-label="导入设置文件" onChange={event => { void importSettings(event.target.files?.[0]); event.target.value = ''; }} /></section>
     <section className="settings-section"><h2><Keyboard size={17} />键盘操作</h2><dl className="shortcut-list"><div><dt>全局搜索</dt><dd>Ctrl / Cmd + K</dd></div><div><dt>执行当前任务</dt><dd>Ctrl / Cmd + Enter</dd></div><div><dt>查找文本</dt><dd>编辑器内 Ctrl / Cmd + F</dd></div><div><dt>新建同类任务</dt><dd>点击工具标题旁的 ＋</dd></div><div><dt>任务标签导航</dt><dd>方向键 / Home / End，Delete 关闭</dd></div><div><dt>离开编辑区</dt><dd>Esc，然后 Tab</dd></div></dl></section>
     <section className="settings-section" aria-labelledby="devkit-about-heading">
       <h2 id="devkit-about-heading"><Info size={17} aria-hidden="true" />关于 DevKit</h2>
@@ -85,8 +86,8 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
         <div><dt>联系邮箱</dt><dd className="about-contact">
           <span>{packageInfo.author.email}</span>
           <MotionButton type="button" variant="copy" className="secondary-button" onClick={async () => {
-            try { await copyText(packageInfo.author.email); onNotice('联系邮箱已复制'); }
-            catch (error) { onNotice(error instanceof Error ? error.message : '无法复制联系邮箱'); }
+            try { await copyText(packageInfo.author.email); onNotice('联系邮箱已复制', 'success'); }
+            catch (error) { onNotice(error instanceof Error ? error.message : '无法复制联系邮箱', 'error'); }
           }}><Copy size={14} aria-hidden="true" />复制邮箱</MotionButton>
         </dd></div>
         <div><dt>项目地址</dt><dd>
@@ -94,7 +95,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
             aria-label="在浏览器打开 DevKit 的 GitHub 仓库" onClick={event => {
               if (!isProjectDesktop()) return;
               event.preventDefault();
-              void openProjectUrl(packageInfo.homepage).catch(() => onNotice('无法打开 DevKit 的 GitHub 仓库'));
+              void openProjectUrl(packageInfo.homepage).catch(() => onNotice('无法打开 DevKit 的 GitHub 仓库', 'error'));
             }}>
             <Github size={16} aria-hidden="true" />
             <span>{packageInfo.homepage}</span>

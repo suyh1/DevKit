@@ -1,3 +1,5 @@
+import type { Notify } from './ToastStack';
+import { navigateTabList } from './tab-navigation';
 import { debugOverrides, debugRequest } from './api-debug-draft';
 import HttpMultipart, { multipartIssue, withMultipart } from './HttpMultipart';
 import type { MultipartField } from './HttpMultipart';
@@ -73,7 +75,7 @@ export default function ApiDebug({
   onBusy: (value: boolean) => void;
   onHistory: (row: ApiHistory) => void;
   onGenerate: (config: string) => void;
-  onNotice: (text: string) => void;
+  onNotice: Notify;
 }) {
   const [overrides, setOverrides] = useState<DebugOverrides>({});
   const [multipart, setMultipart] = useState<MultipartField[] | null>(null);
@@ -282,7 +284,7 @@ export default function ApiDebug({
           {error}
         </p>
       )}
-      <div className="api-debug-scope"><p>本次请求值仅保留在当前页面，不会改写接口定义、默认示例或共享鉴权。需要修改定义时请切换“接口设计”。</p><button type="button" className="text-button" disabled={running || !hasOverrides} onClick={() => { setOverrides({}); setMultipart(null); onNotice('已恢复接口定义中的请求值。'); }}>恢复定义值</button></div>
+      <div className="api-debug-scope"><p>本次请求值仅保留在当前页面，不会改写接口定义、默认示例或共享鉴权。需要修改定义时请切换“接口设计”。</p><button type="button" className="text-button" disabled={running || !hasOverrides} onClick={() => { setOverrides({}); setMultipart(null); onNotice('已恢复接口定义中的请求值。', 'success'); }}>恢复定义值</button></div>
       <fieldset className="api-debug-inputs" disabled={running}>
         <section className="api-section">
           <h3>请求参数</h3>
@@ -357,7 +359,7 @@ export default function ApiDebug({
                       ? headers.map((row) => row.join(": ")).join("\n")
                       : body,
                   )
-                    .then(() => onNotice("已复制响应。"))
+                    .then(() => onNotice("已复制响应。", 'success'))
                     .catch((error) => setError(String(error)))
                 }
               >
@@ -389,7 +391,7 @@ export default function ApiDebug({
               定义或环境已修改，此处仍是上次发送的响应；校验采用发送时的定义。
             </p>
           )}
-          <div className="api-tabs" role="tablist" aria-label="API响应区域">
+          <div className="api-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="API响应区域">
             {[
               ["body", "响应正文"],
               ["headers", `响应头 ${response.headers.length}`],
@@ -402,6 +404,7 @@ export default function ApiDebug({
                 key={id}
                 role="tab"
                 aria-selected={tab === id}
+                tabIndex={tab === id ? 0 : -1}
                 onClick={() => setTab(id as typeof tab)}
               >
                 {name}
@@ -461,7 +464,7 @@ export default function ApiDebug({
                             )
                           : [...definition.responses, row],
                       });
-                      onNotice("已填入响应定义草稿，保存接口后写入文档。");
+                      onNotice("已填入响应定义草稿，保存接口后写入文档。", 'success');
                     } catch (error) {
                       setError(`响应不是JSON，无法生成结构：${error}`);
                     }

@@ -19,7 +19,9 @@ module.exports = function interactionAudit(window, output) {
     await fs.unlink(path.join(output, 'saved.txt')).catch(error => { if (error.code !== 'ENOENT') throw error; });
     await js(`document.querySelector('.top-actions button[title="保存工作区"]').click()`);
     await wait(`document.querySelector('.save-dialog').open`);
+    assert.equal(await js('document.querySelector(".save-dialog .run-button").disabled'), await js('document.querySelector(".snapshot-summary strong").textContent === "0"'));
     await js(`document.querySelector('.save-dialog .sensitive-toggle input').click()`);
+    assert.equal(await js('document.querySelector(".save-dialog .run-button").disabled'), false);
     await js(`document.querySelector('.save-dialog .run-button').click()`);
     await wait(`!document.querySelector('.save-dialog').open && document.querySelector('.app-toast')?.textContent.includes('已保存')`);
     return JSON.parse(await fs.readFile(path.join(output, 'saved.txt'), 'utf8'));

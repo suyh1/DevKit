@@ -166,7 +166,8 @@ module.exports = async function apiSmoke(window, output) {
       path.join(output, "preview-api-docs-dark.png"),
       (await window.webContents.capturePage()).toPNG(),
     );
-    await click("运行调试", ".api-view-toolbar");
+    await js('document.querySelector(".api-view-toolbar [aria-selected=true]").dispatchEvent(new KeyboardEvent("keydown",{key:"End",bubbles:true}))');
+    await wait('document.activeElement.textContent === "运行调试" && document.activeElement.getAttribute("aria-selected") === "true"');
     await wait(
       'document.querySelector(".api-debug .api-error")?.textContent.includes("缺少环境变量")',
     );
@@ -196,9 +197,8 @@ module.exports = async function apiSmoke(window, output) {
     await wait(
       'document.querySelectorAll(".api-checks li[data-result=pass]").length===3',
     );
-    await js(
-      `[...document.querySelectorAll('.api-debug [role=tab]')].find(button=>button.textContent.startsWith('响应头')).click()`,
-    );
+    await js('document.querySelector(".api-debug [aria-selected=true]").dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowLeft",bubbles:true}))');
+    await wait('document.activeElement.textContent.startsWith("响应头") && document.activeElement.tabIndex === 0');
     await wait(
       'document.querySelectorAll("table[aria-label=API响应头] tr").length>=3',
     );

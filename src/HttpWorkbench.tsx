@@ -1,3 +1,5 @@
+import type { Notify } from './ToastStack';
+import { navigateTabList } from './tab-navigation';
 import { SharingButton } from './Sharing';
 import { canSendHttp, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
@@ -37,7 +39,7 @@ export default function HttpWorkbench({
 }: {
   active: boolean;
   initial: { config: string; key: number } | null;
-  onNotice: (message: string) => void;
+  onNotice: Notify;
   onGenerate: (config: string) => void;
 }) {
   const [workspaceMode, setWorkspaceMode] = useState<'api'|'quick'>('api');
@@ -226,7 +228,7 @@ export default function HttpWorkbench({
       setSelected(id);
       setError('');
       setBaseline({ config, name, timeout, includeSensitive });
-      onNotice(includeSensitive ? '请求已保存；集合中包含明文 Headers、正文和参数。' : '请求已保存；鉴权头、常见敏感参数和正文已排除。');
+      onNotice(includeSensitive ? '请求已保存；集合中包含明文 Headers、正文和参数。' : '请求已保存；鉴权头、常见敏感参数和正文已排除。', 'success');
       feedback(true);
     } catch (error) {
       setError((error as Error).message);
@@ -253,8 +255,9 @@ export default function HttpWorkbench({
       setError(String(error));
     }
   }
+  const matchingEntries = entries.filter(entry => (entry.name + entry.config).toLowerCase().includes(search.toLowerCase()));
   return (
-    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
+    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} tabIndex={workspaceMode==='api' ? 0 : -1} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} tabIndex={workspaceMode==='quick' ? 0 : -1} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading workspace-banner">
         <div className="page-title">
           <h1>HTTP 调试</h1>
@@ -295,9 +298,7 @@ export default function HttpWorkbench({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {entries
-            .filter((entry) => (entry.name + entry.config).toLowerCase().includes(search.toLowerCase()))
-            .map((entry) => (
+          {matchingEntries.map((entry) => (
               <div className={selected === entry.id ? 'selected' : ''} key={entry.id} data-motion-key={entry.id}>
                 <button
                   disabled={!!running}
@@ -320,6 +321,7 @@ export default function HttpWorkbench({
                 </button>
               </div>
             ))}
+          {!!entries.length && !matchingEntries.length && <p role="status" className="preview-note">没有匹配的请求。</p>}
           {!entries.length && <p className="preview-note">保存常用请求后，可在这里切换。</p>}
           <div className="feature-toolbar">
             <button
@@ -338,7 +340,7 @@ export default function HttpWorkbench({
             </button>
           </div>
           <input
-            className="sr-only"
+            hidden
             type="file"
             accept=".json"
             aria-label="导入请求集合"
@@ -362,7 +364,7 @@ export default function HttpWorkbench({
                     return;
                   persist([...entries, ...imported.map((entry) => ({ ...entry, id: newProjectId() }))]);
                   setError('');
-                  onNotice('请求集合已合并导入。');
+                  onNotice('请求集合已合并导入。', 'success');
                 } catch (error) {
                   setError(String(error));
                 }
@@ -518,7 +520,7 @@ export default function HttpWorkbench({
                       className="text-button"
                       onClick={() =>
                         void copyText(responseTab === 'body' ? responseBody : responseHeaders.map((row) => row.join(': ')).join('\n'))
-                          .then(() => onNotice('响应已复制。'))
+                          .then(() => onNotice('响应已复制。', 'success'))
                           .catch((error) => setError(String(error)))
                       }
                     >

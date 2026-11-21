@@ -37,3 +37,8 @@
     border-inline-start-width: 2px;
   }
 }
+
+label:has(+ input.sr-only[type="file"]:focus-visible) {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}

@@ -106,7 +106,7 @@ async function streamArchive(response, target, label, protectedRoot, signal, aut
   }
 }
 
-function page(share, base, relative, rows, { name, parent, archive, query = '', page = 1, pages = 1, portal, total = rows.length } = {}) {
+function page(share, base, relative, rows, { name, parent, archive, query = '', page = 1, pages = 1, portal, total = rows.length, hasEntries = total > 0 } = {}) {
   const pageLink = number => escape(base + relative + '?' + new URLSearchParams({ q: query, page: String(number) }));
   const listItems = rows.map(row => `
     <li>
@@ -183,7 +183,7 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
   <header class="tools"><h2>${name ? '文件与文件夹' : '共享内容'} <small>${total} 项</small></h2>
     ${name ? `<form action="${escape(base + relative)}"><input name="q" type="search" maxlength="160" aria-label="筛选当前文件夹" placeholder="筛选文件名" value="${escape(query)}"><button>筛选</button></form>` : ''}
   </header>
-  ${listItems ? `<ul>${listItems}</ul>` : '<p class="empty">没有可显示的文件。</p>'}
+  ${listItems ? `<ul>${listItems}</ul>` : query && hasEntries ? `<p class="empty">没有与“${escape(query)}”匹配的文件或文件夹。 <a href="${escape(base + relative)}">清除筛选</a></p>` : '<p class="empty">没有可显示的文件。</p>'}
 </section>
 ${pages > 1 ? `<nav class="pages" aria-label="分页">${page > 1 ? `<a href="${pageLink(page - 1)}">上一页</a>` : ''}<span>第 ${page} / ${pages} 页</span>${page < pages ? `<a href="${pageLink(page + 1)}">下一页</a>` : ''}</nav>` : ''}
 </main></body></html>`;
@@ -225,7 +225,8 @@ export async function browseFileShare(share, { request, response, url, base, pro
     if (url.searchParams.get('zip') === '1') return streamArchive(response, target, label, protectedRoot, signal, check, request.method);
     const relative = [index, ...encoded].join('/') + '/';
     const query = (url.searchParams.get('q') ?? '').trim().slice(0, 160);
-    const entries = (await list(target, protectedRoot)).filter(entry => entry.name.toLowerCase().includes(query.toLowerCase()))
+    const contents = await list(target, protectedRoot);
+    const entries = contents.filter(entry => entry.name.toLowerCase().includes(query.toLowerCase()))
       .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || collator.compare(a.name, b.name));
     const pages = Math.max(1, Math.ceil(entries.length / entriesPerPage));
     const current = Math.max(1, Math.min(pages, Math.trunc(Number(url.searchParams.get('page'))) || 1));
@@ -233,7 +234,7 @@ export async function browseFileShare(share, { request, response, url, base, pro
       label: entry.name, href: base + relative + encodeURIComponent(entry.name) + (entry.isDirectory() ? '/' : ''), directory: entry.isDirectory(),
     }));
     const parent = names.length ? base + [index, ...encoded.slice(0, -1)].join('/') + '/' : base;
-    return sendPage(page(share, base, relative, rows, { name: label, parent, archive: base + relative + '?zip=1', query, page: current, pages, portal, total: entries.length }));
+    return sendPage(page(share, base, relative, rows, { name: label, parent, archive: base + relative + '?zip=1', query, page: current, pages, portal, total: entries.length, hasEntries: contents.length > 0 }));
   }
   const file = await openSharedFile(target, protectedRoot);
   try {

@@ -124,6 +124,12 @@ module.exports = async function workflowsSmoke(window, output) {
         await js(`[...document.querySelectorAll('${pane} button')].find(b=>b.textContent==='示例图片').click()`);
         await js(`[...document.querySelectorAll('${pane} button')].find(b=>b.textContent==='取此像素').click()`);
         assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), '#EF4444');
+        await fill(pane + ' [aria-label="像素 X 坐标"]', '400');
+        await wait(`document.querySelector('${pane} .color-image-meta code')?.textContent === '#3B82F6'`);
+        assert.equal(await js(`document.querySelector(${JSON.stringify(primary)}).value`), '#EF4444');
+        await fill(primary, '#FF000080');
+        await fill(pane + ' .color-control-panel input[type=color]', '#00ff00');
+        await wait(`document.querySelector(${JSON.stringify(primary)}).value === '#00FF0080'`);
         await fill(primary, original);
       }
       const { clipboard } = require('electron');

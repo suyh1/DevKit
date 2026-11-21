@@ -1,3 +1,4 @@
+import type { Notify } from './ToastStack';
 import ToolRecipes from './ToolRecipes';
 import FileChecksums from './FileChecksums';
 import './workbench-extensions.css';
@@ -24,7 +25,7 @@ import { developerPresentation } from './tool-presentation';
 import { experienceFor } from './tool-experience';
 import { resultInputOptions } from './tool-routing';
 
-type Props = { onDebug?: (config: string) => void; task: Task; preferences: Preferences; onEdit: (patch: Partial<Task>) => void; onRun: () => void; onCancel: () => void; onNotice: (message: string) => void; onSend: (tool: ToolId, text: string, options: Options) => void };
+type Props = { onDebug?: (config: string) => void; task: Task; preferences: Preferences; onEdit: (patch: Partial<Task>) => void; onRun: () => void; onCancel: () => void; onNotice: Notify; onSend: (tool: ToolId, text: string, options: Options) => void };
 const statusLabels = { idle: '等待处理', running: '正在处理', success: '已完成', stale: '结果待更新', error: '处理失败', cancelled: '已取消' };
 const previewTools = ['json', 'yaml', 'csv-json', 'json-csv', 'jwt', 'regex', 'url-inspect', 'password', 'uuid', 'diff', 'hash', 'hmac', 'timestamp', 'radix', 'css-unit'];
 
@@ -55,23 +56,23 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   const selectedDestination = destinations.some(item => item.id === destination) ? destination : 'base64';
 
   async function copy(text: string) {
-    try { await copyText(text); onNotice('已复制到剪贴板'); }
-    catch { onNotice('剪贴板不可用，请选中文本后手动复制。'); }
+    try { await copyText(text); onNotice('已复制到剪贴板', 'success'); }
+    catch { onNotice('剪贴板不可用，请选中文本后手动复制。', 'error'); }
   }
   async function load(file?: File) {
     if (!file || busy || fileBusy) return;
     setFileBusy(true);
     try {
       const { text, encoding } = await readText(file);
-      setUndo(task); onEdit({ input: text, fileName: file.name, encoding }); setDocumentTab('input'); onNotice(`已导入 ${file.name} · ${encoding}`);
-    } catch (error) { onNotice(error instanceof Error ? error.message : '文件导入失败'); }
+      setUndo(task); onEdit({ input: text, fileName: file.name, encoding }); setDocumentTab('input'); onNotice(`已导入 ${file.name} · ${encoding}`, 'success');
+    } catch (error) { onNotice(error instanceof Error ? error.message : '文件导入失败', 'error'); }
     finally { setFileBusy(false); }
   }
   async function download() {
     const extension = presentation?.extension ?? (active === 'json-csv' ? task.options.delimiter === 'tab' ? 'tsv' : 'csv' : outputLanguage === 'typescript' ? 'ts' : outputLanguage === 'diff' ? 'patch' : outputLanguage === 'text' ? 'txt' : outputLanguage);
     const root = /^[A-Za-z_$][A-Za-z\d_$]*$/.test(task.options.rootName || '') ? task.options.rootName : 'Root';
-    try { onNotice(await saveText(task.output, `${active === 'json-code' ? root : `devkit-${active}`}.${extension}`)); }
-    catch (error) { onNotice(`保存失败：${String(error)}`); }
+    try { await saveText(task.output, `${active === 'json-code' ? root : `devkit-${active}`}.${extension}`, onNotice); }
+    catch (error) { onNotice(`保存失败：${String(error)}`, 'error'); }
   }
   function editInput(input: string) { onEdit({ input }); }
   function sample() {
@@ -85,12 +86,15 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   }} />;
   const run = <div className="run-actions">{active === 'http-code' && onDebug && <button className="secondary-button" disabled={busy} onClick={() => onDebug(task.input)}>在 HTTP 调试中打开</button>}{busy && <button className="secondary-button" onClick={onCancel}><Square size={13} />取消</button>}<MotionButton trackBusy outcome={task.status === "success" ? "success" : task.status === "error" ? "error" : ""} busy={busy} className="run-button" disabled={busy || fileBusy} onClick={onRun}>{busy ? <LoaderCircle size={15} className="spin" /> : <ArrowRight size={15} />}{busy ? '正在处理' : experience.action}<kbd>Ctrl ↵</kbd></MotionButton></div>;
   const inputActions = !generated && <><button className="icon-button" title="导入文本文件" aria-label="导入文本文件" disabled={busy || fileBusy} onClick={() => inputFile.current?.click()}><Upload size={14} /></button><button className="icon-button" title="粘贴" aria-label="粘贴输入内容" disabled={busy || fileBusy} onClick={async () => { try { const text = await navigator.clipboard.readText(); setUndo(task); editInput(text); } catch { onNotice('请在编辑器内使用 Ctrl / Cmd + V 粘贴。'); } }}><ClipboardPaste size={14} /></button><button className="icon-button" title="清空输入（可撤销）" aria-label="清空输入" disabled={busy || fileBusy} onClick={() => { setUndo(task); onEdit({ input: '', fileName: undefined, encoding: undefined }); }}><Trash2 size={14} /></button></>;
-  const maximize = (area: string) => <button className="icon-button" title={`最大化${area === 'input' ? '输入' : '结果'}区`} aria-label={`最大化${area === 'input' ? '输入' : '结果'}区`} onClick={() => setFocus(focus === area ? '' : area)}>{focus === area ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>;
+  const maximize = (area: string) => {
+    const label = (focus === area ? "还原" : "最大化") + (area === "input" ? "输入区" : "结果区");
+    return <button className="icon-button" title={label} aria-label={label} onClick={() => setFocus(focus === area ? '' : area)}>{focus === area ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>;
+  };
   const inputHidden = focus === "output" || workflow === "format" && !focus && documentTab === "output";
   const outputHidden = focus === "input" || workflow === "format" && !focus && documentTab === "input";
   const inputPanel = <section aria-busy={fileBusy || busy} data-mode-hidden={inputHidden} inert={inputHidden} className={`editor-card input-card ${dragging ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); if (!busy && !fileBusy && !generated) setDragging(true); }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDrop={event => { event.preventDefault(); setDragging(false); if (!generated) void load(event.dataTransfer.files[0]); }}>
     <MotionDrop active={dragging} /><div className="editor-title"><div className="editor-label"><span className="panel-dot" /><strong key={swaps} className={swaps ? "swap-left" : undefined}>{experience.input}</strong>{!compact && !generated && <small>{inputLanguage.toUpperCase()}</small>}</div><div className="editor-actions">{inputActions}{maximize('input')}</div></div>
-    <input ref={inputFile} type="file" className="sr-only" aria-label="选择输入文件" accept=".json,.yaml,.yml,.csv,.tsv,.sql,.txt,.log,.xml,.md,.js,.ts,.java,.css,.html,.patch,.env,.properties,.scss,.jsx,.tsx,.sh" onChange={event => { void load(event.target.files?.[0]); event.target.value = ''; }} />
+    <input ref={inputFile} type="file" hidden aria-label="选择输入文件" accept=".json,.yaml,.yml,.csv,.tsv,.sql,.txt,.log,.xml,.md,.js,.ts,.java,.css,.html,.patch,.env,.properties,.scss,.jsx,.tsx,.sh" onChange={event => { void load(event.target.files?.[0]); event.target.value = ''; }} />
     {generated ? <div className="generator-config"><span className="result-kicker">{active === 'password' ? 'SECURE PASSWORD' : active.toUpperCase()}</span><h2>{active === 'password' ? '按需构造随机密码' : '批量生成唯一标识'}</h2>{options}{active !== 'password' && <label>生成数量<input aria-label={`${active.toUpperCase()} 生成数量`} type="number" min="1" max="1000" disabled={busy} value={task.input} onChange={event => editInput(event.target.value)} /><small>每次 1–1,000 个</small></label>}{run}<small>{active === 'ulid' ? 'ULID 含可见时间，不用于密码或令牌。' : '使用系统安全随机源，生成结果默认不落盘。'}</small></div> : <>
       {task.fileName && <FileMeta name={task.fileName} encoding={task.encoding || '文本'} />}
       {compact ? <div className="compact-form" onKeyDown={event => { if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !event.nativeEvent.isComposing && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox' && !busy && !fileBusy) { event.preventDefault(); onRun(); } }}><div className="compact-options">{options}</div><ToolInput id={active} value={task.input} options={task.options} label={experience.input} placeholder={experience.placeholder} disabled={busy || fileBusy} onChange={editInput} /><div className="compact-run">{run}</div></div> : active === 'http-code' ? <HttpRequestInput value={task.input} disabled={busy || fileBusy} onChange={editInput} {...editorProps} /> : <div className="editor-body"><CodeEditor label={active === 'diff' ? '原始文本' : '输入内容'} language={inputLanguage} value={task.input} onChange={editInput} readOnly={busy || fileBusy} {...editorProps} placeholder="粘贴内容，或拖入本地文本文件…" /></div>}

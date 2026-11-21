@@ -78,6 +78,8 @@ module.exports = async function collaborationSmoke(window, output) {
     await fill(desktop, main + 'textarea', '跨设备取件测试');
     await fill(desktop, main + 'input[type=password]', 'case-pass');
     await click(desktop, main, '发送文字或链接');
+    await wait(desktop, 'document.querySelector(".collab-inbox [role=status]")?.textContent.includes("已发送 1 项，剩余 0 项")');
+    assert.equal(await desktop('[...document.querySelectorAll(".workspace:not([hidden]) [role=status]")].filter(el=>el.textContent.includes("已发送 1 项")).length'), 1);
     await click(desktop, main, '邀请设备');
     let address = 'http://127.0.0.1:' + port + '/#transfer';
     if (lan) {
@@ -124,7 +126,8 @@ module.exports = async function collaborationSmoke(window, output) {
       }`);
       await click(send, sendScope, direct ? '发布直传文件（1）' : '发送所选内容（1）');
       if (exerciseResume) {
-        await wait(send, "document.querySelector('.collab-pending [role=alert]')?.textContent.includes('测试连接中断')");
+        await wait(send, "document.querySelector('.collab-pending small')?.textContent.includes('测试连接中断')");
+        await wait(send, `[...document.querySelectorAll(${JSON.stringify(sendScope + '[role=status], ' + sendScope + '[role=alert]')})].filter(el=>el.textContent.includes('测试连接中断')).length === 1`);
         await click(send, sendScope, '发送所选内容（1）');
         await wait(send, 'window.resumeOffsets.length === 2');
         assert.deepEqual(await send('window.resumeOffsets'), [0, 1048576]);
@@ -225,6 +228,9 @@ module.exports = async function collaborationSmoke(window, output) {
     await click(web, current, '响应配置');
     await wait(web, '!!document.querySelector(".mock-code-panel .cm-content")');
     await capture('collab-mock-editor');
+    await fill(web, current + '[aria-label="查找接口"]', 'missing-endpoint');
+    await wait(web, 'document.body.innerText.includes("没有匹配的接口")');
+    await fill(web, current + '[aria-label="查找接口"]', '');
     await web('location.hash="whiteboard"');
     await fill(web, current + '[aria-label="新画板名称"]', '同步标注');
     await web(`(async () => {
@@ -246,6 +252,11 @@ module.exports = async function collaborationSmoke(window, output) {
     );
     await wait(web, '!!document.querySelector("canvas[aria-label=共享标注画布]")');
     const boardId = await web('location.hash.split("/")[1]');
+    await web('document.querySelector(".board-library-bar button").click()');
+    await fill(web, current + '[aria-label="查找白板"]', 'missing-board');
+    await wait(web, 'document.body.innerText.includes("没有匹配的画板")');
+    await fill(web, current + '[aria-label="查找白板"]', '');
+    await web('document.querySelector(".board-library-bar button").click()');
     assert.ok(boardId);
     await web(`(() => {
       const canvas = document.querySelector('canvas[aria-label=共享标注画布]');

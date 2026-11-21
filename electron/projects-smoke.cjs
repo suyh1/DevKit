@@ -310,9 +310,11 @@ module.exports = async function checkProjects(window, output, staging) {
   // Closing a dirty editor must preserve the draft until explicitly discarded.
   await js(`document.querySelector('button[aria-label="编辑 团队管理台"]').click()`);
   await field('项目名称','尚未保存的名称');
+  await js('[...document.querySelectorAll("dialog[open] input")].find(input=>input.value==="尚未保存的名称").focus()');
   await click('取消');
   await wait(window.webContents, '!!document.querySelector("dialog[open] .pc-discard")');
   await click('继续编辑');
+  assert.equal(await js('document.activeElement.value'), '尚未保存的名称');
   assert.equal(await js('[...document.querySelectorAll("dialog[open] label")].find(label=>label.querySelector("span")?.textContent==="项目名称").querySelector("input").value'), '尚未保存的名称');
   await click('取消'); await click('放弃更改');
   assert.equal((await ipc('get')).profiles[1].projects[0].name,'团队管理台');

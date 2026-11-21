@@ -55,6 +55,8 @@ module.exports = async function featuresSmoke(window, output) {
   await wait(`document.querySelector('${pane} .devkit-panel')?.textContent.includes('清单一致') && document.querySelector('${pane} .devkit-panel')?.textContent.includes('缺少文件 · missing.bin')`);
   await js('[...document.querySelectorAll(".tab-close")].forEach(button=>button.click())');
   await openTool('JSON 格式化');
+  await require('./result-details-smoke.cjs')({ js, wait, fill, click, pane });
+  await js(`document.querySelector('${pane} .recipe-panel').open=false`);
   await click('示例', pane + ' .input-card');
   await js(`[...document.querySelectorAll('${pane} details')].find(d => d.querySelector('summary')?.textContent==='工具处理流程').open=true`);
   await click('追加步骤', pane);
@@ -82,7 +84,8 @@ module.exports = async function featuresSmoke(window, output) {
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
     await openWorkspace('HTTP 调试');
-    await click('快速请求', '.http-product-tabs');
+    await js('document.querySelector(".http-product-tabs [aria-selected=true]").dispatchEvent(new KeyboardEvent("keydown",{key:"End",bubbles:true}))');
+    await wait('document.activeElement.textContent === "快速请求" && document.activeElement.tabIndex === 0');
     await wait('!!document.querySelector(\'.http-workspace:not([hidden])\')');
     await click('配置 JSON', '.http-request');
     const config = JSON.stringify({ method: 'POST', url: base + '/echo?token=secret-test', headers: { Authorization: 'Bearer secret-test' } }).slice(0, -1) + ',"body":{"id":9007199254740993,"name":"中文"}}';
@@ -90,6 +93,9 @@ module.exports = async function featuresSmoke(window, output) {
     await click('发送请求', '.http-main'); await wait('document.querySelector(".http-response")?.textContent.includes("201")');
     assert.ok(await js('document.querySelector(".http-response .cm-content").textContent.includes("9007199254740993")'));
     await click('保存请求', '.http-main'); await wait('document.querySelectorAll(".http-collection>div:not(.feature-toolbar)").length===1');
+    await fill('input[aria-label="搜索请求集合"]', 'no such request');
+    await wait('document.querySelector(".http-collection").innerText.includes("没有匹配的请求")');
+    await fill('input[aria-label="搜索请求集合"]', '');
     assert.equal(await js('localStorage.getItem("devkit:http-collection").includes("secret-test")'), false);
     assert.equal(await js('localStorage.getItem("devkit:http-collection").includes("9007199254740993")'), false);
     await snap('features-http-light');

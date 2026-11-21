@@ -84,7 +84,6 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const [fileIssue, setFileIssue] = useState<{ file: File; message: string }>();
-  const [batchResult, setBatchResult] = useState('');
   const [direct, setDirect] = useState(true);
   const stagedInvite = useRef('');
   const finishInvite = useRelatedCreation('transfer', active && edit && !quickLink && !op.busy, (_from, invite) => {
@@ -140,7 +139,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
       let sent = 0;
       const total = files.length + Number(!direct && !!text.trim());
       let currentFile: File | undefined;
-      setBatchResult(''); setFileIssue(undefined);
+      setFileIssue(undefined);
+      let detail = '';
       try {
         for (const file of files) {
           if (cancelled.current) break;
@@ -210,17 +210,17 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           if (stagedInvite.current && text === stagedInvite.current && !files.length) finishInvite();
           stagedInvite.current = '';
         }
-        return direct
-          ? '已发布 ' + sent + ' 个直传文件，请保持此页面在线。'
-          : (cancelled.current ? '已取消后续发送，' : '') + '已发送 ' + sent + ' 项';
+        if (cancelled.current) detail = '已暂停后续发送。';
+        else if (direct) detail = '请保持此页面在线。';
       } catch (failure) {
-        if (currentFile) setFileIssue({ file: currentFile, message: failure instanceof Error ? failure.message : String(failure) });
-        throw failure;
+        const reason = failure instanceof Error ? failure.message : String(failure);
+        if (currentFile) setFileIssue({ file: currentFile, message: reason });
+        detail = currentFile ? `${currentFile.name}：${reason}` : reason;
       } finally {
-        setBatchResult(`本次${direct ? '已发布直传' : '已发送'} ${sent} 项，剩余 ${total - sent} 项`);
         setProgress('');
         await feed.refresh();
       }
+      return `本次${direct ? '已发布直传' : '已发送'} ${sent} 项，剩余 ${total - sent} 项。${detail}`;
     });
   }
   async function download(item: Entry, ticket?: string) {
@@ -303,7 +303,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
               {files.map((file, i) => (
                 <div key={i}>
                   <span>
-                    <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}{fileIssue?.file === file && <small role="alert">{fileIssue.message}</small>}
+                    <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}{fileIssue?.file === file && <small>{fileIssue.message}</small>}
                   </span>
                   <button
                     disabled={op.busy}
@@ -366,7 +366,6 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             </button>
           </div>
           <p className="send-summary">{files.length} 个文件 · {sizeOf(files.reduce((sum,file) => sum + file.size,0) + (!direct ? new Blob([text]).size : 0))}{!direct && text.trim() ? ' · 含文字或链接' : ''} · {direct ? '在线直传' : '主机暂存'}</p>
-          {batchResult && <p role="status">{batchResult}{op.message && !fileIssue && pane === 'send' ? ` · ${op.message}` : ''}</p>}
           {progress && (
             <p role="status">
               {progress}{' '}
@@ -385,12 +384,11 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
         <div className="collab-bar">
           <h2 className="section-title">
             <Inbox />
-            共享收件箱 <span className="collab-count">{feed.value?.length ?? 0}</span>
+            共享收件箱 <span className="collab-count">{feed.value?.length ?? '—'}</span>
           </h2>
           <SegmentedControl label="筛选收件箱" value={filter}
             options={[{ value: 'all', label: '全部类型' }, { value: 'file', label: '文件' }, { value: 'text', label: '文字' }, { value: 'link', label: '链接' }]} onChange={setFilter} />
         </div>
-        {batchResult && <p role="status">{batchResult}</p>}
         <details className="transfer-storage">
           <summary>主机存储{storedBytes !== undefined && ' · 暂存文件 ' + sizeOf(storedBytes)}</summary>
           {!!storedBytes && <><div className="storage-meter" aria-hidden="true">{feed.value?.filter(item => item.kind === 'file' && !item.direct && item.size).map((item,index) => <i key={item.id} style={{flexGrow:item.size,backgroundColor:`hsl(${(index * 61 + 158) % 360} 45% 45%)`}} />)}</div><ul>{feed.value?.filter(item => item.kind === 'file' && !item.direct).map(item => <li key={item.id}>{item.name} · {sizeOf(item.size)} · {(item.size * 100 / storedBytes).toFixed(1)}%</li>)}</ul></>}
@@ -402,7 +400,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             </code>
           </small>
         </details>
-        {(op.message || feed.error) && <p role="status">{op.message || feed.error}</p>}
+        {op.message && <p role="status">{op.message}</p>}
+        {feed.error && <p role="status">{feed.value ? '收件箱刷新失败，显示上次读取的内容。' : '收件箱读取失败。'}{feed.error} <button onClick={() => void feed.refresh()}>重试</button></p>}
         {receiving && (
           <p role="status">
             {receiving} <button onClick={() => receiver.current?.abort()}>取消接收</button>
@@ -571,7 +570,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             {revealed?.id === item.id && <button onClick={() => setRevealed(undefined)}>隐藏内容</button>}
           </article>;
         })}
-        {!entries.length && (
+        {!feed.error && !entries.length && (
           <div className="collab-empty">
             <Inbox size={32} />
             <strong>{!feed.value ? '正在读取收件箱…' : filter === 'all' ? '收件箱是空的' : '没有这类内容'}</strong>

@@ -1,3 +1,5 @@
+import type { Notify } from './ToastStack';
+import { navigateTabList } from './tab-navigation';
 import { canWriteWorkspace, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -75,7 +77,7 @@ export default function ApiWorkspace({
   onBusy: (busy: boolean) => void;
   showApi: () => void;
   onGenerate: (config: string) => void;
-  onNotice: (message: string) => void;
+  onNotice: Notify;
 }) {
   const [library, setLibrary] = useState<ApiLibrary | null>(null),
     [projectId, setProjectId] = useState(""),
@@ -225,7 +227,7 @@ export default function ApiWorkspace({
       revision: state.revision,
     });
     adopt(result, nextProject, nextEndpoint);
-    onNotice(`API工作区已保存 · 版本${result.state.revision}`);
+    onNotice(`API工作区已保存 · 版本${result.state.revision}`, 'success');
   }
   function selectProject(item: ApiProject) {
     void allowChange().then((allowed) => {
@@ -354,7 +356,7 @@ export default function ApiWorkspace({
                 const result = await apiLibrary("get-library");
                 if (dirty)
                   (setLibrary(result),
-                    onNotice("已刷新，接口草稿仍保留；请核对后保存。"));
+                    onNotice("已刷新，接口草稿仍保留；请核对后保存。", 'success'));
                 else adopt(result);
               })
             }
@@ -372,7 +374,7 @@ export default function ApiWorkspace({
       )}
       <input
         ref={file}
-        className="sr-only"
+        hidden
         type="file"
         accept=".json,.yaml,.yml"
         aria-label="导入API项目文件"
@@ -497,11 +499,10 @@ export default function ApiWorkspace({
                     disabled={busy || sending}
                     onClick={() =>
                       void action(async () => {
-                        onNotice(
-                          await saveText(
-                            exportOpenApi(project),
-                            `${project.name.replace(/[\\/:*?"<>|]/g, "_")}.openapi.json`,
-                          ),
+                        await saveText(
+                          exportOpenApi(project),
+                          `${project.name.replace(/[\\/:*?"<>|]/g, "_")}.openapi.json`,
+                          onNotice,
                         );
                       })
                     }
@@ -514,11 +515,10 @@ export default function ApiWorkspace({
                     disabled={busy || sending}
                     onClick={() =>
                       void action(async () => {
-                        onNotice(
-                          await saveText(
-                            exportApiMarkdown(project),
-                            "api-documentation.md",
-                          ),
+                        await saveText(
+                          exportApiMarkdown(project),
+                          "api-documentation.md",
+                          onNotice,
                         );
                       })
                     }
@@ -540,11 +540,10 @@ export default function ApiWorkspace({
                             context: "API项目备份",
                           })
                         )
-                          onNotice(
-                            await saveText(
-                              exportApiProject(project),
-                              "devkit-api-project.json",
-                            ),
+                          await saveText(
+                            exportApiProject(project),
+                            "devkit-api-project.json",
+                            onNotice,
                           );
                       })
                     }
@@ -819,7 +818,7 @@ export default function ApiWorkspace({
                   <div className="api-view-toolbar">
                     <div
                       className="api-tabs"
-                      role="tablist"
+                      role="tablist" onKeyDown={navigateTabList}
                       aria-label="API接口视图"
                     >
                       {[
@@ -833,6 +832,7 @@ export default function ApiWorkspace({
                             key={id as string}
                             role="tab"
                             aria-selected={view === id}
+                            tabIndex={view === id ? 0 : -1}
                             disabled={sending || (id === "design" && !canWriteWorkspace('http'))}
                             onClick={() => setView(id as typeof view)}
                           >

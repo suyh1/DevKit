@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Undo2, X } from 'lucide-react';
+import { Check, CircleAlert, Info, Undo2, X } from 'lucide-react';
 import { MotionToast } from './Motion';
 
-export type Notice = { id: number; message: string; undo?: () => void };
+export type NoticeKind = 'success' | 'error' | 'info';
+export type Notify = (message: string, kind?: NoticeKind) => void;
+export type Notice = { kind: NoticeKind; id: number; message: string; undo?: () => void };
 
 function Item({ item, paused, dismiss }: { item: Notice; paused: boolean; dismiss: (id: number) => void }) {
   const remaining = useRef(item.undo ? 12000 : 6000);
@@ -17,9 +19,10 @@ function Item({ item, paused, dismiss }: { item: Notice; paused: boolean; dismis
       remaining.current -= performance.now() - start;
     };
   }, [paused, item.id]);
+  const Icon = { success: Check, error: CircleAlert, info: Info }[item.kind];
   return (
     <MotionToast onClose={() => dismiss(item.id)}>
-      <Check size={16} />
+      <Icon size={16} aria-hidden="true" data-notice-kind={item.kind} />
       <span>{item.message}</span>
       {item.undo && (
         <button

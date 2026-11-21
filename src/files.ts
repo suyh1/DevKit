@@ -11,9 +11,12 @@ declare global {
   } }
 }
 
-export async function saveText(text: string, filename: string): Promise<string> {
-  if (window.devkitDesktop) return window.devkitDesktop.saveText(text, filename);
-  return downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), filename);
+export async function saveText(text: string, filename: string, notify?: (message: string, kind: 'info' | 'success') => void): Promise<string> {
+  const message = window.devkitDesktop
+    ? await window.devkitDesktop.saveText(text, filename)
+    : downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), filename);
+  notify?.(message, message === '已取消保存' ? 'info' : 'success');
+  return message;
 }
 
 export function downloadBlob(blob: Blob, filename: string): string {

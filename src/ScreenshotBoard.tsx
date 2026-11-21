@@ -43,6 +43,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
     [query, setQuery] = useState('');
   const picker = useRef<HTMLInputElement>(null),
     op = useOperation();
+  const matches = list.value?.filter(board => board.name.toLowerCase().includes(query.toLowerCase()));
   function create(file?: File) {
     if (!edit) return;
     void op.run(async () => {
@@ -146,9 +147,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
-            {list.value
-              ?.filter((b) => b.name.toLowerCase().includes(query.toLowerCase()))
-              .map((b) => (
+            {matches?.map((b) => (
                 <button
                   className="collab-record"
                   aria-pressed={b.id === selected}
@@ -164,6 +163,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
                   </small>
                 </button>
               ))}
+            {!!list.value?.length && !matches?.length && <p className="collab-muted" role="status">没有匹配的画板。</p>}
             {!list.value?.length && <p className="collab-muted">暂无画板</p>}
           </div>
           {(op.message || list.error) && <p role="status">{op.message || list.error}</p>}

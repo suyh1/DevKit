@@ -56,8 +56,11 @@ export function validatePreferences(value: unknown): Preferences {
     sharedModuleOrder: normalizeSharedModuleOrder(source.sharedModuleOrder),
   };
 }
+export function snapshotTasks(tasks: Task[], includeSensitive: boolean) {
+  return tasks.filter(task => !task.toolId.startsWith('color-') && (includeSensitive || !['password', 'jwt', 'hmac'].includes(task.toolId)));
+}
 export function workspaceSnapshot(tasks: Task[], activeId: string | null, includeSensitive = false): string {
-  const saved = tasks.filter(task => !task.toolId.startsWith('color-') && (includeSensitive || !['password', 'jwt', 'hmac'].includes(task.toolId)));
+  const saved = snapshotTasks(tasks, includeSensitive);
   const snapshot = JSON.stringify({ format: 'devkit-workspace', version: 1, active: saved.findIndex(task => task.id === activeId), tasks: saved.map(({ toolId, input, output, options, elapsed, fileName, encoding }) => ({ toolId, input, output, options, elapsed, fileName, encoding })) }, null, 2);
   if (snapshot.length > 12_000_000) throw new Error('工作区超过 12,000,000 字符，请分别导出结果并关闭部分任务后再保存。');
   return snapshot;

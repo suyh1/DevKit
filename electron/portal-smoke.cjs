@@ -197,6 +197,7 @@ app
       await wait('document.querySelector(".portal-sidebar nav button")?.textContent === "项目中心"');
       await selector('[aria-label="搜索共享资源"]');
       await fill('.command-dialog input', '共享接口定义');
+      assert.equal(await js('document.querySelector(".command-dialog").getAttribute("aria-label")'), '搜索共享资源');
       await wait('[...document.querySelectorAll(".command-dialog button[role=option]")].some(button => button.textContent.includes("共享接口定义"))');
       key('Return');
       await wait('location.hash === "#http/fixture-project%3Afixture-endpoint" && document.querySelector(".api-endpoint-header h2")?.textContent.includes("共享接口定义")');
@@ -756,6 +757,14 @@ app
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("portal ssh ready")');
       await window.webContents.insertText('browser-echo');
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("browser-echo")');
+      await button('打开终端', '.lan-host-list button');
+      await wait('document.querySelectorAll(".lan-terminal-tabs [role=tab]").length === 2');
+      await js('document.querySelector(".lan-terminal-tabs [aria-selected=true]").focus()');
+      key('Left');
+      await wait('document.activeElement === document.querySelector(".lan-terminal-tabs [role=tab]") && document.activeElement.getAttribute("aria-selected") === "true"');
+      assert.equal(await js('[...document.querySelectorAll(".lan-terminal-tabs [role=tab]")].filter(el => el.tabIndex === 0).length'), 1);
+      await js('document.querySelectorAll(".lan-terminal-tabs .icon-button")[1].click()');
+      await wait('document.querySelectorAll(".lan-terminal-tabs [role=tab]").length === 1');
       await selector('.portal-appearance summary');
       for (const mode of ['light', 'dark']) {
         await selector(`[aria-label="共享页面主题"] button[value="${mode}"]`);

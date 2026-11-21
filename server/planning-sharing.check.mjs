@@ -71,6 +71,13 @@ test('file shares persist independently, scope browsing and stream valid folder 
     const listing = await (await fetch(link + '0/')).text();
     assert.match(listing, /报告 #1\.txt/);
     assert.doesNotMatch(listing, /outside-link|configs/);
+    const unmatched = await (await fetch(link + '0/?q=absent')).text();
+    assert.match(unmatched, /没有与“absent”匹配/);
+    const clearFilter = unmatched.match(/<a href="([^"]+)">清除筛选<\/a>/)[1];
+    assert.equal(await (await fetch(new URL(clearFilter, link))).text(), listing);
+    const empty = await (await fetch(link + '0/' + encodeURIComponent('空目录') + '/?q=absent')).text();
+    assert.match(empty, /没有可显示的文件/);
+    assert.doesNotMatch(empty, /清除筛选/);
     const attachment = await fetch(link + '0/' + encodeURIComponent('报告 #1.txt'));
     assert.match(attachment.headers.get('content-disposition'), /^attachment/);
     assert.equal(await attachment.text(), 'shared document');

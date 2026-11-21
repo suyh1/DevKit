@@ -42,11 +42,15 @@ function MatchView({ text, source }: { text: string; source: string }) {
   return <div className="match-preview"><p className="preview-note">{data.count} 个匹配{data.limitReached ? '（达到结果上限）' : ''} · 预览前 200 项</p><pre className="match-source">{fragments}</pre>{data.matches.slice(0, 200).map((match, index) => <MotionDetails className="match-item" key={index}><summary><span>#{index + 1} · 位置 {match.index}</span><code>{match.match || '空匹配'}</code></summary><pre>{JSON.stringify({ groups: match.groups, namedGroups: match.namedGroups }, null, 2)}</pre></MotionDetails>)}</div>;
 }
 
-function TableView({ node }: { node: JsonNode }) {
-  const rows = node.children.slice(0, 100).map(child => child.node);
+function TableView({ node, query }: { node: JsonNode; query: string }) {
+  const matches = node.children.filter(child => child.node.raw.toLowerCase().includes(query));
+  const rows = matches.slice(0, 100).map(child => child.node);
+  if (!matches.length && query) return <p role="status" className="preview-note">没有匹配的行。</p>;
+  if (rows.some(row => new Set(row.children.map(child => child.key)).size !== row.children.length))
+    return <p className="preview-note">结果含有同名字段，请切换到结构视图或源码查看全部值。</p>;
   const keys = [...new Set(rows.flatMap(row => row.children.map(child => child.key)))].slice(0, 30);
   if (node.kind !== 'array' || rows.some(row => row.kind === 'value')) return <p className="preview-note">此结果不适合表格展示，请使用结构或源码视图。</p>;
-  return <div className="table-preview"><p className="preview-note">共 {node.children.length} 行 · 预览前 100 行、30 列 · 数字保持原始精度</p><table><thead><tr><th>#</th>{keys.map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}><td>{index + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}</tr>)}</tbody></table></div>;
+  return <div className="table-preview"><p className="preview-note">共 {node.children.length} 行{query && ` · 匹配 ${matches.length} 行`} · 预览前 100 行、30 列 · 数字保持原始精度</p><table><thead><tr><th>#</th>{keys.map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={matches[index].key}><td>{Number(matches[index].key) + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}</tr>)}</tbody></table></div>;
 }
 
 export default function ResultView({ toolId, text, source, onCopy, initialView = 'tree' }: { toolId: ToolId; text: string; source: string; onCopy: (text: string) => void; initialView?: string }) {
@@ -62,5 +66,7 @@ export default function ResultView({ toolId, text, source, onCopy, initialView =
     return <MatchView text={text} source={source} />;
   }
   if (!parsed.node) return <p className="preview-note">{parsed.error}</p>;
-  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>原始精度 · $ 复制路径</small></div>{view === 'table' ? <TableView node={parsed.node} /> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={query.trim().toLowerCase()} onCopy={onCopy} /></div>}</div>;
+  const filter = query.trim().toLowerCase();
+  const table = parsed.node.kind === 'array' && view === 'table';
+  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>{table ? '原始精度' : '原始精度 · $ 复制路径'}</small></div>{table ? <TableView node={parsed.node} query={filter} /> : filter && !'$'.includes(filter) && !parsed.node.raw.toLowerCase().includes(filter) ? <p role="status" className="preview-note">没有匹配的节点。</p> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={filter} onCopy={onCopy} /></div>}</div>;
 }

@@ -59,6 +59,7 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null),
     heading = useId(),
     descriptionId = useId();
+  const lastField = useRef<HTMLElement>(null);
   const baseline = useRef(JSON.stringify(draft));
   const [discard, setDiscard] = useState(false);
   const previousSaved = useRef(savedKey);
@@ -110,6 +111,9 @@ export function Modal({
         aria-labelledby={heading}
         aria-describedby={description ? descriptionId : undefined}
         aria-busy={busy}
+        onFocusCapture={event => {
+          if (event.target.matches("input, select, textarea, [contenteditable=true]")) lastField.current = event.target;
+        }}
         onCancel={(event) => {
           event.preventDefault();
           requestClose();
@@ -147,7 +151,11 @@ export function Modal({
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setDiscard(false)}
+                  onClick={() => {
+                setDiscard(false);
+                const target = lastField.current;
+                (target?.isConnected && !target.matches(":disabled") ? target : ref.current?.querySelector<HTMLButtonElement>("header button"))?.focus();
+              }}
                 >
                   继续编辑
                 </button>
