@@ -74,7 +74,7 @@ export function createLogCenter({ jar, nginx, lan }) {
           const console = item.logMode === 'console', filename = console ? '' : jarPaths(item).logPath;
           sources.push({ id: sourceId('jar', item.id, filename), kind: 'jar', instanceId: item.id, name: `${item.name} · ${console ? '控制台输出' : '文件日志'}`, path: filename, mode: console ? 'console' : 'file' });
         }
-      } catch (error) { warnings.push(`JAR 来源读取失败：${error.message}`); }
+      } catch (error) { warnings.push(`后端日志来源读取失败：${error.message}`); }
     }
     if (access.nginx !== false) {
       try {
@@ -147,7 +147,7 @@ export function createLogCenter({ jar, nginx, lan }) {
         if (!source) return { id: value.id, error: '来源已移除、变更或未授权，请刷新来源列表。' };
         try {
           if (payload.incidentAt !== undefined) {
-            if (action !== 'read' || source.kind !== 'jar' || source.mode !== 'file' || typeof payload.incidentAt !== 'string' || !Number.isFinite(Date.parse(payload.incidentAt))) fail('请选择有效的 JAR 文件日志与故障时间。');
+            if (action !== 'read' || source.kind !== 'jar' || source.mode !== 'file' || typeof payload.incidentAt !== 'string' || !Number.isFinite(Date.parse(payload.incidentAt))) fail('请选择有效的后端服务文件日志与故障时间。');
             const tail = await readLogFile(source.path, null, { initial: 4 * 1024 * 1024 });
             return { id: source.id, ...incidentExcerpt(raw ? tail : redactLogResult(tail), payload.incidentAt) };
           }

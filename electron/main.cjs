@@ -434,7 +434,7 @@ app.whenReady().then(async () => {
       }
       if (!jarManager) throw new Error(jarError || '后端管理器尚未准备好。');
       return { data: await (lan ? lan.request(jarManager, 'jar', action, value) : jarManager.request(action, value)) };
-    } catch (error) { return { error: error.message || 'JAR 操作失败。' }; }
+    } catch (error) { return { error: error.message || '后端服务操作失败。' }; }
   });
   ipcMain.handle('devkit:monitor', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的监控请求。');

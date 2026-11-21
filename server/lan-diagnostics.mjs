@@ -29,7 +29,7 @@ export async function diagnoseHost(host, { openSsh, openShare, openPort = probeP
   if (host.mode === 'share') {
     let transport;
     if (await check('DevKit 共享认证', async () => { transport = await openShare(); await transport.capabilities('jar'); return '共享口令有效'; })) {
-      for (const module of modules) await check(module === 'jar' ? 'JAR 管理' : 'Nginx 配置', async () => {
+      for (const module of modules) await check(module === 'jar' ? '后端管理' : 'Nginx 配置', async () => {
         await transport.request(module, 'get', {});
         const { edit, control } = await transport.capabilities(module);
         return ['查看', edit && '编辑', control && '运行'].filter(Boolean).join('、');

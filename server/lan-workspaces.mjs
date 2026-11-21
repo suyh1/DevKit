@@ -342,7 +342,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     },
     async monitorJar(id, timeout) {
       const [hostId, instanceId, extra] = id.split(':'), host = find(hostId);
-      if (extra || !identity.test(instanceId || '') || !host?.modules.jar) throw new Error('关联的远程 JAR 已移除或不可用。');
+      if (extra || !identity.test(instanceId || '') || !host?.modules.jar) throw new Error('关联的远程后端服务已移除或不可用。');
       return remote(host, 'jar', 'monitor-probe', { id: instanceId, timeout }, { edit: false, control: true }, desktopSession);
     },
     hostName: id => find(id)?.name,

@@ -12,18 +12,9 @@ async function openShared(window, name, wait) {
 
 module.exports = async (window, output) => {
   const js = source => window.webContents.executeJavaScript(source, true);
-  async function checkDetectionControls(wide) {
-    const layout = await js(`(() => {
-      const heading = document.querySelector('.jar-heading');
-      const field = heading.querySelector('select').getBoundingClientRect();
-      const detect = [...heading.querySelectorAll('button')].find(button => button.textContent.trim() === '检测 Java').getBoundingClientRect();
-      const add = heading.querySelector('.run-button').getBoundingClientRect();
-      return { height: Math.abs(detect.height - field.height), baseline: Math.abs(detect.bottom - field.bottom),
-        gap: detect.left - field.right, fits: field.left >= 0 && detect.right <= innerWidth,
-        addBaseline: Math.abs(detect.bottom - add.bottom) };
-    })()`);
-    assert.ok(layout.height <= 2 && layout.baseline <= 2 && layout.gap >= 0 && layout.gap <= 16 && layout.fits && (!wide || layout.addBaseline <= 2),
-      'Host selector and Java detection button fit next to each other: ' + JSON.stringify(layout));
+  async function checkServiceHeader() {
+    assert.deepEqual(await js("[...document.querySelectorAll('.jar-heading button')].map(b => b.textContent.trim())"), ['添加服务']);
+    assert.equal(await js("document.querySelector('.jar-heading select') === null"), true);
   }
   async function wait(expression) {
     for (let index = 0; index < 180; index++) {
@@ -54,14 +45,19 @@ module.exports = async (window, output) => {
     await js('document.documentElement.dataset.theme="light"');
     await openShared(window, '后端管理', wait);
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
-    await checkDetectionControls(true);
+    await checkServiceHeader();
     const project = path.join(folder, 'npm project');
     await fs.mkdir(project);
     await fs.writeFile(path.join(project, 'package.json'), JSON.stringify({ scripts: { 'serve:test': 'node server.cjs' } }));
     await fs.writeFile(path.join(project, 'server.cjs'), "console.log('npm desktop ready'); setInterval(() => {}, 1000)");
     await click('添加服务');
     await wait('!!document.querySelector(".jar-dialog[open]")');
+    await click('检测 Java', '.jar-dialog');
+    await wait('!!document.querySelector(".jar-dialog .jar-java-probe p[role=status]")?.textContent.trim()');
+    await click('可执行程序', '.jar-dialog');
+    assert.ok(!await js("document.querySelector('.jar-dialog').textContent.includes('检测 Java')"));
     await click('npm 项目', '.jar-dialog');
+    assert.ok(!await js("document.querySelector('.jar-dialog').textContent.includes('检测 Java')"));
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] });
     await click('选择目录', '.jar-dialog');
     await wait('document.querySelector(".jar-dialog code")?.textContent === "npm run serve:test"');
@@ -124,7 +120,7 @@ module.exports = async (window, output) => {
     const cardSize = window.getSize(), cardMinimum = window.getMinimumSize();
     window.setMinimumSize(360, 600); window.setSize(391, 830);
     await wait('innerWidth < 430 && getComputedStyle(document.querySelector(".jar-instance")).display === "grid" && document.querySelector(".sidebar").getBoundingClientRect().right <= 0');
-    await checkDetectionControls(false);
+    await checkServiceHeader();
     assert.equal(await js(`(() => {
       const row = document.querySelector('.jar-instance'), bounds = row.getBoundingClientRect();
       const actions = [...row.querySelectorAll('.jar-row-actions button')].slice(0, 3);

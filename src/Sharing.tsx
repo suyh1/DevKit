@@ -441,7 +441,7 @@ function SharingPanel({
                         permissions: [
                           { key: 'backend', label: '包含 npm 与可执行程序', detail: '允许查看这两类服务，并按已有编辑与运行授权操作' },
                           { key: 'edit', label: '编辑服务与配置文件', detail: '允许维护实例、启动参数、环境档案以及工作目录配置文件和备份' },
-                          { key: 'control', label: '运行管理与控制台输入', detail: '允许 Java 检测、启动/停止/重启、输入控制及系统自启设置' },
+                          { key: 'control', label: '运行管理与控制台输入', detail: '允许启停和重启服务、控制台输入和系统自启，JAR 服务还可检测 Java' },
                         ],
                       },
                       {

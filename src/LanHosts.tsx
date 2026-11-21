@@ -2,7 +2,7 @@ import { navigateTabList } from './tab-navigation';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
 import { Fragment, lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
-import { Check, Coffee, ExternalLink, Eye, EyeOff, Globe, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
+import { Check, ServerCog, ExternalLink, Eye, EyeOff, Globe, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
 import { Modal, ModalCancel } from './project-components';
 import { useConfirmation } from './Confirmation';
 import LanHostImport from './LanHostImport';
@@ -151,7 +151,7 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
         <fieldset className="lan-host-section lan-module-settings">
           <legend>显示在管理列表 <small>选填</small></legend>
           <div className="lan-host-choices">
-            {([['jar', Coffee], ['nginx', Server]] as const).map(([module, Icon]) => <label className="lan-choice lan-module" key={module}>
+            {([['jar', ServerCog], ['nginx', Server]] as const).map(([module, Icon]) => <label className="lan-choice lan-module" key={module}>
               <input type="checkbox" checked={draft.modules[module]} onChange={event => patch({ modules: { ...draft.modules, [module]: event.target.checked } })} />
               <span className="lan-choice-icon"><Icon size={16} /></span>
               <strong>{titles[module]}</strong><span className="lan-choice-mark" aria-hidden="true"><Check size={12} /></span>

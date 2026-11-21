@@ -48,18 +48,24 @@ app.whenReady().then(async () => {
       await js(window, `Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true})`);
       await wait(window, '!!document.querySelector(\'.portal-login input[type="password"]\')');
       await js(window, `{const input=document.querySelector('.portal-login input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'jar-portal-test');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
-      await js(window, 'document.querySelector(\'.portal-login button[type="submit"], .portal-login button.run-button\').click()');
+      await wait(window, '!!document.querySelector(\'.portal-login button[type="submit"]:enabled\')');
+      await js(window, 'document.querySelector(\'.portal-login button[type="submit"]\').click()');
       await wait(window, 'document.querySelector(".jar-table")?.textContent.includes("共享交互应用")');
       await wait(window, 'document.querySelector(".jar-status")?.textContent === "运行中" && [...document.querySelectorAll(".jar-center button")].some(b=>b.textContent.trim()==="控制台"&&!b.disabled)');
       await click(window, '控制台'); await wait(window, 'document.querySelector(".jar-console pre")?.textContent.includes("PORTAL-CONSOLE-READY")');
       return window;
     }
     const viewer = await portal();
+    assert.equal(await js(viewer, "document.querySelector('.jar-instance').textContent.includes('检测 Java')"), false);
     assert.equal(await js(viewer, `[...document.querySelectorAll('.jar-center button')].find(b=>b.textContent.trim()==='添加服务').disabled`), true);
     assert.equal(await js(viewer, `[...document.querySelectorAll('.jar-center button')].find(b=>b.textContent.trim()==='取得输入控制权').disabled`), true);
     await fs.writeFile(path.join(output, 'readonly-console.png'), (await viewer.webContents.capturePage()).toPNG()); viewer.destroy();
     services.jar.control = true; await host.start(settings);
     const first = await portal(), second = await portal();
+    await js(first, "document.querySelector('.jar-instance details').open = true");
+    await click(first, '检测 Java');
+    await wait(first, 'document.querySelector(".jar-instance .jar-java-probe [role=status]")?.textContent.includes("java")');
+    await js(first, "document.querySelector('.jar-instance details').open = false");
     await click(first, '取得输入控制权'); await wait(first, '!document.querySelector(".jar-console-input input").disabled');
     await wait(second, 'document.querySelector(".jar-console-control")?.textContent.includes("输入控制者")');
     assert.equal(await js(second, 'document.querySelector(".jar-console-input input").disabled'), true);

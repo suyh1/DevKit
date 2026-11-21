@@ -15,7 +15,7 @@ import { CreateRelated, RelatedLink, useWorkspaceGuard } from './related-workspa
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 
 const labels: Record<string, string> = { up: '正常', down: '故障', pending: '待确认', unknown: '待检测 / 已过期', paused: '已暂停', maintenance: '维护中' };
-const sourceLabels = { project: '关联项目入口', jar: '关联服务健康检查', lan: '关联局域网主机端口' };
+const sourceLabels = { project: '关联项目入口', jar: '关联后端服务健康检查', lan: '关联局域网主机端口' };
 const time = (at?: string | null) => at ? new Date(at).toLocaleString() : '尚无记录';
 const localDate = (at?: string) => at ? new Date(Date.parse(at) - new Date(at).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 const empty = (): MonitorConfig => ({ id: '', name: '', type: 'http', url: '', host: '', port: 80, status: 200, interval: 60, timeout: 5, failures: 2, enabled: false, source: null, maintenance: null });
@@ -139,7 +139,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
       </article>)}</div>
       {current && <aside className="monitor-detail" ref={detailRef} tabIndex={-1} aria-label={`${current.name}监控详情`}><button type="button" className="text-button monitor-return" onClick={returnToCard}>返回所选监控</button><div className="monitor-detail-heading"><h2>{current.name}</h2><span className={`monitor-status ${current.state}`}>{labels[current.state]}</span></div><p>{current.detail || '启用后将由主机自动检测。'}</p><dl><div><dt>最近检测</dt><dd>{time(current.checkedAt)}</dd></div><div><dt>24 小时已保存样本</dt><dd>{current.sampleCount} 次</dd></div><div><dt>故障确认</dt><dd>连续失败 {current.failures} 次</dd></div><div><dt>超时</dt><dd>{current.timeout} 秒</dd></div></dl>{operate && (current.runRestriction ? <p>{current.runRestriction}</p> : <button className="secondary-button" disabled={busy || current.checking || !current.enabled || current.state === 'maintenance'} onClick={() => void action('check', { id: current.id })}><RefreshCw size={14} />立即检测</button>)}
         {current.certificate && <p>HTTPS 证书 · {current.certificate.host} · {time(current.certificate.expires)} 到期 · 剩余 {Math.ceil((Date.parse(current.certificate.expires) - Date.now()) / 86400000)} 天（采集于 {time(current.certificate.checkedAt)}）</p>}
-        {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'certificate' ? '证书到期提醒' : current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}{current.source && <RelatedLink {...monitorSourceLink(current.source)}>{current.source.type === 'project' ? '查看来源项目' : current.source.type === 'jar' ? '查看来源服务' : '查看来源主机'}</RelatedLink>}<ResourceLink page="monitor" id={current.id} />
+        {current.executionHost && <p>检测从目标主机 {current.executionHost} 发起</p>}{current.notification && <p role="status">{current.notification.event === 'certificate' ? '证书到期提醒' : current.notification.event === 'down' ? '故障' : '恢复'} · {current.notification.detail} · {time(current.notification.at)}</p>}{current.source && <RelatedLink {...monitorSourceLink(current.source)}>{current.source.type === 'project' ? '查看来源项目' : current.source.type === 'jar' ? '查看后端服务' : '查看来源主机'}</RelatedLink>}<ResourceLink page="monitor" id={current.id} />
         <SampleBars monitor={current} /><h3>响应耗时</h3>{current.samples.length ? <Latency key={current.id} monitor={current} /> : <p>首个检测完成后显示趋势。</p>}
         <h3>事件时间线</h3>
         {timeline.length ? <ol className="monitor-incidents">{timeline.map(item => <li key={item.key}>
@@ -164,7 +164,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
         <div className="monitor-actions" aria-label="新建检测来源">
           {draft.source && <RelatedLink {...monitorSourceLink(draft.source)}>查看所选来源</RelatedLink>}
           <CreateRelated from="monitor" page="projects">添加项目</CreateRelated>
-          <CreateRelated from="monitor" page="jar">添加服务</CreateRelated>
+          <CreateRelated from="monitor" page="jar">添加后端服务</CreateRelated>
           <CreateRelated from="monitor" page="lan-hosts">新建主机</CreateRelated>
         </div>
         {sourceError && <p role="alert">关联来源读取失败：{sourceError}。仍可填写自定义地址。</p>}

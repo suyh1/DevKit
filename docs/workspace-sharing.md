@@ -1,6 +1,6 @@
 # 局域网共享工作台
 
-项目中心、团队知识库、待办清单、本机文件共享管理、局域网快传、接口模拟服务、截图协作白板、Nginx 配置、HTTP 工作台、后端管理、监控中心、日志中心及局域网主机可通过同一个共享地址、访问口令和会话使用。客户端只需现代浏览器。JAR、Nginx 和日志的文件与进程属于对应实例所在的主机。HTTP 调试和项目入口探活从共享主机发起，此时 `127.0.0.1` / `localhost` 指共享主机。项目入口链接在当前浏览器中打开。
+项目中心、团队知识库、待办清单、本机文件共享管理、局域网快传、接口模拟服务、截图协作白板、Nginx 配置、HTTP 工作台、后端管理、监控中心、日志中心及局域网主机可通过同一个共享地址、访问口令和会话使用。客户端只需现代浏览器。后端服务、Nginx 和日志的文件与进程属于对应实例所在的主机。HTTP 调试和项目入口探活从共享主机发起，此时 `127.0.0.1` / `localhost` 指共享主机。项目入口链接在当前浏览器中打开。
 
 打开桌面顶栏的“局域网共享”可先查看当前监听地址与运行状态，再选择开放栏目。每名独立访客的“生效权限”显示栏目总开关与访客权限的交集。访客登录后可展开“主机与权限”核对实际主机和当前栏目的访问范围。
 
@@ -21,7 +21,7 @@
 | 连接方式 | 目标端准备 | 操作范围 |
 | --- | --- | --- |
 | DevKit 共享 | 开启目标 DevKit 桌面或独立服务的相应栏目，保存目标共享地址和口令 | 复用目标机的实例注册表；中心桌面和网页在目标端权限内操作，也可直接打开目标工作台 |
-| SSH | 允许 SSH 执行命令，账号能写入和运行用户目录中的文件。JAR 需要 Java，Nginx 需要 nginx | 集中管理自动部署便携 Node.js 和管理程序，系统自启和进程控制由该账号权限决定 |
+| SSH | 允许 SSH 执行命令，账号能写入和运行用户目录中的文件。JAR 需要 Java，npm 项目需要 Node.js 和 npm，Nginx 需要 nginx | 集中管理自动部署便携 Node.js 和管理程序，系统自启和进程控制由该账号权限决定 |
 
 SSH 终端支持多会话标签、调整尺寸、交互式命令和断线重连。可使用用户名和密码、本机 SSH Agent、`~/.ssh/id_ed25519` 等默认密钥，或为档案选择本地私钥文件并填写可选的解锁口令。私钥档案保存本机文件路径，解锁口令加密保存。可把已保存的 SSH 主机选作跳板机，最多四级，依次验证每级 SHA-256 指纹。首次连接核对目标指纹，指纹变化时核对服务器后再重置信任。终端需要目标机开启 SSH 服务。
 
@@ -40,7 +40,7 @@ Linux x64 和 ARM64 使用官方 glibc 发行版，适用于满足官方系统�
 
 网页操作须满足中心共享的编辑或运行授权。DevKit 类型的目标主机还须授予对应权限。中心汇总各目标 DevKit 的本机实例，避免多层共享重复和循环。有编辑权限时可浏览已选择的远程目标目录，可在“远程绝对目录”输入路径后点击“打开”，或点“上级”返回。主机不可达时仍可使用本机组，当前会话已加载过的远程组会保留上次读取的列表并显示连接异常。
 
-旧版桌面地址簿会导入主机连接。启用 SSH 主机上的对应栏目并验证连接后，可从 JAR 或 Nginx 页面选择“导入旧版 SSH 登记”。已由旧版运行的 Java 应用需先停掉，成功导入后进入目标主机分组。
+旧版桌面地址簿会导入主机连接。启用 SSH 主机上的对应栏目并验证连接后，可从后端管理或 Nginx 配置页面选择“导入旧版 SSH 登记”。已由旧版运行的 Java 应用需先停掉，成功导入后进入目标主机分组。
 
 连接档案、多标签和文件面板参考 Termix、Nexterm 与 Electerm。网段扫描参考 Angry IP Scanner 的地址区间及 NetAlertX 的设备记录。扫描使用 Node TCP 探测和系统邻居表，适用于 DevKit 的 Windows／Linux 桌面版。SFTP 和跳板转发复用现有 SSH 会话实现，每级转发绑定已保存档案的地址和凭据。文件导入只读取连接字段，避免类似 Electerm 的书签命令注入。 [Termix](https://github.com/Termix-SSH/Termix)、[Nexterm](https://github.com/gnmyt/Nexterm)、[Electerm](https://github.com/electerm/electerm)、[Angry IP Scanner](https://github.com/angryip/ipscan)、[NetAlertX](https://github.com/netalertx/NetAlertX)、[ssh2](https://github.com/mscdex/ssh2)、[Electerm 导入安全公告](https://github.com/electerm/electerm/security/advisories/GHSA-jgg9-rw32-44pj)
 
@@ -59,9 +59,9 @@ Linux x64 和 ARM64 使用官方 glibc 发行版，适用于满足官方系统�
 | 截图协作白板 | 查看画板、标注和导出 PNG | 新建、标注、重命名、移除标注和删除画板 | — |
 | Nginx 配置 | 已登记实例、配置、备份 | 登记/修改/删除实例、新建配置、保存文件 | 检测主机程序、检查、启动、重载、优雅停止 |
 | HTTP 调试 | 接口项目、文档和环境 | 保存、恢复接口项目 | 从主机发送请求、取消自己的请求 |
-| 日志中心 | 已授权分类的日志及多窗对照 | 不修改日志或配置 | JAR/Nginx分类读取与日志导出分别授权 |
+| 日志中心 | 已授权分类的日志及多窗对照 | 不修改日志或配置 | 后端日志与 Nginx 日志的分类读取与日志导出分别授权 |
 | 监控中心 | 监控配置、状态、历史及故障恢复记录 | 维护暂停的监控、关联和维护窗口 | 启用、暂停、立即检测；修改/删除运行中的监控还需编辑权限 |
-| 后端管理 | 应用列表、状态、自启状态 | 实例、启动参数、环境档案、同目录配置及备份 | Java 检测、启停重启、健康检查、控制台输入、系统自启 |
+| 后端管理 | 应用列表、状态、自启状态 | 实例、启动参数、环境档案、同目录配置及备份 | 启停重启、健康检查、控制台输入、系统自启；JAR 可检测 Java |
 | 局域网主机 | 已保存的主机清单、分组和标签 | 添加、编辑、移除、导入、置顶 | 诊断、终端、SFTP、直连网段发现、网络唤醒和远程桌面分别授权 |
 
 编辑和执行互不附带授权。例如可只允许 HTTP 调试而禁止修改接口定义，也可只编辑 Nginx 配置而不允许运行命令。所有授权均在主机 API 校验，关闭服务后即使直接调用接口也无法访问。
@@ -70,7 +70,7 @@ Linux x64 和 ARM64 使用官方 glibc 发行版，适用于满足官方系统�
 
 旧配置迁移保留原来已经授予的权限，不会扩权：原项目中心仍开放，旧全局编辑只迁移到原已开放的服务，旧 Nginx 运行仍需原先的编辑与运行开关同时成立。面板提示检查迁移权限，之后可独立调整或关闭项目中心。
 
-网页顶部显示当前栏目、权限和访客名称，点击“外观”切换运行模式、主题与风格。窄屏从菜单打开栏目导航。Ctrl+K 或搜索按钮可打开获准访问的栏目和资源，“复制链接”可直达对应项目、JAR / Nginx 实例、API 接口、监控或日志来源。首次打开链接需要登录，主机按当前权限处理请求。切换栏目保留草稿。同一访客以相同授权重新登录可继续编辑。更换访客或权限后会清除该页面会话中的草稿、响应与弹窗。
+网页顶部显示当前栏目、权限和访客名称，点击“外观”切换运行模式、主题与风格。窄屏从菜单打开栏目导航。Ctrl+K 或搜索按钮可打开获准访问的栏目和资源，“复制链接”可直达对应项目、后端服务或 Nginx 实例、API 接口、监控或日志来源。首次打开链接需要登录，主机按当前权限处理请求。切换栏目保留草稿。同一访客以相同授权重新登录可继续编辑。更换访客或权限后会清除该页面会话中的草稿、响应与弹窗。
 
 窄屏导航从底部打开。上下拖动顶部手柄，松手时会按位置和速度吸附到半屏或展开高度。点击手柄或聚焦后按 Enter 也能切换高度。栏目列表可独立滚动，按 Esc 或关闭按钮收起导航。
 
@@ -178,7 +178,7 @@ DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/s
 | `DEVKIT_SHARE_FILE_SHARES` | 向获准访客开放已发布的本机文件共享 |
 | `DEVKIT_SHARE_NGINX` / `DEVKIT_NGINX_EDIT` / `DEVKIT_NGINX_CONTROL` | Nginx 开放 / 编辑 / 运行管理 |
 | `DEVKIT_SHARE_HTTP` / `DEVKIT_HTTP_EDIT` / `DEVKIT_HTTP_SEND` | HTTP 开放 / 编辑 / 发送 |
-| `DEVKIT_SHARE_LOGS` / `DEVKIT_LOGS_JAR` / `DEVKIT_LOGS_NGINX` / `DEVKIT_LOGS_EXPORT` / `DEVKIT_LOGS_RAW` | 日志中心开放 / JAR日志 / Nginx日志 / 导出 / 原始日志 |
+| `DEVKIT_SHARE_LOGS` / `DEVKIT_LOGS_JAR` / `DEVKIT_LOGS_NGINX` / `DEVKIT_LOGS_EXPORT` / `DEVKIT_LOGS_RAW` | 日志中心开放 / 后端日志 / Nginx日志 / 导出 / 原始日志 |
 | `DEVKIT_SHARE_CERT` / `DEVKIT_SHARE_KEY` / `DEVKIT_SHARE_HOSTNAME` | PEM 证书绝对路径 / PEM 私钥绝对路径 / HTTPS 域名或 IPv4 |
 | `DEVKIT_SHARE_MONITOR` / `DEVKIT_MONITOR_EDIT` / `DEVKIT_MONITOR_CONTROL` | 监控中心开放 / 编辑 / 运行 |
 | `DEVKIT_SHARE_LAN_HOSTS` | 开放已保存的局域网主机清单 |
@@ -186,7 +186,7 @@ DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/s
 | `DEVKIT_LAN_HOSTS_TERMINAL` / `DEVKIT_LAN_HOSTS_FILES` | SSH 终端 / 终端内的 SFTP 文件功能 |
 | `DEVKIT_LAN_HOSTS_DISCOVER` / `DEVKIT_LAN_HOSTS_WAKE` / `DEVKIT_LAN_HOSTS_RDP` | 发现主机 / 网络唤醒 / 网页远程桌面连接 |
 | `DEVKIT_GUACD_HOST` / `DEVKIT_GUACD_PORT` / `DEVKIT_GUACD_TLS` | 网页远程桌面网关地址 / 端口 / TLS，默认 `127.0.0.1` / `4822` / `false` |
-| `DEVKIT_SHARE_JAR` / `DEVKIT_JAR_EDIT` / `DEVKIT_JAR_CONTROL` | JAR 开放 / 编辑 / 运行管理（含控制台输入与系统自启） |
+| `DEVKIT_SHARE_JAR` / `DEVKIT_JAR_EDIT` / `DEVKIT_JAR_CONTROL` | 后端管理开放 / 编辑 / 运行管理（含控制台输入与系统自启） |
 
 可复用已保存的口令哈希。默认 `0.0.0.0:8765`；支持 `HOST`、`PORT`、`DEVKIT_PROJECT_DATA`。
 
@@ -206,11 +206,11 @@ DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/s
 
 在“后端管理”勾选“包含 npm 与可执行程序”可将已有编辑与运行权限扩展到这两类服务。独立共享服务可用 DEVKIT_JAR_BACKEND=true 开启；命名访客还需在自己的授权中启用。旧设置只授予 JAR 管理权限。
 
-后端共享与本机共用实例记录、PID 和进程身份校验，远程启动后再次从本机启动会提示已在运行。未授予编辑权限时隐藏环境变量值、JVM 和应用启动参数；输出及应用自身打印的信息仍可查看。控制台允许多人查看，同一时间仅一人持有输入控制权；关闭视图、退出登录或停止共享会释放输入控制权，断线后租约在 20 秒内到期，Java 继续运行。主机运行 JAR 需另装 Java。详见 [后端管理](jar-manager.md)。构建后运行 `node scripts/smoke-jar-sharing.mjs` 验证真实 Java、共享权限和双客户端输入。
+后端共享与本机共用实例记录、PID 和进程身份校验，远程启动后再次从本机启动会提示已在运行。未授予编辑权限时隐藏环境变量值、JVM 和应用启动参数；输出及应用自身打印的信息仍可查看。控制台允许多人查看，同一时间仅一人持有输入控制权；关闭视图、退出登录或停止共享会释放输入控制权，断线后租约在 20 秒内到期，后端服务继续运行。主机运行 JAR 需另装 Java。详见 [后端管理](jar-manager.md)。构建后运行 `node scripts/smoke-jar-sharing.mjs` 验证真实 Java、共享权限和双客户端输入。
 
 监控中心由主机定时执行，关闭共享或网页不会停止已启用的监控。关联选择遵循项目中心、后端管理及局域网主机的开放状态和访客权限。生命周期与记录保留见 [监控中心说明](monitor-center.md)。
 
-共享栏目在网页侧栏切换，窄屏通过菜单打开导航。日志中心可以独立开放。JAR 文件日志、控制台输出和 Nginx 日志按类别授权，原页面的日志入口同样执行该规则。见[日志中心](log-center.md)。
+共享栏目在网页侧栏切换，窄屏通过菜单打开导航。日志中心可以独立开放。后端服务的文件日志、控制台输出和 Nginx 日志按类别授权，原页面的日志入口同样执行该规则。见[日志中心](log-center.md)。
 
 设置页分别显示本次选择和服务当前发布的栏目。访客口令输入时显示长度要求，编辑已有访客可留空保留原口令。访客登录页可就地显示和隐藏输入的口令。
 

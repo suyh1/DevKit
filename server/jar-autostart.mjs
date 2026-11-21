@@ -19,7 +19,7 @@ export function startupDefinition(registry, item, mode, platform = process.platf
   const javaArguments = item.executable ? ` '--java' ${quote(item.executable)}` : '';
   const launch = `$env:ELECTRON_RUN_AS_NODE='1'; & ${quote(runner)} ${quote(worker)} '--registry' ${quote(registry)} '--id' ${quote(item.id)}${javaArguments}; exit $LASTEXITCODE`;
   return { name, tag, mode, taskArguments: `-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${Buffer.from(launch, 'utf16le').toString('base64')}`,
-    unit: `# ${tag}\n[Unit]\nDescription=DevKit JAR ${item.id}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nEnvironment=ELECTRON_RUN_AS_NODE=1\nExecStart=${unitQuote(runner)} ${unitQuote(worker)} --registry ${unitQuote(registry)} --id ${unitQuote(item.id)}${item.executable ? ` --java ${unitQuote(item.executable)}` : ''}\nWorkingDirectory=${unitQuote(path.dirname(registry), false)}\nRestart=no\nTimeoutStopSec=${item.stopTimeout + 15}\nKillMode=mixed\n\n[Install]\nWantedBy=${mode === 'boot' ? 'default.target' : 'graphical-session.target'}\n` };
+    unit: `# ${tag}\n[Unit]\nDescription=DevKit backend service ${item.id}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nEnvironment=ELECTRON_RUN_AS_NODE=1\nExecStart=${unitQuote(runner)} ${unitQuote(worker)} --registry ${unitQuote(registry)} --id ${unitQuote(item.id)}${item.executable ? ` --java ${unitQuote(item.executable)}` : ''}\nWorkingDirectory=${unitQuote(path.dirname(registry), false)}\nRestart=no\nTimeoutStopSec=${item.stopTimeout + 15}\nKillMode=mixed\n\n[Install]\nWantedBy=${mode === 'boot' ? 'default.target' : 'graphical-session.target'}\n` };
 }
 export function createJarAutostart(registry, dependencies = {}) {
   const platform = dependencies.platform || process.platform, run = dependencies.execute || execute;
@@ -41,12 +41,12 @@ export function createJarAutostart(registry, dependencies = {}) {
       if (platform === 'win32') {
         const { stdout } = await command(`${taskLookup(definition.name)}if($t){@{enabled=($t.State -ne 'Disabled');owned=($t.Description -eq ${quote(definition.tag)})}|ConvertTo-Json -Compress}`);
         const result = stdout.trim() ? JSON.parse(stdout) : { enabled: false, owned: true };
-        if (!result.owned) throw new Error('同名任务不属于此 JAR，拒绝修改。');
+        if (!result.owned) throw new Error('同名任务不属于此后端服务，拒绝修改。');
         return { ...record, enabled: result.enabled, platform, target: definition.name };
       }
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       const content = await readFile(target, 'utf8');
-      if (!content.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此 JAR。');
+      if (!content.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
       let enabled = false;
       try { const { stdout } = await run('systemctl', ['--user', 'is-enabled', `${definition.name}.service`], { timeout: 10000 }); enabled = stdout.trim() === 'enabled'; } catch { /* Disabled or user manager unavailable. */ }
       return { ...record, enabled, platform, target };
@@ -59,12 +59,12 @@ export function createJarAutostart(registry, dependencies = {}) {
     await writeFile(recordFile, JSON.stringify({ enabled: false, mode, installing: true }), { mode: 0o600 });
     try {
     if (platform === 'win32') {
-      await command(`${taskLookup(definition.name, 'old')}if($old -and $old.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this JAR'}; $user=[Security.Principal.WindowsIdentity]::GetCurrent().Name; $action=New-ScheduledTaskAction -Execute ${quote(powershell)} -Argument ${quote(definition.taskArguments)}; $trigger=${mode === 'boot' ? 'New-ScheduledTaskTrigger -AtStartup' : 'New-ScheduledTaskTrigger -AtLogOn -User $user'}; $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType ${mode === 'boot' ? 'S4U' : 'Interactive'} -RunLevel Limited; $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; Register-ScheduledTask -TaskName ${quote(definition.name)} -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description ${quote(definition.tag)} -Force | Out-Null`);
+      await command(`${taskLookup(definition.name, 'old')}if($old -and $old.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this service'}; $user=[Security.Principal.WindowsIdentity]::GetCurrent().Name; $action=New-ScheduledTaskAction -Execute ${quote(powershell)} -Argument ${quote(definition.taskArguments)}; $trigger=${mode === 'boot' ? 'New-ScheduledTaskTrigger -AtStartup' : 'New-ScheduledTaskTrigger -AtLogOn -User $user'}; $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType ${mode === 'boot' ? 'S4U' : 'Interactive'} -RunLevel Limited; $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; Register-ScheduledTask -TaskName ${quote(definition.name)} -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description ${quote(definition.tag)} -Force | Out-Null`);
     } else {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
         const existing = await readFile(target, 'utf8');
-        if (!existing.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此 JAR。');
+        if (!existing.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
         await run('systemctl', ['--user', 'disable', `${definition.name}.service`], { timeout: 10000 });
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
       if (mode === 'boot') await run('loginctl', ['enable-linger'], { timeout: 20000, windowsHide: true });
@@ -84,11 +84,11 @@ export function createJarAutostart(registry, dependencies = {}) {
     const record = await saved(item); if (!record) return { enabled: false, platform };
     const definition = def(item, record.mode);
     if (platform === 'win32') {
-      await command(`${taskLookup(definition.name)}if($t){if($t.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this JAR'}; Unregister-ScheduledTask -TaskName ${quote(definition.name)} -Confirm:$false}`);
+      await command(`${taskLookup(definition.name)}if($t){if($t.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this service'}; Unregister-ScheduledTask -TaskName ${quote(definition.name)} -Confirm:$false}`);
     } else {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
-        if (!(await readFile(target, 'utf8')).startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此 JAR。');
+        if (!(await readFile(target, 'utf8')).startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
         await run('systemctl', ['--user', 'disable', `${definition.name}.service`], { timeout: 10000 }); await unlink(target);
         await run('systemctl', ['--user', 'daemon-reload'], { timeout: 10000 });
       } catch (error) { if (error.code !== 'ENOENT') throw error; }

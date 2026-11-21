@@ -28,7 +28,7 @@
 }
 .workspace-banner .ng-heading-icon svg { width: 20px; height: 20px; stroke-width: 1.5; }
 .workspace-banner :is(.pc-actions, .ng-actions, .jar-actions, .log-actions, .monitor-actions, .lan-heading-actions, .api-actions) { gap: 8px; }
-.workspace-banner :is(.pc-role, .jar-java-target) { font-variant-numeric: tabular-nums; }
+.workspace-banner .pc-role { font-variant-numeric: tabular-nums; }
 .workspace-banner.page-heading { flex-wrap: nowrap; }
 .workspace-banner.page-heading h1 { overflow-wrap: anywhere; }
 .workspace-banner .page-icon { width: 44px; height: 44px; border-radius: 10px; }

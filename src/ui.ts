@@ -1,4 +1,4 @@
-import { Braces, Binary, Link, Clock3, Fingerprint, KeyRound, Regex, Code2, FileCode2, Table2, FileKey2, CaseSensitive, Hash, Code, Pipette, Palette, Contrast, Blend, Paintbrush, SlidersHorizontal, FileJson2, FileSpreadsheet, Database, FileDiff, ScanLine, LockKeyhole, MapPin, Activity, ScrollText, Coffee, Server, FolderOpen, Send, Terminal } from 'lucide-react';
+import { Braces, Binary, Link, Clock3, Fingerprint, KeyRound, Regex, Code2, FileCode2, Table2, FileKey2, CaseSensitive, Hash, Code, Pipette, Palette, Contrast, Blend, Paintbrush, SlidersHorizontal, FileJson2, FileSpreadsheet, Database, FileDiff, ScanLine, LockKeyhole, MapPin, Activity, ScrollText, ServerCog, Server, FolderOpen, Send, Terminal } from 'lucide-react';
 import { categories, type workspaceModules } from './catalog';
 import { BookOpen, ClipboardList, FolderUp, ArrowLeftRight, Workflow, Presentation } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export const workspaceModuleNav = {
   mock: { Icon: Workflow, hint: '多场景响应与调用记录' },
   whiteboard: { Icon: Presentation, hint: '截图与多人标注' },
   nginx: { Icon: Server, hint: '配置与实例管理' },
-  jar: { Icon: Coffee, hint: '应用启停与控制台' },
+  jar: { Icon: ServerCog, hint: '后端服务启停与控制台' },
   monitor: { Icon: Activity, hint: '可用率与故障记录' },
   logs: { Icon: ScrollText, hint: '实时日志多窗对照' },
   'lan-hosts': { Icon: Terminal, hint: '连接档案与 SSH 终端' },

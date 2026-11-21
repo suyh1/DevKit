@@ -1,6 +1,6 @@
 import Skeleton from './Skeleton';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Server, Coffee, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, X, Search } from 'lucide-react';
+import { ServerCog, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, X, Search } from 'lucide-react';
 import { MotionButton } from './Motion';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
@@ -15,7 +15,7 @@ import { groupInstances, targetGroup, hostAccessLabel, hostRole } from './lan-ap
 import type { RemoteDirectory } from './lan-api';
 import { usePerformanceMode } from './DisplayMode';
 import { HostProgress, useHostInventory } from './HostInventory';
-import { CreateRelated, RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
+import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import { inventoryLinkStatus, missingResourceLink, openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 import { canWriteWorkspace, canOperateJar, canReadWorkspaceLogs, remoteAccess } from './workspace-remote';
 import type { JarInstance, JarState, JarStatus, JavaDetection, JarLog, JarCommand } from './jar-api';
@@ -28,6 +28,23 @@ const labels = { running: '运行中', stopped: '已停止', exited: '已退出'
 const healthLabels = { disabled: '未检测', unknown: '待检测', starting: '启动宽限中', stopped: '未运行', healthy: '健康', degraded: '检测波动', unhealthy: '不健康' };
 const supervisionLabels: Record<string, string> = { starting: '正在启动', running: '独立守护中', backoff: '等待重试', exhausted: '重试已达上限', exited: '进程已退出', blocked: '需要处理', stopping: '正在停止' };
 
+function JavaProbe({ hostId, executable, disabled }: { hostId: string; executable: string; disabled: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<JavaDetection | null>(null);
+  const [error, setError] = useState('');
+  async function detect() {
+    setBusy(true); setResult(null); setError('');
+    try { setResult(await jarRequest<JavaDetection>('detect', { hostId, executable })); }
+    catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <div className="jar-java-probe">
+    <MotionButton type="button" className="text-button" disabled={disabled || busy} busy={busy} onClick={() => void detect()}>检测 Java</MotionButton>
+    {result && <p role="status" className={result.found ? 'jar-help' : 'jar-error'}>{result.found ? result.version + ' · ' + result.executable : result.output}</p>}
+    {error && <p role="alert" className="jar-error">{error}</p>}
+  </div>;
+}
+
 function JarForm({ active, instance, state, close, saved }: { active: boolean; instance?: JarInstance; state: JarState; close: () => void; saved: () => void }) {
   const initial = { kind: instance?.kind || 'jar' as BackendKind, workDir: instance?.workDir || '', program: instance?.program || '', script: instance?.script || '', name: instance?.name || '', jar: instance?.jar || '', executable: instance?.executable || '', jvm: instance?.jvmArgs.join('\n') || '', args: instance?.appArgs.join('\n') || '', pidName: instance?.pidName || '', logName: instance?.logName || '', logMode: instance?.logMode || 'file', stopTimeout: instance?.stopTimeout || 15 };
   const [scripts, setScripts] = useState<string[]>(instance?.script ? [instance.script] : []);
@@ -36,7 +53,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
   const [draft, setDraft] = useState(initial), baseline = useRef(JSON.stringify([initial, initialRuntime.current]));
   const [hostId, setHostId] = useState(instance?.hostId || ''), [picker, setPicker] = useState<'jar' | 'executable' | 'directory' | 'program' | null>(null);
   const group = targetGroup(state.groups, hostId), allowControl = group?.control ?? canOperateJar();
-  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [java, setJava] = useState<JavaDetection | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const dialog = useRef<HTMLDialogElement>(null), heading = useId(), confirm = useConfirmation();
   const dirty = JSON.stringify([draft, runtime]) !== baseline.current;
   useBeforeUnload(dirty);
@@ -69,7 +86,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
       if (draft.kind === 'npm') { setScripts([]); patch({ script: '' }); await readScripts(filename); }
     } else if (kind === 'program') {
       patch({ program: filename, ...(!draft.name ? { name: basename(filename) } : {}) });
-    } else { patch({ executable: filename }); setJava(null); }
+    } else patch({ executable: filename });
   }
   function pick(kind: 'jar' | 'executable' | 'directory' | 'program') {
     if (hostId || !window.devkitJar) { setPicker(kind); return; }
@@ -82,7 +99,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
       baseline.current = JSON.stringify([draft, runtime]); saved();
     }); }}>
       <div className="jar-form-body"><fieldset disabled={busy}>
-        <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); setScripts([]); patch({ kind: 'jar', jar: '', executable: '', workDir: '', program: '', script: '' }); setJava(null); }} />
+        <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); setScripts([]); patch({ kind: 'jar', jar: '', executable: '', workDir: '', program: '', script: '' }); }} />
         <div className="choice-field"><span>启动方式</span><SegmentedControl label="启动方式" value={draft.kind} disabled={!!instance} options={[
           { value: 'jar', label: 'Java JAR' },
           { value: 'npm', label: 'npm 项目', disabled: !(hostId ? group?.backendTypes : state.backendTypes) },
@@ -91,9 +108,8 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
         <label>显示名称<input required maxLength={120} value={draft.name} onChange={event => patch({ name: event.target.value })} placeholder="例如：订单服务 · 测试环境" /></label>
         {draft.kind === 'jar' && <><label>JAR 文件绝对路径<span className="jar-path-input"><input required value={draft.jar} onChange={event => patch({ jar: event.target.value })} onBlur={() => { if (!draft.name && draft.jar) patch({ name: basename(draft.jar).replace(/\.jar$/i, '') }); }} placeholder={hostId || !window.devkitJar ? '填写目标主机上的绝对路径' : '选择已有 .jar 文件'} /><button className="secondary-button" type="button" onClick={() => pick('jar')}><FolderOpen size={15} />选择文件</button></span></label>
         <p className="jar-help">自动获取目录和文件名；工作目录、日志与 PID 都在 JAR 同级。每个文件仅登记一次。</p>
-        <label>Java 程序路径（可选）<span className="jar-path-input"><input value={draft.executable} onChange={event => { patch({ executable: event.target.value }); setJava(null); }} placeholder="留空：检测 JAVA_HOME 和 PATH" /><button className="secondary-button" type="button" onClick={() => pick('executable')}>选择 Java</button></span></label>
-        <button className="text-button" type="button" disabled={!allowControl} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId, executable: draft.executable })))}>检测此 Java</button>
-        {java && <p className={java.found ? 'jar-help' : 'jar-error'}>{java.found ? `${java.version} · ${java.executable}` : java.output}</p>}
+        <label>Java 程序路径（可选）<span className="jar-path-input"><input value={draft.executable} onChange={event => patch({ executable: event.target.value })} placeholder="留空：检测 JAVA_HOME 和 PATH" /><button className="secondary-button" type="button" onClick={() => pick('executable')}>选择 Java</button></span></label>
+        <JavaProbe key={JSON.stringify([hostId, draft.executable])} hostId={hostId} executable={draft.executable} disabled={!allowControl} />
         </>}
         {draft.kind === 'program' && <label>可执行程序绝对路径<span className="jar-path-input"><input required value={draft.program} onChange={e => patch({ program: e.target.value })} /><button type="button" className="secondary-button" onClick={() => pick('program')}>选择程序</button></span></label>}
         {draft.kind !== 'jar' && <label>{draft.kind === 'npm' ? '项目目录' : '工作目录（默认程序所在目录）'}<span className="jar-path-input"><input required={draft.kind === 'npm'} value={draft.workDir} onChange={e => { patch({ workDir: e.target.value, script: '' }); setScripts([]); }} /><button type="button" className="secondary-button" onClick={() => pick('directory')}>选择目录</button></span></label>}
@@ -118,11 +134,10 @@ export default function JarCenter({ active }: { active: boolean }) {
   const statusSeconds = performanceMode ? 15 : 5;
   const logSeconds = performanceMode ? 9 : 3;
   const [state, setState] = useState<JarState | null>(null), [statuses, setStatuses] = useState<JarStatus[]>([]);
-  const [form, setForm] = useState<JarInstance | 'new' | null>(null), [java, setJava] = useState<JavaDetection | null>(null);
+  const [form, setForm] = useState<JarInstance | 'new' | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [query, setQuery] = useState('');
   const [listHost, setListHost] = useState<string | null>(null);
   const [monitorError, setMonitorError] = useState('');
-  const [javaHost, setJavaHost] = useState('');
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 920px)').matches);
   const workspace = useRef<HTMLElement>(null);
   const [startup, setStartup] = useState<JarInstance | null>(null);
@@ -145,7 +160,6 @@ export default function JarCenter({ active }: { active: boolean }) {
     observer.observe(workspace.current);
     return () => observer.disconnect();
   }, []);
-  const javaTarget = targetGroup(state?.groups, javaHost);
   const resource = useWorkspaceResource('jar');
   const hostLink = resource?.startsWith('host:') ? resource.slice(5) : undefined;
   const linked = hostLink ? undefined : resource;
@@ -211,22 +225,11 @@ export default function JarCenter({ active }: { active: boolean }) {
   const consoleItem = state?.instances.find(item => item.id === consoleId);
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
     <header className="jar-heading workspace-banner">
-      <div><span className="jar-eyebrow"><Server size={17} />服务进程</span><h1>后端管理</h1><p>按主机管理 JAR、npm 项目与可执行程序，随时查看进程、资源、日志与控制台。</p></div>
-
-      <div className="jar-probe">
-        <div className="jar-probe-controls">
-          <label className="jar-java-target">Java 检测主机<select title={javaTarget ? hostRole(javaTarget) : undefined} disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>
-            {hostOptions.map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}
-          </select></label>
-          <MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton>
-        </div>
-        <div className="jar-probe-links">{javaHost && <RelatedLink page="lan-hosts" id={javaHost}>查看检测主机</RelatedLink>}<CreateRelated from="jar" page="lan-hosts">登记检测主机</CreateRelated></div>
-      </div>
+      <div><span className="jar-eyebrow"><ServerCog size={17} />服务进程</span><h1>后端管理</h1><p>按主机管理 JAR、npm 项目与可执行程序，随时查看进程、资源、日志与控制台。</p></div>
       <button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加服务</button>
     </header>
-    {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用 后端管理。</p>}
-    {java && <div className={java.found ? 'jar-java' : 'jar-warning'}><strong>{javaTarget ? hostRole(javaTarget) + ' · ' : ''}{java.found ? java.version : '未检测到 Java'}</strong><p>{java.found ? java.executable : java.output}</p></div>}
-    <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-java-target">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
+    {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用后端管理。</p>}
+    <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-host-filter">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
       <option value="all">全部主机</option>{hostOptions.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
     </select></label>}<label className="jar-search"><Search size={16} /><input aria-label="搜索服务" placeholder="搜索名称或路径" value={query} onChange={event => setQuery(event.target.value)} /></label><div className="jar-actions"><label className="jar-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(async () => { await refresh(); if (readLogs && logId) setLog(await jarRequest<JarLog>('log-tail', { id: logId })); })}><RefreshCw size={15} />刷新</MotionButton></div></div>
     {error && <p className="jar-error" role="alert">{error}</p>}{notice && <p className="jar-notice" role="status">{notice}</p>}
@@ -238,7 +241,7 @@ export default function JarCenter({ active }: { active: boolean }) {
     {desktop && state && <LegacySshImport module="jar" groups={state.groups} disabled={busy} refresh={() => void task(refresh)} />}
     <div className="jar-summary"><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>{auto ? `状态每 ${statusSeconds} 秒刷新` : '自动刷新已关闭'} · CPU 为采样间隔占用，可超过 100%</small></div>
     {!state && available && !error && <Skeleton kind="list" label="正在读取服务列表…" />}
-    {state && !state.instances.length && <div className="jar-empty"><Server size={35} /><h2>添加第一个后端服务</h2><p>选择主机和启动方式，登记服务后即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />登记服务</button></div>}
+    {state && !state.instances.length && <div className="jar-empty"><ServerCog size={35} /><h2>添加第一个后端服务</h2><p>选择主机和启动方式，登记服务后即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />登记服务</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的服务。</p>}
     {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="后端服务"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
       const write = canEdit(item), control = canControl(item);
@@ -268,6 +271,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
         </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? 'npm' : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
+          {!write && control && (!item.kind || item.kind === 'jar') && <JavaProbe key={item.executable} hostId={item.hostId || ''} executable={item.executable} disabled={busy} />}
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
           <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'force-stop')}>强制终止</button>
