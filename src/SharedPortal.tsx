@@ -591,7 +591,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 <ProjectCenter visible={page === 'projects'} portal portalSession={session} />
               </div>
             )}
-            {services.knowledge?.enabled && <div className="portal-page" hidden={page !== 'knowledge'} inert={page !== 'knowledge'}><KnowledgeBase active={page === 'knowledge'} portal canEdit={services.knowledge.edit} /></div>}
+            {services.knowledge?.enabled && <div className="portal-page" hidden={page !== 'knowledge'} inert={page !== 'knowledge'}><KnowledgeBase active={page === 'knowledge'} portal visitor={session?.visitor || ''} canEdit={services.knowledge.edit} /></div>}
             {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><TodoLists portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
             {(['transfer', 'mock', 'whiteboard'] as const).map(id => services[id].enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} /></div>)}
             {services['file-shares'].enabled && <div className="portal-page" hidden={page !== 'file-shares'} inert={page !== 'file-shares'}><PublishedFileShares active={page === 'file-shares'} /></div>}

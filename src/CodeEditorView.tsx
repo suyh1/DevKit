@@ -8,6 +8,7 @@ import { tags } from '@lezer/highlight';
 import type { EditorLanguage, CodeEditorProps } from './CodeEditor';
 
 async function languageSupport(language: EditorLanguage) {
+  if (language === 'markdown') return (await import('./knowledge-language')).knowledgeLanguage();
   if (language === 'json') return (await import('@codemirror/lang-json')).json();
   if (language === 'javascript') return (await import('@codemirror/lang-javascript')).javascript({ jsx: true });
   if (language === 'html') return (await import('@codemirror/lang-html')).html();
@@ -58,7 +59,8 @@ export default function CodeEditorView(props: CodeEditorProps) {
       }),
     });
     view.current = editor;
-    return () => { view.current = null; editor.destroy(); };
+    values.onReady?.(editor);
+    return () => { values.onReady?.(null); view.current = null; editor.destroy(); };
   }, []);
   useEffect(() => {
     const editor = view.current;

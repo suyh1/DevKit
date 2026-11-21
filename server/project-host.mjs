@@ -303,7 +303,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             const knowledge = managers.knowledge?.();
             if (!knowledge) return json(503, { error: '团队知识库暂不可用。' });
             const action = url.pathname.slice('/api/knowledge/'.length);
-            const writing = !['list', 'history'].includes(action);
+            const writing = !['list', 'library', 'history'].includes(action);
             if (writing && !access.edit) return json(403, { error: '团队知识库为只读模式。' });
             const input = await body();
             ensureCurrentSession();

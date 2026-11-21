@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { referenceText, refersTo, renderArticle } from './knowledge-markdown';
+import { articleLayout, bodyMatch, referenceText, refersTo, renderArticle } from './knowledge-markdown';
 
 it('matches the exact host-qualified resource and ignores examples and plain text', () => {
   const id = 'host:实例 (A)';
@@ -9,6 +9,17 @@ it('matches the exact host-qualified resource and ignores examples and plain tex
   expect(refersTo(link, 'jar', '实例 (A)')).toBe(false);
   expect(refersTo('    ' + link, 'jar', id)).toBe(false);
   expect(refersTo('`' + link + '`', 'jar', id)).toBe(false);
+});
+
+it('locates matching paragraphs, distinguishes repeated headings, and recognizes section backlinks', () => {
+  const body = '## 验证\n\n第一段\n\n## 验证\n\n核对目标端口';
+  const { headings, html } = articleLayout(body);
+  expect(headings[0].key).not.toBe(headings[1].key);
+  expect(html).toContain('data-kb-line="6"');
+  expect(bodyMatch(body, '端口')).toEqual({ line: 6, snippet: '核对目标端口' });
+  expect(
+    refersTo(referenceText('knowledge', 'article~' + headings[1].key, '验证'), 'knowledge', 'article'),
+  ).toBe(true);
 });
 
 it('renders formatted text offline and keeps raw HTML as article text', () => {

@@ -82,8 +82,9 @@ module.exports = async (window, output) => {
     await fill('筛选日志内容', ''); await js(`document.querySelector('.log-toolbar input[type=checkbox]').click()`);
     await fs.writeFile(path.join(folder, 'app0.log'), 'INFO rotated-marker\n'); await wait(window.webContents, `document.querySelector('.log-pane pre').textContent.includes('rotated-marker')`);
     const socket = net.createServer(); await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve)); const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const services = { knowledge: { enabled: true, edit: false }, projects: { enabled: true, edit: false, probe: false }, nginx: { enabled: true, edit: false, control: false }, http: { enabled: true, edit: false, send: false }, jar: { enabled: true, edit: false, control: false }, monitor: { enabled: true, edit: false, control: false }, logs: { enabled: true, jar: true, nginx: true, export: false } };
-    await ipc('devkitProjects', 'start', { host: '127.0.0.1', port, password: 'logs-smoke-only', services });
+    const services = { knowledge: { enabled: true, edit: true }, projects: { enabled: true, edit: false, probe: false }, nginx: { enabled: true, edit: false, control: false }, http: { enabled: true, edit: false, send: false }, jar: { enabled: true, edit: false, control: false }, monitor: { enabled: true, edit: false, control: false }, logs: { enabled: true, jar: true, nginx: true, export: false } };
+    await ipc('devkitProjects', 'start', { host: '127.0.0.1', port, password: 'logs-smoke-only', services,
+      visitors: [{ name: '知识库读者', password: 'knowledge-reader-only', services: { ...services, knowledge: { enabled: true, edit: false } } }] });
     remote = new BrowserWindow({ width: 1440, height: 900, show: true, webPreferences: { partition: `logs-${Date.now()}`, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     await remote.loadURL(`http://127.0.0.1:${port}/#logs`); await wait(remote.webContents, `!!document.querySelector('.portal-login .run-button')&&!document.querySelector('.portal-login .run-button').disabled`);
     await remote.webContents.executeJavaScript(`(()=>{const e=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'logs-smoke-only');e.dispatchEvent(new Event('input',{bubbles:true}))})()`, true); await delay(100); await remote.webContents.executeJavaScript(`document.querySelector('.portal-login .run-button').click()`, true);
@@ -113,7 +114,11 @@ module.exports = async (window, output) => {
       }
       remote.show(); remote.focus(); await fs.writeFile(path.join(output, `logs-shared-${width}.png`), (await remote.webContents.capturePage()).toPNG());
     }
-    await require('./knowledge-smoke.cjs')(window, remote, wait);
+    const monitors = await ipc('devkitMonitor', 'get');
+    await ipc('devkitMonitor', 'upsert', { revision: monitors.revision, monitor: {
+      name: '订单健康检查', type: 'http', url: 'http://127.0.0.1/', enabled: false, interval: 60, timeout: 1, failures: 2, status: 200
+    }});
+    await require('./knowledge-smoke.cjs')(window, remote, wait, output);
     console.log('Logs and navigation passed: four-source streaming, mask/filter/regex timeout, pause/resume/clear, rotation, export permissions, sidebar and keyboard-close mobile drawer.');
   } finally { remote?.destroy(); await ipc('devkitProjects', 'stop'); }
 };

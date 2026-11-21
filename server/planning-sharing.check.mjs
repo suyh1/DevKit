@@ -144,6 +144,8 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
     }
     const readOnly = await login('viewer-test-only', 'viewer');
     const editor = await login('owner-test-only');
+    assert.equal((await post('knowledge/create-folder', {folder:'不允许'}, readOnly)).status, 403);
+    assert.equal((await post('knowledge/library', {}, readOnly)).status, 200);
     const article = { title: '部署', kind: '部署手册', body: '步骤 A' };
     assert.equal((await post('knowledge/list', {})).status, 401);
     assert.equal((await post('knowledge/create', article, readOnly)).status, 403);
@@ -193,6 +195,22 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
     await todos.close();
     await store.close();
   }
+}));
+
+test('knowledge upgrades historical categories to tags and persists empty folders with stable document IDs', async () => fixture(async root => {
+  const original={id:'known-id',project:'示例',kind:'项目交接',title:'交接',body:'旧版',revision:1,actor:'桌面端',updated:'2026-01-01'};
+  await writeFile(path.join(root,'knowledge.json'), JSON.stringify({version:1,pages:[{...original,revision:2,body:'新版',history:[original]}]}));
+  const library=await createKnowledgeBase(root);
+  const [page]=await library.request('list');
+  assert.deepEqual(page.tags,['项目交接']); assert.equal(page.folder,'');
+  assert.deepEqual((await library.request('history',{id:page.id}))[0].tags,['项目交接']);
+  await library.request('create-folder',{folder:' 基础知识 / 网络 '});
+  const plain=await library.request('create',{title:'术语',body:'',folder:'基础知识/其他'});
+  assert.deepEqual(plain.tags,[]);
+  const restored=await library.request('restore',{id:page.id,revision:2,version:1});
+  assert.equal(restored.id,'known-id');assert.equal(restored.body,'旧版');
+  const reopened=await createKnowledgeBase(root);
+  assert.deepEqual((await reopened.request('library')).folders.sort(),['基础知识/其他','基础知识/网络'].sort());
 }));
 
 test('both legacy formats become text lists with their publication and unmodified originals', async () => fixture(async root => {

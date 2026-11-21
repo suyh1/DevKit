@@ -22,7 +22,7 @@ import { parseTodo } from '../shared/todo-text.mjs';
 
 export type WorkspacePage = typeof workspaceModules[number]['id'];
 export type WorkspaceLink = { page: WorkspacePage; id?: string };
-export type WorkspaceResult = WorkspaceLink & { label: string; detail: string };
+export type WorkspaceResult = WorkspaceLink & { label: string; detail: string; host?: string };
 export const workspaceHash = (page: WorkspacePage, id?: string) => `#${page}${id ? '/' + encodeURIComponent(id) : ''}`;
 export function parseWorkspaceLink(hash: string): WorkspaceLink | undefined {
   const [name, ...parts] = hash.slice(1).split('/');
@@ -77,8 +77,8 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
       add(state.profiles.flatMap(profile => profile.projects.map(item => perModule('projects', `${profile.id}:${item.id}`, item.name, profile.name))));
     },
     knowledge: async () => {
-      const pages = await knowledgeRequest<Pick<KnowledgePage, 'id' | 'title' | 'project' | 'kind'>[]>('list', { summary: true });
-      add(pages.map(item => perModule('knowledge', item.id, item.title, [item.project, item.kind].filter(Boolean).join(' · '))));
+      const pages = await knowledgeRequest<Pick<KnowledgePage, 'id' | 'title' | 'project' | 'folder'>[]>('list', { summary: true });
+      add(pages.map(item => perModule('knowledge', item.id, item.title, [item.project, item.folder].filter(Boolean).join(' · '))));
     },
     'project-todos': async () => {
       const state = await todoRequest(!window.devkitProjectTodos, 'get');
@@ -113,7 +113,7 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
   };
   async function inventory(page: 'jar' | 'nginx', request: (action: 'get', value: unknown) => Promise<JarState | NginxState>) {
     const base = await request('get', { scope: 'inventory-local' });
-    const publish = (state: JarState | NginxState, host = '') => add(state.instances.map(item => perModule(page, item.id, item.name, [host, 'jar' in item ? item.jar : item.main].filter(Boolean).join(' · '))));
+    const publish = (state: JarState | NginxState, host = window.devkitDesktop ? '本机' : '共享主机') => add(state.instances.map(item => ({ ...perModule(page, item.id, item.name, [host, 'jar' in item ? item.jar : item.main].join(' · ')), host })));
     publish(base);
     await Promise.allSettled((base.groups || []).filter(group => group.id).map(async group => publish(await request('get', { scope: 'inventory-host', hostId: group.id }), group.name)));
   }
