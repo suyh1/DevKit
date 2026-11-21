@@ -1,0 +1,71 @@
+select option {
+  color: var(--text);
+  background-color: var(--surface);
+}
+
+@supports (appearance: base-select) and selector(::picker(select)) {
+  @media (forced-colors: none) {
+    select:not([multiple], [size]),
+    select:not([multiple], [size])::picker(select) {
+      appearance: base-select;
+    }
+
+    select:not([multiple], [size]) {
+      column-gap: .65em;
+      justify-content: space-between;
+    }
+
+    select::picker-icon {
+      content: "";
+      align-self: center;
+      flex: none;
+      width: .44em;
+      height: .44em;
+      margin-inline: auto .2em;
+      border: solid var(--muted);
+      border-width: 0 1.5px 1.5px 0;
+      transform: translateY(-20%) rotate(45deg);
+    }
+
+    select:open::picker-icon {
+      transform: translateY(20%) rotate(225deg);
+      border-color: var(--accent);
+    }
+
+    select::picker(select) {
+      box-sizing: border-box;
+      max-inline-size: calc(100vw - 16px);
+      max-block-size: min(22rem, 50dvh);
+      margin-block: 3px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow-hover);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    select:not([multiple], [size]) option {
+      display: flex;
+      align-items: center;
+      gap: .75em;
+      min-block-size: 32px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font: inherit;
+      line-height: 1.45;
+      text-align: start;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      cursor: pointer;
+    }
+
+    select option:enabled:hover { background: var(--soft); }
+    select option:checked { background: var(--tint); color: var(--accent); }
+    select option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    select option:disabled { color: var(--muted); opacity: .65; cursor: default; }
+    select option::checkmark { order: 1; margin-inline-start: auto; color: var(--accent); }
+  }
+}

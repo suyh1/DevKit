@@ -1,5 +1,5 @@
 import SegmentedControl from './SegmentedControl';
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
 import { drawMark, prepareScreenshot, type Board, type BoardInfo, type Brush, type Point } from './board-canvas';
 import { openWorkspaceLink, useWorkspaceResource } from './workspace-links';
@@ -36,6 +36,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
   const resource = useWorkspaceResource('whiteboard'),
     selected = resource || list.value?.[0]?.id;
   const [aspect, setAspect] = useState('landscape');
+  const previewId = useId();
   const blankSize = aspect === 'portrait' ? { width:800,height:1280 } : aspect === 'square' ? { width:1024,height:1024 } : { width:1280,height:800 };
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [title, setTitle] = useState(''),
@@ -107,7 +108,15 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
                   <ImagePlus size={17} />
                   从截图新建
                 </button>
-                <label className="board-ratio">空白画板比例<select value={aspect} onChange={e => setAspect(e.target.value)}><option value="landscape">横屏</option><option value="square">方形</option><option value="portrait">竖屏</option></select><span aria-hidden="true" style={{ width: 26 * blankSize.width / blankSize.height, height:26 }} />{blankSize.width} × {blankSize.height}</label>
+                <label className="board-ratio">空白画板比例
+                  <select aria-label="空白画板比例" aria-describedby={previewId} value={aspect} onChange={e => setAspect(e.target.value)}>
+                    <option value="landscape">横屏</option><option value="square">方形</option><option value="portrait">竖屏</option>
+                  </select>
+                  <span className="board-size-preview" id={previewId}>
+                    <i aria-hidden="true" style={{ aspectRatio: blankSize.width / blankSize.height }} />
+                    {blankSize.width} × {blankSize.height} 像素
+                  </span>
+                </label>
                 <button disabled={op.busy} onClick={() => create()}>
                   <Plus size={17} />
                   新建空白画板

@@ -62,13 +62,13 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
     if (hostId) { setPicker(kind); return; }
     void task(async () => { const files = await jarRequest<string[]>('pick', { kind }); if (files[0]) pickFile(kind, files[0]); });
   }
-  return <dialog ref={dialog} className="jar-dialog" aria-labelledby={heading} onCancel={event => { event.preventDefault(); void cancel(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); void cancel(); } }}>
+  return <dialog ref={dialog} className="jar-dialog jar-instance-editor" aria-labelledby={heading} onCancel={event => { event.preventDefault(); void cancel(); }} onKeyDown={event => { if (event.key === 'Escape' && !(event.target instanceof HTMLOptionElement)) { event.preventDefault(); event.stopPropagation(); void cancel(); } }}>
     <header><h2 id={heading}>{instance ? '编辑 JAR' : '添加 JAR'}</h2><button className="icon-button" aria-label="关闭 JAR 设置" disabled={busy} onClick={() => void cancel()}><X size={18} /></button></header>
     <form onSubmit={event => { event.preventDefault(); void task(async () => {
       await jarRequest<JarState>('upsert', { hostId, revision: group?.revision ?? state.revision, instance: { ...instance, ...runtimePayload(runtime), name: draft.name, jar: draft.jar, executable: draft.executable, jvmArgs: draft.jvm.split(/\r?\n/).filter(Boolean), appArgs: draft.args.split(/\r?\n/).filter(Boolean), pidName: draft.pidName, logName: draft.logName, logMode: draft.logMode, stopTimeout: Number(draft.stopTimeout) } });
       baseline.current = JSON.stringify([draft, runtime]); saved();
     }); }}>
-      <fieldset disabled={busy}>
+      <div className="jar-form-body"><fieldset disabled={busy}>
         <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); patch({ jar: '', executable: '' }); setJava(null); }} />
         <label>显示名称<input required maxLength={120} value={draft.name} onChange={event => patch({ name: event.target.value })} placeholder="例如：订单服务 · 测试环境" /></label>
         <label>JAR 文件绝对路径<span className="jar-path-input"><input required value={draft.jar} onChange={event => patch({ jar: event.target.value })} onBlur={() => { if (!draft.name && draft.jar) patch({ name: basename(draft.jar).replace(/\.jar$/i, '') }); }} placeholder={hostId || !window.devkitJar ? '填写目标主机上的绝对路径' : '选择已有 .jar 文件'} /><button className="secondary-button" type="button" disabled={!hostId && !window.devkitJar} onClick={() => pick('jar')}><FolderOpen size={15} />选择文件</button></span></label>
@@ -82,7 +82,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
         <p className="jar-help">console 的标准输出仅在工具内显示，支持行输入；关闭视图不会停止应用。共享网页中的全部路径均指向主机，不是当前电脑。</p>
         <p className="jar-help">可填 app.pid / app.log 延续脚本文件名。旧脚本启动的进程请先由原脚本停止，再通过工具启动。</p>
         <JarRuntimeSettings value={runtime} onChange={setRuntime} />
-      </fieldset>
+      </fieldset></div>
       {error && <p className="jar-error" role="alert">{error}</p>}
       <footer><button className="text-button" type="button" disabled={busy} onClick={() => void cancel()}>取消</button><MotionButton busy={busy} className="run-button" disabled={busy} type="submit">保存 JAR</MotionButton></footer>
     </form>

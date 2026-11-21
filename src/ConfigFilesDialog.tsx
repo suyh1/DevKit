@@ -104,7 +104,22 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
 
   const files = listing?.files ?? [];
   const jar = kind === 'jar';
-  return <Modal title="配置文件" description={item.name} icon={<FileCode size={19} />} className="jar-config-dialog" close={close} closeLabel={`关闭 ${jar ? 'JAR' : 'Nginx'} 配置文件`} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
+  const actions = file && (
+    <footer className="jar-config-actions">
+      <div className="pc-actions">
+        <button type="button" className="text-button" disabled={!editable} onClick={() => void read(file.name)}><RefreshCw size={13} />重新读取</button>
+        <button type="button" className="text-button" disabled={!editable} onClick={() => void loadBackup(file.name)}><History size={14} />查看上一版</button>
+      </div>
+      <div className="pc-actions">
+        {mode === 'edit' && <button type="button" className="secondary-button" disabled={!dirty} onClick={() => setMode('changes')}>预览修改</button>}
+        {mode !== 'edit' && <button type="button" className="secondary-button" onClick={() => setMode('edit')}>返回编辑</button>}
+        {mode === 'backup'
+          ? <button type="button" className="run-button" disabled={!editable} onClick={() => void fillBackup()}>用上一版填入编辑器</button>
+          : <button type="button" className="run-button" disabled={!editable || !dirty} onClick={() => void save(file)}><Save size={14} />保存配置</button>}
+      </div>
+    </footer>
+  );
+  return <Modal footer={actions} title="配置文件" description={item.name} icon={<FileCode size={19} />} className="jar-config-dialog" close={close} closeLabel={`关闭 ${jar ? 'JAR' : 'Nginx'} 配置文件`} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
     <div className="jar-configs">
       <div className="jar-config-source">
         <div className="jar-config-directory">
@@ -133,19 +148,6 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
           <p className="jar-help">左侧为已保存的版本，右侧为上一次保存前的备份。</p>
           <ChangePreview before={file.content} after={backup.content} />
         </>}
-        <footer className="jar-config-actions">
-          <div className="pc-actions">
-            <button type="button" className="text-button" disabled={!editable} onClick={() => void read(file.name)}><RefreshCw size={13} />重新读取</button>
-            <button type="button" className="text-button" disabled={!editable} onClick={() => void loadBackup(file.name)}><History size={14} />查看上一版</button>
-          </div>
-          <div className="pc-actions">
-            {mode === 'edit' && <button type="button" className="secondary-button" disabled={!dirty} onClick={() => setMode('changes')}>预览修改</button>}
-            {mode !== 'edit' && <button type="button" className="secondary-button" onClick={() => setMode('edit')}>返回编辑</button>}
-            {mode === 'backup'
-              ? <button type="button" className="run-button" disabled={!editable} onClick={() => void fillBackup()}>用上一版填入编辑器</button>
-              : <button type="button" className="run-button" disabled={!editable || !dirty} onClick={() => void save(file)}><Save size={14} />保存配置</button>}
-          </div>
-        </footer>
       </>}
     </div>
   </Modal>;

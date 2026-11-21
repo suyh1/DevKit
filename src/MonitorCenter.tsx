@@ -5,7 +5,7 @@ import { Activity, Plus, RefreshCw, Search, Pencil, Trash2, Play, Pause, ShieldC
 import { monitorRequest, monitorSourceKey, monitorSourceLink } from './monitor-api';
 import type { Monitor, MonitorConfig, MonitorSource, MonitorState } from './monitor-api';
 import { canOperateMonitor, canWriteWorkspace } from './workspace-remote';
-import { Modal, ModalCancel, Field } from './project-components';
+import { Modal, ModalForm, ModalCancel, Field } from './project-components';
 import { MotionButton, MotionPresence } from './Motion';
 import { SharingButton } from './Sharing';
 import { usePerformanceMode } from './DisplayMode';
@@ -150,7 +150,9 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
       </aside>}
     </div>}
     <MotionPresence kind="dialog" present={!!draft}>{draft && <Modal active={active} title={draft.id ? '编辑监控' : '添加监控'} close={() => setDraft(null)} draft={{ ...draft, start, end }} busy={busy}>
-      <form className="monitor-form" noValidate onSubmit={event => { event.preventDefault(); setSubmitted(true);
+      <ModalForm
+        footer={<footer className="pc-form-footer"><ModalCancel /><MotionButton className="run-button" busy={busy} disabled={busy || frozen}>保存监控</MotionButton></footer>}
+        className="monitor-form" noValidate onSubmit={event => { event.preventDefault(); setSubmitted(true);
         const form = event.currentTarget;
         for (const control of Array.from(form.elements)) {
           if (!(control instanceof HTMLInputElement) || control.disabled) continue;
@@ -175,8 +177,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
           {draft.webhook && <><Field label="Webhook 地址"><input required type="url" value={draft.webhook.url} onChange={event => setDraft({ ...draft, webhook: { ...draft.webhook!, url: event.target.value } })} placeholder="https://example.com/webhook" /></Field><div className="monitor-form-row">{([{ key: 'down', label: '确认故障时发送' }, { key: 'up', label: '恢复时发送' }, { key: 'certificate', label: 'HTTPS 证书剩余 30 / 7 天时提醒' }] as const).map(item => <label key={item.key}><input type="checkbox" checked={draft.webhook![item.key]} onChange={event => setDraft({ ...draft, webhook: { ...draft.webhook!, [item.key]: event.target.checked } })} />{item.label}</label>)}</div><p className="monitor-form-hint">从监控主机发送 JSON POST。暂时性失败最多再试两次。</p></>}
         </fieldset>}
         <label className="monitor-enabled"><input type="checkbox" checked={draft.enabled} disabled={!operate || (!!restrictedSource && !draft.enabled)} onChange={event => setDraft({ ...draft, enabled: event.target.checked })} />保存后启用定时检测</label><p className="monitor-form-hint">修改配置会开始新的检测序列，旧故障记录保留。暂停和维护期间不产生样本。</p>
-        <footer className="pc-form-footer"><ModalCancel /><MotionButton className="run-button" busy={busy} disabled={busy || frozen}>保存监控</MotionButton></footer>
-      </form>
+      </ModalForm>
     </Modal>}</MotionPresence>
     <MotionPresence kind="dialog" present={!!remove}>{remove && <Modal title="删除监控" close={() => setRemove(null)} busy={busy}>{error && <p className="pc-error" role="alert">{error}</p>}<p>删除“{remove.name}”及其检测历史、故障记录？此操作无法撤销。</p><div className="pc-form-footer"><button className="secondary-button" onClick={() => setRemove(null)}>取消</button><button className="run-button" disabled={busy} onClick={() => void action('remove', { id: remove.id, revision }, () => setRemove(null))}>确认删除</button></div></Modal>}</MotionPresence>
   </section>;

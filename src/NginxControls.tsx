@@ -21,8 +21,10 @@ export function NginxControlDock({ active, children, scrollRoot }: {
     const root = scrollRoot || dock.current?.closest<HTMLElement>('.nginx-workspace'), panel = dock.current;
     if (!root || !panel || !active) return;
     const resize = new ResizeObserver(() => {
+      const height = Math.ceil(panel.getBoundingClientRect().height);
       root.style.setProperty('--ng-scrollport-height', `${root.clientHeight}px`);
-      root.style.setProperty('--ng-dock-height', `${Math.ceil(panel.getBoundingClientRect().height) + 12}px`);
+      root.style.setProperty('--ng-dock-height', `${height + 12}px`);
+      if (panel.dataset.stuck === 'false') root.style.setProperty('--ng-expanded-height', `${height}px`);
     });
     resize.observe(root);
     resize.observe(panel);
@@ -30,6 +32,7 @@ export function NginxControlDock({ active, children, scrollRoot }: {
       resize.disconnect();
       root.style.removeProperty('--ng-scrollport-height');
       root.style.removeProperty('--ng-dock-height');
+      root.style.removeProperty('--ng-expanded-height');
     };
   }, [active, scrollRoot]);
   return <>

@@ -227,23 +227,38 @@ app
         await button("项目中心", ".portal-navigation button");
         await wait('document.querySelectorAll(".pc-card").length===24');
         await delay(350);
-        await js(`document.querySelector('.pc-profiles').scrollTop=0;document.querySelector('.pc-content').scrollTop=0`);
-        const sidebar = await js(`(()=>{const r=document.querySelector('.pc-profiles').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
-        await wheel(18000, sidebar.x, sidebar.y);
-        assert.equal(await js(`(()=>{const l=document.querySelector('.pc-profiles'),r=document.querySelector('.pc-content');return l.scrollTop>0&&l.scrollTop>=l.scrollHeight-l.clientHeight-2&&r.scrollTop===0&&l.scrollHeight>l.clientHeight&&r.scrollHeight>r.clientHeight})()`), true, 'Many profiles scroll independently of the project panel');
-        const leftTop = await js(`document.querySelector('.pc-profiles').scrollTop`);
-        await wheel(18000);
-        console.log(
-          "Project scroll",
-          width,
-          await js(
-            'JSON.stringify({top:document.querySelector(".portal-content").scrollTop,sh:document.querySelector(".portal-content").scrollHeight,h:document.querySelector(".portal-content").clientHeight})',
-          ),
-        );
-        await wait(
-          '(()=>{const r=document.querySelector(".pc-content");return r.scrollTop>=r.scrollHeight-r.clientHeight-2})()',
-        );
-        assert.equal(await js(`document.querySelector('.pc-profiles').scrollTop`), leftTop, 'Project scrolling leaves profiles in place');
+        if (width === 390) {
+          const shell = await js(`(() => {
+            const pane = document.querySelector('.pc-shell');
+            pane.scrollTop = 0;
+            const r = pane.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+          })()`);
+          await wheel(18000, shell.x, shell.y);
+          await wait(`(() => {
+            const pane = document.querySelector('.pc-shell');
+            return pane.scrollTop > 0 && pane.scrollTop >= pane.scrollHeight - pane.clientHeight - 2 &&
+              ['.pc-profiles', '.pc-content'].every(selector => getComputedStyle(document.querySelector(selector)).overflowY === 'visible');
+          })()`);
+        } else {
+          await js(`document.querySelector('.pc-profiles').scrollTop=0;document.querySelector('.pc-content').scrollTop=0`);
+          const sidebar = await js(`(()=>{const r=document.querySelector('.pc-profiles').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+          await wheel(18000, sidebar.x, sidebar.y);
+          assert.equal(await js(`(()=>{const l=document.querySelector('.pc-profiles'),r=document.querySelector('.pc-content');return l.scrollTop>0&&l.scrollTop>=l.scrollHeight-l.clientHeight-2&&r.scrollTop===0&&l.scrollHeight>l.clientHeight&&r.scrollHeight>r.clientHeight})()`), true, 'Many profiles scroll independently of the project panel');
+          const leftTop = await js(`document.querySelector('.pc-profiles').scrollTop`);
+          await wheel(18000);
+          console.log(
+            "Project scroll",
+            width,
+            await js(
+              'JSON.stringify({top:document.querySelector(".portal-content").scrollTop,sh:document.querySelector(".portal-content").scrollHeight,h:document.querySelector(".portal-content").clientHeight})',
+            ),
+          );
+          await wait(
+            '(()=>{const r=document.querySelector(".pc-content");return r.scrollTop>=r.scrollHeight-r.clientHeight-2})()',
+          );
+          assert.equal(await js(`document.querySelector('.pc-profiles').scrollTop`), leftTop, 'Project scrolling leaves profiles in place');
+        }
         assert.equal(await js(`(()=>{const e=document.querySelector('.portal-content');return e.scrollHeight<=e.clientHeight+1})()`), true, 'Project overflow stays inside the two panels');
         assert.equal(await js(`(()=>{const s=document.querySelector('.pc-shell').getBoundingClientRect();return s.bottom<=innerHeight+1&&document.querySelector('.project-center').scrollWidth<=document.querySelector('.project-center').clientWidth})()`), true, 'Both panels stay within the viewport: '+await js(`JSON.stringify([...document.querySelectorAll('.portal-content,.portal-page:not([hidden]),.project-center,.pc-shell,.pc-profiles,.pc-content')].map(e=>({c:e.className,h:e.clientHeight,sh:e.scrollHeight,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom,style:e.getAttribute('style')})))`));
         assert.equal(

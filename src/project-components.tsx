@@ -12,11 +12,25 @@ import { resolveProject } from "../shared/projects.mjs";
 import type { Profile, Project, ProjectState } from "../shared/projects.mjs";
 
 const CloseDialog = createContext(() => {});
+
+/** Keep native submission and validation, with actions outside the scrolling fields. */
+export function ModalForm({ children, footer, className = "", ...props }: React.ComponentProps<"form"> & {
+  footer: React.ReactNode;
+}) {
+  return (
+    <form {...props} className={`pc-modal-frame ${className}`}>
+      <div className="pc-modal-body">{children}</div>
+      {footer}
+    </form>
+  );
+}
+
 export function Modal({
   title,
   description,
   close,
   children,
+  footer,
   draft,
   busy = false,
   active = true,
@@ -31,6 +45,7 @@ export function Modal({
   description?: string;
   close: () => void;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   draft?: unknown;
   busy?: boolean;
   active?: boolean;
@@ -148,7 +163,8 @@ export function Modal({
           </div>
         )}
         <fieldset className="pc-modal-content" disabled={busy}>
-          {children}
+          <div className={footer ? "pc-modal-body" : "pc-modal-slot"}>{children}</div>
+          {footer}
         </fieldset>
       </dialog>
     </CloseDialog.Provider>

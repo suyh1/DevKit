@@ -76,7 +76,12 @@
 .ng-instances { top: 8px; }
 @keyframes ng-feedback-arrive { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 760px) {
-  .ng-control-dock { max-height: 60dvh; }
+  /* Let the end of a tall panel enter the viewport before compacting it. */
+  .ng-detail { --ng-dock-travel: max(0px, calc(var(--ng-expanded-height, 0px) - var(--ng-scrollport-height, 100dvh) + 12px)); }
+  .ng-dock-anchor { position: relative; top: var(--ng-dock-travel); }
+  .ng-detail:has(> .ng-control-dock[data-stuck=true]) { min-height: calc(var(--ng-scrollport-height) + var(--ng-dock-travel)); }
+  .ng-control-dock[data-stuck=false] { position: static; max-height: none; overflow: visible; }
+  .ng-control-dock[data-stuck=true] { max-height: 60dvh; }
   .ng-control-dock[data-stuck=true] .ng-toolbar > button { padding-inline: 6px; font-size: 12px; }
   .ng-control-dock[data-stuck=true] .ng-toolbar .motion-glyph-slot,
   .ng-control-dock[data-stuck=true] .ng-toolbar > button > svg { display: none; }

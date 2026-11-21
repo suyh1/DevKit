@@ -105,7 +105,7 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
   }, [theme]);
   return (
     <details ref={details} className="portal-appearance" onKeyDown={event => {
-      if (event.key === 'Escape' && event.currentTarget.open) {
+      if (event.key === 'Escape' && !(event.target instanceof HTMLOptionElement) && event.currentTarget.open) {
         event.stopPropagation();
         event.currentTarget.open = false;
         event.currentTarget.querySelector('summary')?.focus();

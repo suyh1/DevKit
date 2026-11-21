@@ -135,9 +135,19 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.lan-select { position: relative; }
-.pc-dialog.lan-host-dialog .lan-select select { appearance: none; padding-inline-end: 30px; }
-.lan-select svg { position: absolute; top: 11px; right: 9px; color: var(--muted); pointer-events: none; }
+.lan-field.lan-import-source { grid-template-rows: auto auto; }
+.lan-import-source textarea {
+  width: 100%; min-width: 0; min-height: calc(6lh + 18px); resize: vertical;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--soft); color: var(--text); font: 13px/1.5 var(--font-mono);
+}
+.lan-import-source textarea::placeholder { color: var(--muted); }
+.lan-jump-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; gap: 6px 8px; }
+.lan-jump-row > label { flex: 1 1 175px; }
+.pc-dialog.lan-host-dialog .lan-jump-row > button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 37px; padding-inline: 10px; white-space: nowrap;
+}
 .lan-password-row { grid-column: 1 / -1; position: relative; }
 .pc-dialog.lan-host-dialog .lan-password input { padding-inline-end: 40px; }
 .pc-dialog.lan-host-dialog .lan-password-toggle { position: absolute; right: 4px; bottom: 3px; width: 31px; height: 31px; }

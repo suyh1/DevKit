@@ -13,7 +13,7 @@ import type { Sharing, SharingAudit } from "./project-api";
 import { workspaceModules } from './catalog';
 import { emptySharingServices, visitorServices } from "../shared/sharing.mjs";
 import type { SharingServices } from "../shared/sharing.mjs";
-import { Modal, Field } from "./project-components";
+import { Modal, ModalForm, Field } from "./project-components";
 import { MotionButton, MotionPresence } from "./Motion";
 import { copyText } from "./motion-primitives";
 import "./sharing.css";
@@ -229,7 +229,34 @@ function SharingPanel({
         savedKey={saved}
         feedback={message}
       >
-        <form
+        <ModalForm
+          footer={draft && (
+            <footer>
+              {draft.running && (
+                <MotionButton
+                  busy={busy}
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void apply("stop")}
+                >
+                  停止共享
+                </MotionButton>
+              )}
+              <MotionButton
+                busy={busy}
+                className="run-button"
+                disabled={
+                  busy ||
+                  !Object.values(draft.services).some(
+                    (service) => service.enabled,
+                  )
+                }
+              >
+                {draft.running ? "应用设置并重启共享" : "开启共享"}
+              </MotionButton>
+            </footer>
+          )}
           onSubmit={(event) => {
             event.preventDefault();
             void apply("start");
@@ -608,34 +635,10 @@ function SharingPanel({
               <p className="pc-hint">
                 {draft.tls ? '已配置 HTTPS，请使用客户端信任且名称匹配的证书。' : 'HTTP 使用明文连接，仅用于可信局域网。'}系统防火墙需允许所选端口入站。
               </p>
-              <footer>
-                {draft.running && (
-                  <MotionButton
-                    busy={busy}
-                    type="button"
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => void apply("stop")}
-                  >
-                    停止共享
-                  </MotionButton>
-                )}
-                <MotionButton
-                  busy={busy}
-                  className="run-button"
-                  disabled={
-                    busy ||
-                    !Object.values(draft.services).some(
-                      (service) => service.enabled,
-                    )
-                  }
-                >
-                  {draft.running ? "应用设置并重启共享" : "开启共享"}
-                </MotionButton>
-              </footer>
+
             </>
           )}
-        </form>
+        </ModalForm>
       </Modal>
     </div>
   );

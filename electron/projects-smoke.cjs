@@ -127,6 +127,17 @@ module.exports = async function checkProjects(window, output, staging) {
   assert.equal(await js('document.querySelector(".pc-comparison").textContent.includes("地址模板")'), true);
   await js('new Promise(resolve => setTimeout(resolve, 250))');
   await fs.writeFile(path.join(output, 'preview-project-comparison.png'), (await window.webContents.capturePage()).toPNG());
+  const comparisonSize = window.getSize(), comparisonMinimum = window.getMinimumSize();
+  window.setMinimumSize(360, 600); window.setContentSize(390, 700);
+  await wait(window.webContents, 'innerWidth <= 400');
+  await js('document.querySelector(".selected-profiles button").click()');
+  assert.ok(await js(`(() => {
+    const result = document.querySelector('.pc-comparison');
+    const labels = result.querySelectorAll('tbody tr:first-child .pc-compare-profile');
+    return labels.length === 2 && [...labels].every(label => label.offsetHeight > 0) &&
+      result.scrollWidth <= result.clientWidth + 1 && result.scrollHeight <= result.clientHeight + 1;
+  })()`), 'Narrow comparison keeps both named values in the same reading column');
+  window.setSize(...comparisonSize); window.setMinimumSize(...comparisonMinimum);
   await click('关闭'); await wait(window.webContents, '!document.querySelector("dialog[open]")');
   // Delete is directly available, with cancel and profile-local removal.
   await click('添加项目'); await field('项目名称', '待删除项目'); await field('唯一编码', 'delete-me');
@@ -357,6 +368,15 @@ module.exports = async function checkProjects(window, output, staging) {
   await js('new Promise(resolve=>setTimeout(resolve,150))');
   assert.equal(await js('document.querySelector("dialog[open]").scrollWidth <= document.querySelector("dialog[open]").clientWidth + 1'),true,'Narrow editor must not overflow horizontally');
   await fs.writeFile(path.join(output,'preview-project-editor-narrow.png'),(await window.webContents.capturePage()).toPNG());
+  assert.ok(await js(`(() => {
+    const dialog = document.querySelector('dialog[open]'), body = dialog.querySelector('.pc-modal-body');
+    const last = body.querySelector('input[aria-label="参数 1 值"]');
+    const header = dialog.querySelector('header').getBoundingClientRect();
+    const footer = dialog.querySelector('footer').getBoundingClientRect();
+    last.focus();
+    return body.scrollTop > 0 && dialog.scrollTop === 0 && body.scrollWidth <= body.clientWidth + 1 &&
+      body.getBoundingClientRect().top >= header.bottom - 1 && last.getBoundingClientRect().bottom <= footer.top + 1;
+  })()`), 'Keyboard focus scrolls the narrow project form above its fixed actions');
   window.setSize(...editorSize); window.setMinimumSize(...editorMinimum);
   await aria('参数 1 名称','');
   assert.equal(await js('[...document.querySelectorAll("dialog[open] button")].find(item=>item.textContent.trim()==="保存项目定义").disabled'),true);
@@ -474,6 +494,10 @@ module.exports = async function checkProjects(window, output, staging) {
       assert.ok(metrics.scroll <= metrics.width, `Portal overflow at ${metrics.width}`); responsive.push(metrics);
       if (width <= 390) {
         assert.equal(await remote.webContents.executeJavaScript('document.querySelectorAll(".pc-profiles .pc-profile").length'), 2);
+        assert.ok(await remote.webContents.executeJavaScript(`(() => {
+          const sort = document.querySelector('[aria-label="项目排序"]');
+          return sort.querySelectorAll('button').length === 3 && sort.scrollWidth <= sort.clientWidth + 1;
+        })()`), 'All project sort options fit on narrow screens');
         const spareHeight = await remote.webContents.executeJavaScript(`(() => {
           const profiles = document.querySelector('.pc-profiles');
           const last = profiles.querySelectorAll('.pc-profile');
@@ -513,7 +537,8 @@ module.exports = async function checkProjects(window, output, staging) {
         const choices=profiles.querySelectorAll('.pc-profile');
         const last=choices[choices.length-1];
         last.scrollIntoView({block:'nearest'}); last.click();
-        return profiles.scrollTop>0 && last.getBoundingClientRect().bottom<=profiles.getBoundingClientRect().bottom+1;
+        const shell = profiles.closest('.pc-shell');
+        return shell.scrollTop > 0 && profiles.scrollTop === 0 && last.getBoundingClientRect().bottom <= shell.getBoundingClientRect().bottom + 1;
       })()`));
       await wait(remote.webContents, 'document.querySelector(".pc-environment h2").textContent === ' + JSON.stringify(lastName));
     }

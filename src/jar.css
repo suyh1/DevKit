@@ -8,6 +8,24 @@
 .jar-dialog > header .icon-button { flex-shrink: 0; }
 .jar-dialog footer { flex-wrap: wrap; gap: 8px; }
 .jar-dialog footer .run-button { margin-inline-start: 0; }
+.jar-instance-editor { --jar-form-inset: 22px; overflow: clip; }
+.jar-instance-editor[open],
+.jar-instance-editor > form { display: flex; flex-direction: column; min-height: 0; }
+.jar-instance-editor > header,
+.jar-instance-editor > form > footer { position: static; flex: none; }
+.jar-instance-editor > form { padding: 0; }
+.jar-form-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+  padding: 18px var(--jar-form-inset);
+}
+.jar-instance-editor > form > .jar-error { margin: 0 var(--jar-form-inset) 10px; }
+.jar-instance-editor > form > footer { margin: 0; padding: 14px var(--jar-form-inset); }
+@media (max-width: 760px) {
+  .jar-instance-editor { --jar-form-inset: 16px; }
+}
 .jar-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .jar-config-dialog:focus { outline: none; }

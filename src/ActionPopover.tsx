@@ -6,12 +6,14 @@ export default function ActionPopover({
   above = false,
   children,
   className,
+  triggerClassName,
 }: {
   label: string;
   trigger: ReactNode;
   above?: boolean;
   children: ReactNode;
   className: string;
+  triggerClassName?: string;
 }) {
   const id = useId(),
     anchor = useRef<HTMLButtonElement>(null),
@@ -47,6 +49,7 @@ export default function ActionPopover({
     <div className={className}>
       <button
         ref={anchor}
+        className={triggerClassName}
         type="button"
         aria-label={label}
         aria-expanded={open}

@@ -991,6 +991,7 @@
   .board-tools select.compact-shape {
     width: auto;
     min-height: 38px;
+    padding-block: 6px;
   }
   .board-tools .board-undo {
     margin: 0 0 0 auto;

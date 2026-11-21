@@ -27,7 +27,7 @@ export default function LanHostImport({ close, onImport }: { close: () => void; 
       }} />
       <button className="secondary-button" disabled={busy} onClick={() => file.current?.click()}>选择文件</button>
     </div>
-    <label className="lan-field"><span>连接内容</span><textarea value={source} disabled={busy} maxLength={262144} rows={6} spellCheck={false} onChange={event => change(event.target.value)}
+    <label className="lan-field lan-import-source"><span>连接内容</span><textarea value={source} disabled={busy} maxLength={262144} rows={6} spellCheck={false} onChange={event => change(event.target.value)}
       placeholder={format === 'csv' ? 'name,address,user,port,group,tags\n测试机,192.168.1.20,dev,22,测试,linux|api' : 'Host test\n  HostName 192.168.1.20\n  User dev\n  Port 22'} /></label>
     <p className="lan-note">{format === 'csv' ? '必填列 address。可选列 name、mode、user、port、platform、auth、group、tags、pinned、jar、nginx。标签用 | 分隔。' : '读取 Host、HostName、User 和 Port。密钥和跳板机可在导入后配置。'}</p>
     {rows && <ul className="lan-import-results">{rows.map(row => <li key={row.index}>

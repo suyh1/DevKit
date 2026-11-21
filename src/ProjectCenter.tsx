@@ -51,6 +51,7 @@ import type {
 } from "./project-api";
 import {
   Modal,
+  ModalForm,
   ModalCancel,
   Field,
   UrlPreview,
@@ -1156,7 +1157,13 @@ export default function ProjectCenter({
           busy={busy}
           wide
         >
-          <form
+          <ModalForm
+            footer={<footer>
+              <ModalCancel />
+              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
+                保存项目定义
+              </MotionButton>
+            </footer>}
             onSubmit={(event) => {
               event.preventDefault();
               void action(async () => {
@@ -1350,13 +1357,7 @@ export default function ProjectCenter({
                 {draftError}
               </p>
             )}
-            <footer>
-              <ModalCancel />
-              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
-                保存项目定义
-              </MotionButton>
-            </footer>
-          </form>
+          </ModalForm>
         </Modal>
       )}</MotionPresence>
       <MotionPresence kind="dialog" present={!!(profileDraft)}>{profileDraft && (
@@ -1368,7 +1369,13 @@ export default function ProjectCenter({
           busy={busy}
           wide
         >
-          <form
+          <ModalForm
+            footer={<footer>
+              <ModalCancel />
+              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
+                保存配置档案
+              </MotionButton>
+            </footer>}
             onSubmit={(event) => {
               event.preventDefault();
               void action(async () => {
@@ -1505,13 +1512,7 @@ export default function ProjectCenter({
                 {draftError}
               </p>
             )}
-            <footer>
-              <ModalCancel />
-              <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
-                保存配置档案
-              </MotionButton>
-            </footer>
-          </form>
+          </ModalForm>
         </Modal>
       )}</MotionPresence>
       {!imported && importStage === 1 && busy && <ImportSteps stage={1} />}

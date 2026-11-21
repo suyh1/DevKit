@@ -28,14 +28,41 @@ export default function ProjectComparison({
   const [onlyChanged, setOnlyChanged] = useState(true),
     [error, setError] = useState("");
   const report = ids.length >= 2 ? compareProfiles(data, ids) : null;
+  const actions = (
+    <footer>
+      <button className="text-button" onClick={close}>
+        关闭
+      </button>
+      <button
+        className="secondary-button"
+        disabled={!report}
+        onClick={() =>
+          void saveText(
+            JSON.stringify(report, null, 2),
+            "devkit-scheme-comparison.json",
+          ).catch((error) => setError(String(error)))
+        }
+      >
+        导出差异报告
+      </button>
+    </footer>
+  );
   return (
-    <Modal title="对比方案" close={close} wide>
+    <Modal title="对比方案" close={close} wide footer={actions}>
       <p className="pc-muted">
         选择 2–4
         个独立档案，按项目编码对齐，比较项目有无、名称、分组、说明、启停、地址模板、查询参数和最终入口，以及各方案的变量。这里只读取已保存的数据。
       </p>
       <fieldset className="pc-compare-picks">
-        <legend>参与对比的档案 · {ids.length}/4</legend><div className="selected-profiles" role="status">{ids.map(id => <span key={id}>{data.profiles.find(profile => profile.id === id)?.name}</span>)}{ids.length >= 2 && <button type="button" onClick={() => document.getElementById('project-comparison-result')?.scrollIntoView({ block: 'nearest' })}>查看对比</button>}</div>
+        <legend>参与对比的档案 · {ids.length}/4</legend>
+        <div className="selected-profiles" role="status">
+          {ids.map(id => <span key={id}>{data.profiles.find(profile => profile.id === id)?.name}</span>)}
+          {ids.length >= 2 && (
+            <button type="button" className="secondary-button" onClick={() => document.getElementById("project-comparison-result")?.scrollIntoView({ block: "start" })}>
+              查看对比
+            </button>
+          )}
+        </div>
         {data.profiles.map((profile) => (
           <label key={profile.id}>
             <input
@@ -68,9 +95,9 @@ export default function ProjectComparison({
           <table>
             <thead>
               <tr>
-                <th>变量 / 项目编码</th>
+                <th scope="col">变量 / 项目编码</th>
                 {report.profiles.map((profile) => (
-                  <th key={profile.id}>
+                  <th scope="col" key={profile.id}>
                     {profile.name}
                     <small>
                       {profile.projects} 个项目 ·{" "}
@@ -85,9 +112,10 @@ export default function ProjectComparison({
                 .filter((row) => !onlyChanged || row.different)
                 .map((row) => (
                   <tr key={`v:${row.key}`}>
-                    <th>变量 · {row.key}</th>
+                    <th scope="row">变量 · {row.key}</th>
                     {row.values.map((value, index) => (
                       <td key={index}>
+                        <strong className="pc-compare-profile" aria-hidden="true">{report.profiles[index].name}</strong>
                         {value === undefined ? (
                           <strong className="pc-invalid">未定义</strong>
                         ) : value === "" ? (
@@ -103,9 +131,10 @@ export default function ProjectComparison({
                 .filter((row) => !onlyChanged || row.different)
                 .map((row) => (
                 <tr key={`p:${row.code}`}>
-                    <th>项目 · {row.code}</th>
+                    <th scope="row">项目 · {row.code}</th>
                     {row.values.map((value, index) => (
                       <td key={index}>
+                        <strong className="pc-compare-profile" aria-hidden="true">{report.profiles[index].name}</strong>
                         {value === null ? (
                           <strong className="pc-invalid">此方案无此项目</strong>
                         ) : (
@@ -161,23 +190,6 @@ export default function ProjectComparison({
           {error}
         </p>
       )}
-      <footer>
-        <button className="text-button" onClick={close}>
-          关闭
-        </button>
-        <button
-          className="secondary-button"
-          disabled={!report}
-          onClick={() =>
-            void saveText(
-              JSON.stringify(report, null, 2),
-              "devkit-scheme-comparison.json",
-            ).catch((error) => setError(String(error)))
-          }
-        >
-          导出差异报告
-        </button>
-      </footer>
     </Modal>
   );
 }

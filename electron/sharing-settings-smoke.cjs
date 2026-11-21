@@ -234,6 +234,20 @@ module.exports = async function sharingSettingsSmoke(window, output) {
         path.join(output, `sharing-settings-${width}-${theme}.png`),
         (await window.webContents.capturePage()).toPNG(),
       );
+      if (await js('!matchMedia("(forced-colors: active)").matches')) {
+        await js('document.querySelector(".sharing-panel select").showPicker()');
+        await wait('!!document.querySelector(".sharing-panel select:open")');
+        assert.ok(await js(`(() => {
+          const field = document.querySelector(".sharing-panel select:open");
+          const picker = getComputedStyle(field, "::picker(select)");
+          const row = field.options[0].getBoundingClientRect();
+          return picker.appearance === "base-select" && row.height >= 32 &&
+            row.left >= 0 && row.right <= innerWidth && row.top >= 0 && row.bottom <= innerHeight;
+        })()`), `Sharing scope options fit the ${width}px viewport`);
+        window.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+        window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+        await wait('!document.querySelector(".sharing-panel select:open") && !!document.querySelector(".sharing-panel dialog[open]")');
+      }
       await close();
     }
     const sample = path.join(await fs.mkdtemp(path.join(output, 'file-share-')), 'sample.txt');

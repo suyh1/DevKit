@@ -8,6 +8,8 @@
 .geo-input-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .geo-inline { display:flex; align-items:center; gap:12px; flex-wrap:wrap; min-width:0; }
 .geo-inline .geo-field { flex:1 1 130px; max-width:300px; }
+.geo-inline .geo-field:has(.segmented-control) { flex-basis:max-content; max-width:100%; }
+.geo-inline .segmented-control { flex-wrap:wrap; }
 .geo-settings { border-top:1px solid var(--line); padding-top:18px; }
 .geo-paste-pair { display:flex; align-items:flex-end; gap:12px; }
 .geo-paste-pair>.geo-field { flex:1; }

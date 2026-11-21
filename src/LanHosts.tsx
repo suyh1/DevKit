@@ -1,7 +1,7 @@
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
 import { Fragment, lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
-import { Check, ChevronDown, Coffee, ExternalLink, Eye, EyeOff, Globe, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
+import { Check, Coffee, ExternalLink, Eye, EyeOff, Globe, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
 import { Modal, ModalCancel } from './project-components';
 import { useConfirmation } from './Confirmation';
 import LanHostImport from './LanHostImport';
@@ -98,11 +98,11 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
             {!ssh && <label className="lan-field"><span>访客名称（选填）</span><input autoComplete="off" value={draft.visitor || ''} maxLength={48} onChange={event => patch({ visitor: event.target.value })} /></label>}
             {ssh && <>
               <label className="lan-field"><span>用户名</span><input required autoComplete="off" value={draft.user} maxLength={120} onChange={event => patch({ user: event.target.value })} /></label>
-              <label className="lan-field"><span>认证方式</span><span className="lan-select">
+              <label className="lan-field"><span>认证方式</span>
                 <select value={draft.auth} onChange={event => { setRevealed(false); setKeyError(''); setKeyName(''); patch({ auth: event.target.value as HostDraft['auth'], keyPath: undefined, privateKey: undefined, clearKey: false, password: '', clearPassword: false }); }}>
                   <option value="password">用户名与密码</option><option value="key">{portal ? 'SSH 私钥' : 'SSH Agent 或私钥'}</option>
-                </select><ChevronDown size={15} aria-hidden="true" />
-              </span></label>
+                </select>
+              </label>
             </>}
             {ssh && draft.auth === 'key' && <div className="lan-key-picker">
               <span className="lan-note" title={draft.keyPath}>{keyName || draft.keyPath || (savedKey ? '已配置私钥' : portal || host?.explicitKeyOnly ? '选择私钥文件' : '使用 SSH Agent 或默认密钥')}</span>
@@ -134,14 +134,16 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
               </button>
             </div>}
             {hasCredential && <label className="lan-clear-credential"><input type="checkbox" checked={!!draft.clearPassword} onChange={event => { setRevealed(false); patch({ clearPassword: event.target.checked, password: '' }); }} />清除已保存的凭据</label>}
-            {ssh && <label className="lan-field"><span>SSH 跳板机 <small>选填</small></span><span className="lan-select">
-              <select value={draft.jumpHostId || ''} onChange={event => patch({ jumpHostId: event.target.value || undefined })}>
-                <option value="">直接连接</option>
-                {draft.jumpHostId && !jumps.some(candidate => candidate.id === draft.jumpHostId) && <option value={draft.jumpHostId}>原跳板机已移除</option>}
-                {jumps.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}{candidate.fingerprint ? '' : '（待验证指纹）'}</option>)}
-              </select><ChevronDown size={15} aria-hidden="true" />
-            </span></label>}
-            {ssh && newJump && <button type="button" className="text-button" onClick={() => newJump(id => patch({ jumpHostId: id }))}>新建跳板机</button>}
+            {ssh && <div className="lan-jump-row">
+              <label className="lan-field"><span>SSH 跳板机 <small>选填</small></span>
+                <select value={draft.jumpHostId || ''} onChange={event => patch({ jumpHostId: event.target.value || undefined })}>
+                  <option value="">直接连接</option>
+                  {draft.jumpHostId && !jumps.some(candidate => candidate.id === draft.jumpHostId) && <option value={draft.jumpHostId}>原跳板机已移除</option>}
+                  {jumps.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}{candidate.fingerprint ? '' : '（待验证指纹）'}</option>)}
+                </select>
+              </label>
+              {newJump && <button type="button" className="secondary-button" onClick={() => newJump(id => patch({ jumpHostId: id }))}><Plus size={14} />新建跳板机</button>}
+            </div>}
           </div>
         </fieldset>
 

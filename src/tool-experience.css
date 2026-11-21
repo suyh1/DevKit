@@ -33,6 +33,14 @@
 .workflow-generate .generator-config .option { display:flex; flex-direction:column; align-items:stretch; gap:7px; }
 .workflow-generate .generator-config .option input,.workflow-generate .generator-config .option select { width:100%; max-width:none; }
 .workflow-generate .generator-config label>input { width:100%; box-sizing:border-box; }
+.field-charset .segmented-control,
+[data-tool="hash"] .field-algorithm .segmented-control {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(max-content,1fr));
+}
+@media(min-width:701px) {
+  [data-tool="hash"] .field-algorithm .segmented-control { display:inline-flex; flex-wrap:wrap; }
+}
 .workflow-generate .generator-config>small { margin:0; }
 .workflow-generate .run-actions { margin:0; flex-wrap:wrap; }
 .workflow-generate .run-button { width:100%; }

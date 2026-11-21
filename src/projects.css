@@ -379,14 +379,18 @@
 .pc-dialog {
   width: min(720px, calc(100vw - 32px));
   max-height: calc(100dvh - 40px);
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 24px;
+  padding: 0;
   color: var(--text);
   background: var(--surface);
   font-family: inherit;
   font-size: 13px;
+}
+.pc-dialog[open] {
+  display: flex;
+  flex-direction: column;
 }
 .pc-dialog::backdrop {
   background: #06111db3;
@@ -574,9 +578,6 @@ body:has(.pc-login) {
   }
   .pc-form-grid {
     grid-template-columns: 1fr;
-  }
-  .pc-dialog {
-    padding: 18px;
   }
   .pc-actions {
     gap: 8px;
@@ -881,18 +882,16 @@ body:has(.pc-login) {
 }
 .pc-dialog {
   width: min(720px, calc(100vw - 32px));
-  scroll-padding-block: 90px;
+  --pc-dialog-inset: 24px;
 }
 .pc-dialog-wide {
   width: min(880px, calc(100vw - 32px));
 }
 .pc-dialog > header {
-  position: sticky;
-  top: -24px;
-  z-index: 3;
+  flex: none;
   background: var(--surface);
   padding: 20px 24px 16px;
-  margin: -24px -24px 20px;
+  margin: 0;
   border-bottom: 1px solid var(--line);
 }
 .pc-dialog > header > div {
@@ -909,22 +908,45 @@ body:has(.pc-login) {
 }
 .pc-dialog footer {
   position: sticky;
-  bottom: -24px;
+  bottom: 0;
   z-index: 2;
   background: var(--surface);
   padding: 15px 24px;
-  margin: 22px -24px -24px;
+  margin: 22px calc(-1 * var(--pc-dialog-inset)) calc(-1 * var(--pc-dialog-inset));
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.pc-modal-content {
-  padding: 0;
-  margin: 0;
-  border: 0;
+.pc-modal-slot, .pc-modal-body {
+  padding: var(--pc-dialog-inset);
+  min-height: 0;
   min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
 }
-.pc-modal-content:disabled {
+.pc-modal-content {
+  display: contents;
+}
+.pc-modal-slot:has(> .pc-modal-frame, > .lan-host-form) {
+  display: contents;
+}
+.pc-modal-content:disabled > :is(.pc-modal-slot, .pc-modal-body, footer),
+.pc-modal-content:disabled .pc-modal-frame {
   opacity: 0.8;
+}
+.pc-modal-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pc-dialog .pc-modal-body + footer {
+  position: static;
+  flex: none;
+  margin: 0;
+}
+.pc-dialog > .pc-discard {
+  flex: none;
+  margin: 8px var(--pc-dialog-inset);
 }
 .pc-draft-state {
   display: block;
@@ -1223,9 +1245,16 @@ body:has(.pc-login) {
   }
 }
 @container (max-width: 560px) {
-  .pc-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: fit-content(35%) minmax(0, 1fr);
+  .project-center .pc-shell {
+    display: block;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scroll-padding: 8px;
+  }
+  .pc-shell > :is(.pc-profiles, .pc-content) {
+    overflow: visible;
+    scrollbar-gutter: auto;
   }
   .pc-profiles {
     border-right: 0;
@@ -1311,7 +1340,7 @@ body:has(.pc-login) {
   }
   .pc-toolbar {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding: 10px;
   }
@@ -1323,21 +1352,23 @@ body:has(.pc-login) {
     font-size: 11px;
     padding-inline: 6px;
   }
+  .pc-toolbar .segmented-control > button {
+    flex: 1;
+  }
   .pc-toolbar > .run-button {
     grid-column: 1 / -1;
   }
   .pc-toolbar .pc-view-toggle {
     display: none;
   }
+  .pc-dialog {
+    --pc-dialog-inset: 18px;
+  }
   .pc-dialog > header {
-    top: -18px;
     padding: 17px 18px 14px;
-    margin: -18px -18px 18px;
   }
   .pc-dialog footer {
-    bottom: -18px;
     padding: 13px 18px;
-    margin: 20px -18px -18px;
   }
   .pc-dialog h2 {
     font-size: 17px;

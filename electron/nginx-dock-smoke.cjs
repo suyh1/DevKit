@@ -18,6 +18,11 @@ module.exports = async function checkNginxDock(window, output) {
         await js(`document.documentElement.dataset.theme=${JSON.stringify(theme)};document.querySelector('.nginx-workspace').scrollTop=0`);
         await wait('document.querySelector(".ng-control-dock")?.dataset.stuck === "false"'); await settle();
         const expandedHeight = await js('document.querySelector(".ng-control-dock").getBoundingClientRect().height');
+        if (width === 390) {
+          assert.equal(await js(`(() => { const dock = document.querySelector('.ng-control-dock');
+            return dock.scrollHeight <= dock.clientHeight + 1 && dock.querySelector('.ng-dock-details:last-child').getBoundingClientRect().bottom <= dock.getBoundingClientRect().bottom + 1;
+          })()`), true, 'The expanded narrow panel shows every action without a nested scrollbar');
+        }
         await js(`{const root=document.querySelector('.nginx-workspace'),anchor=document.querySelector('.ng-dock-anchor');root.scrollTop=anchor.getBoundingClientRect().top-root.getBoundingClientRect().top+root.scrollTop+130;}`);
         await wait('document.querySelector(".ng-control-dock")?.dataset.stuck === "true"'); await settle();
         const first = await js(`(()=>{const dock=document.querySelector('.ng-control-dock'),root=document.querySelector('.nginx-workspace'),bar=document.querySelector('.ng-toolbar'),d=dock.getBoundingClientRect(),r=root.getBoundingClientRect(),b=bar.getBoundingClientRect();return {top:d.top,bottom:d.bottom,height:d.height,left:d.left,right:d.right,rootTop:r.top,rootContentTop:r.top+parseFloat(getComputedStyle(root).paddingTop),rootBottom:r.bottom,barTop:b.top,barBottom:b.bottom,scroll:root.scrollTop};})()`);

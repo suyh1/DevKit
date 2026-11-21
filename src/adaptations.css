@@ -17,7 +17,6 @@
 }
 .notice-count,
 .shared-shortcuts button,
-.task-create > button,
 .running-tasks > button {
   display: inline-flex;
   align-items: center;
@@ -35,6 +34,7 @@
 }
 .action-popover {
   position: fixed;
+  font: 500 13px/1.5 var(--font-ui);
   inset: auto;
   margin: 0;
   padding: 0.35rem;
@@ -46,11 +46,26 @@
 }
 .action-popover button {
   padding: 0.5rem 0.75rem;
+  color: var(--text);
+  background: transparent;
+  border-radius: 6px;
+  font: inherit;
   text-align: left;
   white-space: nowrap;
 }
 .action-popover button:is(:hover, :focus-visible) {
-  background: var(--soft);
+  background: var(--tint);
+  color: var(--accent);
+}
+.action-popover button:focus-visible {
+  outline-offset: -2px;
+}
+.task-create > button[aria-expanded="true"] {
+  background: var(--tint);
+  color: var(--accent);
+}
+@media (forced-colors: none) {
+  .font-slider input[type="range"] { accent-color: var(--accent); }
 }
 .shared-shortcuts,
 .font-slider {
@@ -365,11 +380,20 @@
 .storage-meter i {
   flex-basis: 0;
 }
-.board-ratio span {
-  display: inline-block;
+.board-size-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.board-size-preview i {
+  flex: none;
+  height: 20px;
   border: 1px solid var(--accent);
   border-radius: 2px;
-  vertical-align: middle;
+  background: var(--tint);
 }
 .board-comparison {
   padding: 8px 16px;

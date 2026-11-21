@@ -56,6 +56,22 @@ module.exports = async (window, output) => {
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
     await checkDetectionControls(true);
     await click('添加 JAR'); await wait('!!document.querySelector(".jar-dialog[open]")');
+    if (await js('!matchMedia("(forced-colors: active)").matches')) {
+      await js('document.querySelector(".jar-dialog select").showPicker()');
+      await wait('!!document.querySelector(".jar-dialog select:open")');
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+      await wait('!!document.querySelector(".jar-dialog[open]") && !document.querySelector(".jar-dialog select:open")');
+    }
+    assert.equal(await js(`(() => {
+      const dialog = document.querySelector('.jar-instance-editor'), body = dialog.querySelector('.jar-form-body');
+      body.scrollTop = body.scrollHeight;
+      const header = dialog.querySelector('header').getBoundingClientRect(), footer = dialog.querySelector('footer').getBoundingClientRect();
+      const ok = body.scrollTop > 0 && dialog.scrollHeight <= dialog.clientHeight + 1 &&
+        header.bottom <= body.getBoundingClientRect().top + 1 && footer.top >= body.getBoundingClientRect().bottom - 1;
+      body.scrollTop = 0;
+      return ok;
+    })()`), true, 'JAR registration scrolls the settings independently of its header and save actions');
     await click('选择文件'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
     await fill('显示名称', '订单服务 · 测试环境');
     await fill('JVM 参数（每行一个）', '-Xms64m\n-Xmx256m');
@@ -124,13 +140,13 @@ module.exports = async (window, output) => {
     await js('document.documentElement.dataset.theme="light"');
     await js("document.querySelector('.jar-configs .cm-content').focus()");
     await window.webContents.insertText('name: sample\n');
-    await click('预览修改', '.jar-configs');
+    await click('预览修改', '.jar-config-actions');
     await wait('!!document.querySelector(".jar-configs .change-preview")');
-    await click('保存配置', '.jar-configs');
+    await click('保存配置', '.jar-config-actions');
     await wait('document.querySelector(".pc-dialog[open] [role=status]")?.textContent.includes("已保存")');
     assert.match(await fs.readFile(configFile, 'utf8'), /^\uFEFF.*\r\n/s);
     assert.match(await fs.readFile(configFile, 'utf8'), /name: sample/);
-    await click('查看上一版', '.jar-configs');
+    await click('查看上一版', '.jar-config-actions');
     await wait('!!document.querySelector(".jar-configs .change-preview")');
     await js('document.querySelector(\'button[aria-label="关闭 JAR 配置文件"]\').click()');
     await fs.writeFile(path.join(folder, item.logName), 'fixture log 中文\nready for inspection\n');
