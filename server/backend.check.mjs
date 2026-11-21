@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,6 +9,7 @@ import { createJarManager } from './jar-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { createMonitorManager } from './monitor-manager.mjs';
 import { managedRequest } from './managed-workspace.mjs';
+import { launchSpec } from './backend-launch.mjs';
 
 test('form checks resolve the selected runtime and inspect program files without launching them', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'devkit-probes-'));
@@ -67,6 +69,7 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
   await writeFile(path.join(cwd, 'app.cjs'), `
     const http = require('node:http'), fs = require('node:fs');
     const label = process.env.SERVICE_LABEL;
+    fs.writeFileSync(label + '.node', JSON.stringify({ node: process.execPath, npmNode: process.env.npm_node_execpath, version: process.version }));
     const server = http.createServer((req, res) => res.end(label));
     server.listen(0, '127.0.0.1', () => {
       fs.writeFileSync(label + '.port', String(server.address().port));
@@ -94,7 +97,27 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
     assert.deepEqual(await manager.request('npm-scripts', { directory: cwd }), ['prestart', 'start', 'serve:custom']);
     await assert.rejects(managedRequest(manager, 'jar', 'npm-scripts', { directory: cwd }, restricted), /权限/);
     const one = await add('npm', 'one', { script: 'start' });
-    const two = await add('npm', 'two', { script: 'serve:custom' });
+    const automatic = (await manager.request('get')).instances.find(item => item.id === one);
+    const spec = await launchSpec(automatic);
+    const windows = process.platform === 'win32';
+    const bin = path.join(root, 'selected Node');
+    await mkdir(bin);
+    const chosen = path.join(bin, windows ? 'node.exe' : 'node');
+    await copyFile(process.env.DEVKIT_TEST_NODE || process.execPath, chosen);
+    const expectedVersion = execFileSync(chosen, ['--version'], { encoding: 'utf8', windowsHide: true }).trim();
+    const missingNpm = await manager.request('detect-npm', { nodePath: chosen });
+    assert.equal(missingNpm[0].ok, true);
+    assert.match(missingNpm[1].text, /所选 Node.js 安装中未找到 npm/);
+    await assert.rejects(launchSpec({ ...automatic, nodePath: chosen }), /未找到 npm/);
+    await assert.rejects(manager.request('detect-npm', { nodePath: path.join(bin, 'missing') }), /找不到指定/);
+    if (windows) {
+      await mkdir(path.join(bin, 'node_modules'));
+      await symlink(path.resolve(spec.args[0], '../..'), path.join(bin, 'node_modules/npm'), 'junction');
+    } else await symlink(spec.executable, path.join(bin, 'npm'));
+    const detected = await manager.request('detect-npm', { nodePath: chosen });
+    assert.equal(detected[0].text, 'Node.js ' + expectedVersion + ' · ' + chosen);
+    assert.ok(detected[1].ok, detected[1].text);
+    const two = await add('npm', 'two', { script: 'serve:custom', nodePath: chosen });
     const executable = await add('program', 'exe', { program: process.execPath, appArgs: ['app.cjs'] });
     const logCenter = createLogCenter({ jar: () => manager });
     const catalog = await logCenter.request('sources');
@@ -111,8 +134,12 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
     for (const id of ids) assert.equal((await command(id, 'start')).status.state, 'running');
     assert.equal(await readFile(path.join(cwd, 'prestart'), 'utf8'), 'ok');
     const first = await endpoint('one'), second = await endpoint('two'), third = await endpoint('exe');
+    const selectedRuntime = () => readFile(path.join(cwd, 'two.node'), 'utf8').then(JSON.parse);
+    const expected = { node: chosen, npmNode: chosen, version: expectedVersion };
+    assert.deepEqual(await selectedRuntime(), expected);
     assert.equal(await (await fetch(first)).text(), 'one');
     await manager.close(); manager = await createJarManager(root);
+    assert.equal((await manager.request('get')).instances.find(item => item.id === two).nodePath, chosen);
     assert.ok((await manager.request('statuses')).every(s => s.state === 'running'));
     await assert.rejects(command(two, 'start'), /已在运行/);
     await command(one, 'stop');
@@ -120,8 +147,19 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
     assert.equal(await (await fetch(second)).text(), 'two');
     assert.equal(await (await fetch(third)).text(), 'exe');
     assert.match((await manager.request('log-tail', { id: two })).text, /ready two/);
+    await rm(path.join(cwd, 'two.port'));
     await command(two, 'restart');
     assert.equal(await (await fetch(await endpoint('two'))).text(), 'two');
+    assert.deepEqual(await selectedRuntime(), expected);
+    await command(two, 'stop');
+    const saved = await manager.request('get');
+    const unpinned = await manager.request('upsert', { revision: saved.revision, instance: { ...saved.instances.find(item => item.id === two), nodePath: '' } });
+    assert.equal(unpinned.instances.find(item => item.id === two).nodePath, undefined);
+    await rm(path.join(cwd, 'two.port'));
+    await command(two, 'start');
+    await endpoint('two');
+    const automaticRuntime = JSON.parse(await readFile(path.join(cwd, 'one.node'), 'utf8'));
+    assert.deepEqual(await selectedRuntime(), automaticRuntime);
     await command(executable, 'force-stop'); await assert.rejects(fetch(third));
   } finally {
     try { for (const id of ids) await command(id, 'force-stop'); }

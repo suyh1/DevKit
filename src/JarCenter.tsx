@@ -53,7 +53,7 @@ function JavaProbe({ hostId, executable, disabled }: { hostId: string; executabl
 }
 
 function JarForm({ active, instance, state, close, saved }: { active: boolean; instance?: JarInstance; state: JarState; close: () => void; saved: () => void }) {
-  const initial = { kind: instance?.kind || 'jar' as BackendKind, workDir: instance?.workDir || '', program: instance?.program || '', script: instance?.script || '', name: instance?.name || '', jar: instance?.jar || '', executable: instance?.executable || '', jvm: instance?.jvmArgs.join('\n') || '', args: instance?.appArgs.join('\n') || '', pidName: instance?.pidName || '', logName: instance?.logName || '', logMode: instance?.logMode || 'file', stopTimeout: instance?.stopTimeout || 15 };
+  const initial = { kind: instance?.kind || 'jar' as BackendKind, workDir: instance?.workDir || '', program: instance?.program || '', script: instance?.script || '', nodePath: instance?.nodePath || '', name: instance?.name || '', jar: instance?.jar || '', executable: instance?.executable || '', jvm: instance?.jvmArgs.join('\n') || '', args: instance?.appArgs.join('\n') || '', pidName: instance?.pidName || '', logName: instance?.logName || '', logMode: instance?.logMode || 'file', stopTimeout: instance?.stopTimeout || 15 };
   const [scripts, setScripts] = useState<string[]>(instance?.script ? [instance.script] : []);
   const initialRuntime = useRef(runtimeDraft(instance));
   const [runtime, setRuntime] = useState(initialRuntime.current);
@@ -62,6 +62,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
   const group = targetGroup(state.groups, hostId), allowControl = group?.control ?? canOperateJar();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const searchPath = draft.kind === 'npm' ? npmSearchPath(runtime, group?.platform || state.platform) : undefined;
+  const supportsNodePath = hostId ? group?.supportsNodePath : state.supportsNodePath;
   const checksAvailable = hostId ? group?.backendChecks : state.backendChecks;
   const dialog = useRef<HTMLDialogElement>(null), heading = useId(), confirm = useConfirmation();
   const dirty = JSON.stringify([draft, runtime]) !== baseline.current;
@@ -95,7 +96,8 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
       if (draft.kind === 'npm') { setScripts([]); patch({ script: '' }); await readScripts(filename); }
     } else if (kind === 'program') {
       patch({ program: filename, ...(!draft.name ? { name: basename(filename) } : {}) });
-    } else patch({ executable: filename });
+    } else if (draft.kind === 'npm') patch({ nodePath: filename });
+    else patch({ executable: filename });
   }
   function pick(kind: 'jar' | 'executable' | 'directory' | 'program') {
     if (hostId || !window.devkitJar) { setPicker(kind); return; }
@@ -104,11 +106,12 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
   return <dialog ref={dialog} className="jar-dialog jar-instance-editor" aria-labelledby={heading} onCancel={event => { event.preventDefault(); void cancel(); }} onKeyDown={event => { if (event.key === 'Escape' && !(event.target instanceof HTMLOptionElement)) { event.preventDefault(); event.stopPropagation(); void cancel(); } }}>
     <header><h2 id={heading}>{instance ? '编辑服务' : '添加服务'}</h2><button className="icon-button" aria-label="关闭服务设置" disabled={busy} onClick={() => void cancel()}><X size={18} /></button></header>
     <form onSubmit={event => { event.preventDefault(); void task(async () => {
-      await jarRequest<JarState>('upsert', { hostId, revision: group?.revision ?? state.revision, instance: { ...instance, ...runtimePayload(runtime), kind: draft.kind, workDir: draft.workDir, program: draft.program, script: draft.script, name: draft.name, jar: draft.jar, executable: draft.executable, jvmArgs: draft.jvm.split(/\r?\n/).filter(Boolean), appArgs: draft.args.split(/\r?\n/).filter(Boolean), pidName: draft.pidName, logName: draft.logName, logMode: draft.logMode, stopTimeout: Number(draft.stopTimeout) } });
+      if (draft.kind === 'npm' && draft.nodePath && !supportsNodePath) throw new Error('请刷新主机信息，确认目标主机支持指定 Node.js 路径后再保存。');
+      await jarRequest<JarState>('upsert', { hostId, revision: group?.revision ?? state.revision, instance: { ...instance, ...runtimePayload(runtime), kind: draft.kind, workDir: draft.workDir, program: draft.program, script: draft.script, nodePath: draft.kind === 'npm' && supportsNodePath ? draft.nodePath : undefined, name: draft.name, jar: draft.jar, executable: draft.executable, jvmArgs: draft.jvm.split(/\r?\n/).filter(Boolean), appArgs: draft.args.split(/\r?\n/).filter(Boolean), pidName: draft.pidName, logName: draft.logName, logMode: draft.logMode, stopTimeout: Number(draft.stopTimeout) } });
       baseline.current = JSON.stringify([draft, runtime]); saved();
     }); }}>
       <div className="jar-form-body"><fieldset disabled={busy}>
-        <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); setScripts([]); patch({ kind: 'jar', jar: '', executable: '', workDir: '', program: '', script: '' }); }} />
+        <HostSelect module="jar" groups={state.groups} id={hostId} locked={!!instance} change={id => { setHostId(id); setScripts([]); patch({ kind: 'jar', jar: '', executable: '', nodePath: '', workDir: '', program: '', script: '' }); }} />
         <div className="choice-field"><span>启动方式</span><SegmentedControl label="启动方式" value={draft.kind} disabled={!!instance} options={[
           { value: 'jar', label: 'Java JAR' },
           { value: 'npm', label: 'npm 项目', disabled: !(hostId ? group?.backendTypes : state.backendTypes) },
@@ -123,7 +126,9 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
         {draft.kind === 'program' && <label>可执行程序绝对路径<span className="jar-path-input"><input required value={draft.program} onChange={e => patch({ program: e.target.value })} /><button type="button" className="secondary-button" onClick={() => pick('program')}>选择程序</button></span></label>}
         {draft.kind === 'program' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, draft.program])} label="检查可执行文件" disabled={!draft.program.trim()} check={() => jarRequest<ProbeLine[]>('check-program', { hostId, program: draft.program })} />}
         {draft.kind !== 'jar' && <label>{draft.kind === 'npm' ? '项目目录' : '工作目录（默认程序所在目录）'}<span className="jar-path-input"><input required={draft.kind === 'npm'} value={draft.workDir} onChange={e => { patch({ workDir: e.target.value, script: '' }); setScripts([]); }} /><button type="button" className="secondary-button" onClick={() => pick('directory')}>选择目录</button></span></label>}
-        {draft.kind === 'npm' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, searchPath])} label="检测 Node.js 和 npm" disabled={!allowControl} check={() => jarRequest<ProbeLine[]>('detect-npm', { hostId, searchPath })} />}
+        {draft.kind === 'npm' && supportsNodePath && <label>Node.js 程序路径（可选）<span className="jar-path-input"><input value={draft.nodePath} onChange={event => patch({ nodePath: event.target.value })} placeholder="留空使用服务环境的 PATH" /><button type="button" className="secondary-button" onClick={() => pick('executable')}>选择 Node.js</button></span></label>}
+        {draft.kind === 'npm' && checksAvailable && !supportsNodePath && <p className="jar-help">此主机按 PATH 选择 Node.js，升级目标主机的 DevKit 后可指定路径。</p>}
+        {draft.kind === 'npm' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, searchPath, draft.nodePath])} label="检测 Node.js 和 npm" disabled={!allowControl} check={() => jarRequest<ProbeLine[]>('detect-npm', { hostId, searchPath, nodePath: supportsNodePath ? draft.nodePath : undefined })} />}
         {draft.kind !== 'jar' && !checksAvailable && <p className="jar-help">升级目标主机的 DevKit 后即可在此表单检测。</p>}
         {draft.kind === 'npm' && <label>npm 启动脚本<span className="jar-path-input"><select required value={draft.script} onChange={e => patch({ script: e.target.value })}><option value="">选择脚本</option>{scripts.map(name => <option key={name}>{name}</option>)}</select><button type="button" className="secondary-button" disabled={!draft.workDir} onClick={() => void task(() => readScripts(draft.workDir))}>读取脚本</button></span></label>}
         {draft.kind === 'npm' && draft.script && <p className="jar-help">启动命令 <code>{draft.script === 'start' ? 'npm start' : 'npm run ' + draft.script}</code></p>}
@@ -282,7 +287,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
-        </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? 'npm' : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
+        </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? (item.nodePath ? 'npm · ' + item.nodePath : 'npm · 按 PATH 选择 Node.js') : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
           {!write && control && (!item.kind || item.kind === 'jar') && <JavaProbe key={item.executable} hostId={item.hostId || ''} executable={item.executable} disabled={busy} />}
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>

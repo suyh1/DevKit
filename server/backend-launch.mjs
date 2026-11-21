@@ -42,28 +42,54 @@ export async function projectScripts(directory) {
 
 export const validScript = name => typeof name === 'string' && name.length > 0 && name.length <= 128 && !name.startsWith('-') && !/[\x00-\x1f\x7f]/.test(name);
 
-async function npmRuntime(env) {
-  const dirs = (Object.entries(env).find(([k]) => windows ? k.toUpperCase() === 'PATH' : k === 'PATH')?.[1] || '')
+const nodeName = windows ? 'node.exe' : 'node';
+export async function resolveNode(filename) {
+  const resolved = await realpath(filename).catch(() => { throw new Error('找不到指定的 Node.js 程序：' + filename); });
+  if (!(await stat(resolved)).isFile()) throw new Error('请选择 Node.js 程序文件。');
+  await access(resolved, windows ? constants.F_OK : constants.X_OK).catch(() => { throw new Error('指定的 Node.js 程序缺少执行权限。'); });
+  // Store the version directory behind a version manager's current symlink.
+  const directory = path.dirname(resolved);
+  const command = path.join(directory, nodeName);
+  const target = await realpath(command).catch(() => '');
+  if (!target || pathKey(target) !== pathKey(resolved)) throw new Error('请选择安装目录中的 ' + nodeName + '，以便 npm 脚本使用同一版本。');
+  return command;
+}
+
+async function npmRuntime(env, nodePath) {
+  const pathKeyName = Object.keys(env).find(k => windows ? k.toUpperCase() === 'PATH' : k === 'PATH') || 'PATH';
+  const searchPath = env[pathKeyName] || '';
+  const cliName = windows ? 'node_modules/npm/bin/npm-cli.js' : 'npm';
+  if (nodePath) {
+    const node = await resolveNode(nodePath);
+    const directory = path.dirname(node);
+    // npm from an upstream Unix installation lives under lib, while distro
+    // packages often link bin/npm to their own npm-cli.js.
+    const bundledCli = windows ? cliName : '../lib/node_modules/npm/bin/npm-cli.js';
+    let cli = await realpath(path.join(directory, bundledCli)).catch(() => undefined);
+    if (!cli && !windows) cli = await realpath(path.join(directory, 'npm')).catch(() => undefined);
+    const childEnv = { ...env, [pathKeyName]: searchPath ? directory + path.delimiter + searchPath : directory };
+    return { node, cli, viaNode: true, env: childEnv };
+  }
+  const dirs = searchPath
     .split(path.delimiter).map(dir => dir.replace(/^"|"$/g, '')).filter(dir => path.isAbsolute(dir));
   let node, cli;
   for (const dir of dirs) {
-    if (!node) node = await realpath(path.join(dir, windows ? 'node.exe' : 'node')).catch(() => undefined);
+    if (!node) node = await realpath(path.join(dir, nodeName)).catch(() => undefined);
     if (!cli) {
-      const candidate = path.join(dir, windows ? 'node_modules/npm/bin/npm-cli.js' : 'npm');
+      const candidate = path.join(dir, cliName);
       const resolved = await realpath(candidate).catch(() => undefined);
       if (resolved) cli = resolved;
     }
     if (node && cli) break;
   }
-  return { node, cli };
+  return { node, cli, viaNode: windows, env };
 }
 
-export async function detectNpm(searchPath) {
+export async function detectNpm(searchPath, nodePath) {
   if (searchPath !== undefined && (typeof searchPath !== 'string' || searchPath.length > 16000 || searchPath.includes('\0'))) throw new Error('PATH 无效。');
-  const env = effectiveEnvironment({ env: searchPath === undefined ? {} : { PATH: searchPath } });
-  const { node, cli } = await npmRuntime(env);
+  const { node, cli, viaNode, env } = await npmRuntime(effectiveEnvironment({ env: searchPath === undefined ? {} : { PATH: searchPath } }), nodePath);
   async function version(label, file, executable, args) {
-    if (!file) return { ok: false, text: label + '：在目标主机的 PATH 中未找到。' };
+    if (!file) return { ok: false, text: nodePath ? '所选 Node.js 安装中未找到 npm。' : label + '：在目标主机的 PATH 中未找到。' };
     if (!executable) return { ok: false, text: label + '：缺少 Node.js，无法读取版本 · ' + file };
     try {
       const { stdout } = await execute(executable, [...args, '--version'], { env, cwd: tmpdir(), shell: false, windowsHide: true, timeout: 5000, maxBuffer: 32768 });
@@ -72,7 +98,7 @@ export async function detectNpm(searchPath) {
     } catch { /* Report the resolved path even if version detection failed. */ }
     return { ok: false, text: label + '：版本检测失败，请检查安装和执行权限 · ' + file };
   }
-  return Promise.all([version('Node.js', node, node, []), version('npm', cli, windows ? node : cli, windows ? [cli] : [])]);
+  return Promise.all([version('Node.js', node, node, []), version('npm', cli, viaNode ? node : cli, viaNode ? [cli] : [])]);
 }
 
 export async function checkProgram(filename) {
@@ -130,11 +156,12 @@ export async function launchSpec(item, detect) {
   }
   if (item.kind === 'npm') {
     if (!(await projectScripts(directory)).includes(item.script)) throw new Error('package.json 中找不到所选 npm 脚本。');
-    const { node, cli } = await npmRuntime(effectiveEnvironment(item));
+    const { node, cli, viaNode, env } = await npmRuntime(effectiveEnvironment(item), item.nodePath);
+    if (item.nodePath && !cli) throw new Error('所选 Node.js 安装中未找到 npm。');
     if (!node || !cli) throw new Error('目标主机找不到 Node.js 或 npm CLI，请检查服务环境的 PATH。');
     const args = item.script === 'start' ? ['start'] : ['run', item.script];
     if (item.appArgs.length) args.push('--', ...item.appArgs);
-    return windows ? { executable: node, args: [cli, ...args] } : { executable: cli, args };
+    return viaNode ? { executable: node, args: [cli, ...args], env } : { executable: cli, args, env };
   }
   await access(entry, windows ? 0 : 1);
   return { executable: entry, args: item.appArgs };

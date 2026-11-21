@@ -143,10 +143,10 @@ try {
       const detected = await detectJava(options);
       return detected.found || !fallbackJava || options.executable ? detected : detectJava({ executable: fallbackJava });
     },
-    launch: async (executable, argv, cwd, _output, _env, job) => {
+    launch: async (executable, argv, cwd, _output, launchEnv, job) => {
       if (!writer && item.logMode === 'file') writer = await createJarLogWriter(paths.logPath, item.rotation);
       const inherited = { ...process.env }; delete inherited.ELECTRON_RUN_AS_NODE;
-      const env = effectiveEnvironment(item, inherited);
+      const env = job ? launchEnv : effectiveEnvironment(item, inherited);
       if (job) env.ELECTRON_RUN_AS_NODE = '1';
       const child = spawn(executable, argv, { cwd, env, detached: true, windowsHide: true, shell: false, stdio: [item.logMode === 'console' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore', ...(job ? ['ipc'] : [])] });
       child.stdin?.on('error', () => {});

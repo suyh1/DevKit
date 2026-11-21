@@ -72,6 +72,13 @@ module.exports = async (window, output) => {
     assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
     await click('检测 Node.js 和 npm', '.jar-dialog');
     await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-error").length === 2');
+    const chosenNode = require('node:child_process').execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', windowsHide: true }).trim();
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosenNode] });
+    await click('选择 Node.js', '.jar-dialog');
+    await wait('document.querySelector(".jar-dialog input[placeholder*=PATH]").value === ' + JSON.stringify(chosenNode));
+    assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
+    await click('检测 Node.js 和 npm', '.jar-dialog');
+    await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-help").length === 2');
     await fill('公共环境变量', '');
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] });
     await click('选择目录', '.jar-dialog');
@@ -79,6 +86,11 @@ module.exports = async (window, output) => {
     await click('保存服务', '.jar-dialog');
     await wait('!document.querySelector(".jar-dialog[open]") && !!document.querySelector(".jar-table")');
     const service = await js('window.devkitJar.request("get").then(r => r.data.instances.find(i => i.kind === "npm"))');
+    assert.equal(service.nodePath, await fs.realpath(chosenNode));
+    await click('设置', '.jar-instance');
+    await wait('document.querySelector(".jar-dialog[open] input[placeholder*=PATH]")?.value === ' + JSON.stringify(service.nodePath));
+    await click('取消', '.jar-dialog');
+    await wait('!document.querySelector(".jar-dialog[open]")');
     const backend = async (action, payload) => {
       const response = await js('window.devkitJar.request(' + JSON.stringify(action) + ',' + JSON.stringify(payload) + ')');
       assert.ok(!response.error, response.error); return response.data;
@@ -447,6 +459,8 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await js(window, '{const field=document.querySelector(".jar-dialog select");field.selectedIndex=1;field.dispatchEvent(new Event("change",{bubbles:true}));}');
     await wait('[...document.querySelectorAll(".jar-dialog button")].some(b => b.textContent === "npm 项目" && !b.disabled)');
     await click('npm 项目', '.jar-dialog');
+    const remoteNode = require('node:child_process').execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', windowsHide: true }).trim();
+    await input(window, '.jar-dialog input[placeholder*=PATH]', remoteNode);
     await click('检测 Node.js 和 npm', '.jar-dialog');
     await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-help").length === 2');
     await click('Java JAR', '.jar-dialog');

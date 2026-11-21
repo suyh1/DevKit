@@ -10,7 +10,7 @@ import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-super
 import { createJarAutostart } from './jar-autostart.mjs';
 import { jarConfigs } from './jar-configs.mjs';
 
-import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, detectNpm, checkProgram, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
+import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, resolveNode, detectNpm, checkProgram, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
 
 const message = error => error.message || String(error);
 function absolute(value, label) {
@@ -39,6 +39,7 @@ function normalize(item) {
   } else if (kind === 'npm') {
     if (!validScript(item.script)) throw new Error('请选择有效的 npm 脚本。');
     source = { kind, workDir: absolute(item.workDir, '项目目录'), script: item.script };
+    if (item.nodePath) source.nodePath = absolute(item.nodePath, 'Node.js 路径');
   } else if (kind === 'program') {
     const program = absolute(item.program, '程序路径');
     if (process.platform === 'win32' && path.extname(program).toLowerCase() !== '.exe') throw new Error('请选择 Windows .exe 程序。');
@@ -197,7 +198,7 @@ export async function createJarManager(directory, dependencies = {}) {
     let output, child, identity;
     try {
       if (item.logMode === 'file' && !runtime.captureLogs) output = await open(paths.logPath, 'a', 0o600);
-      child = await runtime.launch(spec.executable, spec.args, paths.directory, output?.fd, effectiveEnvironment(item), job);
+      child = await runtime.launch(spec.executable, spec.args, paths.directory, output?.fd, target.env || effectiveEnvironment(item), job);
       children.set(item.id, child);
       await reservation.writeFile(String(child.pid));
       await reservation.sync();
@@ -274,7 +275,7 @@ export async function createJarManager(directory, dependencies = {}) {
         selected && !isJar(selected) && !['log-tail', 'console-read', 'startup-get', 'monitor-probe'].includes(action))) {
       throw Object.assign(new Error('未授予 npm 与可执行程序管理权限。'), { status: 403 });
     }
-    if (action === 'detect-npm') return detectNpm(value.searchPath);
+    if (action === 'detect-npm') return detectNpm(value.searchPath, value.nodePath ? absolute(value.nodePath, 'Node.js 路径') : undefined);
     if (action === 'check-program') return checkProgram(absolute(value.program, '程序路径'));
     if (action === 'npm-scripts') {
       if (options.allowEdit === false) throw new Error('未授予编辑权限。');
@@ -284,6 +285,7 @@ export async function createJarManager(directory, dependencies = {}) {
       const result = snapshot();
       result.backendTypes = options.allowBackend !== false;
       result.backendChecks = result.backendTypes;
+      result.supportsNodePath = result.backendTypes;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;
@@ -321,6 +323,7 @@ export async function createJarManager(directory, dependencies = {}) {
       const item = normalize(value.instance), existing = state.instances.find(old => old.id === item.id);
       if (!/^[a-f0-9-]{36}$/.test(item.id)) throw new Error('服务标识无效。');
       if (existing && (existing.kind || 'jar') !== (item.kind || 'jar')) throw new Error('已登记服务不能更换启动方式。');
+      if (item.nodePath && item.nodePath !== existing?.nodePath) item.nodePath = await resolveNode(item.nodePath);
       const previous = existing ? await status(existing) : null;
       if (existing && (!['stopped', 'exited'].includes(previous.state) || previous.supervision?.active)) {
         const { name: a, ...before } = existing, { name: b, ...after } = item;
