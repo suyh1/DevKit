@@ -20,6 +20,17 @@ async function fixture(t) {
   return { folder, filename, calls, logs: createLogCenter({ jar: () => jar, nginx: () => nginx }), remove: () => { instances = []; }, restart: () => { generation = 'run2'; } };
 }
 
+test('incident window includes Java stack lines and hides secrets before returning matches', async t => {
+  const f = await fixture(t);
+  const incidentAt = '2026-01-01T10:00:00Z';
+  await writeFile(f.filename, '2026-01-01T09:54:59Z early\n2026-01-01T09:55:00Z first\n2026-01-01T10:00:00Z token=secret\n    at App.java:10\n2026-01-01T10:05:01Z too late\n');
+  const {sources} = await f.logs.request('sources');
+  const id = sources.find(s => s.kind === 'jar' && s.mode === 'file').id;
+  const {results:[row]} = await f.logs.request('read',{sources:[{id}],incidentAt},{raw:false,jar:true});
+  assert.equal(row.incidentAt,incidentAt);
+  assert.match(row.text,/first/); assert.match(row.text,/App.java:10/); assert.doesNotMatch(row.text,/secret|early|too late/);
+});
+
 test('byte cursors append once, preserve split UTF-8, detect copy-truncate and file replacement', async t => {
   const f = await fixture(t); let result = await readLogFile(f.filename); assert.match(result.text, /启动/);
   assert.equal((await readLogFile(f.filename, result.cursor)).text, '');

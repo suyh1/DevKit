@@ -13,6 +13,7 @@ export type Project = {
   url: string;
   enabled: boolean;
   query: QueryRow[];
+  resources?: Partial<Record<"http" | "jar" | "nginx" | "monitor", string>>;
 };
 export type Profile = {
   id: string;

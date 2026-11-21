@@ -38,6 +38,7 @@ import {
 } from "./api-formats";
 import ApiEndpointEditor from "./ApiEndpointEditor";
 import ApiDocumentation from "./ApiDocumentation";
+import ApiRegression from './ApiRegression';
 import ApiDebug from "./ApiDebug";
 import type { ApiHistory } from "./ApiDebug";
 import ApiProjectSettings from "./ApiProjectSettings";
@@ -152,14 +153,14 @@ export default function ApiWorkspace({
     if (!library || busy || sending || handledLink.current === linked) return;
     const [projectId, endpointId] = linked.split(':');
     const target = library.state.projects.find(item => item.id === projectId);
-    const endpoint = target?.endpoints.find(item => item.id === endpointId);
+    const endpoint = endpointId ? target?.endpoints.find(item => item.id === endpointId) : target?.endpoints[0];
     handledLink.current = linked;
-    if (!target || !endpoint) { onNotice('接口已移除或不可访问。'); return; }
-    if (draft?.id === endpoint.id && project?.id === target.id) return;
+    if (!target || (endpointId && !endpoint)) { onNotice('接口已移除或不可访问。'); return; }
+    if (draft?.id === endpoint?.id && project?.id === target.id) return;
     void allowChange().then(allowed => {
       if (!allowed) return;
       setProjectId(target.id); setEnvironmentId(readPreference(`devkit:api-env:${target.id}`) || '');
-      changeDraft(structuredClone(endpoint)); setSearch('');
+      changeDraft(endpoint ? structuredClone(endpoint) : null); setSearch('');
     });
   }, [linked, library, busy, sending]);
   function adopt(
@@ -362,6 +363,7 @@ export default function ApiWorkspace({
           </button>
         </div>
       </div>
+      {project && <ApiRegression key={project.id} project={project} environment={environment} sending={sending || busy} onBusy={onSending} />}
       {error && (
         <div className="api-error" role="alert">
           <strong>操作未完成</strong>
@@ -881,6 +883,7 @@ export default function ApiWorkspace({
                     initialRequest={historyRequest}
                     resetRequest={requestReset}
                     onDraftChange={onRequestDirty}
+                    otherSending={sending}
                     onBusy={onSending}
                     onGenerate={onGenerate}
                     onNotice={onNotice}

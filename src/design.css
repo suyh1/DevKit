@@ -182,7 +182,7 @@ body { letter-spacing: .05px; }
 .project-center .pc-metrics > :is(span,button:not(:last-child)) {
   padding:5px 9px; border:1px solid var(--line); background:var(--surface); border-radius:8px;
 }
-.project-center .pc-card-top { padding-bottom:7px; border-bottom:1px solid var(--line); }
+.project-center .pc-card-top { padding-bottom:2px; border-bottom:1px solid var(--line); }
 .project-center .pc-grid { gap:12px; }
 @media(max-width:540px) {
   .setting-row .segmented-control { width:100%; }

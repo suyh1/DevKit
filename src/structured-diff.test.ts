@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { structuredDiff } from './structured-diff';
+import { structuredDiff, filterDiffPaths } from './structured-diff';
 
 describe('JSON structure diff', () => {
   it('ignores object ordering and escaped strings, preserves exact number tokens', () => {
@@ -11,6 +11,10 @@ describe('JSON structure diff', () => {
     expect(result.map(row => row.kind)).toEqual(['removed', 'moved', 'changed', 'added']);
     expect(result.find(row => row.kind === 'changed')?.path).toBe('$[0]["n"]');
     expect(structuredDiff('{"__proto__":1}', '{"new":null}').map(row => row.kind)).toEqual(['removed', 'added']);
+  });
+  it('filters subtrees and literal field names without prefix collisions', () => {
+    const rows = structuredDiff('{"a.b":1,"ab":1,"a":{"stamp":1}}','{"a.b":2,"ab":2,"a":{"stamp":2}}');
+    expect(filterDiffPaths(rows,'$.a; $["a.b"]')).toEqual({ignored:2,changes:[rows[1]]});
   });
   it('rejects duplicate keys and ambiguous identities', () => {
     expect(() => structuredDiff('{"x":1,"x":2}', '{}')).toThrow('重复');

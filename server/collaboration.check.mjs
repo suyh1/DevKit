@@ -125,17 +125,19 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
       [second, first],
     ]) {
       const bytes = randomBytes(1024 * 1024 + 17);
-      const { id } = await ok(
-        'transfer/begin',
-        { name: 'from-PC.bin', size: bytes.length, hours: 24, password },
-        sender,
-      );
+      const upload = { name: 'from-PC.bin', size: bytes.length, hours: 24, password, resumeToken: randomBytes(32).toString('hex'), sha256: createHash('sha256').update(bytes).digest('hex') };
+      const { id } = await ok('transfer/begin', upload, sender);
       assert.equal((await post('transfer/finish', { id }, recipient)).status, 404);
       assert.equal((await post('transfer/finish', { id }, sender)).status, 409);
       const chunks = [bytes.subarray(0, 1048576), bytes.subarray(1048576)];
-      for (const [index, chunk] of chunks.entries())
-        await ok('transfer/part', { id, offset: index * 1048576, data: chunk.toString('base64') }, sender);
+      await ok('transfer/part', { id, offset: 0, data: chunks[0].toString('base64') }, sender);
+      const resumed = await ok('transfer/begin', upload, sender);
+      assert.equal(resumed.id, id);
+      assert.equal(resumed.offset, chunks[0].length);
+      assert.equal((await post('transfer/begin', { ...upload, password: 'wrong' }, sender)).status, 409);
+      await ok('transfer/part', { id, offset: resumed.offset, data: chunks[1].toString('base64') }, sender);
       await ok('transfer/finish', { id }, sender);
+      assert.equal((await ok('transfer/begin', upload, sender)).complete, true);
       assert.equal((await post('transfer/read', { id, offset: 0 }, recipient)).status, 403);
       const { ticket } = await ok('transfer/unlock', { id, password }, recipient);
       assert.equal((await post('transfer/read', { id, offset: 0, ticket }, sender)).status, 403);

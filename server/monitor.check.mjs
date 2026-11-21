@@ -23,6 +23,21 @@ async function add(manager, item) {
 }
 const wait = async predicate => { for (let i = 0; i < 100; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); } assert.fail('检测未在预期时间完成'); };
 
+test('certificate milestones deduplicate across checks and host restart', async t => {
+  let clock = Date.now();
+  const expires = new Date(clock + 29 * 86400000).toISOString(), events = [];
+  const f = await fixture(t, { now: () => clock, probe(_target, _signal, observe) {
+    observe({ host:'example.test', fingerprint:'test', expires }); return 'HTTP 200';
+  }, deliver: async (_url, options) => { events.push(JSON.parse(options.body)); return new Response(null, { status:204 }); } });
+  const item = await add(f.manager, { webhook: { url:'http://127.0.0.1/', certificate:true } });
+  const check = () => f.manager.request('check', {id:item.id});
+  await check(); await wait(async () => (await f.manager.request('get')).monitors[0].notification.state === 'sent');
+  await f.reopen(); await check(); clock += 23 * 86400000; await check();
+  await wait(() => events.length === 2); await check();
+  assert.deepEqual(events.map(row => row.certificate.threshold), [30,7]);
+  assert.equal((await f.manager.request('get')).monitors[0].certificate.expires, expires);
+});
+
 test('LAN monitoring follows saved targets and restricts associations without host access', async t => {
   let targets = [{ id: 'fixture-lan', name: 'Fixture', address: '127.0.0.1', port: 2222 }];
   let target;

@@ -26,7 +26,21 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [regex, setRegex] = useState(false), [level, setLevel] = useState('all'), [raw, setRaw] = useState(false), [paused, setPaused] = useState(false), [loading, setLoading] = useState(false);
   const [hostFilter, setHostFilter] = useState(''), [focusedSource, setFocusedSource] = useState('');
   const rawAllowed = raw && canReadRawLogs();
-  const linked = useWorkspaceResource('logs');
+  const resource = useWorkspaceResource('logs');
+  const incident = /^incident:(\d{1,13}):(.+)$/.exec(resource || '');
+  const linked = incident ? 'instance:' + incident[2] : resource;
+  const incidentTime = incident ? new Date(Number(incident[1])).toISOString() : '';
+  const incidentSource = incident && catalog.sources.find(s => s.instanceId === incident[2] && s.kind === 'jar' && s.mode === 'file');
+  const [excerpt, setExcerpt] = useState('');
+  useEffect(() => {
+    if (!active || !incidentTime || !incidentSource) return;
+    let live = true;
+    setExcerpt('正在查找故障时段…');
+    void logsRequest<{ results: (LogRead & { incidentAt?: string })[] }>('read', { incidentAt: incidentTime, sources:[{ id:incidentSource.id }] }).then(({results:[row]}) => {
+      if (live) setExcerpt(row.error || (row.incidentAt !== incidentTime ? '目标主机尚未支持故障时段查询。' : (row.text || '当前文件扫描范围内没有匹配时间戳。') + (row.truncated ? '\n已达到扫描或显示上限。' : '')));
+    }).catch(e => { if (live) setExcerpt(String(e)); });
+    return () => { live = false; };
+  }, [active, incidentTime, incidentSource?.id]);
   const handledLink = useRef('');
   const alive = useRef(true), sourceVersion = useRef(0);
   const rawPermission = canReadRawLogs();
@@ -95,6 +109,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     {error && <p className="pc-error" role="alert">{error}</p>}{message && <p className="pc-message" role="status">{message}</p>}
     {linkStatus === 'ready' && <p className="pc-notice" role="status">{missingResourceLink('日志来源')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的日志来源，请刷新来源重试。</p>}
+    {incident && <section className="devkit-panel"><h3>故障前后 5 分钟 · {new Date(incidentTime).toLocaleString()}</h3><small>当前 JAR 文件末尾 4 MiB · 默认脱敏 · 无时区的时间按日志主机本地时间解释</small><pre>{incidentSource ? excerpt : loading ? '正在读取来源…' : '找不到已授权的 JAR 文件日志。'}</pre></section>}
     <div className="log-toolbar"><label className="log-query"><Search size={14} /><input aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input type="checkbox" checked={!rawAllowed} disabled={!canReadRawLogs()} onChange={event => setRaw(!event.target.checked)} />主机脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
     <div className="log-layout" style={{'--source-width':sourceWidth+'px'} as React.CSSProperties}>
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><input aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />

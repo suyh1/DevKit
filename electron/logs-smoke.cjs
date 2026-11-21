@@ -94,6 +94,12 @@ module.exports = async (window, output) => {
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.log-pane button[title^="导出"]').length`), 0);
     const id = (await ipc('devkitLogs', 'sources')).sources[0].id;
     assert.equal(await remote.webContents.executeJavaScript(`fetch('/api/logs/export',{method:'POST',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify({ sources: [{ id }] }))}}).then(r=>r.status)`), 403);
+    const incidentJar = (await ipc('devkitJar','get')).instances.find(item => item.name === '应用 A');
+    const incidentTime = Date.parse('2026-11-01T09:00:00Z');
+    await fs.appendFile(path.join(folder,'app0.log'),'\n2026-11-01T08:01:00Z outside-window\n2026-11-01T09:00:07Z incident-match token=do-not-display\n');
+    await remote.webContents.executeJavaScript(`location.hash = ${JSON.stringify('#logs/incident:' + incidentTime + ':' + incidentJar.id)}`);
+    await wait(remote.webContents,`document.querySelector('.log-center .devkit-panel pre')?.textContent.includes('incident-match')`);
+    assert.doesNotMatch(await remote.webContents.executeJavaScript(`document.querySelector('.log-center .devkit-panel pre').textContent`),/outside-window|do-not-display/);
     for (const width of [1440, 768, 390]) {
       remote.setContentSize(width, 900); await delay(250);
       assert.equal(await remote.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.log-center').scrollWidth<=document.querySelector('.log-center').clientWidth`), true, 'Log layout fits ' + width);

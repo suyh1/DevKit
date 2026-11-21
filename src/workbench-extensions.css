@@ -1,0 +1,91 @@
+.pc-card-top > .pc-overview-trigger {
+  margin-left: auto;
+  white-space: nowrap;
+  padding: 0 3px;
+  line-height: 16px;
+  min-height: 16px;
+  font-size: 11px;
+}
+.devkit-panel {
+  margin-block: 0.65rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+}
+.devkit-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.devkit-panel pre {
+  white-space: pre-wrap;
+  max-height: 20rem;
+  overflow: auto;
+}
+.devkit-panel fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.devkit-fields,
+.devkit-bento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem;
+  margin-block: 0.7rem;
+}
+.devkit-fields label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.devkit-panel :is(input, select, textarea) {
+  max-width: 100%;
+  color: var(--text);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  padding: 0.4rem;
+  border-radius: 6px;
+}
+.devkit-panel button:not([class]) {
+  color: var(--accent);
+  background: var(--tint);
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  margin: 0.2rem;
+}
+.devkit-bento {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  align-items: stretch;
+}
+.devkit-bento > section {
+  position: relative;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+}
+.devkit-bento > section:first-child {
+  grid-column: 1 / -1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-display-mode='performance']) [data-resource-card] {
+    transform: perspective(780px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    transition: transform 430ms var(--press-spring);
+  }
+  :root:not([data-display-mode='performance']) [data-resource-card][data-lit] {
+    transition-duration: 85ms;
+    background:
+      radial-gradient(ellipse at var(--light-x) var(--light-y), var(--tint), transparent 60%),
+      radial-gradient(
+        ellipse at calc(100% - var(--light-x)) calc(100% - var(--light-y)),
+        var(--surface-raised),
+        var(--soft)
+      );
+  }
+}

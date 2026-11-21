@@ -30,6 +30,13 @@ const list = (value, max, label) =>
   Array.isArray(value) && value.length <= max
     ? value
     : fail(`${label}最多 ${max} 项。`);
+function projectResources(value) {
+  if (!record(value)) fail('项目资源关联格式无效。');
+  const entries = Object.entries(value);
+  if (entries.some(([module, resource]) => !['http', 'jar', 'nginx', 'monitor'].includes(module) ||
+    typeof resource !== 'string' || !/^[\w-]{1,100}(?::[\w-]{1,100})?$/.test(resource))) fail('项目关联的资源标识无效。');
+  return Object.fromEntries(entries);
+}
 function unique(items, key, label) {
   if (new Set(items.map((item) => item[key])).size !== items.length)
     fail(`${label}不能重复。`);
@@ -70,6 +77,7 @@ function validateLegacyState(input) {
         description: text(item.description, "说明", 1000),
         url,
         enabled: bool(item.enabled),
+        ...(item.resources === undefined ? {} : { resources: projectResources(item.resources) }),
         query,
       };
     }),

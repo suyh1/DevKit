@@ -44,6 +44,14 @@ const fixture = () => ({
   ...initialState(),
   profiles: [{ ...initialState().profiles[0], projects: [structuredClone(project)] }],
 });
+test('resource bindings survive project export and validate per profile', () => {
+  const state = fixture(), resources = { http: 'api', jar: 'host:app', nginx: 'edge', monitor:'uptime' };
+  state.profiles[0].projects[0].resources = resources;
+  assert.deepEqual(importState(exportState(state)).profiles[0].projects[0].resources, resources);
+  state.profiles[0].projects[0].resources = { logs: '../unknown' };
+  assert.throws(() => validateState(state), /资源标识/);
+});
+
 async function temporary(work) {
   const folder = await mkdtemp(path.join(tmpdir(), "devkit-project-test-"));
   try {

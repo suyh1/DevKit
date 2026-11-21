@@ -5,6 +5,8 @@ const fs = require('node:fs/promises');
 const { BrowserWindow, clipboard, dialog } = require('electron');
 
 module.exports = async function collaborationSmoke(window, output) {
+  window.webContents.setBackgroundThrottling(false);
+  window.show();
   const desktop = (code) => window.webContents.executeJavaScript(code, true);
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   const { emptySharingServices } = await import('../shared/sharing.mjs');
@@ -98,16 +100,42 @@ module.exports = async function collaborationSmoke(window, output) {
     // Send actual browser File objects in each direction, then read the downloaded bytes.
     async function exchange(send, sendScope, receive, receiveScope, receiverWindow, name, direct = false) {
       const bytes = [0, 255, 3, 9, 128];
-      const length = direct ? 3 * 524288 + 31 : bytes.length;
+      const exerciseResume = name === 'portal-to-desktop.bin';
+      const length = exerciseResume ? 1048576 + 31 : direct ? 3 * 524288 + 31 : bytes.length;
       const content = Buffer.alloc(length);
       for (let i = 0; i < length; i++) content[i] = bytes[i % bytes.length];
       await selectMode(send, sendScope, direct ? 'direct' : 'stored');
       await send(`{ const input=document.querySelector(${JSON.stringify(sendScope + 'input[type=file]')}); const dt=new DataTransfer();
         const pattern=${JSON.stringify(bytes)};dt.items.add(new File([Uint8Array.from({length:${length}},(_,i)=>pattern[i%pattern.length])],${JSON.stringify(name)}));input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true})); }`);
       await fill(send, sendScope + '.collab-compose input[type=password]', 'file-pass');
+      if (exerciseResume) await send(`{
+        window.resumeOffsets = [];
+        const fetch = window.fetch;
+        window.restoreTransferFetch = () => { window.fetch = fetch; };
+        window.fetch = async (...args) => {
+          const response = await fetch(...args);
+          if (String(args[0]).endsWith('/transfer/part')) {
+            window.resumeOffsets.push(JSON.parse(args[1].body).offset);
+            if (window.resumeOffsets.length === 1) throw new Error('测试连接中断');
+          }
+          return response;
+        };
+        void 0;
+      }`);
       await click(send, sendScope, direct ? '发布直传文件（1）' : '发送所选内容（1）');
+      if (exerciseResume) {
+        await wait(send, "document.querySelector('.collab-pending [role=alert]')?.textContent.includes('测试连接中断')");
+        await click(send, sendScope, '发送所选内容（1）');
+        await wait(send, 'window.resumeOffsets.length === 2');
+        assert.deepEqual(await send('window.resumeOffsets'), [0, 1048576]);
+        await send('window.restoreTransferFetch()');
+      }
       const article = `[...document.querySelectorAll(${JSON.stringify(receiveScope + '.collab-entry')})].find(el=>el.innerText.includes(${JSON.stringify(name)}))`;
-      await wait(receive, '!!' + article);
+      try { await wait(receive, '!!' + article); }
+      catch (error) {
+        const diagnostics = await send(`[...document.querySelectorAll(${JSON.stringify(sendScope + '[role=alert], ' + sendScope + '[role=status]')})].map(el => el.textContent)`);
+        throw new Error(error.message + ' · 发送端 ' + diagnostics.join(' / '));
+      }
       const own = `[...document.querySelectorAll(${JSON.stringify(sendScope + '.collab-entry')})].find(el=>el.innerText.includes(${JSON.stringify(name)}))`;
       await wait(send, '!!' + own + '?.querySelector(".publisher-pickup button")');
       assert.equal(await receive('!!' + article + '.querySelector(".publisher-pickup")'), false);

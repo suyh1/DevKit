@@ -78,6 +78,11 @@ module.exports = async function checkProjects(window, output, staging) {
     window.webContents,
     'document.querySelector(".project-workspace .pc-environment h2")?.textContent === "开发环境"',
   );
+  const monitorFixture = await js(`(async () => {
+    const state = (await window.devkitMonitor.request('get')).data;
+    return window.devkitMonitor.request('upsert', {revision:state.revision, monitor:{id:'project-overview-fixture',name:'入口运行状态',type:'http',url:'http://127.0.0.1/',enabled:false}});
+  })()`);
+  assert.equal(monitorFixture.error, undefined);
   await click("添加项目");
   await field("项目名称", "管理控制台");
   await field("唯一编码", "admin");
@@ -86,7 +91,15 @@ module.exports = async function checkProjects(window, output, staging) {
   await click("＋ 添加参数");
   await aria("参数 1 名称", "lang");
   await aria("参数 1 值", "中文");
+  await js(`[...document.querySelectorAll('dialog[open] summary')].find(node => node.textContent === '关联运维资源').click()`);
+  await wait(window.webContents,`!!document.querySelector('dialog[open] option[value="project-overview-fixture"]')`);
+  await js(`{const select=document.querySelector('dialog[open] option[value="project-overview-fixture"]').parentElement;select.value='project-overview-fixture';select.dispatchEvent(new Event('change',{bubbles:true}));}`);
   await click("保存项目定义");
+  await wait(window.webContents,'!!document.querySelector(".pc-card-actions") && !document.querySelector("dialog[open]")');
+  await click('运维总览');
+  await wait(window.webContents,'document.querySelector("dialog[open] h2")?.textContent.includes("运维总览") && !!document.querySelector("dialog[open] .devkit-bento")');
+  await wait(window.webContents,'document.querySelector("dialog[open] .devkit-bento")?.textContent.includes("入口运行状态") && document.querySelector("dialog[open] .devkit-bento")?.textContent.includes("已暂停")');
+  await js('document.querySelector("dialog[open] button[aria-label]").click()');
   await wait(
     window.webContents,
     'document.querySelectorAll(".project-workspace .pc-card").length === 1 && !document.querySelector("dialog[open]")',

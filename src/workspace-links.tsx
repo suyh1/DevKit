@@ -66,7 +66,7 @@ export function ResourceLink({ page, id, compact = false }: { page: WorkspacePag
   return <span className={'resource-copy' + (compact ? ' compact' : '')}>{compact ? <>{button}{field}</> : <>{field}{button}</>}</span>;
 }
 
-export function workspaceSearch(pages: WorkspacePage[], add: (results: WorkspaceResult[]) => void) {
+export function workspaceSearch(pages: WorkspacePage[], add: (results: WorkspaceResult[]) => void, apiProjects = false) {
   const modules = workspaceModules.filter(item => pages.includes(item.id));
   const perModule = (page: WorkspacePage, id: string, label: string, detail: string) => ({ page, id, label, detail });
   add(modules.map(item => ({ page: item.id, label: item.name, detail: item.description })));
@@ -92,6 +92,7 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
     nginx: () => inventory('nginx', nginxRequest<NginxState>),
     http: async () => {
       const { state } = await apiLibrary('get-library');
+      if (apiProjects) { add(state.projects.map(project => perModule('http',project.id,project.name,'API 项目'))); return; }
       add(state.projects.flatMap(project => project.endpoints.map(item => perModule('http', `${project.id}:${item.id}`, item.name, `${project.name} · ${item.method} ${item.path}`))));
     },
     monitor: async () => {

@@ -39,10 +39,10 @@ export function useWorkspaceGuard() {
   };
 }
 
-export function RelatedLink({ page, id, children }: { page: WorkspaceModuleId; id?: string; children: ReactNode }) {
+export function RelatedLink({ page, id, children, onOpen }: { page: WorkspaceModuleId; id?: string; children: ReactNode; onOpen?: () => void }) {
   const guard = useWorkspaceGuard();
   return <button type="button" className="text-button" onClick={() => {
-    if (guard(page)) openWorkspaceLink(page, id);
+    if (guard(page)) { onOpen?.(); openWorkspaceLink(page, id); }
   }}>{children}</button>;
 }
 

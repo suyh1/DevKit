@@ -1,3 +1,4 @@
+import { fileDigest, uploadIdentity } from './file-digest';
 import SegmentedControl from './SegmentedControl';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -122,7 +123,15 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
   }, [active]);
   function choose(selected: File[]) {
     if (!edit || op.busy) return;
-    setFiles((current) => [...current, ...selected]);
+    setFiles(current => {
+      const remaining = [...selected];
+      const next = current.map(file => {
+        if (fileIssue?.file !== file) return file;
+        const index = remaining.findIndex(item => item.name === file.name && item.size === file.size);
+        return index < 0 ? file : remaining.splice(index, 1)[0];
+      });
+      return [...next, ...remaining];
+    });
   }
   function send() {
     if (!edit || (!files.length && !text.trim())) return;
@@ -156,7 +165,10 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             sent++;
             continue;
           }
-          const published = await collab<PublishedTransfer>('transfer', 'begin', {
+          const digest = await fileDigest(file, bytes => setProgress('核对源文件 · ' + sizeOf(bytes)), () => cancelled.current);
+          const resume = uploadIdentity(file, digest, hours);
+          const published = await collab<PublishedTransfer & { offset?: number; complete?: boolean }>('transfer', 'begin', {
+            resumeToken: resume.token, sha256: digest,
             rememberPickup: true,
             name: file.name,
             size: file.size,
@@ -164,25 +176,26 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             password,
           });
           const { id } = published;
-          try {
-            for (let offset = 0; offset < file.size; offset += 1048576) {
-              if (cancelled.current) break;
-              setProgress(file.name + ' · ' + Math.floor((offset / file.size) * 100) + '%');
-              const data = await base64(file.slice(offset, offset + 1048576));
-              await collab('transfer', 'part', { id, offset, data });
-            }
-            if (cancelled.current) {
-              await collab('transfer', 'cancel', { id });
-              break;
-            }
-            const finished = await collab<PublishedTransfer>('transfer', 'finish', { id });
-            pickups.remember({ ...published, ...finished });
-            sent++;
-            setFiles((current) => current.slice(1));
-          } catch (error) {
-            await collab('transfer', 'cancel', { id }).catch(() => {});
-            throw error;
+          if (published.complete) {
+            pickups.remember(published); resume.clear(); sent++;
+            setFiles(current => current.slice(1));
+            continue;
           }
+          for (let offset = published.offset || 0; offset < file.size; offset += 1048576) {
+            if (cancelled.current) break;
+            setProgress(file.name + ' · ' + sizeOf(offset) + ' / ' + sizeOf(file.size));
+            const data = await base64(file.slice(offset, offset + 1048576));
+            await collab('transfer', 'part', { id, offset, data });
+          }
+          if (cancelled.current) {
+            setFileIssue({file, message: '已暂停，再次发送可续传。'});
+            break;
+          }
+          const finished = await collab<PublishedTransfer>('transfer', 'finish', { id });
+          resume.clear();
+          pickups.remember({ ...published, ...finished });
+          sent++;
+          setFiles((current) => current.slice(1));
         }
         currentFile = undefined;
         if (!direct && !cancelled.current && text.trim()) {
@@ -265,6 +278,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             <span>发送方式</span>
             <SegmentedControl label="发送方式" value={direct ? 'direct' : 'stored'} disabled={op.busy}
               options={[{ value: 'direct', label: '在线直传' }, { value: 'stored', label: '主机暂存' }]} onChange={value => setDirect(value === 'direct')} />
+            {!direct && <small>中断后 10 分钟内，在同一标签页用原文件、有效期和密码再次发送即可续传。</small>}
             {direct && <small>文件从你的设备直接发给取件人。请保持页面在线，手机保持亮屏。</small>}
           </div>
           <button className="collab-drop" disabled={op.busy} onClick={() => picker.current?.click()}>
@@ -361,7 +375,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                   cancelled.current = true;
                 }}
               >
-                取消上传
+                暂停上传
               </button>
             </p>
           )}

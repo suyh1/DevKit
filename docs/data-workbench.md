@@ -40,3 +40,7 @@ Schema 生成支持单个 `type`（object/array/string/integer/number/boolean/nu
 输入最多 300,000 字符/8,000 节点，规则最多 30,000 字符，种子最多 200 字符；输出生成最多 100,000 节点、20 层和 4,000,000 字符，内部提前限制紧凑记录总量以控制内存。CSV 要求生成对象记录，嵌套值作为 JSON 单元格，并沿用现有公式转义。
 
 生成器使用按需加载的 [Faker](https://github.com/faker-js/faker) 中文 locale；许可证为 [MIT](faker-license.txt)，原始许可随文档分发。只在首次运行 Mock 时加载对应解析/生成模块，不使用 CDN。
+
+## 忽略差异路径
+
+JSON 对比可在「忽略路径」填写多个分号分隔的路径，例如 $.requestId; $.meta.updatedAt。也可从结果复制字段路径，包括带引号的特殊键。规则覆盖路径和子项。设置规则后，导出报告中的 ignored 表示被过滤的差异条数，changes 为剩余差异。空规则延用原有差异数组。

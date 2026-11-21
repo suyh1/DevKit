@@ -214,6 +214,19 @@ module.exports = async function apiSmoke(window, output) {
     await click("采用为响应示例", ".api-debug");
     await click("保存接口");
     await wait('!document.querySelector(".api-draft-badge")');
+    await js("document.querySelector('.api-regression').open=true");
+    await click("追加接口", ".api-regression");
+    await click("追加接口", ".api-regression");
+    // Extract from the first response and use the value as the bearer variable in step two.
+    const setRule = async (placeholder, value) => {
+      await js(`{const e=document.querySelector('.api-regression input[placeholder="'+${JSON.stringify(placeholder)}+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));}`);
+    };
+    await setRule('/data/id','/ok');
+    await setRule('projectId','token');
+    await click("依次发送并校验", ".api-regression");
+    await wait('document.querySelectorAll(".api-regression ol li").length >= 2');
+    assert.equal(requests.at(-1).headers.authorization, 'Bearer true');
+    await click("保存回归步骤", ".api-regression");
     // Saved examples and definitions survive reload without any hosted service.
     await window.webContents.reload();
     await wait('!!document.querySelector(".shared-sidebar-trigger")');

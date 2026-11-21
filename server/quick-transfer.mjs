@@ -43,6 +43,7 @@ async function protection(password) {
 const lifetimes = [1, 24, 168];
 export async function createTransferService(folder, initial, changed) {
   const direct = createDirectDirectory(changed);
+  const completed = new Map();
   const pending = new Map(),
     tickets = new Map(),
     attempts = new Map();
@@ -81,6 +82,7 @@ export async function createTransferService(folder, initial, changed) {
         await discard(id);
         pending.delete(id);
       }
+    for (const [key, value] of completed) if (value.until <= now) completed.delete(key);
     for (const [key, value] of tickets) if (value.until <= now) tickets.delete(key);
     for (const [key, value] of attempts) if (value.until <= now) attempts.delete(key);
     if (action === 'list')
@@ -157,6 +159,24 @@ export async function createTransferService(folder, initial, changed) {
       return {};
     }
     if (action === 'begin' || action === 'send' || action === 'publish') {
+      let resumeKey;
+      if (action === 'begin' && input.resumeToken !== undefined) {
+        if (typeof input.resumeToken !== 'string' || !/^[0-9a-f]{64}$/.test(input.resumeToken)) fail(400, '续传凭据无效。');
+        if (input.sha256 !== undefined && (typeof input.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(input.sha256))) fail(400, '文件 SHA-256 无效。');
+        resumeKey = sessionDigest(JSON.stringify([access.owner, input.resumeToken]));
+        const done = completed.get(resumeKey);
+        if (done && live.some(row => row.id === done.receipt.id)) return { ...done.receipt, complete: true };
+        const previous = [...pending.values()].find(row => row.resumeKey === resumeKey);
+        if (previous) {
+          if (previous.item.size !== input.size || previous.hours !== input.hours || previous.digest !== input.sha256) fail(409, '文件或有效期与原上传不同。');
+          const lock = previous.item.protection;
+          if (lock ? typeof input.password !== 'string' || input.password.length > 128 || !timingSafeEqual(await derive(input.password, lock.salt, 32), Buffer.from(lock.hash, 'hex')) : !!input.password)
+            fail(409, '续传请使用原取件密码。');
+          access.authorize?.();
+          previous.touched = now;
+          return { ...previous.receipt, offset: previous.offset };
+        }
+      }
       if (live.length + pending.size + direct.rows().length >= 250) fail(409, '收件箱已满，请移除旧内容。');
       if (!lifetimes.includes(input.hours)) fail(400, '请选择有效期。');
       const item = {
@@ -191,7 +211,8 @@ export async function createTransferService(folder, initial, changed) {
       await (await open(filename(item.id), 'wx', 0o600)).close();
       pending.set(item.id, {
         item: { ...item, name, kind: 'file', size: input.size },
-        offset: 0,
+        resumeKey, receipt: published, offset: 0,
+        digest: input.sha256, hash: resumeKey && input.sha256 ? createHash('sha256') : undefined,
         touched: now,
         hours: input.hours,
         owner: access.owner,
@@ -208,9 +229,17 @@ export async function createTransferService(folder, initial, changed) {
     }
     if (action === 'finish') {
       if (upload.offset !== upload.item.size) fail(409, '文件尚未完整接收。');
+      if (upload.hash && upload.hash.copy().digest('hex') !== upload.digest) {
+        await discard(input.id); pending.delete(input.id);
+        fail(409, '文件内容与发送前的 SHA-256 不一致，请重新选择源文件。');
+      }
       const expires = now + upload.hours * 3600_000;
       await commit([...live, { ...upload.item, expires }]);
       pending.delete(input.id);
+      if (upload.resumeKey) {
+        if (completed.size >= 250) completed.delete(completed.keys().next().value);
+        completed.set(upload.resumeKey, { receipt: { ...upload.receipt, expires }, until: now + 600000 });
+      }
       return upload.item.protection?.publisher ? { id: input.id, expires } : { id: input.id };
     }
     if (input.offset !== upload.offset) fail(409, '上传位置已变化，请重新发送。');
@@ -231,6 +260,7 @@ export async function createTransferService(folder, initial, changed) {
     } finally {
       await file.close();
     }
+    upload.hash?.update(bytes);
     upload.offset += bytes.length;
     upload.touched = now;
     return { offset: upload.offset };

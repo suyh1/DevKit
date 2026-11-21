@@ -4,7 +4,7 @@ import { reducedMotion } from './motion-primitives';
 
 // Only the card under the primary pointer owns a highlight. Native touch
 // scrolling, the open button and the footer actions keep their normal events.
-export function useCardLight(grid: RefObject<HTMLDivElement | null>, visible: boolean) {
+export function useCardLight(grid: RefObject<HTMLDivElement | null>, visible: boolean, selector = '.tool-card') {
   useEffect(() => {
     const host = grid.current;
     if (!host || !visible) return;
@@ -18,7 +18,7 @@ export function useCardLight(grid: RefObject<HTMLDivElement | null>, visible: bo
     }
     function track(event: PointerEvent) {
       if (!event.isPrimary || reducedMotion()) return reset();
-      const card = event.target instanceof Element ? event.target.closest<HTMLElement>('.tool-card') : null;
+      const card = event.target instanceof Element ? event.target.closest<HTMLElement>(selector) : null;
       if (active !== card) reset();
       if (!card) return;
       active = card;
@@ -41,7 +41,7 @@ export function useCardLight(grid: RefObject<HTMLDivElement | null>, visible: bo
       ends.forEach(type => host.removeEventListener(type, reset));
       reset();
     };
-  }, [grid, visible]);
+  }, [grid, visible, selector]);
 }
 
 export function expandToolCard(card: HTMLElement, open: () => void) {

@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, rename, unlink, stat } from 'node:fs/promis
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import net from 'node:net';
+import https from 'node:https';
 import { setTimeout as delay } from 'node:timers/promises';
 import { acquireProjectLock } from './project-lock.mjs';
 import { resolveProject } from '../shared/projects.mjs';
@@ -44,11 +45,23 @@ export function normalizeMonitor(input) {
     port: !source && input.type === 'tcp' ? number(input.port, 1, 65535) : 0,
     status: number(input.status ?? 200, 100, 599), interval: number(input.interval ?? 60, 10, 86400),
     timeout: number(input.timeout ?? 5, 1, 60), failures: number(input.failures ?? 2, 1, 10), maintenance,
-    webhook: input.webhook ? { url: address(input.webhook.url), down: input.webhook.down !== false, up: input.webhook.up !== false } : null };
+    webhook: input.webhook ? { url: address(input.webhook.url), down: input.webhook.down !== false, up: input.webhook.up !== false, certificate: input.webhook.certificate === true } : null };
 }
 
 // Only response headers are needed; one deadline covers DNS, connection and redirects.
-export async function probeMonitor(target, signal) {
+function httpsHeaders(url, signal, certificate) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, { signal, agent: false, headers: { 'User-Agent': 'DevKit-Monitor' } }, response => {
+      const peer = response.socket.getPeerCertificate();
+      if (peer.valid_to && peer.fingerprint256) certificate?.({ host: new URL(url).host, expires: new Date(peer.valid_to).toISOString(), fingerprint: peer.fingerprint256 });
+      const result = { status: response.statusCode, location: response.headers.location };
+      response.destroy();
+      resolve(result);
+    });
+    request.on('error', reject);
+  });
+}
+export async function probeMonitor(target, signal, certificate) {
   if (target.type === 'tcp') return new Promise((resolve, reject) => {
     const socket = net.connect({ host: target.host, port: target.port });
     const finish = error => { signal.removeEventListener('abort', abort); socket.destroy(); error ? reject(error) : resolve('TCP 连接成功'); };
@@ -58,15 +71,20 @@ export async function probeMonitor(target, signal) {
   });
   let url = address(target.url);
   for (let redirects = 0; redirects <= 5; redirects++) {
-    const response = await fetch(url, { signal, redirect: 'manual', headers: { 'User-Agent': 'DevKit-Monitor' } });
-    await response.body?.cancel();
-    const location = response.headers.get('location');
-    if ([301, 302, 303, 307, 308].includes(response.status) && location) {
+    let status, location;
+    if (url.startsWith('https:')) {
+      ({ status, location } = await httpsHeaders(url, signal, redirects === 0 ? certificate : undefined));
+    } else {
+      const response = await fetch(url, { signal, redirect: 'manual', headers: { 'User-Agent': 'DevKit-Monitor' } });
+      await response.body?.cancel();
+      status = response.status; location = response.headers.get('location');
+    }
+    if ([301, 302, 303, 307, 308].includes(status) && location) {
       if (redirects === 5) fail('重定向超过 5 次。');
       url = address(new URL(location, url).href); continue;
     }
-    if (response.status !== target.status) fail(`HTTP ${response.status}，预期 ${target.status}`);
-    return `HTTP ${response.status}`;
+    if (status !== target.status) fail(`HTTP ${status}，预期 ${target.status}`);
+    return `HTTP ${status}`;
   }
 }
 
@@ -82,7 +100,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
       if (parsed.schemaVersion !== 1 || !Number.isSafeInteger(parsed.revision) || parsed.revision < 0 || !Array.isArray(parsed.monitors) || parsed.monitors.length > 100 || !parsed.runtime || typeof parsed.runtime !== 'object' || Array.isArray(parsed.runtime)) fail('监控存储格式无效。');
       parsed.monitors = parsed.monitors.map(normalizeMonitor);
       parsed.notifications ??= [];
-      if (!Array.isArray(parsed.notifications) || parsed.notifications.length > 200 || parsed.notifications.some(item => !item || !['down', 'up'].includes(item.event) || typeof item.id !== 'string' || !parsed.monitors.some(monitor => monitor.id === item.monitorId) || !Number.isSafeInteger(item.attempts) || item.attempts < 0 || item.attempts > 2 || !Number.isFinite(item.nextAt))) fail('Webhook 通知队列无效。');
+      if (!Array.isArray(parsed.notifications) || parsed.notifications.length > 200 || parsed.notifications.some(item => !item || !['down', 'up','certificate'].includes(item.event) || typeof item.id !== 'string' || !parsed.monitors.some(monitor => monitor.id === item.monitorId) || !Number.isSafeInteger(item.attempts) || item.attempts < 0 || item.attempts > 2 || !Number.isFinite(item.nextAt))) fail('Webhook 通知队列无效。');
       if (new Set(parsed.monitors.map(item => item.id)).size !== parsed.monitors.length) fail('监控标识重复。');
       const validDate = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
       for (const [id, value] of Object.entries(parsed.runtime)) {
@@ -159,7 +177,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
       next.runtime[monitor.id].notification = { event, at, state: 'failed', detail: '通知队列已满' };
       return;
     }
-    next.notifications.push({ id: `${incident.id}-${event}`, monitorId: monitor.id, incidentId: incident.id, at, event, attempts: 0, nextAt: now() });
+    next.notifications.push({ id: `${incident.id}-${event}`, monitorId: monitor.id, incidentId: incident.id, ...(incident.certificate ? { certificate: incident.certificate } : {}), at, event, attempts: 0, nextAt: now() });
     next.runtime[monitor.id].notification = { event, at, state: 'pending', detail: '等待 Webhook 投递' };
   }
   function dispatchNotifications() {
@@ -176,7 +194,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
         const response = await deliver(monitor.webhook.url, {
           method: 'POST', signal: controller.signal, redirect: 'error',
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': item.id },
-          body: JSON.stringify({ id: item.id, event: item.event, at: item.at, monitor: { id: monitor.id, name: monitor.name }, incidentId: item.incidentId }),
+          body: JSON.stringify({ id: item.id, event: item.event, at: item.at, monitor: { id: monitor.id, name: monitor.name }, incidentId: item.incidentId, certificate: item.certificate }),
         });
         await response.body?.cancel();
         if (!response.ok) {
@@ -208,7 +226,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
     if (running.size >= 3) fail('主机正在检测其他监控，请稍后再试。');
     const version = versions.get(id), controller = new AbortController(); controllers.add(controller);
     const task = (async () => {
-      const started = now(), timer = setTimeout(() => controller.abort(), monitor.timeout * 1000); let ok = false, detail;
+      const started = now(), timer = setTimeout(() => controller.abort(), monitor.timeout * 1000); let ok = false, detail, certificate;
       try {
         const target = await resolve(monitor);
         if (target.remoteJar) {
@@ -217,7 +235,7 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
           const result = await abortable(resolved.monitorJar(target.remoteJar, monitor.timeout), controller.signal);
           detail = result.detail;
           ok = result.state === 'healthy';
-        } else { detail = await probe(target, controller.signal); ok = true; }
+        } else { detail = await probe(target, controller.signal, observed => { certificate = observed; }); ok = true; }
       }
       catch (error) { detail = controller.signal.aborted ? '检测超时或已停止' : error.cause?.code || error.message; }
       finally { clearTimeout(timer); controllers.delete(controller); }
@@ -225,13 +243,26 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
       await transaction(async () => {
         if (closed || versions.get(id) !== version || !data.monitors.some(item => item.id === id)) return;
         const next = structuredClone(data), runtime = next.runtime[id] ||= blank(), at = new Date(now()).toISOString();
+        if (certificate) {
+          const previous = runtime.certificate;
+          const notified = previous?.fingerprint === certificate.fingerprint && previous.host === certificate.host ? previous.notified : [];
+          runtime.certificate = { ...certificate, checkedAt: at, notified };
+          const days = Math.ceil((Date.parse(certificate.expires) - now()) / 86400000);
+          const threshold = days <= 7 ? 7 : days <= 30 ? 30 : 0;
+          if (threshold && monitor.webhook?.certificate && !notified.includes(threshold) && !notified.includes(7)) {
+            const payload = { host: certificate.host, expires: certificate.expires, days, threshold };
+            queueNotification(next, monitor, 'certificate', { id: randomUUID(), certificate: payload }, at);
+            notified.push(threshold);
+          }
+        }
+        if (ok && !certificate) delete runtime.certificate;
         runtime.streak = ok ? 0 : runtime.streak + 1;
         runtime.state = ok ? 'up' : runtime.streak >= monitor.failures ? 'down' : 'pending';
         runtime.detail = String(detail).slice(0, 500); runtime.checkedAt = at;
         runtime.samples = [...runtime.samples.filter(sample => now() - Date.parse(sample.at) < 7 * 86400000), { at, ok, elapsed: Math.max(0, now() - started), detail: runtime.detail }].slice(-1440);
         const incident = runtime.incidents.find(item => !item.end);
         if (runtime.state === 'down' && !incident) {
-          const created = { id: randomUUID(), start: at, detail: runtime.detail, end: null };
+          const created = { id: randomUUID(), start: at, detail: runtime.detail, end: null, jarId: monitor.source?.type === 'jar' ? monitor.source.id : null };
           runtime.incidents.unshift(created);
           queueNotification(next, monitor, 'down', created, at);
         }
@@ -300,7 +331,17 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
           else next.monitors[index] = monitor;
           const previousRuntime = next.runtime[id];
           // Configuration changes begin a new series; keep old incident records as closed history.
-          if (previousRuntime) next.runtime[id] = { ...blank(), incidents: previousRuntime.incidents.map(item => item.end ? item : { ...item, end: new Date(now()).toISOString(), reason: '配置已变更' }) };
+          if (previousRuntime) {
+            const sameTarget = previous.url === monitor.url && JSON.stringify(previous.source) === JSON.stringify(monitor.source);
+            next.runtime[id] = {
+              ...blank(),
+              ...(sameTarget && previousRuntime.certificate ? { certificate: previousRuntime.certificate } : {}),
+              incidents: previousRuntime.incidents.map(item => ({
+                jarId: previous.source?.type === 'jar' ? previous.source.id : null, ...item,
+                ...(!item.end ? { end: new Date(now()).toISOString(), reason: '配置已变更' } : {}),
+              })),
+            };
+          }
         } else {
           const item = next.monitors.find(item => item.id === id); if (!item) fail('监控不存在。');
           if (action === 'remove') { next.monitors = next.monitors.filter(item => item.id !== id); next.notifications = next.notifications.filter(item => item.monitorId !== id); delete next.runtime[id]; }

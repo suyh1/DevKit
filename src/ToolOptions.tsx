@@ -37,7 +37,7 @@ const fields: Partial<Record<ToolId, Field[]>> = {
     { key: 'keywordCase', label: '关键字', entries: [['upper', '大写'], ['lower', '小写'], ['preserve', '保留原样']] },
     { key: 'indent', label: '缩进', entries: [['2', '2 空格'], ['4', '4 空格']] },
   ],
-  diff: [{ key: 'mode', label: '对比方式', entries: [['text', '文本逐行'], ['json', 'JSON 结构']] }, { key: 'arrayKey', label: '对象数组标识字段', placeholder: '留空按位置，如 id' }, { key: 'ignoreWhitespace', label: '行首尾空白', entries: [['off', '参与对比'], ['on', '忽略差异']] }],
+  diff: [{ key: 'mode', label: '对比方式', entries: [['text', '文本逐行'], ['json', 'JSON 结构']] }, { key: 'ignorePaths', label: '忽略路径（分号分隔）', placeholder: '$.requestId; $.updatedAt' }, { key: 'arrayKey', label: '对象数组标识字段', placeholder: '留空按位置，如 id' }, { key: 'ignoreWhitespace', label: '行首尾空白', entries: [['off', '参与对比'], ['on', '忽略差异']] }],
   password: [
     { key: 'length', label: '长度', min: 4, max: 256 }, { key: 'count', label: '数量', min: 1, max: 100 },
     { key: 'charset', label: '字符集', entries: [['all', '字母 + 数字 + 符号'], ['alnum', '字母 + 数字'], ['hex', '十六进制'], ['digits', '纯数字']] },
@@ -67,7 +67,7 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
   ] : toolId === 'type-json' && options.language !== 'java' ? [{ key: 'optional', label: '可选字段', entries: [['include', '包含示例'], ['exclude', '忽略']] } as Field] : [])];
   const showIndent = toolId !== 'json' || !['stringify', 'compact'].includes(options.mode);
   const notice = toolId === 'type-json' ? '生成示例值 · 不执行源码或还原真实数据' : toolId === 'hmac' ? '密钥仅在内存，默认不保存工作区' : toolId === 'http-code' ? '只生成代码，不发送请求' : toolId === 'cron' ? 'UTC · 五字段 Unix Cron' : toolId === 'jwt' ? '仅解码，不验证签名或可信性' : toolId === 'url-inspect' ? '保留重复参数，不访问地址' : toolId === 'uuid' ? '安全随机 UUID v4 · 最多 1,000 个' : '';
-  return <div className="options">{visibleFields.filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (field.key !== 'arrayKey' || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => {
+  return <div className="options">{visibleFields.filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (!['arrayKey', 'ignorePaths'].includes(field.key) || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => {
     if (field.entries && field.entries.length <= 4) {
       return <div className={`option field-${field.key}`} key={field.key}>
         <span>{field.label}</span>

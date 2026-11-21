@@ -42,6 +42,25 @@ export async function readLogFile(filename, cursor, { initial = 128 * 1024, chun
   } finally { await handle.close(); }
 }
 
+export function incidentExcerpt(result, at) {
+  const center = Date.parse(at);
+  if (!Number.isFinite(center)) fail('故障时间无效。');
+  let include = false, length = 0, limited = false;
+  const lines = [];
+  for (const line of result.text.split('\n')) {
+    const timestamp = /^\[?(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:[.,]\d{1,9})?(?:Z|[+-]\d\d:?\d\d)?)/.exec(line);
+    if (timestamp) {
+      const time = Date.parse(timestamp[1].replace(' ', 'T').replace(',', '.'));
+      include = Number.isFinite(time) && Math.abs(time - center) <= 300000;
+    }
+    if (include) {
+      if (length + line.length > 128 * 1024) { limited = true; break; }
+      lines.push(line); length += line.length + 1;
+    }
+  }
+  return { text: lines.join('\n'), incidentAt: at, truncated: result.truncated || limited, checkedAt: result.checkedAt };
+}
+
 export function createLogCenter({ jar, nginx, lan }) {
   const clientId = randomUUID();
   const active = { local: 0, remote: 0 };
@@ -120,13 +139,18 @@ export function createLogCenter({ jar, nginx, lan }) {
         if (id) {
           try {
             if (!hosts.some(item => item.id === hostId)) fail('日志来源主机已移除。');
-            const result = await coordinator.logs(hostId, action, { raw, sources: [{ id, cursor: value.cursor }] }, access, session);
+            const result = await coordinator.logs(hostId, action, { raw, incidentAt: payload.incidentAt, sources: [{ id, cursor: value.cursor }] }, access, session);
             return { ...result.results[0], id: value.id };
           } catch (error) { return { id: value.id, error: error.message }; }
         }
         const source = catalog.sources.find(item => item.id === value.id);
         if (!source) return { id: value.id, error: '来源已移除、变更或未授权，请刷新来源列表。' };
         try {
+          if (payload.incidentAt !== undefined) {
+            if (action !== 'read' || source.kind !== 'jar' || source.mode !== 'file' || typeof payload.incidentAt !== 'string' || !Number.isFinite(Date.parse(payload.incidentAt))) fail('请选择有效的 JAR 文件日志与故障时间。');
+            const tail = await readLogFile(source.path, null, { initial: 4 * 1024 * 1024 });
+            return { id: source.id, ...incidentExcerpt(raw ? tail : redactLogResult(tail), payload.incidentAt) };
+          }
           const result = await read(source, value.cursor, action === 'export');
           return { id: source.id, ...(raw ? result : redactLogResult(result)) };
         } catch (error) { return { id: source.id, error: error.code === 'ENOENT' ? '日志文件尚未生成或已被移走。' : error.message }; }

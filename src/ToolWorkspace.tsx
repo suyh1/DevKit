@@ -1,3 +1,6 @@
+import ToolRecipes from './ToolRecipes';
+import FileChecksums from './FileChecksums';
+import './workbench-extensions.css';
 import ResultSelection from './ResultSelection';
 import SegmentedControl from './SegmentedControl';
 import { MotionDrop, MotionButton, MotionPresence, MotionDetails } from './Motion';
@@ -102,6 +105,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     <div className="editor-footer"><span>{task.output.length.toLocaleString()} 字符 · {outputLanguage.toUpperCase()}</span>{currentResult ? <span className="success-text"><Check size={12} />当前结果</span> : task.output && <span className="previous-result">上次结果</span>}</div>
   </section>;
   return <div className={`text-workbench workflow-${workflow}`} data-tool={active}>
+    {active === 'hash' && <FileChecksums />}
     <p className="workflow-intro">{experience.hint}</p>
     {!generated && !compact && <div className="toolbar">{options}{run}</div>}
     <div className="workbench-controls"><span className={`task-status status-${task.status}`} role="status"><span />{statusLabels[task.status]}{task.elapsed !== null && ` · ${task.elapsed || '<1'} ms`}</span><div>{!compact && !generated && <button className="text-button" onClick={() => setWrap(!wrapping)} aria-pressed={wrapping}><WrapText size={14} />换行</button>}{adjustable && <button className="text-button" onClick={() => setLayout(arrangement === 'split' ? 'stack' : 'split')} aria-label="切换编辑区布局">{arrangement === 'split' ? <Rows2 size={14} /> : <Columns2 size={14} />}{arrangement === 'split' ? '上下布局' : '左右布局'}</button>}</div></div>
@@ -115,6 +119,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
       {adjustable && <div className="split-handle" role="separator" aria-label="调整输入与结果宽度" aria-orientation="vertical" aria-valuemin={25} aria-valuemax={75} aria-valuenow={ratio} tabIndex={0} onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setRatio(value => Math.max(25, Math.min(75, value + (event.key === 'ArrowLeft' ? -2 : 2)))); } }} onDoubleClick={() => setRatio(50)} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); if (split.current) split.current.dataset.resizing = "true"; }} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId) || !split.current) return; const rect = split.current.getBoundingClientRect(); setRatio(Math.max(25, Math.min(75, (event.clientX - rect.left) / rect.width * 100))); }} onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)} onLostPointerCapture={() => { if (split.current) delete split.current.dataset.resizing; }}><span /></div>}
       {outputPanel}
     </div>
+    <ToolRecipes input={task.input} />
     <MotionDetails className="tool-help"><summary>使用提示与边界</summary><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></MotionDetails>
   </div>;
 }

@@ -81,6 +81,7 @@ function upsert<T extends { id: string }>(items: T[], value: T): T[] {
     : [...items, value];
 }
 
+import { ResourceFields, ProjectOverview } from './ProjectOverview';
 import { RelatedLink, useRelatedCreation } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 
@@ -909,7 +910,7 @@ export default function ProjectCenter({
                     <small className="pc-code" title={project.code}>
                       {project.code}
                     </small>
-                    <span>当前方案</span>
+                    <ProjectOverview project={project} profileId={profile.id} url={result.url} />
                   </div>
                   <div className="pc-card-identity">
                     <h3 title={project.name}>{project.name}</h3>
@@ -1210,6 +1211,7 @@ export default function ProjectCenter({
                     />
                   </Field>
                 </div>
+                <ResourceFields project={entry} change={resources => setEntry({ ...entry, resources })} />
                 <h3 className="pc-form-section">入口地址与参数</h3>
                 <Field label="HTTP(S) 地址模板">
                   <input

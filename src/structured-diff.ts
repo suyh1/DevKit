@@ -1,7 +1,48 @@
 import { jsonTree, nodePath } from './result-model';
 import type { JsonNode } from './result-model';
 
-export type JsonChange = { kind: 'added' | 'removed' | 'changed' | 'moved'; path: string; before?: string; after?: string; from?: string };
+export type JsonChange = {
+  kind: 'added' | 'removed' | 'changed' | 'moved';
+  path: string;
+  before?: string;
+  after?: string;
+  from?: string;
+};
+// Separate paths with newlines or semicolons outside quoted keys.
+export function filterDiffPaths(rows: JsonChange[], rules: string) {
+  const paths = new Set<string>();
+  if (rules.length > 8000) throw new Error('忽略规则最多 8,000 字符。');
+  const root = /\$|[A-Za-z_][\w$]*/y;
+  const segment = /(?:\.([A-Za-z_$][\w$]*)|\[("(?:\\.|[^"\\])*"|0|[1-9]\d*)\])/y;
+  const divider = /[ \t]*(?:;|\r?\n|$)[ \t]*/y;
+  const input = rules.trim();
+  const invalid = () => new Error('忽略路径格式无效，请使用 $.字段 或从结果复制路径，以分号分隔。');
+  let index = 0;
+  while (index < input.length) {
+    root.lastIndex = index;
+    const head = root.exec(input);
+    if (!head) throw invalid();
+    let path = head[0] === '$' ? '$' : nodePath('$', head[0], false);
+    segment.lastIndex = root.lastIndex;
+    index = root.lastIndex;
+    let part;
+    while ((part = segment.exec(input))) {
+      if (part[1]) path = nodePath(path, part[1], false);
+      else if (part[2].startsWith('"')) path = nodePath(path, JSON.parse(part[2]), false);
+      else path = nodePath(path, part[2], true);
+      index = segment.lastIndex;
+    }
+    if (path === '$') throw invalid();
+    paths.add(path);
+    divider.lastIndex = index;
+    if (!divider.exec(input)) throw invalid();
+    index = divider.lastIndex;
+  }
+  if (paths.size > 100) throw new Error('最多设置 100 个忽略路径。');
+  const prefixes = [...paths];
+  const changes = rows.filter((row) => !prefixes.some((p) => row.path === p || row.path.startsWith(p + '[')));
+  return { ignored: rows.length - changes.length, changes };
+}
 // Compare source tokens, never JS numbers: 9007199254740993 remains distinct.
 export function structuredDiff(left: string, right: string, arrayKey = ''): JsonChange[] {
   if (arrayKey.length > 100) throw new Error('数组标识字段最多 100 字符。');

@@ -59,8 +59,10 @@ export default function ApiDebug({
   onNotice,
   initialRequest,
   resetRequest,
+  otherSending,
   onDraftChange,
 }: {
+  otherSending?: boolean;
   initialRequest?: ApiHistory | null;
   resetRequest?: number;
   onDraftChange?: (dirty: boolean) => void;
@@ -262,7 +264,7 @@ export default function ApiDebug({
         <small className="http-execution-host">请求发起方 <strong>{remoteAccess() ? location.host : '桌面本机'}</strong></small>
         <button
           className="run-button"
-          disabled={!running && (!request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()) || !!(multipart && multipartIssue(multipart)))}
+          disabled={!running && (otherSending || !request.value || !canSendHttp() || (!window.devkitHttp && !remoteAccess()) || !!(multipart && multipartIssue(multipart)))}
           onClick={() => void (running ? cancel() : send())}
         >
           {running ? <Square size={14} /> : <Send size={14} />}{" "}

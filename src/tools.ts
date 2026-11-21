@@ -44,7 +44,7 @@ const definitions: { id: ToolId; name: string; english: string; category: string
   { id: 'url', name: 'URL 编解码', english: 'URL Encoder', category: '编码转换', description: '编码或解码 URL 参数中的特殊字符。', sample: 'https://example.com/search?q=程序员&lang=中文' },
   { id: 'html', name: 'HTML 实体转换', english: 'HTML Entities', category: '编码转换', description: '转义 HTML 特殊字符；解码常见命名实体与数字实体。输出作为文本展示。', sample: '<div title="DevKit">你好 & welcome</div>' },
   { id: 'timestamp', name: '时间戳转换', english: 'Timestamp Converter', category: '效率工具', description: '在 Unix 时间戳与日期之间转换，明确区分秒和毫秒；可填入当前时间，逐项复制 UTC、本地时间与时区。', sample: '1735689600' },
-  { id: 'hash', name: '哈希计算', english: 'Hash Generator', category: '数据处理', description: '为 UTF-8 文本计算 SHA 摘要，粘贴已有 HEX 摘要核对是否一致。', sample: 'Hello, DevKit!' },
+  { id: 'hash', name: '哈希计算', english: 'Hash Generator', category: '数据处理', description: '为文本计算 SHA 摘要，或分块计算文件 SHA-256，支持批量核对和 SHA256SUMS 导入导出。', sample: 'Hello, DevKit!' },
   { id: 'uuid', name: 'UUID 生成', english: 'UUID Generator', category: '效率工具', description: '使用安全随机数批量生成 UUID v4。', sample: '5' },
   { id: 'regex', name: '正则测试', english: 'Regex Playground', category: '数据处理', description: '测试 JavaScript 正则表达式，查看匹配位置和捕获分组。', sample: '联系 hello@example.com 或 dev@toolkit.dev' },
   { id: 'jwt', name: 'JWT 解码', english: 'JWT Decoder', category: '数据处理', description: '查看 Header、Payload 和时间字段。仅解码，不验证签名或令牌可信性。', sample: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZraXQiLCJuYW1lIjoiQWxpY2UiLCJpYXQiOjE3MzU2ODk2MDB9.c2FtcGxl' },
