@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "homepage": "https://github.com/suyh1/DevKit",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "type": "module",
   "scripts": {
     "docs:update": "node scripts/update-readme.mjs",
