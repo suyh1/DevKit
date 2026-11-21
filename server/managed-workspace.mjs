@@ -5,7 +5,7 @@ import path from 'node:path';
 const actions = {
   jar: {
     read: ['get', 'statuses', 'log-tail', 'console-read', 'startup-get'],
-    edit: ['npm-scripts', 'browse', 'upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'],
+    edit: ['npm-scripts', 'check-program', 'browse', 'upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'],
     control: ['command', 'detect', 'health-check', 'monitor-probe', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'],
   },
   nginx: {
@@ -16,7 +16,7 @@ const actions = {
 };
 export const fullAccess = { edit: true, control: true, backend: true };
 export function authorizeWorkspace(module, action, access) {
-  if (module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
+  if (module === 'jar' && action === 'detect-npm' || module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
     if (access.edit && access.control) return;
     throw Object.assign(new Error('此操作需要编辑和运行管理权限。'), { status: 403 });
   }

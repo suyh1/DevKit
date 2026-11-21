@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,6 +8,53 @@ import { createJarManager } from './jar-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { createMonitorManager } from './monitor-manager.mjs';
 import { managedRequest } from './managed-workspace.mjs';
+
+test('form checks resolve the selected runtime and inspect program files without launching them', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'devkit-probes-'));
+  const manager = await createJarManager(root);
+  try {
+    const npm = await manager.request('detect-npm');
+    assert.match(npm[0].text, /^Node\.js v\d+\./);
+    assert.match(npm[1].text, /^npm \d+\./);
+    assert.ok(npm.every(line => line.ok));
+    const empty = await manager.request('detect-npm', { searchPath: root });
+    assert.ok(empty.every(line => !line.ok && line.text.includes('未找到')));
+    const windows = process.platform === 'win32';
+    const cli = path.join(root, windows ? 'node_modules/npm/bin/npm-cli.js' : 'npm');
+    await mkdir(path.dirname(cli), { recursive: true });
+    await writeFile(cli, windows ? 'console.log("10.0.0")' : '#!/bin/sh\necho 10.0.0\n', { mode: 0o755 });
+    const partial = await manager.request('detect-npm', { searchPath: root });
+    assert.equal(partial[0].ok, false);
+    assert.equal(partial[1].ok, !windows);
+    assert.ok(partial[1].text.includes(await realpath(cli)));
+    const binary = await manager.request('check-program', { program: process.execPath });
+    assert.equal(binary[0].ok, true, binary[0].text);
+    const check = program => manager.request('check-program', { program });
+    assert.match((await check(root))[0].text, /普通程序文件/);
+    const file = path.join(root, 'sample.exe');
+    assert.match((await check(file))[0].text, /不存在/);
+    await writeFile(file, 'plain text');
+    if (process.platform !== 'win32') {
+      await chmod(file, 0o600);
+      assert.match((await check(file))[0].text, /权限/);
+      await chmod(file, 0o700);
+    }
+    assert.equal((await check(file))[0].ok, false);
+    if (process.platform !== 'win32') {
+      const marker = path.join(root, 'was-started');
+      await writeFile(file, '#!/bin/sh\ntouch "' + marker + '"\n');
+      assert.equal((await check(file))[0].ok, true);
+      await assert.rejects(readFile(marker), { code: 'ENOENT' });
+    }
+    for (const action of ['check-program', 'detect-npm']) {
+      await assert.rejects(managedRequest(manager, 'jar', action, {}, { edit: true, control: true, backend: false }), /权限/);
+      await assert.rejects(managedRequest(manager, 'jar', action, {}, { edit: false, control: true, backend: true }), /权限/);
+    }
+    const editor = { edit: true, control: false, backend: true };
+    await assert.rejects(managedRequest(manager, 'jar', 'detect-npm', {}, editor), /权限/);
+    assert.equal((await managedRequest(manager, 'jar', 'check-program', { program: process.execPath }, editor))[0].ok, true);
+  } finally { await manager.close(); await rm(root, { recursive: true, force: true }); }
+});
 
 test('npm lifecycle, executable and simultaneous service trees survive reconnect and stop independently', { timeout: 180000 }, async () => {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-backend-')));

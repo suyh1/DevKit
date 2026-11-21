@@ -10,7 +10,7 @@ export function newJarClientId() {
 export type BackendKind = 'jar' | 'npm' | 'program';
 export const serviceLocation = (item: JarInstance) => item.kind === 'npm' ? item.workDir || '' : item.kind === 'program' ? item.program || '' : item.jar || '';
 export type JarInstance = JarPolicies & { id: string; hostId?: string; name: string; jar?: string; kind?: BackendKind; workDir?: string; program?: string; script?: string; executable: string; jvmArgs: string[]; appArgs: string[]; logMode: 'file' | 'silent' | 'console'; pidName: string; logName: string; stopTimeout: number };
-export type JarState = { backendTypes?: boolean; schemaVersion: number; revision: number; instances: JarInstance[]; platform: string; directory: string; groups?: HostGroup[] };
+export type JarState = { backendTypes?: boolean; backendChecks?: boolean; schemaVersion: number; revision: number; instances: JarInstance[]; platform: string; directory: string; groups?: HostGroup[] };
 export type JarHealth = { state: 'disabled' | 'unknown' | 'starting' | 'stopped' | 'healthy' | 'degraded' | 'unhealthy'; detail: string; checkedAt?: string; latency?: number; failures?: number };
 export type JarStatus = { id: string; state: 'running' | 'stopped' | 'exited' | 'unknown'; detail: string; checkedAt: string; pid?: number; businessPid?: number; uptime?: number; memory?: number; cpu?: number; size?: number; fileMissing?: boolean; executable?: string; pidPath: string; logPath: string; startedAt?: string; health?: JarHealth; supervision?: { active: boolean; state: string; attempts: number; nextRetryAt?: string; lastError?: string; logError?: string; profile?: string; pid?: number } };
 export type JarStartup = { enabled: boolean; mode: 'login' | 'boot'; platform: string; target?: string; installedAt?: string; error?: string };
@@ -20,7 +20,8 @@ export type JarConfigList = { directory: string; files: string[] };
 export type JarConfigDocument = { name: string; content: string; hash: string };
 export type JarCommand = 'start' | 'stop' | 'restart' | 'force-stop';
 export type JarConsoleSnapshot = { available: boolean; generation?: string; cursor?: number; end?: number; text?: string; reset?: boolean; truncated?: boolean; inputOpen: boolean; phase?: string; lease: { label: string; expiresAt: number; mine: boolean } | null };
-type JarAction = 'npm-scripts' | 'get' | 'detect' | 'statuses' | 'upsert' | 'remove' | 'command' | 'pick' | 'browse' | 'log-tail' | 'health-check' | 'startup-get' | 'startup-install' | 'startup-remove' | 'console-read' | 'console-claim' | 'console-input' | 'console-eof' | 'console-release' | 'config-list' | 'config-read' | 'config-save' | 'config-backup';
+export type ProbeLine = { ok: boolean; text: string };
+type JarAction = 'detect-npm' | 'check-program' | 'npm-scripts' | 'get' | 'detect' | 'statuses' | 'upsert' | 'remove' | 'command' | 'pick' | 'browse' | 'log-tail' | 'health-check' | 'startup-get' | 'startup-install' | 'startup-remove' | 'console-read' | 'console-claim' | 'console-input' | 'console-eof' | 'console-release' | 'config-list' | 'config-read' | 'config-save' | 'config-backup';
 declare global { interface Window { devkitJar?: { request: (action: JarAction, payload?: unknown) => Promise<unknown> } } }
 export async function jarRequest<T>(action: JarAction, payload?: unknown): Promise<T> {
   if (!window.devkitJar) return remoteRequest<T>('jar', action, payload);

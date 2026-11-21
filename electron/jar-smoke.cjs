@@ -53,11 +53,26 @@ module.exports = async (window, output) => {
     await click('添加服务');
     await wait('!!document.querySelector(".jar-dialog[open]")');
     await click('检测 Java', '.jar-dialog');
-    await wait('!!document.querySelector(".jar-dialog .jar-java-probe p[role=status]")?.textContent.trim()');
+    await wait('!!document.querySelector(".jar-dialog .jar-runtime-probe [role=status]")?.textContent.trim()');
     await click('可执行程序', '.jar-dialog');
     assert.ok(!await js("document.querySelector('.jar-dialog').textContent.includes('检测 Java')"));
+    assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe button').disabled"), true);
+    await fill('可执行程序绝对路径', process.execPath);
+    await click('检查可执行文件', '.jar-dialog');
+    await wait('document.querySelector(".jar-dialog .jar-runtime-probe .jar-help")?.textContent.includes("检查通过")');
+    await fill('可执行程序绝对路径', path.join(folder, 'missing.exe'));
+    assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
+    await click('检查可执行文件', '.jar-dialog');
+    await wait('document.querySelector(".jar-dialog .jar-runtime-probe .jar-error")?.textContent.includes("不存在")');
     await click('npm 项目', '.jar-dialog');
     assert.ok(!await js("document.querySelector('.jar-dialog').textContent.includes('检测 Java')"));
+    await click('检测 Node.js 和 npm', '.jar-dialog');
+    await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-help").length === 2');
+    await fill('公共环境变量', 'PATH=' + folder);
+    assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
+    await click('检测 Node.js 和 npm', '.jar-dialog');
+    await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-error").length === 2');
+    await fill('公共环境变量', '');
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] });
     await click('选择目录', '.jar-dialog');
     await wait('document.querySelector(".jar-dialog code")?.textContent === "npm run serve:test"');
@@ -371,7 +386,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
   const gatewayPort = gateway.address().port, gatewayOrigin = `http://127.0.0.1:${gatewayPort}`;
   await new Promise(resolve => gateway.close(resolve));
   const services = emptySharingServices();
-  services.jar = { enabled: true, edit: true, control: true };
+  services.jar = { enabled: true, edit: true, control: true, backend: true };
   services.nginx.enabled = true;
   const js = (target, source) => target.webContents.executeJavaScript(source, true);
   async function when(target, expression, timeout = 12_000) {
@@ -430,6 +445,11 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await wait('!document.querySelector(".jar-center button.run-button")?.disabled');
     await click('添加服务');
     await js(window, '{const field=document.querySelector(".jar-dialog select");field.selectedIndex=1;field.dispatchEvent(new Event("change",{bubbles:true}));}');
+    await wait('[...document.querySelectorAll(".jar-dialog button")].some(b => b.textContent === "npm 项目" && !b.disabled)');
+    await click('npm 项目', '.jar-dialog');
+    await click('检测 Node.js 和 npm', '.jar-dialog');
+    await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-help").length === 2');
+    await click('Java JAR', '.jar-dialog');
     await click('选择文件', '.jar-dialog');
     await wait('!!document.querySelector(".host-directory-path")');
     await when(window, '!document.querySelector(".host-directory-path .secondary-button")?.disabled');

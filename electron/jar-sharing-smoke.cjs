@@ -64,7 +64,7 @@ app.whenReady().then(async () => {
     const first = await portal(), second = await portal();
     await js(first, "document.querySelector('.jar-instance details').open = true");
     await click(first, '检测 Java');
-    await wait(first, 'document.querySelector(".jar-instance .jar-java-probe [role=status]")?.textContent.includes("java")');
+    await wait(first, 'document.querySelector(".jar-instance .jar-runtime-probe [role=status]")?.textContent.includes("java")');
     await js(first, "document.querySelector('.jar-instance details').open = false");
     await click(first, '取得输入控制权'); await wait(first, '!document.querySelector(".jar-console-input input").disabled');
     await wait(second, 'document.querySelector(".jar-console-control")?.textContent.includes("输入控制者")');

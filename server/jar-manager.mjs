@@ -10,7 +10,7 @@ import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-super
 import { createJarAutostart } from './jar-autostart.mjs';
 import { jarConfigs } from './jar-configs.mjs';
 
-import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
+import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, detectNpm, checkProgram, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
 
 const message = error => error.message || String(error);
 function absolute(value, label) {
@@ -267,13 +267,15 @@ export async function createJarManager(directory, dependencies = {}) {
     await Promise.all(state.instances.filter(item => item.logMode === 'console').map(item => supervisorRequest(item, 'console-revoke', 3000, { session: sessionKey(session) }).catch(() => {})));
   }
   async function request(action, value = {}, options = {}) {
-    if (['command', 'detect', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予服务运行管理权限。');
-    if (['upsert', 'remove'].includes(action) && options.allowEdit === false) throw new Error('未授予服务编辑权限。');
+    if (['command', 'detect', 'detect-npm', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予服务运行管理权限。');
+    if (['upsert', 'remove', 'detect-npm', 'check-program'].includes(action) && options.allowEdit === false) throw new Error('未授予服务编辑权限。');
     const selected = state.instances.find(item => item.id === (action === 'upsert' ? value.instance?.id : value.id));
-    if (options.allowBackend === false && (action === 'npm-scripts' || action === 'upsert' && !isJar(value.instance || {}) ||
+    if (options.allowBackend === false && (['npm-scripts', 'detect-npm', 'check-program'].includes(action) || action === 'upsert' && !isJar(value.instance || {}) ||
         selected && !isJar(selected) && !['log-tail', 'console-read', 'startup-get', 'monitor-probe'].includes(action))) {
       throw Object.assign(new Error('未授予 npm 与可执行程序管理权限。'), { status: 403 });
     }
+    if (action === 'detect-npm') return detectNpm(value.searchPath);
+    if (action === 'check-program') return checkProgram(absolute(value.program, '程序路径'));
     if (action === 'npm-scripts') {
       if (options.allowEdit === false) throw new Error('未授予编辑权限。');
       return projectScripts(absolute(value.directory, '项目目录'));
@@ -281,6 +283,7 @@ export async function createJarManager(directory, dependencies = {}) {
     if (action === 'get') {
       const result = snapshot();
       result.backendTypes = options.allowBackend !== false;
+      result.backendChecks = result.backendTypes;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;

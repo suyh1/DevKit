@@ -17,6 +17,18 @@ function parseEnv(text: string) {
   }
   return result;
 }
+export function npmSearchPath(draft: RuntimeDraft, platform: string) {
+  const active = draft.profiles.find(profile => profile.id === draft.profile);
+  const pathLine = platform === 'win32' ? /^\s*PATH\s*=(.*)$/i : /^\s*PATH\s*=(.*)$/;
+  let searchPath: string | undefined;
+  for (const text of [draft.envText, active?.text || '']) {
+    for (const line of text.split(/\r?\n/)) {
+      const match = pathLine.exec(line);
+      if (match) searchPath = match[1];
+    }
+  }
+  return searchPath;
+}
 export function runtimePayload(draft: RuntimeDraft): JarPolicies {
   return { health: draft.health, rotation: draft.rotation, restart: draft.restart, env: parseEnv(draft.envText), profile: draft.profile, profiles: draft.profiles.map(profile => ({ id: profile.id, name: profile.name, env: parseEnv(profile.text) })) };
 }

@@ -5,7 +5,7 @@ import { MotionButton } from './Motion';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
 import { jarRequest, serviceLocation, type BackendKind } from './jar-api';
-import JarRuntimeSettings, { runtimeDraft, runtimePayload } from './JarRuntimeSettings';
+import JarRuntimeSettings, { npmSearchPath, runtimeDraft, runtimePayload } from './JarRuntimeSettings';
 import JarStartupDialog from './JarStartupDialog';
 import JarConsole from './JarConsole';
 import ConfigFilesDialog from './ConfigFilesDialog';
@@ -18,7 +18,7 @@ import { HostProgress, useHostInventory } from './HostInventory';
 import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import { inventoryLinkStatus, missingResourceLink, openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 import { canWriteWorkspace, canOperateJar, canReadWorkspaceLogs, remoteAccess } from './workspace-remote';
-import type { JarInstance, JarState, JarStatus, JavaDetection, JarLog, JarCommand } from './jar-api';
+import type { JarInstance, JarState, JarStatus, JavaDetection, ProbeLine, JarLog, JarCommand } from './jar-api';
 import './jar.css';
 
 const basename = (value: string) => value.split(/[\\/]/).pop() || value;
@@ -28,21 +28,28 @@ const labels = { running: '运行中', stopped: '已停止', exited: '已退出'
 const healthLabels = { disabled: '未检测', unknown: '待检测', starting: '启动宽限中', stopped: '未运行', healthy: '健康', degraded: '检测波动', unhealthy: '不健康' };
 const supervisionLabels: Record<string, string> = { starting: '正在启动', running: '独立守护中', backoff: '等待重试', exhausted: '重试已达上限', exited: '进程已退出', blocked: '需要处理', stopping: '正在停止' };
 
-function JavaProbe({ hostId, executable, disabled }: { hostId: string; executable: string; disabled: boolean }) {
+function RuntimeProbe({ label, disabled, check }: { label: string; disabled: boolean; check: () => Promise<ProbeLine[]> }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<JavaDetection | null>(null);
+  const [lines, setLines] = useState<ProbeLine[]>([]);
   const [error, setError] = useState('');
   async function detect() {
-    setBusy(true); setResult(null); setError('');
-    try { setResult(await jarRequest<JavaDetection>('detect', { hostId, executable })); }
+    setBusy(true); setLines([]); setError('');
+    try { setLines(await check()); }
     catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
-  return <div className="jar-java-probe">
-    <MotionButton type="button" className="text-button" disabled={disabled || busy} busy={busy} onClick={() => void detect()}>检测 Java</MotionButton>
-    {result && <p role="status" className={result.found ? 'jar-help' : 'jar-error'}>{result.found ? result.version + ' · ' + result.executable : result.output}</p>}
+  return <div className="jar-runtime-probe">
+    <MotionButton type="button" className="text-button" disabled={disabled || busy} busy={busy} onClick={() => void detect()}>{label}</MotionButton>
+    {lines.length > 0 && <div role="status">{lines.map(line => <p key={line.text} className={line.ok ? 'jar-help' : 'jar-error'}>{line.text}</p>)}</div>}
     {error && <p role="alert" className="jar-error">{error}</p>}
   </div>;
+}
+
+function JavaProbe({ hostId, executable, disabled }: { hostId: string; executable: string; disabled: boolean }) {
+  return <RuntimeProbe label="检测 Java" disabled={disabled} check={async () => {
+    const result = await jarRequest<JavaDetection>('detect', { hostId, executable });
+    return [{ ok: result.found, text: result.found ? result.version + ' · ' + result.executable : result.output }];
+  }} />;
 }
 
 function JarForm({ active, instance, state, close, saved }: { active: boolean; instance?: JarInstance; state: JarState; close: () => void; saved: () => void }) {
@@ -54,6 +61,8 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
   const [hostId, setHostId] = useState(instance?.hostId || ''), [picker, setPicker] = useState<'jar' | 'executable' | 'directory' | 'program' | null>(null);
   const group = targetGroup(state.groups, hostId), allowControl = group?.control ?? canOperateJar();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const searchPath = draft.kind === 'npm' ? npmSearchPath(runtime, group?.platform || state.platform) : undefined;
+  const checksAvailable = hostId ? group?.backendChecks : state.backendChecks;
   const dialog = useRef<HTMLDialogElement>(null), heading = useId(), confirm = useConfirmation();
   const dirty = JSON.stringify([draft, runtime]) !== baseline.current;
   useBeforeUnload(dirty);
@@ -112,7 +121,10 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
         <JavaProbe key={JSON.stringify([hostId, draft.executable])} hostId={hostId} executable={draft.executable} disabled={!allowControl} />
         </>}
         {draft.kind === 'program' && <label>可执行程序绝对路径<span className="jar-path-input"><input required value={draft.program} onChange={e => patch({ program: e.target.value })} /><button type="button" className="secondary-button" onClick={() => pick('program')}>选择程序</button></span></label>}
+        {draft.kind === 'program' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, draft.program])} label="检查可执行文件" disabled={!draft.program.trim()} check={() => jarRequest<ProbeLine[]>('check-program', { hostId, program: draft.program })} />}
         {draft.kind !== 'jar' && <label>{draft.kind === 'npm' ? '项目目录' : '工作目录（默认程序所在目录）'}<span className="jar-path-input"><input required={draft.kind === 'npm'} value={draft.workDir} onChange={e => { patch({ workDir: e.target.value, script: '' }); setScripts([]); }} /><button type="button" className="secondary-button" onClick={() => pick('directory')}>选择目录</button></span></label>}
+        {draft.kind === 'npm' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, searchPath])} label="检测 Node.js 和 npm" disabled={!allowControl} check={() => jarRequest<ProbeLine[]>('detect-npm', { hostId, searchPath })} />}
+        {draft.kind !== 'jar' && !checksAvailable && <p className="jar-help">升级目标主机的 DevKit 后即可在此表单检测。</p>}
         {draft.kind === 'npm' && <label>npm 启动脚本<span className="jar-path-input"><select required value={draft.script} onChange={e => patch({ script: e.target.value })}><option value="">选择脚本</option>{scripts.map(name => <option key={name}>{name}</option>)}</select><button type="button" className="secondary-button" disabled={!draft.workDir} onClick={() => void task(() => readScripts(draft.workDir))}>读取脚本</button></span></label>}
         {draft.kind === 'npm' && draft.script && <p className="jar-help">启动命令 <code>{draft.script === 'start' ? 'npm start' : 'npm run ' + draft.script}</code></p>}
         <div className="jar-form-grid">{draft.kind === 'jar' && <label>JVM 参数（每行一个）<textarea rows={4} value={draft.jvm} onChange={event => patch({ jvm: event.target.value })} placeholder={'-Xms256m\n-Xmx1024m\n-Dfile.encoding=UTF-8'} /></label>}<label>应用参数（每行一个）<textarea rows={4} value={draft.args} onChange={event => patch({ args: event.target.value })} placeholder={draft.kind === 'jar' ? '--spring.profiles.active=test\n--server.port=8080' : '--port=8080'} /></label></div>

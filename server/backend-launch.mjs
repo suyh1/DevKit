@@ -2,6 +2,9 @@ import { access, open, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { constants } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { effectiveEnvironment } from './jar-policies.mjs';
 import { matchesJar, pathKey } from './jar-process.mjs';
@@ -10,6 +13,7 @@ export const isJar = item => !item.kind || item.kind === 'jar';
 export const serviceDirectory = item => isJar(item) ? path.dirname(item.jar) : item.workDir;
 export const serviceEntry = item => item.kind === 'npm' ? path.join(item.workDir, 'package.json') : item.kind === 'program' ? item.program : item.jar;
 const windows = process.platform === 'win32';
+const execute = promisify(execFile);
 export const jobRunner = fileURLToPath(new URL('./backend-job.mjs', import.meta.url));
 
 export async function projectScripts(directory) {
@@ -49,9 +53,70 @@ async function npmRuntime(env) {
       const resolved = await realpath(candidate).catch(() => undefined);
       if (resolved) cli = resolved;
     }
-    if (node && cli) return { node, cli };
+    if (node && cli) break;
   }
-  throw new Error('目标主机找不到 Node.js 或 npm CLI，请检查服务环境的 PATH。');
+  return { node, cli };
+}
+
+export async function detectNpm(searchPath) {
+  if (searchPath !== undefined && (typeof searchPath !== 'string' || searchPath.length > 16000 || searchPath.includes('\0'))) throw new Error('PATH 无效。');
+  const env = effectiveEnvironment({ env: searchPath === undefined ? {} : { PATH: searchPath } });
+  const { node, cli } = await npmRuntime(env);
+  async function version(label, file, executable, args) {
+    if (!file) return { ok: false, text: label + '：在目标主机的 PATH 中未找到。' };
+    if (!executable) return { ok: false, text: label + '：缺少 Node.js，无法读取版本 · ' + file };
+    try {
+      const { stdout } = await execute(executable, [...args, '--version'], { env, cwd: tmpdir(), shell: false, windowsHide: true, timeout: 5000, maxBuffer: 32768 });
+      const value = stdout.trim();
+      if (/^v?\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.+-]+)?$/.test(value)) return { ok: true, text: label + ' ' + value + ' · ' + file };
+    } catch { /* Report the resolved path even if version detection failed. */ }
+    return { ok: false, text: label + '：版本检测失败，请检查安装和执行权限 · ' + file };
+  }
+  return Promise.all([version('Node.js', node, node, []), version('npm', cli, windows ? node : cli, windows ? [cli] : [])]);
+}
+
+export async function checkProgram(filename) {
+  let file;
+  try {
+    const resolved = await realpath(filename);
+    if (!(await stat(resolved)).isFile()) throw new Error('请选择普通程序文件。');
+    if (windows && path.extname(filename).toLowerCase() !== '.exe') throw new Error('请选择 Windows .exe 程序。');
+    await access(resolved, windows ? constants.R_OK : constants.X_OK);
+    file = await open(resolved, constants.O_RDONLY | (constants.O_NONBLOCK || 0));
+    const head = Buffer.alloc(256);
+    const { bytesRead } = await file.read(head, 0, head.length, 0);
+    let detail, architecture;
+    if (windows) {
+      const pe = Buffer.alloc(26);
+      const validDos = bytesRead >= 64 && head.toString('latin1', 0, 2) === 'MZ';
+      const offset = validDos ? head.readUInt32LE(60) : 0;
+      if (!validDos || offset < 64 || (await file.read(pe, 0, pe.length, offset)).bytesRead !== pe.length ||
+          pe.readUInt32LE(0) !== 0x4550 || !(pe.readUInt16LE(22) & 2) || (pe.readUInt16LE(22) & 0x2000) ||
+          ![0x10b, 0x20b].includes(pe.readUInt16LE(24))) throw new Error('文件不是有效的 Windows PE 可执行程序。');
+      detail = 'Windows .exe 文件格式检查通过';
+      architecture = ({ 0x14c: 'ia32', 0x8664: 'x64', 0xaa64: 'arm64' })[pe.readUInt16LE(4)];
+    } else {
+      const elf = bytesRead >= 52 && head.readUInt32BE(0) === 0x7f454c46 && [1, 2].includes(head[4]) && [1, 2].includes(head[5]);
+      if (elf && [2, 3].includes(head[5] === 1 ? head.readUInt16LE(16) : head.readUInt16BE(16))) {
+        detail = 'ELF 程序格式和执行权限检查通过';
+        const machine = head[5] === 1 ? head.readUInt16LE(18) : head.readUInt16BE(18);
+        architecture = ({ 3: 'ia32', 62: 'x64', 40: 'arm', 183: 'arm64' })[machine];
+      } else {
+        const interpreter = /^#![ \t]*(\/[^ \t\n\0]+)/.exec(head.toString('utf8', 0, bytesRead))?.[1];
+        if (!interpreter) throw new Error('文件有执行权限，但未识别为 ELF 程序或带解释器声明的脚本。');
+        if (!(await stat(interpreter).catch(() => null))?.isFile()) throw new Error('找不到脚本声明的解释器。');
+        await access(interpreter, constants.X_OK).catch(() => { throw new Error('脚本解释器缺少执行权限。'); });
+        detail = '脚本解释器和执行权限检查通过';
+      }
+    }
+    if (architecture && architecture !== process.arch) {
+      return [{ ok: false, text: detail + '；程序架构为 ' + architecture + '，主机运行时为 ' + process.arch + '，请确认系统兼容支持。' }];
+    }
+    return [{ ok: true, text: detail + ' · ' + resolved }];
+  } catch (error) {
+    const reason = { ENOENT: '所选文件不存在。', ENOTDIR: '所选文件的路径无效。', EACCES: '当前账号缺少读取或执行权限。', EPERM: '当前账号无权检查此文件。' };
+    return [{ ok: false, text: reason[error.code] || error.message }];
+  } finally { await file?.close(); }
 }
 
 export async function launchSpec(item, detect) {
@@ -66,6 +131,7 @@ export async function launchSpec(item, detect) {
   if (item.kind === 'npm') {
     if (!(await projectScripts(directory)).includes(item.script)) throw new Error('package.json 中找不到所选 npm 脚本。');
     const { node, cli } = await npmRuntime(effectiveEnvironment(item));
+    if (!node || !cli) throw new Error('目标主机找不到 Node.js 或 npm CLI，请检查服务环境的 PATH。');
     const args = item.script === 'start' ? ['start'] : ['run', item.script];
     if (item.appArgs.length) args.push('--', ...item.appArgs);
     return windows ? { executable: node, args: [cli, ...args] } : { executable: cli, args };
