@@ -98,7 +98,6 @@
   --editor-active: color-mix(in srgb, var(--accent) 5%, transparent);
   --editor-selection: color-mix(in srgb, var(--accent) 23%, transparent);
   --selection: color-mix(in srgb, var(--accent) 28%, transparent);
-  --editor-focus-line: var(--accent); --focus-shadow: color-mix(in srgb, var(--accent) 10%, transparent);
   --button-shadow: color-mix(in srgb, var(--accent) 16%, transparent);
   --color-story-background: linear-gradient(135deg, var(--surface), var(--tint));
 }
@@ -135,7 +134,6 @@
 .theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
 .theme-option { display: grid; grid-template-columns: 18px 1fr; align-content: start; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; transition: background 180ms, border-color 180ms; }
 .theme-option:has(input:checked) { border-color: var(--accent); background: var(--tint); }
-.theme-option:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .theme-option:hover { border-color: var(--accent); }
 .theme-option input { margin: 3px 0 0; accent-color: var(--accent); }
 .theme-option strong, .theme-option small { grid-column: 1 / -1; }

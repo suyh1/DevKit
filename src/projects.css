@@ -604,11 +604,6 @@ body:has(.pc-login) {
 .pc-dialog button:disabled {
   cursor: not-allowed;
 }
-.project-center :is(button, input, select, summary):focus-visible,
-.pc-dialog :is(button, input, select, summary):focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
-}
 .project-center .text-button,
 .pc-dialog .text-button {
   display: inline-flex;

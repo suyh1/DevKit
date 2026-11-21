@@ -48,7 +48,8 @@ def write_bundle(bundle):
         for source in sorted((root / folder).iterdir()):
             if source.suffix in {'.mjs', '.sh', '.ps1'} and not source.name.endswith(('.check.mjs', '.test.mjs')):
                 bundle.write(source, f'{folder}/{source.name}')
-    bundle.write(root / 'shared/scrollbars.css', 'shared/scrollbars.css')
+    for stylesheet in ('scrollbars.css', 'focus.css'):
+        bundle.write(root / 'shared' / stylesheet, 'shared/' + stylesheet)
     for name in json.loads((root / 'scripts/server-runtime.json').read_text(encoding='utf-8')):
         source_folder = root / 'node_modules' / name
         if not (source_folder / 'package.json').is_file():

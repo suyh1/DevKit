@@ -73,10 +73,6 @@
   background: var(--soft);
   border-color: var(--muted);
 }
-.collab-page :is(button, input, select, textarea, summary):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 .collab-page button:disabled {
   opacity: 0.48;
   cursor: default;

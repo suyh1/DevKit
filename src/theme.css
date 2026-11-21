@@ -17,3 +17,5 @@
 @import './display-mode.css';
 @import './adaptations.css';
 @import './select.css';
+@import '../shared/focus.css';
+@import './focus-controls.css';

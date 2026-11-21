@@ -15,7 +15,7 @@
 .monitor-chart { margin:0; }.monitor-chart svg { width:100%; display:block; }.monitor-chart figcaption { font-size:10px; color:var(--muted); text-align:right; }.monitor-incidents { list-style:none; margin:0; padding:0; max-height:300px; overflow:auto; }.monitor-incidents li { padding:12px 0; border-bottom:1px solid var(--line); }.monitor-incidents strong { font-size:12px; }.monitor-incidents p { margin:5px 0; font-size:11px; }.monitor-incidents small { color:var(--muted); font-size:10px; line-height:1.8; }.monitor-samples { margin-top:20px; font-size:11px; }.monitor-samples summary { cursor:pointer; }.monitor-samples ul { list-style:none; padding:0; max-height:240px; overflow:auto; }.monitor-samples li { padding:8px 0; border-bottom:1px solid var(--line); }.monitor-samples small { display:block; color:var(--muted); margin-top:5px; overflow-wrap:anywhere; line-height:1.6; }
 .monitor-empty { text-align:center; padding:60px 18px; color:var(--muted); background:var(--surface); border:1px dashed var(--line); border-radius:12px; }.monitor-empty>svg { color:var(--accent); }.monitor-empty h2 { color:var(--text); font-size:18px; }.monitor-empty p { line-height:1.8; }.monitor-empty button { margin:12px auto 0; }
 .monitor-form .pc-modal-body { display:grid; gap:14px; }.monitor-form-row { display:flex; gap:12px; flex-wrap:wrap; }.monitor-form-row>label { flex:1 1 130px; min-width:0; }.monitor-form input,.monitor-form select { width:100%; min-width:0; }.monitor-form fieldset { border:1px solid var(--line); border-radius:8px; padding:12px; margin:0; min-width:0; }.monitor-form legend { color:var(--muted); font-size:12px; }.monitor-enabled { display:flex; gap:8px; align-items:center; font-size:12px; }.monitor-enabled input { width:auto; }.monitor-form-hint { font-size:11px; color:var(--muted); line-height:1.7; margin:0; }
-.monitor-center button:disabled { opacity:.45; cursor:not-allowed; }.monitor-center :is(button,input,select,summary):focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.monitor-center button:disabled { opacity:.45; cursor:not-allowed; }
 .monitor-detail .monitor-return { display: none; }
 .monitor-detail { scroll-margin-block-start: 14px; }
 @media(max-width:1100px) {
@@ -30,7 +30,6 @@
 .monitor-incidents > li { padding-inline-start: 9px; }
 .monitor-incidents time { margin-inline-start: 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .monitor-status.maintenance { color: var(--warning); }
-.monitor-toolbar label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .monitor-chart-reading { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; justify-content:space-between; font-variant-numeric:tabular-nums; }
 .monitor-chart-reading strong { font-size:18px; }
 .monitor-chart-reading time { color:var(--muted); font-size:11px; }
@@ -41,4 +40,4 @@
 .monitor-chart-plot input { position:absolute; top:0; bottom:0; left:calc(2.6667% - 1px); width:calc(94.6666% + 2px); height:100%; margin:0; appearance:none; background:transparent; opacity:0; cursor:ew-resize; touch-action:pan-y; }
 .monitor-chart-plot input::-webkit-slider-thumb { appearance:none; width:2px; height:12px; }
 .monitor-chart-plot input::-moz-range-thumb { width:2px; }
-.monitor-chart-plot:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
+.monitor-chart-plot:has(input:focus-visible) { outline: var(--focus-outline); outline-offset:2px; }

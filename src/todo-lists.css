@@ -218,7 +218,6 @@ button.td-preview-check:hover { border-color: var(--accent); background: var(--t
 }
 .td-more > div > button { justify-content: flex-start; white-space: nowrap; }
 .td-toolbar .td-more:has(+ .td-shortcuts) > div { inset-inline-end: auto; inset-inline-start: 0; }
-.td-editor .cm-editor.cm-focused { outline: 2px solid var(--accent); outline-offset: -2px; }
 .td-editor .cm-scroller { font-family: var(--font-mono); }
 @container (max-width: 720px) {
   .td-documents:has(.td-document-picker) { grid-template-columns: auto minmax(0, 1fr); align-items: center; }

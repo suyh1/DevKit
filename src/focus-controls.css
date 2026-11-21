@@ -1,0 +1,39 @@
+/* The search icon and its borderless input share one visible field. */
+:is(.kb-search, .jar-search, .lan-search, .pl-search, .library-search,
+    .command-search, .monitor-toolbar > label):has(> input:focus) {
+  --field-mark: none;
+  --field-outline: none;
+  border-bottom-color: var(--focus-ink);
+}
+
+/* Mark the editor viewport, so the cue stays put when its contents scroll. */
+.cm-editor .cm-content:focus {
+  --field-mark: none;
+  outline: none;
+}
+.cm-editor.cm-focused::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 1;
+  border-inline-start: 1px solid var(--focus-ink);
+  pointer-events: none;
+}
+
+/* These widgets paint the keyboard indicator on behalf of an invisible input. */
+.color-field-picker:has(input:focus-visible) input,
+.lan-choice:has(input:focus-visible) input {
+  outline: none;
+}
+
+@media (forced-colors: active) {
+  :is(.kb-search, .jar-search, .lan-search, .pl-search, .library-search,
+      .command-search, .monitor-toolbar > label):has(> input:focus) {
+    outline: var(--focus-outline);
+    outline-offset: -2px;
+  }
+  .cm-editor.cm-focused::after {
+    border-inline-start-width: 2px;
+  }
+}

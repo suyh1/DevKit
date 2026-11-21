@@ -68,9 +68,6 @@
 .jar-config-directory > div { display: grid; gap: 3px; min-width: 0; }
 .jar-config-directory code { color: var(--text); overflow-wrap: anywhere; }
 .jar-config-dialog .pc-field-action select { background: var(--surface); }
-.jar-config-dialog .pc-field-action select:focus-visible {
-  outline-offset: 2px;
-}
 .jar-configs :is(.jar-help, .jar-error, .change-preview, .preview-note) { margin: 0; }
 .jar-config-editor {
   height: clamp(180px, 43dvh, 460px);
@@ -107,7 +104,7 @@
 .jar-compact .jar-table .jar-instance td:last-child { grid-column:1 / -1; border-top:1px solid var(--line); }
 .jar-compact .jar-instance .jar-row-actions .text-button { min-height:34px; }
 
-.jar-instance[data-linked] { outline:2px solid var(--accent); outline-offset:-2px; }
+.jar-instance[data-linked] { border-color: var(--focus-ink); }
 
 .jar-instance-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .jar-instance .jar-target { font-size: 12px; }

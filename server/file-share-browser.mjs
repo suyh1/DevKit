@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 
 const entriesPerPage = 100;
 const scrollbars = readFileSync(new URL('../shared/scrollbars.css', import.meta.url), 'utf8');
+const focusStyles = readFileSync(new URL('../shared/focus.css', import.meta.url), 'utf8');
 const maxArchiveEntries = 25_000;
 const maxDepth = 64;
 const collator = new Intl.Collator('zh-CN', { numeric: true });
@@ -134,7 +135,7 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
   body { margin: 0; background: var(--canvas); color: var(--ink); font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
   main { max-width: 1056px; margin: auto; padding: clamp(12px, 3vw, 32px); }
   a { color: var(--link); text-underline-offset: 3px; }
-  :is(a,button,input):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  ${focusStyles}
   .trail, .heading, .tools, .pages { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .trail { min-height: 28px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
   .trail a { min-width: 0; }

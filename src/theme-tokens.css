@@ -15,7 +15,7 @@
   --syntax-key: #4270ac; --syntax-string: #6d5793; --syntax-number: #a45b28;
   --syntax-keyword: #8e53b1; --syntax-comment: #556878; --syntax-type: #9a6821; --syntax-function: #3566b2;
   --editor-gutter: #f8f9fb; --editor-active: #3d5fad07; --editor-selection: #b9ccf766;
-  --selection: #b9ccf780; --editor-focus-line: #365fae; --focus-shadow: #3d5fad08;
+  --selection: #b9ccf780;
   --button-shadow: #3d5fad24;
   --ease-out: cubic-bezier(.2,.7,.2,1);
 }
@@ -31,6 +31,6 @@
   --syntax-key: #a9c2f3; --syntax-string: #b5c5a2; --syntax-number: #e8bc8b;
   --syntax-keyword: #c7ade8; --syntax-comment: #a2b1c8; --syntax-type: #dec995; --syntax-function: #b4c7f4;
   --editor-gutter: #263141; --editor-active: #ffffff05; --editor-selection: #b4caff3d;
-  --selection: #b4caff4d; --editor-focus-line: var(--accent); --focus-shadow: #b4caff14;
+  --selection: #b4caff4d;
   --button-shadow: #b4caff24;
 }

@@ -109,7 +109,7 @@
 }
 .lan-choice:hover { border-color: var(--lan-choice-border); }
 .lan-choice:has(input:checked) { border-color: var(--lan-choice-border); background: var(--lan-selected); }
-.lan-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lan-choice:has(input:focus-visible) { outline: var(--focus-outline); outline-offset: 2px; }
 .lan-choice :is(input[type=radio], input[type=checkbox]) { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; margin: 0; }
 .lan-choice-icon { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 7px; background: var(--surface); color: var(--muted); }
 .lan-choice:has(input:checked) .lan-choice-icon { color: var(--accent); }
@@ -130,11 +130,6 @@
   border-radius: 7px;
 }
 .lan-field input::placeholder { color: var(--muted); opacity: .8; }
-.pc-dialog.lan-host-dialog .lan-field :is(input, select):focus {
-  outline: 0;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
-}
 .lan-field.lan-import-source { grid-template-rows: auto auto; }
 .lan-import-source textarea {
   width: 100%; min-width: 0; min-height: calc(6lh + 18px); resize: vertical;
@@ -295,4 +290,4 @@
 .lan-host-list .lan-connection-select[aria-expanded=true] { background: var(--tint); color: var(--accent); }
 .lan-host-list .pc-actions[hidden] { display: none; }
 .lan-terminal-tabs small { font-family: var(--font-mono); color: var(--muted); }
-.lan-rdp-viewport > div:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lan-rdp-viewport > div:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }

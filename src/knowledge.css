@@ -57,9 +57,6 @@
   color: inherit;
   background: transparent;
 }
-.kb-search:focus-within {
-  outline: 2px solid var(--accent);
-}
 .kb-fields,
 .kb-picker {
   display: grid;
@@ -367,8 +364,10 @@
   display: none;
 }
 .kb-location {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  background-color: var(--tint);
+  text-decoration: underline;
+  text-decoration-color: var(--focus-ink);
+  text-underline-offset: .22em;
 }
 .kb-backlinks {
   margin-top: 20px;

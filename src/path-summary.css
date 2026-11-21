@@ -1,4 +1,3 @@
 .path-summary { min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .path-summary summary { cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.path-summary summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .path-summary > code { display: block; margin-block-start: 3px; padding-inline-start: 12px; color: var(--text); overflow-wrap: anywhere; user-select: text; }

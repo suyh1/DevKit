@@ -504,7 +504,7 @@
   background: var(--surface);
   color: var(--accent);
 }
-.ng-impact:focus {
-  outline: 2px solid var(--accent);
+.ng-impact:focus-visible {
+  outline: var(--focus-outline);
   outline-offset: -2px;
 }

@@ -85,6 +85,16 @@ module.exports = async function checkProjects(window, output, staging) {
   assert.equal(monitorFixture.error, undefined);
   await click("添加项目");
   await field("项目名称", "管理控制台");
+  const fieldMark = await js(`(() => {
+    const field = [...document.querySelectorAll('dialog[open] label')].find(label => label.querySelector('span')?.textContent === '项目名称').querySelector('input');
+    const before = field.getBoundingClientRect();
+    field.focus();
+    const after = field.getBoundingClientRect(), s = getComputedStyle(field);
+    return { outline: s.outlineStyle, shadow: s.boxShadow, stable: before.width === after.width && before.height === after.height };
+  })()`);
+  assert.equal(fieldMark.outline, 'none');
+  assert.match(fieldMark.shadow, /inset/);
+  assert.equal(fieldMark.stable, true);
   await field("唯一编码", "admin");
   await field("分组", "业务应用");
   await field("说明", "项目定义与环境配置独立维护");

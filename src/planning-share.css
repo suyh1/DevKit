@@ -16,10 +16,6 @@
   margin-inline: auto;
   font-size: 13px;
 }
-.planning-workspace :is(button, a, select, input, summary, textarea):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 .planning-workspace :is(h1, h2, h3, p, dl, dd) { margin: 0; }
 .planning-workspace :is(h1, h2, h3, strong, p, code) { overflow-wrap: anywhere; }
 .planning-workspace svg { flex-shrink: 0; stroke-width: 1.65; }
@@ -75,7 +71,6 @@
 }
 .pl-select { max-width: 100%; padding: 0 8px; }
 .pl-search { display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--pl-quiet); }
-.pl-search:focus-within { border-color: var(--accent); }
 .pl-search input {
   min-width: 0;
   width: 100%;

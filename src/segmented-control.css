@@ -15,4 +15,4 @@
 .segmented-control > button:disabled { opacity: .48; cursor: default; }
 .choice-field .segmented-control > button[aria-pressed=true], .collab-page .segmented-control > button[aria-pressed=true],
 .geo-field .segmented-control > button[aria-pressed=true], .feature-toolbar .segmented-control > button[aria-pressed=true] { color: var(--accent); }
-.choice-field .segmented-control > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.choice-field .segmented-control > button:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }

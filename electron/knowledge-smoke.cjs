@@ -70,6 +70,15 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
       await click('.kb-writing-tools', mode);
     }
     async function previewAndResume(title) {
+      await run('document.querySelector(' + q(source) + ').focus()');
+      await until('!!document.querySelector(".kb-source-pane .cm-focused")');
+      assert.equal(await run('getComputedStyle(document.activeElement).outlineStyle'), 'none');
+      assert.equal(
+        await run(
+          'getComputedStyle(document.querySelector(".kb-source-pane .cm-focused"), "::after").borderInlineStartWidth',
+        ),
+        '1px',
+      );
       const scroll = await run(
         '(()=>{const s=document.querySelector(".kb-source-pane .cm-scroller");s.scrollTop=s.scrollHeight;return s.scrollTop})()',
       );
@@ -229,6 +238,7 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
     await until(
       'location.hash.includes("~h") && document.querySelector(".kb-location")?.textContent==="服务术语"',
     );
+    await require('./focus-smoke.cjs')(wc, wait, output, narrow);
     console.log(
       (narrow ? '390px shared browser' : '1440px desktop') +
         ' wrote, previewed, resumed after reload, saved and reopened both articles; confirmed cross-module batch, backlinks, search and section navigation. Editor dimensions ' +

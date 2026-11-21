@@ -122,7 +122,6 @@ body { letter-spacing: .05px; }
 .color-secondary-button:hover:not(:disabled),
 .color-formats button:hover,
 .color-saved:hover { border-color: var(--accent); }
-.color-field-row:focus-within { box-shadow: 0 0 0 2px var(--focus-shadow); }
 .color-live { border-color: var(--line); }
 .color-image-empty { border-color: var(--line); }
 .color-image-empty:hover { border-color: var(--accent); }
@@ -174,7 +173,7 @@ body { letter-spacing: .05px; }
 .setting-row .segmented-control > button,
 .option .segmented-control > button,
 .pc-state-filter.segmented-control > button { font-size:12px; font-weight:550; padding-inline:10px; }
-.segmented-control > button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.segmented-control > button:focus-visible { outline: var(--focus-outline); outline-offset:-2px; }
 .option:has(> .segmented-control) { min-width:0; max-width:100%; flex-wrap:wrap; }
 .pc-state-filter { grid-column:1/-1; }
 .project-center .pc-content { background:var(--bg); }

@@ -1,0 +1,38 @@
+/* Shared by desktop, portal, standalone transfer and the server-rendered file browser. */
+:root {
+  --focus-ink: color-mix(in srgb, var(--accent) 85%, var(--muted));
+  --focus-outline: 1px solid var(--focus-ink);
+  --field-outline: none;
+}
+
+:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+}
+
+:where(input[type=checkbox], input[type=radio], input[type=range]) {
+  accent-color: var(--accent);
+}
+
+/* Text controls can match :focus-visible even after a pointer click. Give
+   typing and selection a steady baseline that also works on borderless fields. */
+:is(input:not(:where([type=checkbox], [type=radio], [type=range], [type=color],
+    [type=button], [type=submit], [type=reset], [type=image], [type=file], [type=hidden])),
+    textarea, select, [contenteditable=true]):focus {
+  outline: var(--field-outline);
+  outline-offset: -1px;
+  box-shadow: var(--field-mark, inset 0 -1px 0 var(--field-ink, var(--focus-ink)));
+}
+
+[aria-invalid=true] {
+  --field-ink: var(--error);
+}
+
+@media (forced-colors: active) {
+  :root {
+    --focus-ink: Highlight;
+    --focus-outline: 2px solid Highlight;
+    --field-outline: var(--focus-outline);
+    --field-mark: none;
+  }
+}
