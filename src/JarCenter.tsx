@@ -18,7 +18,7 @@ import { HostProgress, useHostInventory } from './HostInventory';
 import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import { inventoryLinkStatus, missingResourceLink, openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
 import { canWriteWorkspace, canOperateJar, canReadWorkspaceLogs, remoteAccess } from './workspace-remote';
-import type { JarInstance, JarState, JarStatus, JavaDetection, ProbeLine, JarLog, JarCommand } from './jar-api';
+import type { JarInstance, JarState, JarStatus, JavaDetection, RuntimeList, ProbeLine, JarLog, JarCommand } from './jar-api';
 import './jar.css';
 
 const basename = (value: string) => value.split(/[\\/]/).pop() || value;
@@ -45,6 +45,38 @@ function RuntimeProbe({ label, disabled, check }: { label: string; disabled: boo
   </div>;
 }
 
+function RuntimePathField({ kind, hostId, available, allowControl, value, change, browse }: {
+  kind: 'java' | 'node'; hostId: string; available: boolean; allowControl: boolean; value: string; change: (path: string) => void; browse: () => void;
+}) {
+  const name = kind === 'node' ? 'Node.js' : 'Java';
+  const [list, setList] = useState<RuntimeList | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const id = useId(), input = useRef<HTMLInputElement>(null);
+  async function discover() {
+    setBusy(true); setList(null); setError('');
+    try { setList(await jarRequest<RuntimeList>('list-runtimes', { kind, hostId })); }
+    catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
+  }
+  return <div className="jar-runtime-field">
+    <label htmlFor={id}>{name} 程序路径（可选）</label>
+    <div className="jar-path-input">
+      <input id={id} ref={input} value={value} onChange={event => change(event.target.value)} placeholder={kind === 'java' ? '留空：检测 JAVA_HOME 和 PATH' : '留空使用服务环境的 PATH'} />
+      {available && <button type="button" className="secondary-button" disabled={busy || !allowControl} onClick={() => void discover()}>查找已安装版本</button>}
+      <button type="button" className="text-button" onClick={browse}>手动选文件</button>
+    </div>
+    {busy && <Skeleton kind="list" label={'正在目标主机查找 ' + name + ' 版本'} />}
+    {error && <p role="alert" className="jar-error">{error}</p>}
+    {list && <>
+      {list.installations.length > 0 ? <ul aria-label={'目标主机上的 ' + name + ' 版本'}>{list.installations.map(item =>
+        <li key={item.executable}><button type="button" aria-pressed={value === item.executable} onClick={() => { change(item.executable); setList(null); input.current?.focus(); }}>
+          <strong>{name} {item.version}</strong><span>{item.executable}</span>
+        </button></li>)}</ul> : <p role="status" className="jar-help">常用安装目录中未找到可用的 {name}，可手动选择程序文件。</p>}
+      {list.truncated && <p className="jar-help">已达到本次查找上限，其他安装可手动选择。</p>}
+    </>}
+  </div>;
+}
+
 function JavaProbe({ hostId, executable, disabled }: { hostId: string; executable: string; disabled: boolean }) {
   return <RuntimeProbe label="检测 Java" disabled={disabled} check={async () => {
     const result = await jarRequest<JavaDetection>('detect', { hostId, executable });
@@ -63,6 +95,7 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const searchPath = draft.kind === 'npm' ? npmSearchPath(runtime, group?.platform || state.platform) : undefined;
   const supportsNodePath = hostId ? group?.supportsNodePath : state.supportsNodePath;
+  const discoveryAvailable = !!(hostId ? group?.runtimeDiscovery : state.runtimeDiscovery);
   const checksAvailable = hostId ? group?.backendChecks : state.backendChecks;
   const dialog = useRef<HTMLDialogElement>(null), heading = useId(), confirm = useConfirmation();
   const dirty = JSON.stringify([draft, runtime]) !== baseline.current;
@@ -120,13 +153,13 @@ function JarForm({ active, instance, state, close, saved }: { active: boolean; i
         <label>显示名称<input required maxLength={120} value={draft.name} onChange={event => patch({ name: event.target.value })} placeholder="例如：订单服务 · 测试环境" /></label>
         {draft.kind === 'jar' && <><label>JAR 文件绝对路径<span className="jar-path-input"><input required value={draft.jar} onChange={event => patch({ jar: event.target.value })} onBlur={() => { if (!draft.name && draft.jar) patch({ name: basename(draft.jar).replace(/\.jar$/i, '') }); }} placeholder={hostId || !window.devkitJar ? '填写目标主机上的绝对路径' : '选择已有 .jar 文件'} /><button className="secondary-button" type="button" onClick={() => pick('jar')}><FolderOpen size={15} />选择文件</button></span></label>
         <p className="jar-help">自动获取目录和文件名；工作目录、日志与 PID 都在 JAR 同级。每个文件仅登记一次。</p>
-        <label>Java 程序路径（可选）<span className="jar-path-input"><input value={draft.executable} onChange={event => patch({ executable: event.target.value })} placeholder="留空：检测 JAVA_HOME 和 PATH" /><button className="secondary-button" type="button" onClick={() => pick('executable')}>选择 Java</button></span></label>
+        <RuntimePathField key={hostId} kind="java" hostId={hostId} available={discoveryAvailable} allowControl={allowControl} value={draft.executable} change={executable => patch({ executable })} browse={() => pick('executable')} />
         <JavaProbe key={JSON.stringify([hostId, draft.executable])} hostId={hostId} executable={draft.executable} disabled={!allowControl} />
         </>}
         {draft.kind === 'program' && <label>可执行程序绝对路径<span className="jar-path-input"><input required value={draft.program} onChange={e => patch({ program: e.target.value })} /><button type="button" className="secondary-button" onClick={() => pick('program')}>选择程序</button></span></label>}
         {draft.kind === 'program' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, draft.program])} label="检查可执行文件" disabled={!draft.program.trim()} check={() => jarRequest<ProbeLine[]>('check-program', { hostId, program: draft.program })} />}
         {draft.kind !== 'jar' && <label>{draft.kind === 'npm' ? '项目目录' : '工作目录（默认程序所在目录）'}<span className="jar-path-input"><input required={draft.kind === 'npm'} value={draft.workDir} onChange={e => { patch({ workDir: e.target.value, script: '' }); setScripts([]); }} /><button type="button" className="secondary-button" onClick={() => pick('directory')}>选择目录</button></span></label>}
-        {draft.kind === 'npm' && supportsNodePath && <label>Node.js 程序路径（可选）<span className="jar-path-input"><input value={draft.nodePath} onChange={event => patch({ nodePath: event.target.value })} placeholder="留空使用服务环境的 PATH" /><button type="button" className="secondary-button" onClick={() => pick('executable')}>选择 Node.js</button></span></label>}
+        {draft.kind === 'npm' && supportsNodePath && <RuntimePathField key={hostId} kind="node" hostId={hostId} available={discoveryAvailable} allowControl={allowControl} value={draft.nodePath} change={nodePath => patch({ nodePath })} browse={() => pick('executable')} />}
         {draft.kind === 'npm' && checksAvailable && !supportsNodePath && <p className="jar-help">此主机按 PATH 选择 Node.js，升级目标主机的 DevKit 后可指定路径。</p>}
         {draft.kind === 'npm' && checksAvailable && <RuntimeProbe key={JSON.stringify([hostId, searchPath, draft.nodePath])} label="检测 Node.js 和 npm" disabled={!allowControl} check={() => jarRequest<ProbeLine[]>('detect-npm', { hostId, searchPath, nodePath: supportsNodePath ? draft.nodePath : undefined })} />}
         {draft.kind !== 'jar' && !checksAvailable && <p className="jar-help">升级目标主机的 DevKit 后即可在此表单检测。</p>}

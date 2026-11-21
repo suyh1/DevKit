@@ -17,7 +17,7 @@ export async function protectSupervisorFile(filename) {
   const literal = "'" + filename.replaceAll("'", "''") + "'";
   await ps(`$ErrorActionPreference='Stop'; $acl=New-Object System.Security.AccessControl.FileSecurity; $acl.SetAccessRuleProtection($true,$false); $user=[Security.Principal.WindowsIdentity]::GetCurrent().User; $system=New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18'); $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($user,'FullControl','Allow'))); $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($system,'FullControl','Allow'))); [IO.File]::SetAccessControl(${literal},$acl)`);
 }
-export async function detectJava({ executable = '', env = process.env } = {}) {
+export async function detectJava({ executable = '', env = process.env, resolveHome = false } = {}) {
   const name = process.platform === 'win32' ? 'java.exe' : 'java';
   const candidates = executable ? [executable] : [env.JAVA_HOME && path.join(env.JAVA_HOME, 'bin', name), ...(env.PATH || env.Path || '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir.replace(/^"|"$/g, ''), name))].filter(Boolean);
   for (const candidate of [...new Set(candidates)]) {
@@ -26,10 +26,14 @@ export async function detectJava({ executable = '', env = process.env } = {}) {
       const resolved = await realpath(candidate);
       if (!(await stat(resolved)).isFile() || (process.platform === 'win32' && path.extname(resolved).toLowerCase() !== '.exe')) continue;
       await access(resolved, process.platform === 'win32' ? 0 : 1);
-      const { stdout, stderr } = await execute(resolved, ['-version'], { windowsHide: true, timeout: 3500, maxBuffer: 65536, shell: false });
+      const args = resolveHome ? ['-XshowSettings:properties', '-version'] : ['-version'];
+      const { stdout, stderr } = await execute(resolved, args, { windowsHide: true, timeout: 3500, maxBuffer: 65536, shell: false });
       const output = (stdout + stderr).trim();
-      if (!/(?:java|openjdk)\s+version\s+"[^"\r\n]+"/i.test(output)) continue;
-      return { found: true, executable: resolved, version: output.split(/\r?\n/)[0], output };
+      const version = output.match(/(?:java|openjdk)\s+version\s+"[^"\r\n]+"[^\r\n]*/i);
+      if (!version) continue;
+      const javaHome = resolveHome && output.match(/^\s*java\.home = (.+)$/m)?.[1].trim();
+      const actual = javaHome && path.isAbsolute(javaHome) && await realpath(path.join(javaHome, 'bin', name)).catch(() => '');
+      return { found: true, executable: actual || resolved, version: version[0], output };
     } catch { /* Try the next configured location. */ }
   }
   return { found: false, executable: '', version: '', output: executable ? '指定 Java 不可用，请检查路径与执行权限。' : '未检测到 Java，请安装 JRE/JDK 并设置 JAVA_HOME 或 PATH，也可为此 JAR 指定 Java。' };

@@ -113,3 +113,10 @@
 .jar-console pre, .jar-console-input > input { font: var(--code-size, 14px)/1.7 var(--font-mono); }
 .jar-heading.workspace-banner { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; }
 .jar-heading > .run-button { grid-area: 1 / 2; white-space: nowrap; }
+
+.jar-runtime-field > label { margin-bottom: 7px; }
+.jar-runtime-field ul { list-style: none; padding: 0; margin: 8px 0; max-height: 15rem; overflow: auto; border: 1px solid var(--line); border-radius: 7px; }
+.jar-runtime-field li + li { border-top: 1px solid var(--line); }
+.jar-runtime-field li button { display: grid; gap: 3px; width: 100%; padding: 8px 11px; background: var(--surface); color: var(--text); text-align: start; overflow-wrap: anywhere; }
+.jar-runtime-field li button:is(:hover, :focus-visible, [aria-pressed=true]) { background: var(--soft); }
+.jar-runtime-field li span { font: 12px/1.5 var(--font-mono); color: var(--muted); }

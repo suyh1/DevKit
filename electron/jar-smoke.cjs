@@ -52,6 +52,11 @@ module.exports = async (window, output) => {
     await fs.writeFile(path.join(project, 'server.cjs'), "console.log('npm desktop ready'); setInterval(() => {}, 1000)");
     await click('添加服务');
     await wait('!!document.querySelector(".jar-dialog[open]")');
+    await click('查找已安装版本', '.jar-runtime-field');
+    await wait('!!document.querySelector(".jar-runtime-field li button")');
+    const selectedJava = await js('document.querySelector(".jar-runtime-field li span").textContent');
+    await js('document.querySelector(".jar-runtime-field li button").click()');
+    await wait('document.querySelector(".jar-runtime-field input").value === ' + JSON.stringify(selectedJava));
     await click('检测 Java', '.jar-dialog');
     await wait('!!document.querySelector(".jar-dialog .jar-runtime-probe [role=status]")?.textContent.trim()');
     await click('可执行程序', '.jar-dialog');
@@ -74,7 +79,7 @@ module.exports = async (window, output) => {
     await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-error").length === 2');
     const chosenNode = require('node:child_process').execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', windowsHide: true }).trim();
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosenNode] });
-    await click('选择 Node.js', '.jar-dialog');
+    await click('手动选文件', '.jar-runtime-field');
     await wait('document.querySelector(".jar-dialog input[placeholder*=PATH]").value === ' + JSON.stringify(chosenNode));
     assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
     await click('检测 Node.js 和 npm', '.jar-dialog');
@@ -460,7 +465,11 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await wait('[...document.querySelectorAll(".jar-dialog button")].some(b => b.textContent === "npm 项目" && !b.disabled)');
     await click('npm 项目', '.jar-dialog');
     const remoteNode = require('node:child_process').execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', windowsHide: true }).trim();
-    await input(window, '.jar-dialog input[placeholder*=PATH]', remoteNode);
+    const nodePath = JSON.stringify(await fs.realpath(remoteNode));
+    await click('查找已安装版本', '.jar-runtime-field');
+    await wait('[...document.querySelectorAll(".jar-runtime-field li span")].some(el => el.textContent === ' + nodePath + ')');
+    await js(window, '[...document.querySelectorAll(".jar-runtime-field li span")].find(el => el.textContent === ' + nodePath + ').closest("button").click()');
+    await wait('document.querySelector(".jar-runtime-field input").value === ' + nodePath);
     await click('检测 Node.js 和 npm', '.jar-dialog');
     await wait('document.querySelectorAll(".jar-dialog .jar-runtime-probe .jar-help").length === 2');
     await click('Java JAR', '.jar-dialog');

@@ -8,6 +8,7 @@ import { detectJava, inspectJava, launchJar, signalJava, pathKey } from './jar-p
 import { normalizePolicies, effectiveEnvironment, probeHealth } from './jar-policies.mjs';
 import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-supervisor-client.mjs';
 import { createJarAutostart } from './jar-autostart.mjs';
+import { discoverRuntimes } from './runtime-discovery.mjs';
 import { jarConfigs } from './jar-configs.mjs';
 
 import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, resolveNode, detectNpm, checkProgram, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
@@ -117,6 +118,7 @@ export async function createJarManager(directory, dependencies = {}) {
   } catch (error) { await unlock(); throw error; }
   let queue = Promise.resolve(), closed = false;
   const children = new Map(), samples = new Map();
+  const discoveries = new Map();
   const snapshot = () => ({ ...structuredClone(state), backendTypes: true, platform: process.platform, directory: folder });
   function find(id) { const item = state.instances.find(item => item.id === id); if (!item) throw new Error('服务记录不存在，请刷新列表。'); return item; }
   async function commit(instances, options) {
@@ -268,12 +270,23 @@ export async function createJarManager(directory, dependencies = {}) {
     await Promise.all(state.instances.filter(item => item.logMode === 'console').map(item => supervisorRequest(item, 'console-revoke', 3000, { session: sessionKey(session) }).catch(() => {})));
   }
   async function request(action, value = {}, options = {}) {
-    if (['command', 'detect', 'detect-npm', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予服务运行管理权限。');
-    if (['upsert', 'remove', 'detect-npm', 'check-program'].includes(action) && options.allowEdit === false) throw new Error('未授予服务编辑权限。');
+    if (['command', 'detect', 'list-runtimes', 'detect-npm', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予服务运行管理权限。');
+    if (['upsert', 'remove', 'list-runtimes', 'detect-npm', 'check-program'].includes(action) && options.allowEdit === false) throw new Error('未授予服务编辑权限。');
     const selected = state.instances.find(item => item.id === (action === 'upsert' ? value.instance?.id : value.id));
-    if (options.allowBackend === false && (['npm-scripts', 'detect-npm', 'check-program'].includes(action) || action === 'upsert' && !isJar(value.instance || {}) ||
+    if (options.allowBackend === false && (action === 'list-runtimes' && value.kind === 'node' || ['npm-scripts', 'detect-npm', 'check-program'].includes(action) || action === 'upsert' && !isJar(value.instance || {}) ||
         selected && !isJar(selected) && !['log-tail', 'console-read', 'startup-get', 'monitor-probe'].includes(action))) {
       throw Object.assign(new Error('未授予 npm 与可执行程序管理权限。'), { status: 403 });
+    }
+    if (action === 'list-runtimes') {
+      const kind = value.kind;
+      if (!['java', 'node'].includes(kind)) throw new Error('未知运行时类型。');
+      if (!discoveries.has(kind)) {
+        const configured = kind === 'java'
+          ? state.instances.filter(isJar).map(item => item.executable)
+          : state.instances.filter(item => item.kind === 'npm').map(item => item.nodePath);
+        discoveries.set(kind, discoverRuntimes(kind, { configured: configured.filter(Boolean) }).finally(() => discoveries.delete(kind)));
+      }
+      return discoveries.get(kind);
     }
     if (action === 'detect-npm') return detectNpm(value.searchPath, value.nodePath ? absolute(value.nodePath, 'Node.js 路径') : undefined);
     if (action === 'check-program') return checkProgram(absolute(value.program, '程序路径'));
@@ -286,6 +299,7 @@ export async function createJarManager(directory, dependencies = {}) {
       result.backendTypes = options.allowBackend !== false;
       result.backendChecks = result.backendTypes;
       result.supportsNodePath = result.backendTypes;
+      result.runtimeDiscovery = true;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;
@@ -375,7 +389,7 @@ export async function createJarManager(directory, dependencies = {}) {
   return {
     request(action, value, options) {
       if (closed) return Promise.reject(new Error('后端管理器已关闭。'));
-      if (action.startsWith('console-')) return request(action, value, options);
+      if (action === 'list-runtimes' || action.startsWith('console-')) return request(action, value, options);
       const pending = queue.then(() => request(action, value, options)); queue = pending.catch(() => {}); return pending;
     },
     releaseConsoleSession,

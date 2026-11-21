@@ -115,7 +115,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       const cacheKey = host => `${host.id}:${module}:${session}:${access.edit}:${access.control}:${!!access.backend}`;
       const phaseFor = host => connections.get(host.mode === 'share' ? `${host.id}:${session}` : host.id)?.phase || 'connecting';
       const pendingGroup = host => ({ id: host.id, name: host.name, platform: host.platform || '', revision: 0, edit: false, control: false, phase: phaseFor(host), checkedAt: cache.get(cacheKey(host))?.group.checkedAt });
-      const localGroup = base => ({ id: '', name: session === desktopSession ? '本机' : '共享主机', platform: base.platform, revision: base.revision, backendTypes: base.backendTypes, backendChecks: base.backendChecks, supportsNodePath: base.supportsNodePath, edit: access.edit, control: access.control });
+      const localGroup = base => ({ id: '', name: session === desktopSession ? '本机' : '共享主机', platform: base.platform, revision: base.revision, backendTypes: base.backendTypes, backendChecks: base.backendChecks, supportsNodePath: base.supportsNodePath, runtimeDiscovery: base.runtimeDiscovery, edit: access.edit, control: access.control });
       if (scope === 'inventory-progress') return hosts.map(pendingGroup);
       if (scope === 'inventory-local') {
         const base = await local(action, value);
@@ -131,7 +131,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
           const limits = await transport.capabilities?.(module) || fullAccess;
           const permissions = { edit: access.edit && limits.edit, control: access.control && limits.control };
           const state = stateFor(module, result, host.id, permissions);
-          const group = { id: host.id, name: host.name, platform: state.platform, revision: state.revision, backendTypes: state.backendTypes === true && access.backend === true, backendChecks: state.backendChecks === true && access.backend === true, supportsNodePath: state.supportsNodePath === true && access.backend === true, ...permissions, phase: 'ready', checkedAt: new Date().toISOString() };
+          const group = { id: host.id, name: host.name, platform: state.platform, revision: state.revision, backendTypes: state.backendTypes === true && access.backend === true, backendChecks: state.backendChecks === true && access.backend === true, supportsNodePath: state.supportsNodePath === true && access.backend === true, runtimeDiscovery: state.runtimeDiscovery === true, ...permissions, phase: 'ready', checkedAt: new Date().toISOString() };
           cache.set(key, { host, session, state: stateFor(module, result, host.id, { edit: false }), group });
           return { state, group };
         } catch (error) {

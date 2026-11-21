@@ -10,6 +10,37 @@ import { createLogCenter } from './log-center.mjs';
 import { createMonitorManager } from './monitor-manager.mjs';
 import { managedRequest } from './managed-workspace.mjs';
 import { launchSpec } from './backend-launch.mjs';
+import { discoverRuntimes } from './runtime-discovery.mjs';
+
+test('runtime discovery finds inactive installations and merges multiple paths to the same runtime', async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-runtime-list-')));
+  const windows = process.platform === 'win32';
+  try {
+    const dir = path.join(root, windows ? 'nvm/v24.0.0' : '.nvm/versions/node/v24.0.0/bin');
+    await mkdir(dir, { recursive: true });
+    const node = path.join(dir, windows ? 'node.exe' : 'node');
+    await copyFile(process.execPath, node);
+    const env = { NVM_HOME: path.join(root, 'nvm'), PATH: '' };
+    const list = await discoverRuntimes('node', { env, home: root });
+    assert.deepEqual(list.installations.find(row => row.executable === node), { executable: node, version: process.version });
+    const alias = path.join(root, 'active');
+    await symlink(dir, alias, windows ? 'junction' : 'dir');
+    env.PATH = alias;
+    const again = await discoverRuntimes('node', { env, home: root, configured: [node] });
+    assert.deepEqual(again, list);
+    if (!windows) {
+      const jdks = path.join(root, '.sdkman/candidates/java');
+      for (const version of ['17.0.12', '21.0.4']) {
+        const jdk = path.join(jdks, version);
+        await mkdir(path.join(jdk, 'bin'), { recursive: true });
+        await writeFile(path.join(jdk, 'bin/java'), '#!/bin/sh\nprintf \'openjdk version "' + version + '"\\n\' >&2\n', { mode: 0o755 });
+      }
+      const java = await discoverRuntimes('java', { env: {}, home: root });
+      const fixtures = java.installations.filter(row => row.executable.startsWith(jdks + path.sep));
+      assert.deepEqual(fixtures.map(row => row.version), ['21.0.4', '17.0.12']);
+    }
+  } finally { await rm(root, { recursive: true, force: true, maxRetries: 3 }); }
+});
 
 test('form checks resolve the selected runtime and inspect program files without launching them', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'devkit-probes-'));
@@ -53,6 +84,12 @@ test('form checks resolve the selected runtime and inspect program files without
       await assert.rejects(managedRequest(manager, 'jar', action, {}, { edit: false, control: true, backend: true }), /权限/);
     }
     const editor = { edit: true, control: false, backend: true };
+    for (const kind of ['node', 'java']) {
+      await assert.rejects(managedRequest(manager, 'jar', 'list-runtimes', { kind }, editor), /权限/);
+    }
+    const jarOnly = { control: true, edit: true, backend: false };
+    await assert.rejects(managedRequest(manager, 'jar', 'list-runtimes', { kind: 'node' }, jarOnly), /权限/);
+    assert.ok(Array.isArray((await managedRequest(manager, 'jar', 'list-runtimes', { kind: 'java' }, jarOnly)).installations));
     await assert.rejects(managedRequest(manager, 'jar', 'detect-npm', {}, editor), /权限/);
     assert.equal((await managedRequest(manager, 'jar', 'check-program', { program: process.execPath }, editor))[0].ok, true);
   } finally { await manager.close(); await rm(root, { recursive: true, force: true }); }
