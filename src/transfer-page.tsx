@@ -3,6 +3,7 @@ import { ArrowLeftRight } from 'lucide-react';
 import { ConfirmationProvider } from './Confirmation';
 import { QuickTransfer } from './QuickTransfer';
 import './theme-tokens.css';
+import '../shared/scrollbars.css';
 import './collaboration.css';
 import './segmented-control.css';
 import './motion.css';

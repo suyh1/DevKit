@@ -1,5 +1,6 @@
 /* Keep desktop and portal cascade order identical in production CSS chunks. */
 @import './theme-tokens.css';
+@import '../shared/scrollbars.css';
 @import './styles.css';
 @import './colors.css';
 @import './workbench.css';

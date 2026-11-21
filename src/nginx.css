@@ -50,7 +50,7 @@
 .ng-control-dock {
   position: sticky; top: 0; z-index: 4; background: var(--surface);
   border-radius: 15px 15px 0 0; max-height: min(64dvh, 620px);
-  overflow: auto; scrollbar-width: thin; overflow-anchor: none;
+  overflow: auto; overflow-anchor: none;
   transition: box-shadow 140ms var(--ease-out, ease), border-radius 140ms var(--ease-out, ease);
   border-bottom: 1px solid var(--line);
 }
@@ -61,7 +61,7 @@
 .ng-toolbar > .run-button { margin-inline-start: auto; }
 .ng-control-dock[data-stuck=true] .ng-toolbar {
   flex-wrap: nowrap; gap: 4px; padding: 4px 8px; border-top-color: transparent;
-  overflow-x: auto; scrollbar-width: thin;
+  overflow-x: auto;
 }
 .ng-control-dock[data-stuck=true] .ng-toolbar > button { flex-shrink: 0; margin-block: 0; }
 .ng-control-dock .ng-message { margin: 8px 16px; font-size: 11px; }

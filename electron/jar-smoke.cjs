@@ -217,7 +217,9 @@ async function verifyHostEditor(window, output, click, wait) {
   const painted = () => js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   const visible = '!!document.querySelector(".lan-host-dialog[open]")';
   async function capture(name) {
-    await js(`Promise.allSettled(document.querySelector('.lan-host-dialog').getAnimations().map(animation => animation.finished))`);
+    await painted();
+    await js(`Promise.allSettled(document.querySelector('.lan-host-dialog').getAnimations({subtree:true})
+      .filter(animation => animation.effect.getComputedTiming().endTime < Infinity).map(animation => animation.finished))`);
     await painted();
     const rectangle = await js(`{ const rect = document.querySelector('.lan-host-dialog').getBoundingClientRect();
       ({ x: Math.floor(rect.x), y: Math.floor(rect.y), width: Math.ceil(rect.width), height: Math.ceil(rect.height) }); }`);
@@ -247,11 +249,47 @@ async function verifyHostEditor(window, output, click, wait) {
     window.setContentSize(420, 590);
     await wait('innerWidth <= 460');
     await painted();
-    const narrow = await js(`{ const dialog = document.querySelector('.lan-host-dialog'), footer = document.querySelector('.lan-host-footer');
-      ({ inside: footer.getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1, width: dialog.clientWidth, scrollWidth: dialog.scrollWidth, height: dialog.clientHeight, scrollHeight: dialog.scrollHeight }); }`);
+    const thumbColors = await js(`(() => {
+      const root = document.documentElement, body = document.querySelector('.lan-host-body');
+      if (matchMedia('(forced-colors: active)').matches) return [];
+      const { theme, themeStyle } = root.dataset, colors = [];
+      try {
+        for (const style of ['default','minimal','organic','editorial','brutalist','soft','glass','gradient','retro']) {
+          root.dataset.themeStyle = style;
+          for (const brightness of ['light','dark']) {
+            root.dataset.theme = brightness;
+            if (getComputedStyle(body).scrollbarWidth !== 'auto' || getComputedStyle(body, '::-webkit-scrollbar-button').display !== 'none')
+              throw new Error('Host dialog reverted to a system scrollbar: ' + style + '/' + brightness);
+            colors.push(getComputedStyle(body, '::-webkit-scrollbar-thumb').backgroundColor);
+          }
+        }
+      } finally {
+        root.dataset.theme = theme;
+        if (themeStyle === undefined) delete root.dataset.themeStyle;
+        else root.dataset.themeStyle = themeStyle;
+      }
+      return colors;
+    })()`);
+    assert.ok(thumbColors.every((color, index) => index % 2 === 0 || color !== thumbColors[index - 1]), 'Scrollbar follows each light/dark palette');
+    const narrow = await js(`{ const dialog = document.querySelector('.lan-host-dialog'), body = dialog.querySelector('.lan-host-body'), footer = dialog.querySelector('.lan-host-footer');
+      ({ inside: footer.getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1, width: body.clientWidth, scrollWidth: body.scrollWidth, height: body.clientHeight, scrollHeight: body.scrollHeight }); }`);
     await capture('lan-host-ssh-narrow.png');
+    await js('document.documentElement.dataset.theme="dark"');
+    await capture('lan-host-ssh-narrow-dark.png');
+    await js('document.documentElement.dataset.theme="light"');
     assert.ok(narrow.scrollHeight > narrow.height && narrow.scrollWidth <= narrow.width && narrow.inside,
     'Host editor scrolls vertically with the footer visible on narrow windows: ' + JSON.stringify(narrow));
+    assert.ok(await js(`(() => {
+      const platform = document.querySelector('.lan-platform .segmented-control');
+      return platform.scrollWidth <= platform.clientWidth + 1;
+    })()`), 'The platform options fit beside the scrollbar');
+    assert.ok(await js(`(() => {
+      const dialog = document.querySelector('.lan-host-dialog'), body = dialog.querySelector('.lan-host-body');
+      const last = body.querySelector('input[placeholder="00:11:22:33:44:55"]');
+      last.focus();
+      return body.scrollTop > 0 && dialog.scrollTop === 0 &&
+        last.getBoundingClientRect().bottom <= dialog.querySelector('footer').getBoundingClientRect().top;
+    })()`), 'Focusing the final field scrolls the form while keeping the header and actions in place');
     const password = '.lan-password input';
     await js(`{ const input = document.querySelector('${password}');
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'fixture-only');

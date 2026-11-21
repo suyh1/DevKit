@@ -1,9 +1,10 @@
-import { constants } from 'node:fs';
+import { constants, readFileSync } from 'node:fs';
 import { lstat, open, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 const entriesPerPage = 100;
+const scrollbars = readFileSync(new URL('../shared/scrollbars.css', import.meta.url), 'utf8');
 const maxArchiveEntries = 25_000;
 const maxDepth = 64;
 const collator = new Intl.Collator('zh-CN', { numeric: true });
@@ -124,9 +125,11 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
     --ink: light-dark(#252934, #e8e9ed);
     --muted: light-dark(#616877, #acafb9);
     --link: light-dark(#3d5fad, #a6b8f4);
+    --accent: var(--link);
     --accent-ink: light-dark(#fff, #171d30);
     --wash: light-dark(#f0f2f5, #22252a);
   }
+  ${scrollbars}
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--canvas); color: var(--ink); font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
   main { max-width: 1056px; margin: auto; padding: clamp(12px, 3vw, 32px); }

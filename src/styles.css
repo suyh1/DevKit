@@ -15,9 +15,6 @@ button svg { flex-shrink: 0; }
 button:disabled:hover { box-shadow: none; }
 input, select, textarea { color: var(--text); }
 ::selection { background: var(--selection); }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: #a7b7c155; border-radius: 9px; }
-::-webkit-scrollbar-track { background: transparent; }
 kbd { display: inline-flex; align-items: center; justify-content: center; min-height: 21px; padding: 1px 5px; font-family: inherit; font-size: 10px; line-height: 1.5; white-space: nowrap; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; background: var(--soft); }
 .app { display: flex; height: 100dvh; min-height: 0; overflow: hidden; }
 .sidebar { display: flex; flex-direction: column; flex-shrink: 0; width: 254px; padding: 28px 15px 0; background: #14202d; color: #c0cbd6; border-right: 1px solid #ffffff07; height: 100%; }
@@ -46,7 +43,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-he
 .active-dot { width: 5px; height: 5px; border-radius: 50%; background: #78d8bc; flex: 0 0 5px!important; }
 .nav-caption { display: flex; align-items: center; justify-content: space-between; padding: 22px 12px 10px; font-size: 10px; letter-spacing: .8px; color: #90a6b8; }
 .nav-caption small { color: #748b9f; font-size: 9px; letter-spacing: 0; }
-.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; padding-right: 3px; scrollbar-width: thin; scrollbar-color: #ffffff12 transparent; }
+.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; padding-right: 3px; }
 .nav-group { margin: 0 0 15px; }
 .nav-group-heading { display: flex; align-items: center; width: 100%; gap: 7px; padding: 8px 12px 6px; color: #94a8b9; background: transparent; font-size: 10px; }
 .nav-group-heading>span { flex: 1; text-align: left; letter-spacing: .8px; }
