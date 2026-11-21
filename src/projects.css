@@ -546,7 +546,7 @@ body:has(.pc-login) {
 @media (max-width: 640px) {
   .pc-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-rows: fit-content(35%) minmax(0, 1fr);
   }
   .pc-profiles {
     border-right: 0;
@@ -1225,7 +1225,7 @@ body:has(.pc-login) {
 @container (max-width: 560px) {
   .pc-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-rows: fit-content(35%) minmax(0, 1fr);
   }
   .pc-profiles {
     border-right: 0;

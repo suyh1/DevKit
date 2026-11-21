@@ -25,17 +25,22 @@ export function WorkspaceFeedback({ children }: { children: ReactNode }) {
 }
 
 const permissions = { edit: '编辑', send: '发送请求', control: '运行管理', jar: 'JAR 日志', nginx: 'Nginx 日志' } as const;
+export function workspaceRestriction<P extends WorkspaceModuleId>(page: P, ...required: (keyof SharingServices[P] & keyof typeof permissions)[]) {
+  const access = remoteAccess();
+  if (!access) return '';
+  const grant = access.services?.[page];
+  const name = workspaceModules.find(item => item.id === page)!.name;
+  if (!grant?.enabled) return `「${name}」未向当前访客共享。`;
+  const missing = required.find(key => !grant[key]);
+  return missing ? `当前访客没有「${name}」的${permissions[missing]}权限。` : '';
+}
+
 export function useWorkspaceGuard() {
   const feedback = useWorkspaceFeedback();
   return <P extends WorkspaceModuleId,>(page: P, ...required: (keyof SharingServices[P] & keyof typeof permissions)[]) => {
-    const access = remoteAccess();
-    if (!access) return true;
-    const grant = access.services?.[page];
-    const name = workspaceModules.find(item => item.id === page)!.name;
-    if (!grant?.enabled) { feedback(`「${name}」未向当前访客共享。`); return false; }
-    const missing = required.find(key => !grant[key]);
-    if (missing) { feedback(`当前访客没有「${name}」的${permissions[missing]}权限。`); return false; }
-    return true;
+    const restriction = workspaceRestriction(page, ...required);
+    if (restriction) feedback(restriction);
+    return !restriction;
   };
 }
 

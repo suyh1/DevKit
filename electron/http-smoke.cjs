@@ -72,6 +72,57 @@ module.exports = async function httpSmoke(window, output) {
     await require('./navigation-helpers.cjs')(window).openWorkspace('HTTP 调试');
     await click('快速请求', '.http-product-tabs');
     await wait('!!document.querySelector(\'input[aria-label="请求 URL"]\')');
+    const initialSize = window.getSize(), initialMinimum = window.getMinimumSize();
+    window.setMinimumSize(360, 600);
+    await fill('请求名称', '布局验证请求');
+    await click('保存请求');
+    for (const width of [1440, 375, 390]) {
+      window.setContentSize(width, 844);
+      await js('new Promise(resolve=>setTimeout(resolve,100))');
+      const actual = await js('innerWidth');
+      if (actual !== width) window.setContentSize(width + (width - actual), 844);
+      await wait('innerWidth === ' + width);
+      const toggle = 'document.querySelector(".http-collection-toggle")';
+      const list = 'document.querySelector(".http-collection")';
+      if (width < 900) {
+        assert.equal(await js(list + '.offsetWidth'), 0);
+        assert.ok(await js(`(() => {
+          document.querySelector('.http-workspace').scrollTop=0;
+          const r=document.querySelector('.http-main input[aria-label="请求 URL"]').getBoundingClientRect();
+          return r.height>0 && r.top>=0 && r.bottom<innerHeight;
+        })()`), 'URL is visible on entry at ' + width);
+        await fs.writeFile(path.join(output, `http-quick-entry-${width}.png`), (await window.webContents.capturePage()).toPNG());
+        await js(toggle + '.click()');
+      }
+      await wait(list + '.offsetWidth > 0');
+      await fill('搜索请求集合', '布局验证');
+      const row = 'document.querySelector(".http-collection [data-motion-key] button")';
+      await wait(row + '?.textContent.includes("布局验证请求")');
+      await js('document.querySelectorAll(".notice-stack button[aria-label=关闭通知]").forEach(b=>b.click())');
+      await js(row + '.click()');
+      await wait('!document.querySelector(".notice-stack")');
+      if (width < 900) await wait(list + '.offsetWidth === 0');
+      await click('保存请求');
+      await wait('document.querySelector(".notice-stack .app-toast")?.textContent.includes("请求已保存")');
+      await js('document.querySelector(".notice-stack button[aria-label=关闭通知]").click()');
+      await wait('!document.querySelector(".notice-stack")');
+    }
+    await js('document.querySelector(".http-collection-toggle").click()');
+    await js(`(() => {
+      const file=document.querySelector('input[aria-label="导入请求集合"]');
+      const data=JSON.parse(localStorage.getItem('devkit:http-collection'));
+      data.entries[0].name='导入验证请求';
+      const dt=new DataTransfer();dt.items.add(new File([JSON.stringify(data)],'collection.json'));
+      file.files=dt.files;file.dispatchEvent(new Event('change',{bubbles:true}));
+    })()`);
+    await click('合并导入', '.confirm-dialog');
+    await fill('搜索请求集合', '导入验证请求');
+    await wait('document.querySelector(".http-collection [data-motion-key] button")?.textContent.includes("导入验证请求")');
+    await js('document.querySelector(".http-collection-toggle").click()');
+    assert.equal(await js('document.querySelector(".http-main input[aria-label=请求名称]").value'), '布局验证请求');
+    await click('新请求');
+    window.setSize(...initialSize);
+    window.setMinimumSize(...initialMinimum);
     await fill('请求 URL', base + '/?tag=a&tag=b');
     await select('HTTP 方法', 'POST');
     await wait('document.querySelectorAll(".http-kv-row").length===2');

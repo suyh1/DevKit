@@ -306,6 +306,12 @@ module.exports = async function apiSmoke(window, output) {
     await input("API接口名称", "独立副本");
     await click("保存接口");
     await wait('!document.querySelector(".api-draft-badge")');
+      await js('document.querySelectorAll(".notice-stack button[aria-label=关闭通知]").forEach(button => button.click())');
+      for (const name of ['创建用户', '独立副本']) {
+        await js(`[...document.querySelectorAll(".api-tree-item")].find(button => button.textContent.includes(${JSON.stringify(name)})).click()`);
+        await wait(`document.querySelector('.api-tree-item.selected')?.textContent.includes(${JSON.stringify(name)})`);
+        assert.equal(await js('document.querySelectorAll(".notice-stack .app-toast").length'), 0);
+      }
     assert.equal(
       (await ipc("get-library")).state.projects[0].endpoints.length,
       2,

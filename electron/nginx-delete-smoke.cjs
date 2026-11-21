@@ -28,7 +28,8 @@ module.exports = async function checkDeletion(window, output, { instanceId, crea
     await js(`document.querySelector('[data-instance-id="${instanceId}"] .ng-instance-delete').click()`);await wait('!!document.querySelector(".confirm-dialog[open]")');
     assert.equal(await js('document.querySelector(".confirm-dialog").textContent.includes("未保存")'),false,'Deleting another instance preserves the current draft');
     await click('删除实例','.confirm-dialog');await wait(`!document.querySelector('[data-instance-id="${instanceId}"]')`);
-    assert.equal(await js(`document.querySelector('.ng-instances>.ng-help').textContent.includes(${JSON.stringify(state.directory)})`),true,'Deletion retains runtime storage metadata');
+    await js("document.querySelector('.ng-storage summary').click()");
+    assert.equal(await js("document.querySelector('.ng-storage details[open] code')?.textContent"),state.directory,'Deletion retains the full storage directory in the expandable summary');
     assert.equal(await js('[...document.querySelectorAll(".ng-argument input")].find(input=>input.getAttribute("aria-label").startsWith("proxy_pass 第")).value'),'http://127.0.0.1:9009');
     await click('删除实例','.ng-instance-heading');await wait('!!document.querySelector(".confirm-dialog[open]")');await click('删除实例','.confirm-dialog');
     await wait('document.querySelector(".ng-instance-heading h2")?.textContent.includes("备用实例")');

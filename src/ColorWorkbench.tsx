@@ -1,7 +1,7 @@
 import SegmentedControl from './SegmentedControl';
 import { copyText } from './motion-primitives';
 import { MotionButton, MotionText, MotionDrop, MotionReveal, useMotionList } from './Motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Dispatch, PointerEvent, SetStateAction } from 'react';
 import { Pipette, Copy, Check, ImagePlus, Shuffle, Star, X, ArrowLeftRight, Plus, Minus, Palette, Download } from 'lucide-react';
 import { parseColor, hexColor, colorFormats, readableInk, harmonyColors, shadeColors, shadeLabels, paletteExport, gradientCss, contrastReport, mixColors, clamp, composite } from './colors';
@@ -12,7 +12,6 @@ import { saveText } from './files';
 type Parsed = { color: Color; error?: never } | { color?: never; error: string };
 function parsed(input: string): Parsed { try { return { color: parseColor(input) }; } catch (error) { return { error: error instanceof Error ? error.message : '颜色格式无效。' }; } }
 type EyeDropperWindow = Window & { EyeDropper?: new () => { open: (options: { signal: AbortSignal }) => Promise<{ sRGBHex: string }> } };
-const initialColor = '#147D64';
 export function savedColors(): string[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem('devkit:colors') || '[]');
@@ -23,7 +22,18 @@ function randomColor(): string { const bytes = crypto.getRandomValues(new Uint8A
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const result = parsed(value);
-  return <div className="color-field"><label><span>{label}</span><div className="color-field-row"><input type="color" aria-label={`${label}色板`} value={result.color ? hexColor(result.color, false) : initialColor} onChange={event => onChange(event.target.value.toUpperCase())} /><input className="color-value-input" aria-label={label} value={value} onChange={event => onChange(event.target.value)} spellCheck={false} maxLength={200} /></div></label>{result.error && <small role="alert" className="color-error">{result.error}</small>}</div>;
+  const id = useId();
+  return <div className="color-field">
+    <label htmlFor={id}><span>{label}</span></label>
+    <div className="color-field-row">
+      <span className="color-field-picker" data-invalid={!!result.error}>
+        {result.error && <Pipette size={16} aria-hidden="true" />}
+        <input type="color" aria-label={`${label}色板`} value={result.color ? hexColor(result.color, false) : '#000000'} onChange={event => onChange(event.target.value.toUpperCase())} />
+      </span>
+      <input id={id} className="color-value-input" aria-label={label} aria-invalid={!!result.error} aria-describedby={result.error ? `${id}-error` : undefined} value={value} onChange={event => onChange(event.target.value)} spellCheck={false} maxLength={200} />
+    </div>
+    {result.error && <small id={`${id}-error`} role="alert" className="color-error">{label}格式无效。{result.error}</small>}
+  </div>;
 }
 function Swatches({ colors, labels, onPick }: { colors: Color[]; labels?: string[]; onPick: (hex: string) => void }) {
   return <div className="color-swatches">{colors.map((color, index) => <MotionButton variant="copy" key={index} className="color-swatch" style={{ background: hexColor(composite(color, { r: 255, g: 255, b: 255, a: 1 })), color: readableInk(color) }} onClick={() => onPick(hexColor(color))} aria-label={`复制颜色 ${hexColor(color)}`}><strong>{labels?.[index]}</strong><code>{hexColor(color)}</code><Copy size={12} /></MotionButton>)}</div>;
@@ -142,6 +152,13 @@ export default function ColorWorkbench({ mode, primary, onPrimary: setPrimary, f
   const gradient = stops.every(stop => !!stop.color) ? gradientCss(stops.map(stop => stop.color!), angle, gradientType) : null;
   const report = first.color && second.color ? contrastReport(first.color, second.color) : null;
   const mixed = first.color && second.color ? mixColors(first.color, second.color, amount / 100, space) : null;
+  const invalidFields: string[] = [];
+  if (first.error) invalidFields.push(mode === 'color-contrast' ? '文字颜色' : '主颜色');
+  if (mode === 'color-gradient') {
+    extraStops.forEach((_, index) => { if (stops[index + 1].error) invalidFields.push(`中间色 ${index + 1}`); });
+  }
+  if (second.error && ['color-gradient', 'color-mix', 'color-contrast'].includes(mode))
+    invalidFields.push(mode === 'color-contrast' ? '背景颜色' : '终点颜色');
   const primaryControls = <><ColorField label={mode === 'color-contrast' ? '文字颜色' : '主颜色'} value={primary} onChange={setPrimary} /><label className="color-range">透明度 <strong>{first.color ? Math.round(first.color.a * 100) : 100}%</strong><input aria-label="主颜色透明度" type="range" min="0" max="100" value={first.color ? Math.round(first.color.a * 100) : 100} disabled={!first.color} onChange={event => first.color && setPrimary(hexColor({ ...first.color, a: Number(event.target.value) / 100 }, true))} /></label></>;
 
   return <div className="color-workbench">
@@ -156,9 +173,9 @@ export default function ColorWorkbench({ mode, primary, onPrimary: setPrimary, f
           options={[{ value: 'srgb', label: 'sRGB 通道混合' }, { value: 'linear', label: '线性光混合' }]} onChange={setSpace} /></div><p className="color-note">按透明度预乘后混合；线性光模式先校正 sRGB 伽马。</p></>}
         <button className="color-secondary-button" disabled={!first.color} onClick={saveColor}><Star size={15} />收藏主颜色</button>
       </section>
-      <section className="color-panel color-result-panel"><div className="color-panel-heading"><h2>{mode === 'color-gradient' ? '渐变预览' : mode === 'color-contrast' ? '对比度预览' : mode === 'color-mix' ? '混合结果' : '颜色预览'}</h2><span className="color-live">实时更新</span></div>
+      <section className="color-panel color-result-panel"><div className="color-panel-heading"><h2>{mode === 'color-gradient' ? '渐变预览' : mode === 'color-contrast' ? '对比度预览' : mode === 'color-mix' ? '混合结果' : '颜色预览'}</h2><span className="color-live" data-waiting={!!invalidFields.length}>{invalidFields.length ? '等待有效颜色' : '实时更新'}</span></div>
         {mode === 'color-gradient' ? gradient && <><div className="color-gradient-preview color-checker"><div style={{ background: gradient }} /></div><p className="color-note">色标按位置等距分布；CSS 渐变由系统 WebView 渲染。</p></> : mode === 'color-contrast' ? report && <><div className="color-contrast-preview" style={{ color: hexColor(report.foreground), background: hexColor(report.background) }}><span>Aa</span><strong>让每一个字都清晰可读。</strong><p>The quick brown fox jumps over the lazy dog.</p></div><div className="color-ratio"><strong>{report.ratio.toFixed(2)}<small>: 1</small></strong><span>WCAG 2.2 对比度</span></div><div className="color-verdicts">{[['AA 普通文字', report.aa], ['AA 大文字', report.aaLarge], ['AAA 普通文字', report.aaa], ['AAA 大文字', report.aaaLarge], ['UI 图形 / 控件', report.ui]].map(([label, pass]) => <div key={String(label)} className={pass ? 'pass' : 'fail'}>{pass ? <Check size={14} /> : <X size={14} />}<span>{label}</span><strong>{pass ? '通过' : '未通过'}</strong></div>)}</div><p className="color-note">透明背景先叠加白色；按原始比值判定。大文字为 ≥24px 或粗体 ≥18.67px。</p></> : (mode === 'color-mix' ? mixed : first.color) && <><div className="color-large-swatch color-checker"><div style={{ background: hexColor((mode === 'color-mix' ? mixed : first.color)!) }} /><strong style={{ color: readableInk((mode === 'color-mix' ? mixed : first.color)!) }}>{hexColor((mode === 'color-mix' ? mixed : first.color)!)}</strong></div><FormatList color={(mode === 'color-mix' ? mixed : first.color)!} onCopy={copy} /><p className="color-note">HEX / RGB / HSL 支持透明度。HSV 与 CMYK 为分量换算；CMYK 不包含印刷 ICC 配置。</p></>}
-        {(first.error || ((mode === 'color-contrast' || mode === 'color-mix') && second.error) || (mode === 'color-gradient' && !gradient)) && <p role="alert" className="color-error color-empty-error">请修正左侧颜色输入，预览将在有效后自动恢复。</p>}
+        {!!invalidFields.length && <p className="color-error color-empty-error">请修正{invalidFields.join('、')}，预览将自动恢复。</p>}
       </section>
     </div>
     {mode === 'color-picker' && <section className="color-panel color-image-panel" onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDrop={event => { event.preventDefault(); setDragging(false); loadImage(event.dataTransfer.files[0]); }}><MotionDrop active={dragging} /><div className="color-panel-heading"><h2><ImagePlus size={17} />图片取色</h2><div><button className="text-button" onClick={sampleImage}>示例图片</button><button className="text-button" onClick={() => fileRef.current?.click()}><ImagePlus size={14} />导入本地图片</button></div></div><input type="file" ref={fileRef} accept=".png,.jpg,.jpeg,.webp,.bmp" aria-label="导入取色图片" className="sr-only" onChange={event => { loadImage(event.target.files?.[0]); event.target.value = ''; }} />{!imageInfo && <button className="color-image-empty" onClick={() => fileRef.current?.click()}><ImagePlus size={32} /><strong>从图片中找到你的颜色</strong><span>PNG / JPEG / WebP / BMP，最大 20 MB，仅在本地处理</span></button>}<div className="color-image-scroll" hidden={!imageInfo}><canvas ref={imageCanvas} aria-label="图片取色区域，点击像素或使用下方坐标取色" onPointerMove={event => canvasPoint(event, false)} onPointerDown={event => canvasPoint(event, true)} /></div>{imageInfo && <div className="color-image-meta"><div><p>{imageInfo.name} · {imageInfo.width} × {imageInfo.height}</p><div className="color-coordinates"><label>X <input type="number" aria-label="像素 X 坐标" min="0" max={imageInfo.width - 1} value={coordinates.x} onChange={event => setCoordinates(old => ({ ...old, x: clamp(Number(event.target.value) || 0, 0, imageInfo.width - 1) }))} /></label><label>Y <input type="number" aria-label="像素 Y 坐标" min="0" max={imageInfo.height - 1} value={coordinates.y} onChange={event => setCoordinates(old => ({ ...old, y: clamp(Number(event.target.value) || 0, 0, imageInfo.height - 1) }))} /></label><button className="text-button" onClick={() => readPixel(coordinates.x, coordinates.y, true)}><Pipette size={14} />取此像素</button></div><code>{hoverColor || '移动鼠标查看像素颜色'}</code></div><canvas ref={zoomCanvas} width="90" height="90" className="color-zoom color-checker" aria-label="像素放大预览" /></div>}</section>}

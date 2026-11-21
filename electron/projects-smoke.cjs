@@ -461,14 +461,29 @@ module.exports = async function checkProjects(window, output, staging) {
       (await remote.webContents.capturePage()).toPNG(),
     );
     const responsive = [];
-    for (const width of [375,768,1024,1440]) {
-      remote.setContentSize(width,800);
+    async function sizePortal(width) {
+      remote.setContentSize(width, 800);
       await remote.webContents.executeJavaScript('new Promise(resolve=>setTimeout(resolve,100))');
+      const actual = await remote.webContents.executeJavaScript('innerWidth');
+      if (actual !== width) remote.setContentSize(width + (width - actual), 800);
+      await wait(remote.webContents, 'innerWidth === ' + width);
+    }
+    for (const width of [375,390,768,1024,1440]) {
+      await sizePortal(width);
       const metrics = await remote.webContents.executeJavaScript('({width:innerWidth,scroll:document.documentElement.scrollWidth})');
       assert.ok(metrics.scroll <= metrics.width, `Portal overflow at ${metrics.width}`); responsive.push(metrics);
+      if (width <= 390) {
+        assert.equal(await remote.webContents.executeJavaScript('document.querySelectorAll(".pc-profiles .pc-profile").length'), 2);
+        const spareHeight = await remote.webContents.executeJavaScript(`(() => {
+          const profiles = document.querySelector('.pc-profiles');
+          const last = profiles.querySelectorAll('.pc-profile');
+          return profiles.getBoundingClientRect().bottom - last[last.length - 1].getBoundingClientRect().bottom;
+        })()`);
+        assert.ok(spareHeight <= 24, `Two readonly profiles fit their content at ${width}px: ${spareHeight}px trailing space`);
+      }
     }
     await fs.writeFile(path.join(output,'project-responsive.json'),JSON.stringify(responsive,null,2));
-    remote.setContentSize(375, 800);
+    await sizePortal(375);
     await remote.webContents.executeJavaScript(
       'document.documentElement.dataset.theme="dark"; new Promise(resolve=>setTimeout(resolve,200))',
     );
@@ -482,6 +497,26 @@ module.exports = async function checkProjects(window, output, staging) {
       path.join(output, "preview-project-portal-narrow.png"),
       (await remote.webContents.capturePage()).toPNG(),
     );
+    const few = await ipc('get');
+    const extraProfiles = Array.from({ length: 19 }, (_, index) => ({
+      id: 'responsive-' + index, name: '布局测试档案 ' + index, description: '', variables: [], projects: [],
+    }));
+    await ipc('save', { revision: few.revision, data: { ...few, profiles: [...few.profiles, ...extraProfiles] } });
+    const lastName = extraProfiles.at(-1).name;
+    const remoteJs = code => remote.webContents.executeJavaScript(code);
+    await remoteJs('[...document.querySelectorAll(".pc-actions button")].find(b => b.textContent.trim() === "刷新").click()');
+    await wait(remote.webContents, 'document.querySelector(".pc-profiles")?.textContent.includes(' + JSON.stringify(lastName) + ')');
+    for (const width of [375, 390]) {
+      await sizePortal(width);
+      assert.ok(await remoteJs(`(() => {
+        const profiles=document.querySelector('.pc-profiles');
+        const choices=profiles.querySelectorAll('.pc-profile');
+        const last=choices[choices.length-1];
+        last.scrollIntoView({block:'nearest'}); last.click();
+        return profiles.scrollTop>0 && last.getBoundingClientRect().bottom<=profiles.getBoundingClientRect().bottom+1;
+      })()`));
+      await wait(remote.webContents, 'document.querySelector(".pc-environment h2").textContent === ' + JSON.stringify(lastName));
+    }
     window.show();
     await js("new Promise(resolve=>setTimeout(resolve,200))");
     await fs.writeFile(

@@ -161,6 +161,37 @@
   max-height: calc(100vh - 240px);
   overflow: auto;
 }
+.http-collection-toggle {
+  display: none;
+}
+@media (max-width: 900px) {
+  .http-collection-toggle {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+  }
+  .http-collection-toggle small {
+    margin-left: 5px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .http-collection-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+  .http-collection[data-open="false"],
+  .http-collection h2 {
+    display: none;
+  }
+}
 @media (max-width: 600px) {
   .http-auth {
     grid-template-columns: 1fr;

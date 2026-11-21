@@ -12,6 +12,19 @@ async function openShared(window, name, wait) {
 
 module.exports = async (window, output) => {
   const js = source => window.webContents.executeJavaScript(source, true);
+  async function checkDetectionControls(wide) {
+    const layout = await js(`(() => {
+      const heading = document.querySelector('.jar-heading');
+      const field = heading.querySelector('select').getBoundingClientRect();
+      const detect = [...heading.querySelectorAll('button')].find(button => button.textContent.trim() === '检测 Java').getBoundingClientRect();
+      const add = heading.querySelector('.run-button').getBoundingClientRect();
+      return { height: Math.abs(detect.height - field.height), baseline: Math.abs(detect.bottom - field.bottom),
+        gap: detect.left - field.right, fits: field.left >= 0 && detect.right <= innerWidth,
+        addBaseline: Math.abs(detect.bottom - add.bottom) };
+    })()`);
+    assert.ok(layout.height <= 2 && layout.baseline <= 2 && layout.gap >= 0 && layout.gap <= 16 && layout.fits && (!wide || layout.addBaseline <= 2),
+      'Host selector and Java detection button fit next to each other: ' + JSON.stringify(layout));
+  }
   async function wait(expression) {
     for (let index = 0; index < 180; index++) {
       if (await js(expression)) return;
@@ -41,6 +54,7 @@ module.exports = async (window, output) => {
     await js('document.documentElement.dataset.theme="light"');
     await openShared(window, 'JAR 管理', wait);
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
+    await checkDetectionControls(true);
     await click('添加 JAR'); await wait('!!document.querySelector(".jar-dialog[open]")');
     await click('选择文件'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
     await fill('显示名称', '订单服务 · 测试环境');
@@ -67,6 +81,7 @@ module.exports = async (window, output) => {
     const cardSize = window.getSize(), cardMinimum = window.getMinimumSize();
     window.setMinimumSize(360, 600); window.setSize(391, 830);
     await wait('innerWidth < 430 && getComputedStyle(document.querySelector(".jar-instance")).display === "grid" && document.querySelector(".sidebar").getBoundingClientRect().right <= 0');
+    await checkDetectionControls(false);
     assert.equal(await js(`(() => {
       const row = document.querySelector('.jar-instance'), bounds = row.getBoundingClientRect();
       const actions = [...row.querySelectorAll('.jar-row-actions button')].slice(0, 3);

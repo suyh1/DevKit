@@ -186,7 +186,20 @@ export default function JarCenter({ active }: { active: boolean }) {
     && `${item.name} ${item.jar} ${targetGroup(state.groups, item.hostId)?.name || ''}`.toLowerCase().includes(query.toLowerCase())) || [];
   const consoleItem = state?.instances.find(item => item.id === consoleId);
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
-    <header className="jar-heading workspace-banner"><div><span className="jar-eyebrow"><Coffee size={17} />Java 应用</span><h1>JAR 管理</h1><p>按主机管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div><div className="jar-actions"><label className="jar-java-target">Java 检测主机<select disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>{(state?.groups || []).map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}</select></label>{javaHost && <RelatedLink page="lan-hosts" id={javaHost}>查看检测主机</RelatedLink>}<CreateRelated from="jar" page="lan-hosts">登记检测主机</CreateRelated><MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton><button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button></div></header>
+    <header className="jar-heading workspace-banner">
+      <div><span className="jar-eyebrow"><Coffee size={17} />Java 应用</span><h1>JAR 管理</h1><p>按主机管理 Java 应用，随时查看进程、资源、日志与控制台。</p></div>
+
+      <div className="jar-probe">
+        <div className="jar-probe-controls">
+          <label className="jar-java-target">Java 检测主机<select title={javaTarget ? hostRole(javaTarget) : undefined} disabled={busy || !state} value={javaHost} onChange={event => { setJavaHost(event.target.value); setJava(null); }}>
+            {hostOptions.map(group => <option key={group.id} value={group.id}>{hostRole(group)}{!group.control ? `（${group.error ? '连接不可用' : '无运行权限'}）` : ''}</option>)}
+          </select></label>
+          <MotionButton busy={busy} className="secondary-button" disabled={busy || !available || !control || !javaTarget?.control} onClick={() => void task(async () => setJava(await jarRequest<JavaDetection>('detect', { hostId: javaHost })))}><Coffee size={15} />检测 Java</MotionButton>
+        </div>
+        <div className="jar-probe-links">{javaHost && <RelatedLink page="lan-hosts" id={javaHost}>查看检测主机</RelatedLink>}<CreateRelated from="jar" page="lan-hosts">登记检测主机</CreateRelated></div>
+      </div>
+      <button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加 JAR</button>
+    </header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用 JAR 管理。</p>}
     {java && <div className={java.found ? 'jar-java' : 'jar-warning'}><strong>{javaTarget ? hostRole(javaTarget) + ' · ' : ''}{java.found ? java.version : '未检测到 Java'}</strong><p>{java.found ? java.executable : java.output}</p></div>}
     <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-java-target">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>

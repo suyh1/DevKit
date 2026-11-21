@@ -3,8 +3,8 @@ import { canSendHttp, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { MotionReveal, MotionGroup, useMotionList, MotionButton, MotionPresence } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Square, Save, Plus, Trash2, Download, Upload, Copy } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Send, Square, Save, Plus, Trash2, Download, Upload, Copy, ChevronDown } from 'lucide-react';
 import ApiWorkspace from './ApiWorkspace';
 import HttpRequestInput from './HttpRequestInput';
 import HttpMultipart, { multipartIssue, withMultipart } from './HttpMultipart';
@@ -79,6 +79,9 @@ export default function HttpWorkbench({
     mounted = useRef(true),
     file = useRef<HTMLInputElement>(null);
   const collection = useRef<HTMLElement>(null);
+  const collectionId = useId();
+  const collectionToggle = useRef<HTMLButtonElement>(null);
+  const [collectionOpen, setCollectionOpen] = useState(false);
   useMotionList(collection, entries.map((entry) => entry.id).join('|'));
   const confirm = useConfirmation();
   const dirty =
@@ -96,6 +99,10 @@ export default function HttpWorkbench({
     };
   }, []);
   function reset(config: string, name = '新请求', timeout = 15000, id = '', sensitive = false) {
+    if (collection.current?.contains(document.activeElement) && collectionToggle.current?.getClientRects().length) {
+      collectionToggle.current.focus({ preventScroll: true });
+    }
+    setCollectionOpen(false);
     setMultipart(null);
     setEditorKey((key) => key + 1);
     setInvalidDraft(false);
@@ -267,7 +274,17 @@ export default function HttpWorkbench({
         </button>
       </div>
       <div className="http-layout">
-        <aside ref={collection} className="http-collection">
+        <button
+          ref={collectionToggle}
+          className="http-collection-toggle"
+          aria-expanded={collectionOpen}
+          aria-controls={collectionId}
+          onClick={() => setCollectionOpen(!collectionOpen)}
+        >
+          <span>请求集合 <small>{entries.length}/100</small></span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+        <aside ref={collection} id={collectionId} className="http-collection" aria-label="请求集合" data-open={collectionOpen}>
           <h2>
             请求集合 <small>{entries.length}/100</small>
           </h2>

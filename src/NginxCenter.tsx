@@ -1,3 +1,4 @@
+import PathSummary, { pathSuffix } from './PathSummary';
 import Skeleton from './Skeleton';
 import { SharingButton } from './Sharing';
 import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
@@ -393,8 +394,8 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
       </select></label>}
       {hostGroups.filter(group => selectedListHost === null ? group.items.length : group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{group.name}</RelatedLink> : group.name}</h3>{!group.items.length && <p>此主机暂无可查看的实例。</p>}{group.items.map(instance => {
       const itemStatus = statusStale ? undefined : statuses.find(item => item.id === instance.id);
-      return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => { if (selected !== instance.id) discardThen(() => void task(() => load(instance.id))); }}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code>{basename(instance.main)}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
-    })}</section>)}<p className="ng-help">{remoteAccess() ? '共享主机' : '本机'}的实例登记与备份保存在 {state.directory}。各实例的配置文件在所属主机的原路径编辑。</p></aside>
+      return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => { if (selected !== instance.id) discardThen(() => void task(() => load(instance.id))); }}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code title={instance.main}>{pathSuffix(instance.main, group.items.map(item => item.main))}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
+    })}</section>)}<div className="ng-storage"><PathSummary label={remoteAccess() ? '共享主机登记与备份' : '本机登记与备份'} path={state.directory} /></div></aside>
     {current && (selectedListHost === null || selectedListHost === (current.hostId || '')) && <div className="ng-detail">
       <NginxControlDock active={active} scrollRoot={scrollRoot}>{stuck => <>
         <div className="ng-dock-details" inert={stuck}>
@@ -403,14 +404,19 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
               <div>
                 <h2>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2>
                 <p className="ng-help">目标主机 <strong>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')}</strong></p>
-                <p title={current.main}>{current.main}</p>
+                <PathSummary label="主配置" path={current.main} others={state.instances.map(item => item.main)} />
               </div>
               <div className="ng-actions">
                 <MotionButton busy={busy} className="text-button" disabled={busy || dirty || !currentEdit} onClick={() => setInstanceForm(current)}><Settings2 size={15} />实例设置</MotionButton>
                 <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
               </div>
             </header>
-            <p className="ng-runtime">{hostFor(current) && <>{hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}<br /></>}运行目录：<code>{current.prefix}</code><br />{status?.detail}{status?.pidPath && <> · PID 文件：<code>{status.pidPath}</code></>}</p>
+            <div className="ng-runtime">
+              {hostFor(current) && <span>{hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}</span>}
+              <PathSummary label="运行目录" path={current.prefix} others={state.instances.map(item => item.prefix)} />
+              {status?.detail && <span>{status.detail}</span>}
+              {status?.pidPath && <PathSummary label="PID 文件" path={status.pidPath} />}
+            </div>
             <div className="ng-status-connection" role="status" data-stale={statusStale}>
               <span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span>
               <button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button>

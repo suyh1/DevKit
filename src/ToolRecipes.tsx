@@ -107,7 +107,7 @@ export default function ToolRecipes({ input }: { input: string }) {
   }
   return (
     <details
-      className="devkit-panel"
+      className="devkit-panel recipe-panel"
       onToggle={(e) => {
         setOpen(e.currentTarget.open);
         if (e.currentTarget.open) refresh();
@@ -116,7 +116,7 @@ export default function ToolRecipes({ input }: { input: string }) {
       <summary>工具处理流程</summary>
       {open && (
         <fieldset disabled={busy}>
-          <div className="devkit-fields">
+          <div className="recipe-library">
             <label>
               已存流程
               <select value="" onChange={(e) => load(e.target.value)}>
@@ -126,42 +126,55 @@ export default function ToolRecipes({ input }: { input: string }) {
                 ))}
               </select>
             </label>
-            <label>
-              流程名称
-              <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <button
-              disabled={!name.trim()}
-              onClick={() => {
-                try {
-                  localStorage.setItem(prefix + name.trim(), JSON.stringify(steps));
-                  refresh();
-                  setMessage('已保存步骤和参数');
-                } catch (e) {
-                  setMessage(String(e));
-                }
-              }}
-            >
-              保存流程
-            </button>
+            <div className="recipe-save">
+              <label>
+                流程名称
+                <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <button
+                className="secondary-button"
+                disabled={!name.trim()}
+                onClick={() => {
+                  try {
+                    localStorage.setItem(prefix + name.trim(), JSON.stringify(steps));
+                    refresh();
+                    setMessage('已保存步骤和参数');
+                  } catch (e) {
+                    setMessage(String(e));
+                  }
+                }}
+              >
+                保存流程
+              </button>
+            </div>
           </div>
           {steps.map((step, i) => (
-            <div className="devkit-fields" key={i}>
-              <label>
-                步骤 {i + 1}
-                <select
-                  value={step.tool}
-                  onChange={(e) =>
-                    change(steps.map((s, j) => (i === j ? makeStep(e.target.value as ToolId) : s)))
-                  }
+            <section className="recipe-step" key={i} aria-label={`步骤 ${i + 1}`}>
+              <header>
+                <label>
+                  步骤 {i + 1}
+                  <select
+                    value={step.tool}
+                    onChange={(e) =>
+                      change(steps.map((s, j) => (i === j ? makeStep(e.target.value as ToolId) : s)))
+                    }
+                  >
+                    {allowed.map((id) => (
+                      <option value={id} key={id}>
+                        {label(id)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="text-button"
+                  aria-label={`移除步骤 ${i + 1}`}
+                  disabled={steps.length === 1}
+                  onClick={() => change(steps.filter((_, j) => i !== j))}
                 >
-                  {allowed.map((id) => (
-                    <option value={id} key={id}>
-                      {label(id)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  移除此步
+                </button>
+              </header>
               <ToolOptions
                 toolId={step.tool}
                 options={step.options}
@@ -172,17 +185,20 @@ export default function ToolRecipes({ input }: { input: string }) {
                   )
                 }
               />
-              <button disabled={steps.length === 1} onClick={() => change(steps.filter((_, j) => i !== j))}>
-                移除此步
-              </button>
-            </div>
+            </section>
           ))}
-          <button disabled={steps.length >= 12} onClick={() => change([...steps, makeStep('json-path')])}>
-            追加步骤
-          </button>
-          <button className="run-button" onClick={() => void run()}>
-            用当前原文运行
-          </button>
+          <div className="recipe-actions">
+            <button
+              className="secondary-button"
+              disabled={steps.length >= 12}
+              onClick={() => change([...steps, makeStep('json-path')])}
+            >
+              追加步骤
+            </button>
+            <button className="run-button" onClick={() => void run()}>
+              用当前原文运行
+            </button>
+          </div>
         </fieldset>
       )}
       {busy && <button onClick={() => cancel.current?.()}>取消流程</button>}

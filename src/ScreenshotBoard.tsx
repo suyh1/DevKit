@@ -191,7 +191,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
     [history, setHistory] = useState<string[]>([]),
     [zoom, setZoom] = useState(false);
   const [compare, setCompare] = useState(false), [split, setSplit] = useState(50);
-  const [decodeAttempt, setDecodeAttempt] = useState(0), [shape, setShape] = useState<'rect' | 'ellipse'>('rect');
+  const [decodeAttempt, setDecodeAttempt] = useState(0);
   const comparePointer = useRef<number | null>(null);
   const [rename, setRename] = useState<string>();
   const canvas = useRef<HTMLCanvasElement>(null),
@@ -341,15 +341,22 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
                   aria-label={tools[t]}
                   title={tools[t]}
                   aria-pressed={tool === t}
-                  onClick={() => { setTool(t); if (t === 'rect' || t === 'ellipse') setShape(t); }}
+                  onClick={() => setTool(t)}
                 >
                   <Icon size={19} />
                 </button>
               );
             })}
-            <button
-              className="compact-shape" aria-pressed={tool === shape} onClick={() => setTool(shape)}>{tools[shape]}</button>
-            <select className="compact-shape" aria-label="选择形状" value={shape} onChange={e => { const next = e.target.value as 'rect' | 'ellipse'; setShape(next); setTool(next); }}><option value="rect">矩形</option><option value="ellipse">椭圆</option></select>
+            <select
+              className="compact-shape"
+              aria-label="选择形状"
+              value={tool === 'rect' || tool === 'ellipse' ? tool : ''}
+              onChange={event => setTool(event.target.value as 'rect' | 'ellipse')}
+            >
+              <option value="" disabled>形状</option>
+              <option value="rect">矩形</option>
+              <option value="ellipse">椭圆</option>
+            </select>
             <button
               className="board-undo"
               title="撤销我的上一笔"

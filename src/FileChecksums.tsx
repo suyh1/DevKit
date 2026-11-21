@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FileText, Files } from 'lucide-react';
 import { fileDigest } from './file-digest';
 import { readText, saveText } from './files';
 
@@ -16,19 +17,24 @@ export function parseManifest(text: string) {
 export default function FileChecksums() {
   const [rows, setRows] = useState(new Map<string, string>());
   const [manifest, setManifest] = useState(new Map<string, string>());
+  const [manifestName, setManifestName] = useState('');
+  const [fileCount, setFileCount] = useState(0);
   const [expected, setExpected] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const generation = useRef(0);
+  const manifestGeneration = useRef(0);
   useEffect(
     () => () => {
       generation.current++;
+      manifestGeneration.current++;
     },
     [],
   );
   async function calculate(files: File[]) {
     if (!files.length) return;
     const run = ++generation.current;
+    setFileCount(files.length);
     setBusy(true);
     setRows(new Map());
     try {
@@ -56,11 +62,27 @@ export default function FileChecksums() {
       if (run === generation.current) setBusy(false);
     }
   }
+  async function importManifest(file?: File) {
+    if (!file) return;
+    const run = ++manifestGeneration.current;
+    try {
+      const entries = parseManifest((await readText(file)).text);
+      if (run !== manifestGeneration.current) return;
+      setManifest(entries);
+      setManifestName(file.name);
+      setStatus('已导入校验清单');
+    } catch (error) {
+      if (run !== manifestGeneration.current) return;
+      setManifest(new Map());
+      setManifestName('');
+      setStatus(String(error));
+    }
+  }
   return (
-    <details className="devkit-panel">
+    <details className="devkit-panel checksum-panel">
       <summary>文件 SHA-256 与批量校验</summary>
       <div
-        className="devkit-fields"
+        className="checksum-fields"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -68,8 +90,14 @@ export default function FileChecksums() {
         }}
       >
         <label>
-          选择或拖入文件
+          <span>待校验文件</span>
+          <span className="checksum-picker">
+            <Files size={15} aria-hidden="true" />
+            选择或拖入文件
+          </span>
           <input
+            className="sr-only"
+            aria-label="选择或拖入文件"
             type="file"
             multiple
             onChange={(e) => {
@@ -77,33 +105,47 @@ export default function FileChecksums() {
               e.target.value = '';
             }}
           />
+          <small>{fileCount ? `已选择 ${fileCount} 个文件` : '可一次选择多个文件'}</small>
         </label>
-        <label>
-          导入 SHA256SUMS
+        <label
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void importManifest(e.dataTransfer.files[0]);
+          }}
+        >
+          <span>对照清单</span>
+          <span className="checksum-picker">
+            <FileText size={15} aria-hidden="true" />
+            导入 SHA256SUMS
+          </span>
           <input
+            className="sr-only"
+            aria-label="导入 SHA256SUMS"
             type="file"
-            onChange={async (e) => {
+            onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
-              if (!file) return;
-              try {
-                setManifest(parseManifest((await readText(file)).text));
-                setStatus('已导入校验清单');
-              } catch (error) {
-                setManifest(new Map());
-                setStatus(String(error));
-              }
+              void importManifest(file);
             }}
           />
+          <small>{manifestName ? `${manifestName} · ${manifest.size} 项` : '可选，用于批量比对'}</small>
         </label>
         {rows.size === 1 && (
           <label>
-            预期 SHA-256
-            <input value={expected} onChange={(e) => setExpected(e.target.value)} />
+            <span>预期 SHA-256</span>
+            <input
+              placeholder="输入比对摘要"
+              value={expected}
+              onChange={(e) => setExpected(e.target.value)}
+            />
           </label>
         )}
+      </div>
+      <div className="checksum-actions">
         {!!rows.size && (
           <button
+            className="secondary-button"
             onClick={() =>
               void saveText([...rows].map(([name, hex]) => hex + '  ' + name + '\n').join(''), 'SHA256SUMS')
                 .then(setStatus)
@@ -115,6 +157,7 @@ export default function FileChecksums() {
         )}
         {busy && (
           <button
+            className="secondary-button"
             onClick={() => {
               generation.current++;
               setBusy(false);

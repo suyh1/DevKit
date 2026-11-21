@@ -97,3 +97,6 @@
 .ng-change-actions { padding: 6px 16px; border-top: 1px solid var(--line); }
 .ng-list-host { display: grid; gap: 5px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
 .ng-list-host select { min-width: 0; width: 100%; min-height: 34px; background: var(--surface); color: var(--text); }
+.ng-storage { grid-column: 1 / -1; min-width: 0; }
+.ng-instance-heading .path-summary { margin-top: 4px; }
+.ng-runtime { display: grid; gap: 3px; }

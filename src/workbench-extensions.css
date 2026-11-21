@@ -50,13 +50,91 @@
   padding: 0.4rem;
   border-radius: 6px;
 }
-.devkit-panel button:not([class]) {
+.devkit-panel button:not([class]):where(:not(.segmented-control > button)) {
   color: var(--accent);
   background: var(--tint);
   border: 1px solid var(--line);
   padding: 0.35rem 0.65rem;
   border-radius: 8px;
   margin: 0.2rem;
+}
+.checksum-fields,
+.recipe-library {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-block: 14px;
+}
+.checksum-fields label,
+.recipe-library label {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.checksum-fields .checksum-picker,
+.checksum-fields input:not([type=file]),
+.recipe-library :is(select, input, button) {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 36px;
+}
+.checksum-fields .checksum-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--text);
+  cursor: pointer;
+}
+.checksum-fields label:focus-within .checksum-picker {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.checksum-fields small { overflow-wrap: anywhere; }
+.checksum-actions, .recipe-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.checksum-panel p:empty, .recipe-panel p:empty { margin: 0; }
+.recipe-library { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.recipe-save {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.recipe-step {
+  display: grid;
+  gap: 10px;
+  margin-block: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.recipe-step header, .recipe-step header label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+.recipe-step header { justify-content: space-between; }
+.recipe-step header button { flex: none; }
+.recipe-step .options { min-width: 0; flex-wrap: wrap; }
+.recipe-step .option { min-width: 0; max-width: 100%; }
+.recipe-step .field-path { flex: 1 1 16rem; }
+.recipe-step .field-path input { flex: 1; width: auto; min-width: 0; }
+.recipe-actions { justify-content: flex-end; }
+.recipe-actions button { height: 36px; font-size: 12px; }
+@media (max-width: 700px) {
+  .recipe-library { grid-template-columns: minmax(0, 1fr); }
+  .recipe-step .option { flex-wrap: wrap; }
+  .recipe-step .option > span { flex-basis: 100%; }
+  .recipe-step .segmented-control { max-width: 100%; }
 }
 .devkit-bento {
   display: grid;

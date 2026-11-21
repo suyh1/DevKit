@@ -309,8 +309,36 @@ module.exports = async function collaborationSmoke(window, output) {
     await wait(web, '!!document.querySelector(".board-index .collab-record")');
     await web('document.querySelector(".board-index .collab-record").click()');
     await wait(web, '!document.querySelector(".board-library")');
-    browser.setContentSize(390, 844);
-    await wait(web, 'innerWidth <= 390');
+    for (const width of [375, 390]) {
+      browser.setContentSize(width, 844);
+      await wait(web, 'innerWidth === ' + width);
+      const toolbar = current + '.board-tools';
+      const getTool = selector => 'document.querySelector(' + JSON.stringify(toolbar + ' ' + selector) + ')';
+      const shape = getTool('select');
+      for (const value of ['rect', 'ellipse']) {
+        await web(`{const field=${shape};field.value=${JSON.stringify(value)};field.dispatchEvent(new Event('change',{bubbles:true}));}`);
+        await wait(web, shape + '.value === ' + JSON.stringify(value));
+      }
+      await web(getTool('[aria-label="画笔"]') + '.click()');
+      await wait(web, shape + '.value === ""');
+      await web(`{const field=${shape};field.value='ellipse';field.dispatchEvent(new Event('change',{bubbles:true}));}`);
+      await wait(web, shape + '.value === "ellipse"');
+      assert.equal(await web(shape + '.getBoundingClientRect().top === ' + getTool('.board-undo') + '.getBoundingClientRect().top'), true);
+      const point = await web(`(() => {
+        const canvas=document.querySelector('canvas[aria-label=共享标注画布]');
+        canvas.scrollIntoView({block:'center'});
+        const r=canvas.getBoundingClientRect();
+        return {x: Math.round(r.left+r.width*.3), y: Math.round(r.top+r.height*.3)};
+      })()`);
+      browser.webContents.sendInputEvent({type:'mouseDown', ...point, button:'left', clickCount:1});
+      browser.webContents.sendInputEvent({type:'mouseMove', x:point.x+24, y:point.y+20, modifiers:['leftButtonDown']});
+      browser.webContents.sendInputEvent({type:'mouseUp', x:point.x+24, y:point.y+20, button:'left', clickCount:1});
+      await wait(web, 'document.querySelector(".board-editor details summary")?.textContent.includes("（2）")');
+      const updated = await desktop('window.devkitCollab.request("whiteboard","read",{id:' + JSON.stringify(boardId) + '})');
+      assert.equal(updated.data.marks.at(-1).tool, 'ellipse');
+      await web(getTool('.board-undo') + '.click()');
+      await wait(web, 'document.querySelector(".board-editor details summary")?.textContent.includes("（1）")');
+    }
     assert.ok(await web('document.documentElement.scrollWidth <= innerWidth'));
     await wait(
       web,
@@ -331,6 +359,20 @@ module.exports = async function collaborationSmoke(window, output) {
     assert.ok(await web('document.documentElement.scrollWidth <= innerWidth'));
     await click(web, current + '.transfer-switch ', '发送内容');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden]) .collab-compose").offsetWidth');
+    for (const width of [375, 390]) {
+      browser.setContentSize(width, 844);
+      await wait(web, 'innerWidth === ' + width);
+      for (const value of ['1', '168', '24']) {
+        const segment = 'document.querySelector(' + JSON.stringify(current + '[aria-label="有效期"] button[value="' + value + '"]') + ')';
+        const fits = await web(`(() => {
+          const b=${segment}, r=b.getBoundingClientRect(), group=b.parentElement.getBoundingClientRect();
+          return r.width>0 && r.left>=group.left && r.right<=group.right+1 && r.right<=innerWidth;
+        })()`);
+        assert.ok(fits, `Every expiry option fits at ${width}px`);
+        await web(segment + '.click()');
+        await wait(web, segment + '.getAttribute("aria-pressed") === "true"');
+      }
+    }
     await capture('collab-transfer-compose-mobile');
     await click(web, current + '.transfer-switch ', '收件箱');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden]) .collab-inbox").offsetWidth');

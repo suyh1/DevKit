@@ -96,3 +96,25 @@
 .jar-instance .jar-advanced .jar-row-actions { margin-block: 6px; }
 
 .jar-console pre, .jar-console-input > input { font: var(--code-size, 14px)/1.7 var(--font-mono); }
+.jar-heading.workspace-banner { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; }
+.jar-center { container: jar-workspace / inline-size; }
+.jar-heading > .run-button { grid-area: 1 / 2; white-space: nowrap; }
+.jar-probe { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; gap: 6px 16px; padding-top: 10px; border-top: 1px solid var(--line); }
+.jar-probe-controls { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 8px; max-width: 100%; min-width: 0; }
+.jar-probe-controls .jar-java-target { min-width: 0; }
+.jar-probe-controls select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.jar-probe-controls :is(select,button) { box-sizing: border-box; height: 36px; min-height: 36px; }
+.jar-probe-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.jar-probe-links .text-button { min-height: 36px; font-size: 12px; }
+@container jar-workspace (min-width: 880px) {
+  .jar-heading.workspace-banner { grid-template-columns: minmax(0,1fr) auto auto; row-gap: 2px; }
+  .jar-heading > div:first-child { grid-area: 1 / 1 / span 2; }
+  .jar-probe { grid-area: 1 / 2 / span 2; display: grid; grid-template-rows: subgrid; row-gap: 2px; padding: 0 16px 0 0; border-top: 0; border-right: 1px solid var(--line); }
+  .jar-probe-controls { grid-template-columns: minmax(120px, 200px) auto; }
+  .jar-probe-links .text-button { min-height: 26px; padding: 2px 4px; }
+  .jar-heading > .run-button { grid-area: 1 / 3; align-self: end; height: 36px; min-height: 36px; }
+}
+@media (max-width: 540px) {
+  .jar-probe-controls { width: 100%; }
+  .jar-probe-controls select { max-width: none; }
+}

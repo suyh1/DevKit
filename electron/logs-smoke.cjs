@@ -52,7 +52,7 @@ module.exports = async (window, output) => {
       await js(`[...document.querySelectorAll('.shared-nav-item')].find(e=>e.querySelector('strong').textContent===${JSON.stringify(name)}).click()`);
       await wait(window.webContents, `document.querySelector('.breadcrumb strong')?.textContent===${JSON.stringify(name)}&&!document.querySelector('.shared-nav-panel')`);
     }
-    await wait(window.webContents, `document.querySelectorAll('.log-source-list section>label').length===4`);
+    await wait(window.webContents, `document.querySelectorAll('.log-source-list input[type=checkbox]').length===4`);
     await js(`document.querySelectorAll('.log-source-list input').forEach(e=>e.click())`);
     await wait(window.webContents, `document.querySelectorAll('.log-pane').length===4&&[...document.querySelectorAll('.log-pane pre')].every(e=>e.textContent.includes('INFO'))`);
     assert.equal(await js(`document.querySelector('.log-panels').textContent.includes('private-value')`), false, 'Display masking is on by default');
@@ -87,7 +87,10 @@ module.exports = async (window, output) => {
     remote = new BrowserWindow({ width: 1440, height: 900, show: true, webPreferences: { partition: `logs-${Date.now()}`, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     await remote.loadURL(`http://127.0.0.1:${port}/#logs`); await wait(remote.webContents, `!!document.querySelector('.portal-login .run-button')&&!document.querySelector('.portal-login .run-button').disabled`);
     await remote.webContents.executeJavaScript(`(()=>{const e=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'logs-smoke-only');e.dispatchEvent(new Event('input',{bubbles:true}))})()`, true); await delay(100); await remote.webContents.executeJavaScript(`document.querySelector('.portal-login .run-button').click()`, true);
-    await wait(remote.webContents, `document.querySelectorAll('.log-source-list section>label').length===4`);
+    await wait(remote.webContents, `document.querySelectorAll('.log-source-list input[type=checkbox]').length===4`);
+    assert.equal(await remote.webContents.executeJavaScript(`[...document.querySelectorAll('.log-sources button')].some(button =>
+      ['新建主机', '添加 JAR 来源', '添加 Nginx 来源'].includes(button.textContent.trim()) && !button.disabled && button.getClientRects().length)`),
+      false, 'Read-only visitors have no actionable creation controls');
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-bar .portal-navigation').length`), 0);
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar .portal-navigation button').length`), 6);
     await remote.webContents.executeJavaScript(`document.querySelector('.log-source-list input').click()`, true); await wait(remote.webContents, `document.querySelector('.log-pane pre')?.textContent.includes('rotated-marker')`);

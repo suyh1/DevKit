@@ -8,11 +8,18 @@
 .color-panel-heading h2>span { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; font-weight: 400; margin-left: 2px; }
 .color-live { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; color: var(--accent); white-space: nowrap; border: 1px solid #087f7020; border-radius: 20px; padding: 4px 8px; background: var(--tint); }
 .color-live:before { content: ''; display: block; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
+.task-pane .color-panel .color-live[data-waiting=true] { color: var(--muted); background: var(--soft); border-color: var(--line); }
+.color-live[data-waiting=true]:before { background: currentColor; }
 .color-field { margin-bottom: 20px; }
 .color-field label>span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 9px; }
 .color-field-row { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); overflow: hidden; padding: 6px; transition: border-color 150ms, box-shadow 150ms; }
 .color-field-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px #087f7009; }
 .color-field input[type=color] { width: 33px; height: 32px; flex-shrink: 0; border: 0; padding: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.color-field-picker { position: relative; display: grid; place-items: center; flex: none; }
+.color-field-picker[data-invalid=true] { color: var(--muted); border-radius: 5px; outline: 1px dashed var(--line); }
+.color-field-picker svg { position: absolute; pointer-events: none; }
+.color-field-picker[data-invalid=true] input { opacity: 0; }
+.color-field-picker:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 .color-field input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }.color-field input[type=color]::-webkit-color-swatch { border: 1px solid #00000009; border-radius: 5px; }
 .color-value-input { font-family: var(--font-mono); font-size: var(--code-size,14px); border: 0; background: transparent; color: var(--text); width: 100%; min-width: 0; padding: 6px 1px; }
 .color-range { display: block; font-size: 11px; color: var(--muted); margin: 21px 0 23px; }

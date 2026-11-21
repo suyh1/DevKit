@@ -381,7 +381,7 @@
 .board-tools .compact-shape {
   display: none;
 }
-@media (max-width: 760px) {
+@container collaboration (max-width: 640px) {
   .board-tools .individual-shape {
     display: none;
   }

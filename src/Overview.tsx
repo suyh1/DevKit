@@ -10,7 +10,7 @@ import { tools, type Options, type ToolId } from './tools';
 import { categoryMeta, categoryOrder, toolIcons } from './ui';
 import type { Task } from './workbench';
 
-type OverviewScreen = 'launch' | 'library';
+export type OverviewScreen = 'launch' | 'library';
 
 type Props = {
   onDetect: (id: ToolId, text: string, options?: Options) => void;
@@ -18,7 +18,8 @@ type Props = {
   favorites: ToolId[];
   onFavorite: (id: ToolId) => void;
   mode: 'home' | 'favorites' | 'recent';
-  homeVisit: number;
+  homeVisit: { screen: OverviewScreen };
+  onBrowse: () => void;
   recent: ToolId[];
   tasks: Task[];
   onResume: (id: string) => void;
@@ -31,8 +32,8 @@ function canScroll(element: HTMLElement | null, delta: number) {
   return delta < 0 ? element.scrollTop > 1 : element.scrollTop + element.clientHeight < element.scrollHeight - 1;
 }
 
-export default function Overview({ onDetect, onChoose, favorites, onFavorite, mode, homeVisit, recent, tasks, onResume, library, onLibrary }: Props) {
-  const [screen, setScreen] = useState<OverviewScreen>('launch');
+export default function Overview({ onDetect, onChoose, favorites, onFavorite, mode, homeVisit, onBrowse, recent, tasks, onResume, library, onLibrary }: Props) {
+  const [screen, setScreen] = useState<OverviewScreen>(homeVisit.screen);
   const [category, setCategory] = useState('全部');
   const [query, setQuery] = useState('');
   const home = mode === 'home';
@@ -64,7 +65,10 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
     setScreen(next);
   }, [screen]);
 
-  useLayoutEffect(() => { setScreen('launch'); }, [homeVisit]);
+  useLayoutEffect(() => {
+    setScreen(homeVisit.screen);
+    if (homeVisit.screen === 'library') focusAfterSwitch.current = 'heading';
+  }, [homeVisit]);
 
   useLayoutEffect(() => {
     const focus = focusAfterSwitch.current;
@@ -191,10 +195,15 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
           </div></footer>
         </article>;
       })}</div>
-      {!visible.length && <div className="library-empty">
+      {!visible.length && !scopedTools.length ? <div className="library-empty">
+        {mode === 'favorites' ? <Star size={32} aria-hidden="true" /> : <Clock3 size={32} aria-hidden="true" />}
+        <h3>{mode === 'favorites' ? '把常用工具收藏到这里' : '暂无最近使用的工具'}</h3>
+        <p>{mode === 'favorites' ? '在工具库点击星标，即可在这里找到收藏的工具。' : '打开工具后，这里会记录本次会话使用过的工具。'}</p>
+        <button type="button" onClick={onBrowse}>浏览工具库</button>
+      </div> : !visible.length && <div className="library-empty">
         <SearchX size={32} aria-hidden="true" />
-        <h3>{mode === 'favorites' && !favorites.length ? '把常用工具收藏到这里' : mode === 'recent' && !recent.length ? '暂无最近使用的工具' : '没有匹配的工具'}</h3>
-        <p>{mode === 'recent' && !recent.length ? '打开工具后，这里会记录本次会话使用过的工具。' : home ? '试试“令牌”“表格”或“驼峰”等关键词。' : '试试其他关键词，或调整分类。'}</p>
+        <h3>没有匹配的工具</h3>
+        <p>{home ? '试试“令牌”“表格”或“驼峰”等关键词。' : '试试其他关键词，或调整分类。'}</p>
         <button type="button" onClick={() => { setCategory('全部'); setQuery(''); }}>清除筛选</button>
       </div>}
   </section>;
