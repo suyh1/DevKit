@@ -5,7 +5,7 @@ import path from 'node:path';
 const actions = {
   jar: {
     read: ['get', 'statuses', 'log-tail', 'console-read', 'startup-get'],
-    edit: ['browse', 'upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'],
+    edit: ['npm-scripts', 'browse', 'upsert', 'remove', 'config-list', 'config-read', 'config-save', 'config-backup'],
     control: ['command', 'detect', 'health-check', 'monitor-probe', 'console-claim', 'console-input', 'console-eof', 'console-release', 'startup-install', 'startup-remove'],
   },
   nginx: {
@@ -14,7 +14,7 @@ const actions = {
     control: ['command', 'detect', 'reload-restored'],
   },
 };
-export const fullAccess = { edit: true, control: true };
+export const fullAccess = { edit: true, control: true, backend: true };
 export function authorizeWorkspace(module, action, access) {
   if (module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
     if (access.edit && access.control) return;
@@ -47,7 +47,12 @@ async function browse({ directory = '', kind }) {
 }
 
 export async function managedRequest(manager, module, action, payload, access = fullAccess, session) {
+  if (payload?.scope === 'local' && payload.scopeAccess) {
+    const limit = payload.scopeAccess;
+    access = { edit: access.edit && limit.edit === true, control: access.control && limit.control === true,
+      backend: access.backend === true && limit.backend === true };
+  }
   authorizeWorkspace(module, action, access);
   if (action === 'browse') return browse(payload);
-  return manager.request(action, payload, { session, allowEdit: access.edit, allowControl: access.control, allowExecution: access.control });
+  return manager.request(action, payload, { session, allowBackend: access.backend === true, allowEdit: access.edit, allowControl: access.control, allowExecution: access.control });
 }

@@ -103,7 +103,7 @@ async function openLanWindow(address, module) {
   isolated.setPermissionCheckHandler(() => false);
   isolated.setPermissionRequestHandler((_contents, _permission, reply) => reply(false));
   isolated.webRequest.onBeforeRequest((details, reply) => reply({ cancel: !sameHost(details.url) }));
-  const title = `DevKit · ${module === 'jar' ? '远程 JAR 管理' : '远程 Nginx 配置'} · ${url.host}`;
+  const title = `DevKit · ${module === 'jar' ? '远程 后端管理' : '远程 Nginx 配置'} · ${url.host}`;
   const remote = new BrowserWindow({
     width: 1240, height: 820, minWidth: 480, minHeight: 540, show: false, title, autoHideMenuBar: true,
     webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, webviewTag: false },
@@ -422,17 +422,17 @@ app.whenReady().then(async () => {
     catch (error) { return { error: error.message }; }
   });
   ipcMain.handle('devkit:jar', async (event, action, value) => {
-    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 JAR 管理请求。');
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 后端管理请求。');
     try {
       if (action === 'pick') {
-        if (!['jar', 'executable'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
+        if (!['jar', 'executable', 'directory'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
         const result = await dialog.showOpenDialog(window, {
-          title: value.kind === 'jar' ? '选择 JAR 文件' : '选择 Java 程序', properties: ['openFile'],
+          title: value.kind === 'jar' ? '选择 JAR 文件' : value.kind === 'directory' ? '选择服务目录' : '选择程序', properties: [value.kind === 'directory' ? 'openDirectory' : 'openFile'],
           ...(value.kind === 'jar' ? { filters: [{ name: 'Java 应用', extensions: ['jar'] }] } : {}),
         });
         return { data: result.canceled ? [] : result.filePaths };
       }
-      if (!jarManager) throw new Error(jarError || 'JAR 管理器尚未准备好。');
+      if (!jarManager) throw new Error(jarError || '后端管理器尚未准备好。');
       return { data: await (lan ? lan.request(jarManager, 'jar', action, value) : jarManager.request(action, value)) };
     } catch (error) { return { error: error.message || 'JAR 操作失败。' }; }
   });

@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import { lstat, mkdir, open, readdir, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { serviceDirectory } from './backend-launch.mjs';
 import { atomicFile } from './atomic-file.mjs';
 import { pathKey } from './jar-process.mjs';
 
@@ -35,9 +36,9 @@ async function readDocument(filename) {
 }
 
 export async function jarConfigs(folder, item, action, value) {
-  const directory = path.dirname(item.jar);
+  const directory = serviceDirectory(item);
   async function checkDirectory() {
-    if (pathKey(await realpath(directory)) !== pathKey(directory)) throw new Error('JAR 目录已变化，请重新登记。');
+    if (pathKey(await realpath(directory)) !== pathKey(directory)) throw new Error('工作目录已变化，请重新登记。');
   }
   await checkDirectory();
   const allowed = name => supportedName(name) && pathKey(path.join(directory, name)) !== pathKey(path.join(folder, 'instances.json'));
@@ -46,7 +47,7 @@ export async function jarConfigs(folder, item, action, value) {
     return { directory, files: entries.filter(entry => entry.isFile() && allowed(entry.name)).map(entry => entry.name).sort((a, b) => a.localeCompare(b)) };
   }
   const { name, hash, content } = value;
-  if (!allowed(name)) throw new Error('请选择 JAR 同目录下支持的配置文件。');
+  if (!allowed(name)) throw new Error('请选择 服务工作目录下支持的配置文件。');
   const filename = path.join(directory, name);
   const backupDirectory = path.join(folder, 'config-backups');
   const backupFile = path.join(backupDirectory, `${checksum(pathKey(filename))}.bak`);

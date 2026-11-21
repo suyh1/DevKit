@@ -107,15 +107,15 @@ export async function createLanWorkspaces(directory, transports = { share: share
   async function request(manager, module, action, payload = {}, access = fullAccess, session = desktopSession) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('请求参数无效。');
     const { scope, scopeAccess, hostId: explicit, ...value } = payload;
-    if (scope === 'local' && scopeAccess) access = { edit: access.edit && scopeAccess.edit === true, control: access.control && scopeAccess.control === true };
+    if (scope === 'local' && scopeAccess) access = { backend: access.backend === true && scopeAccess.backend === true, edit: access.edit && scopeAccess.edit === true, control: access.control && scopeAccess.control === true };
     authorizeWorkspace(module, action, access);
     const local = (name, data) => managedRequest(manager, module, name, data, access, session === desktopSession ? undefined : session);
     if (['inventory', 'inventory-local', 'inventory-host', 'inventory-progress'].includes(scope) && ['get', 'statuses'].includes(action)) {
       const hosts = store.list().filter(host => host.modules[module]);
-      const cacheKey = host => `${host.id}:${module}:${session}:${access.edit}:${access.control}`;
+      const cacheKey = host => `${host.id}:${module}:${session}:${access.edit}:${access.control}:${!!access.backend}`;
       const phaseFor = host => connections.get(host.mode === 'share' ? `${host.id}:${session}` : host.id)?.phase || 'connecting';
       const pendingGroup = host => ({ id: host.id, name: host.name, platform: host.platform || '', revision: 0, edit: false, control: false, phase: phaseFor(host), checkedAt: cache.get(cacheKey(host))?.group.checkedAt });
-      const localGroup = base => ({ id: '', name: session === desktopSession ? '本机' : '共享主机', platform: base.platform, revision: base.revision, edit: access.edit, control: access.control });
+      const localGroup = base => ({ id: '', name: session === desktopSession ? '本机' : '共享主机', platform: base.platform, revision: base.revision, backendTypes: base.backendTypes, edit: access.edit, control: access.control });
       if (scope === 'inventory-progress') return hosts.map(pendingGroup);
       if (scope === 'inventory-local') {
         const base = await local(action, value);
@@ -131,7 +131,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
           const limits = await transport.capabilities?.(module) || fullAccess;
           const permissions = { edit: access.edit && limits.edit, control: access.control && limits.control };
           const state = stateFor(module, result, host.id, permissions);
-          const group = { id: host.id, name: host.name, platform: state.platform, revision: state.revision, ...permissions, phase: 'ready', checkedAt: new Date().toISOString() };
+          const group = { id: host.id, name: host.name, platform: state.platform, revision: state.revision, backendTypes: state.backendTypes === true && access.backend === true, ...permissions, phase: 'ready', checkedAt: new Date().toISOString() };
           cache.set(key, { host, session, state: stateFor(module, result, host.id, { edit: false }), group });
           return { state, group };
         } catch (error) {
@@ -256,7 +256,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       const state = await remote(host, module, 'get', {}, fullAccess, desktopSession);
       if (state.instances.some(item => item.id === target.id)) return true;
       const filename = await remote(host, module, 'resolve-legacy-path', { path: target.path }, fullAccess, desktopSession);
-      if (state.instances.some(item => key(module === 'jar' ? item.jar : item.main) === key(filename))) return true;
+      if (state.instances.some(item => (module !== 'jar' || item.jar) && key(module === 'jar' ? item.jar : item.main) === key(filename))) return true;
       if (module === 'jar') {
         const status = await requestSsh({ host: { ...host, platform }, module, action: 'status', target }, async (_args, command, input) => runSshCommand(await openHost(host), command, input));
         if (status !== 'stopped') throw new Error(`${target.name} 仍由旧版 SSH 管理（${status}）。请停止后再导入。`);
@@ -328,12 +328,12 @@ export async function createLanWorkspaces(directory, transports = { share: share
         ...(access.rdp ? { canRdp: !!rdpPort || platform === 'win32' } : {}),
       };
     }),
-    async monitorJarSources(session = desktopSession) {
+    async monitorJarSources(session = desktopSession, backend = true) {
       const hosts = store.list().filter(host => host.modules.jar);
       const results = await Promise.allSettled(hosts.map(async host => {
         const transport = await connection(host, session);
         if (transport.capabilities && !(await transport.capabilities('jar')).control) return [];
-        const state = await transport.request('jar', 'get', {}, { edit: false, control: true }, session);
+        const state = await transport.request('jar', 'get', {}, { edit: false, control: true, backend }, session);
         return state.instances.filter(item => ['http', 'tcp'].includes(item.health?.type)).map(item => ({
           label: `目标主机 · ${host.name} / ${item.name}`, source: { type: 'jar', id: qualified(host.id, item.id) },
         }));

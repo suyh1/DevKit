@@ -2,11 +2,12 @@ import { readFile, lstat, unlink } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
+import { serviceDirectory } from './backend-launch.mjs';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { inspectJava } from './jar-process.mjs';
 
-export const supervisorPath = item => path.join(path.dirname(item.jar), `${item.pidName}.supervisor.json`);
+export const supervisorPath = item => path.join(serviceDirectory(item), `${item.pidName}.supervisor.json`);
 export const workerPath = fileURLToPath(new URL('./jar-supervisor-worker.mjs', import.meta.url));
 export async function supervisorRequest(item, command = 'status', timeout = 8000, payload = {}) {
   const file = supervisorPath(item); let raw, record;
@@ -57,14 +58,14 @@ export async function launchSupervisor(registry, item, launch = spawnWorker) {
   let created = false;
   if (!await supervisorRequest(item)) {
     created = true;
-    const exited = await launch(process.execPath, [workerPath, '--registry', registry, '--id', item.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, cwd: path.dirname(item.jar) });
+    const exited = await launch(process.execPath, [workerPath, '--registry', registry, '--id', item.id], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, cwd: serviceDirectory(item) });
     let ready = false;
     for (let attempt = 0; attempt < 150; attempt++) {
       if (exited?.()) break;
       try { if (await supervisorRequest(item)) { ready = true; break; } } catch { /* Wait for the endpoint to finish initializing. */ }
       await delay(100);
     }
-    if (!ready) throw new Error('JAR 守护进程未能启动，请检查运行文件权限与应用安装路径。');
+    if (!ready) throw new Error('服务守护进程未能启动，请检查运行文件权限与应用安装路径。');
   }
   return supervisorRequest(item, created ? 'start-result' : 'start', 150000);
 }

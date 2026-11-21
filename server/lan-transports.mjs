@@ -67,7 +67,7 @@ export function shareTransport(host, password) {
       if (closed) throw new Error('远程共享会话已关闭。');
       const timeout = module === 'logs' && action !== 'export' || ['get', 'browse'].includes(action) ? 12000 : 160000;
       const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(timeout)]);
-      const response = await call(`${module}/${action}`, { ...payload, scope: 'local', scopeAccess: access && { edit: access.edit, control: access.control } }, cookie, timeout, signal);
+      const response = await call(`${module}/${action}`, { ...payload, scope: 'local', scopeAccess: access && { backend: access.backend === true, edit: access.edit, control: access.control } }, cookie, timeout, signal);
       if (response.status === 401 && attempt === 0) { if (authentication === pending) authentication = undefined; continue; }
       const result = await response.json();
       if (!response.ok) throw Object.assign(new Error(result.error || `目标 DevKit 请求失败（${response.status}）。`), { status: response.status === 403 ? 403 : 502 });

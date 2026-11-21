@@ -112,10 +112,10 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
         if (['upsert', 'remove'].includes(action) && !services.monitor.edit) fail(403, '未授予监控编辑权限。');
         if ((['toggle', 'check'].includes(action) || action === 'upsert' && payload?.monitor?.enabled) && !services.monitor.control) fail(403, '未授予监控运行权限；仅编辑用户请保存为暂停状态。');
         if (action === 'remove' && !services.monitor.control && (await manager.request('get')).monitors.find(item => item.id === payload?.id)?.enabled) fail(403, '移除运行中的监控需要运行权限。');
-        return manage(token, () => manager.request(action, payload, { allowProjects: services.projects.enabled, allowJar: services.jar.enabled, allowRemoteJar: services.jar.enabled && services.jar.control, session: token, allowLan, allowControl: services.monitor.control, allowWebhook: services.monitor.edit && services.monitor.control }));
+        return manage(token, () => manager.request(action, payload, { allowProjects: services.projects.enabled, allowJar: services.jar.enabled, allowBackend: services.jar.backend, allowRemoteJar: services.jar.enabled && services.jar.control, session: token, allowLan, allowControl: services.monitor.control, allowWebhook: services.monitor.edit && services.monitor.control }));
       }
       if (module === 'jar' || module === 'nginx') {
-        const label = module === 'jar' ? 'JAR' : 'Nginx';
+        const label = module === 'jar' ? '后端' : 'Nginx';
         const access = services[module];
         if (!access.enabled) fail(404, `未开放 ${label} 共享。`);
         const readsLogs = action === 'log-tail' || action === 'console-read';

@@ -60,7 +60,7 @@ test('standalone service exposes opt-in workspaces without installed npm depende
     const login = await fetch(origin + '/api/projects/login', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: '{"password":"standalone-test-only"}' });
     const capabilities = await login.json();
     assert.equal(capabilities.shareNginx, true); assert.equal(capabilities.shareHttp, true); assert.equal(capabilities.nginxControl, false);
-    assert.deepEqual(capabilities.services.jar, { enabled: true, edit: false, control: false });
+    assert.deepEqual(capabilities.services.jar, { enabled: true, edit: false, control: false, backend: false });
     const cookie = login.headers.get('set-cookie').split(';')[0];
     for (const retired of ['releases', 'snippets']) {
       assert.equal(Object.hasOwn(capabilities.services, retired), false);

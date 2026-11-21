@@ -1,13 +1,16 @@
 import { mkdir, readFile, writeFile, rename, unlink, open, stat, realpath, lstat } from 'node:fs/promises';
 import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { acquireProjectLock } from './project-lock.mjs';
-import { detectJava, inspectJava, launchJar, signalJava, matchesJar, pathKey } from './jar-process.mjs';
+import { detectJava, inspectJava, launchJar, signalJava, pathKey } from './jar-process.mjs';
 import { normalizePolicies, effectiveEnvironment, probeHealth } from './jar-policies.mjs';
 import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-supervisor-client.mjs';
 import { createJarAutostart } from './jar-autostart.mjs';
 import { jarConfigs } from './jar-configs.mjs';
+
+import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
 
 const message = error => error.message || String(error);
 function absolute(value, label) {
@@ -26,19 +29,48 @@ function argumentsList(value, jvm = false) {
 }
 function normalize(item) {
   if (!item || typeof item !== 'object' || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120) throw new Error('请填写 1–120 字的显示名称。');
-  const jar = absolute(item.jar, 'JAR 路径');
-  if (path.extname(jar).toLowerCase() !== '.jar') throw new Error('请选择 .jar 文件。');
-  const stem = path.basename(jar, path.extname(jar));
+  const id = item.id || randomUUID();
+  const kind = item.kind ?? 'jar';
+  let source, stem;
+  if (kind === 'jar') {
+    const jar = absolute(item.jar, 'JAR 路径');
+    if (path.extname(jar).toLowerCase() !== '.jar') throw new Error('请选择 .jar 文件。');
+    source = { jar }; stem = path.basename(jar, path.extname(jar));
+  } else if (kind === 'npm') {
+    if (!validScript(item.script)) throw new Error('请选择有效的 npm 脚本。');
+    source = { kind, workDir: absolute(item.workDir, '项目目录'), script: item.script };
+  } else if (kind === 'program') {
+    const program = absolute(item.program, '程序路径');
+    if (process.platform === 'win32' && path.extname(program).toLowerCase() !== '.exe') throw new Error('请选择 Windows .exe 程序。');
+    source = { kind, program, workDir: absolute(item.workDir || path.dirname(program), '工作目录') };
+  } else throw new Error('未知服务类型。');
+  stem ??= 'devkit-' + id;
   const pidName = fileName(item.pidName, `${stem}.pid`, '.pid'), logName = fileName(item.logName, `${stem}.log`, '.log');
   if (!['file', 'silent', 'console'].includes(item.logMode)) throw new Error('请选择文件日志、控制台或静默模式。');
   const stopTimeout = Number(item.stopTimeout ?? 15);
   if (!Number.isInteger(stopTimeout) || stopTimeout < 1 || stopTimeout > 120) throw new Error('停止等待时间为 1–120 秒。');
-  return { id: item.id || randomUUID(), name: item.name.trim(), jar, executable: item.executable ? absolute(item.executable, 'Java 路径') : '', jvmArgs: argumentsList(item.jvmArgs || [], true), appArgs: argumentsList(item.appArgs || []), logMode: item.logMode, pidName, logName, stopTimeout, ...normalizePolicies(item) };
+  return { id, name: item.name.trim(), ...source, executable: kind === 'jar' && item.executable ? absolute(item.executable, 'Java 路径') : '', jvmArgs: kind === 'jar' ? argumentsList(item.jvmArgs || [], true) : [], appArgs: argumentsList(item.appArgs || []), logMode: item.logMode, pidName, logName, stopTimeout, ...normalizePolicies(item) };
 }
 export { normalize as normalizeJar };
 export function jarPaths(item) {
-  const directory = path.dirname(item.jar);
+  const directory = serviceDirectory(item);
   return { directory, pidPath: path.join(directory, item.pidName), logPath: path.join(directory, item.logName), identityPath: path.join(directory, `${item.pidName}.devkit.json`), supervisorPath: supervisorPath(item) };
+}
+function validatePaths(instances) {
+  const entries = new Set(instances.map(item => pathKey(serviceEntry(item))));
+  const jars = new Set(), files = new Set();
+  for (const item of instances) {
+    if (isJar(item)) {
+      if (jars.has(pathKey(item.jar))) throw new Error('JAR 已登记。');
+      jars.add(pathKey(item.jar));
+    }
+    const { pidPath, logPath, identityPath, supervisorPath } = jarPaths(item);
+    for (const filename of [pidPath, logPath, identityPath, supervisorPath]) {
+      const key = pathKey(filename);
+      if (entries.has(key) || files.has(key)) throw new Error('服务入口或运行文件路径冲突。');
+      files.add(key);
+    }
+  }
 }
 async function regular(filename) {
   try { if (!(await lstat(filename)).isFile()) throw new Error(`运行文件不是普通文件，拒绝操作：${filename}`); }
@@ -70,15 +102,13 @@ export async function createJarManager(directory, dependencies = {}) {
   try {
     try {
       state = JSON.parse(await readFile(filename, 'utf8'));
-      if (state.schemaVersion !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 0 || !Array.isArray(state.instances) || state.instances.length > 100) throw new Error('JAR 注册表格式无效。');
-      const ids = new Set(), paths = new Set();
+      if (state.schemaVersion !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 0 || !Array.isArray(state.instances) || state.instances.length > 100) throw new Error('服务注册表格式无效。');
+      const ids = new Set();
       for (const item of state.instances) {
-        if (!/^[a-f0-9-]{36}$/.test(item.id) || ids.has(item.id)) throw new Error('JAR 标识无效或重复。');
+        if (!/^[a-f0-9-]{36}$/.test(item.id) || ids.has(item.id)) throw new Error('服务标识无效或重复。');
         Object.assign(item, normalize(item)); ids.add(item.id);
-        for (const target of [item.jar, ...Object.values(jarPaths(item)).slice(1)]) {
-          if (paths.has(pathKey(target))) throw new Error('JAR 或运行文件路径重复。'); paths.add(pathKey(target));
-        }
       }
+      validatePaths(state.instances);
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
       state = { schemaVersion: 1, revision: 0, instances: [] }; await atomic(filename, state);
@@ -86,11 +116,11 @@ export async function createJarManager(directory, dependencies = {}) {
   } catch (error) { await unlock(); throw error; }
   let queue = Promise.resolve(), closed = false;
   const children = new Map(), samples = new Map();
-  const snapshot = () => ({ ...structuredClone(state), platform: process.platform, directory: folder });
-  function find(id) { const item = state.instances.find(item => item.id === id); if (!item) throw new Error('JAR 记录不存在，请刷新列表。'); return item; }
-  async function commit(instances) {
+  const snapshot = () => ({ ...structuredClone(state), backendTypes: true, platform: process.platform, directory: folder });
+  function find(id) { const item = state.instances.find(item => item.id === id); if (!item) throw new Error('服务记录不存在，请刷新列表。'); return item; }
+  async function commit(instances, options) {
     const next = { ...state, revision: state.revision + 1, instances };
-    await atomic(filename, next); state = next; return snapshot();
+    await atomic(filename, next); state = next; return request('get', {}, options);
   }
   async function status(item) {
     const paths = jarPaths(item), base = { id: item.id, ...paths, checkedAt: new Date().toISOString() };
@@ -101,7 +131,7 @@ export async function createJarManager(directory, dependencies = {}) {
         else base.health = { state: item.health.type === 'none' ? 'disabled' : 'unknown', detail: '启动或重启后启用独立健康监视' };
       }
       let fileInfo;
-      try { fileInfo = await stat(item.jar); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      try { fileInfo = await stat(serviceEntry(item)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
       base.size = fileInfo?.size; base.fileMissing = !fileInfo?.isFile();
       const raw = await optional(paths.pidPath), identity = await optional(paths.identityPath, true);
       if (raw === null) {
@@ -114,15 +144,22 @@ export async function createJarManager(directory, dependencies = {}) {
       if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) <= 1) return { ...base, state: 'unknown', detail: 'PID 文件无效，拒绝运行操作。' };
       const pid = Number(raw), info = await runtime.inspect(pid);
       if (!info) {
+        if (identity?.business) {
+          const live = await runtime.inspect(identity.business.pid);
+          if (live && (live.unknown || live.created === identity.business.created))
+            return { ...base, state: 'unknown', detail: '启动进程已退出，业务进程仍存在。请核实后再启动。' };
+        }
         const exit = children.get(item.id)?.exit();
         return { ...base, state: identity?.stopped ? 'stopped' : 'exited', pid, exitCode: exit?.code, detail: `PID 对应的进程已退出${exit ? `（退出码 ${exit.code ?? exit.signal}）` : ''}；PID 文件已失效。` };
       }
-      if (!matchesJar(item, info, identity)) return { ...base, state: 'unknown', pid, detail: '进程身份不匹配或无法核实（旧脚本 PID、权限不足或 PID 复用），拒绝启动和终止。' };
+      if (!matchesService(item, info, identity)) return { ...base, state: 'unknown', pid, detail: '进程身份不匹配或无法核实（旧脚本 PID、权限不足或 PID 复用），拒绝启动和终止。' };
+      const business = identity.business && await runtime.inspect(identity.business.pid);
+      const sample = identity.business ? (business?.created === identity.business.created ? business : {}) : info;
       const previous = samples.get(item.id), now = Date.now();
       let cpu;
-      if (previous?.created === info.created && now > previous.at && Number.isFinite(info.cpuSeconds)) cpu = Math.max(0, (info.cpuSeconds - previous.seconds) / ((now - previous.at) / 1000) * 100);
-      samples.set(item.id, { at: now, created: info.created, seconds: info.cpuSeconds });
-      return { ...base, state: 'running', pid, uptime: info.uptime, memory: info.memory, cpu, executable: info.executable, startedAt: identity.startedAt, detail: 'Java 进程身份已确认；业务是否就绪请检查应用日志。' };
+      if (previous && previous.created === sample.created && now > previous.at && Number.isFinite(sample.cpuSeconds)) cpu = Math.max(0, (sample.cpuSeconds - previous.seconds) / ((now - previous.at) / 1000) * 100);
+      samples.set(item.id, { at: now, created: sample.created, seconds: sample.cpuSeconds });
+      return { ...base, state: 'running', pid, uptime: info.uptime, memory: sample.memory, cpu, businessPid: sample.pid, executable: sample.executable, startedAt: identity.startedAt, detail: '服务进程身份已确认；业务是否就绪请检查应用日志。' };
     } catch (error) { return { ...base, state: 'unknown', detail: message(error) }; }
   }
   async function log(item) {
@@ -142,15 +179,16 @@ export async function createJarManager(directory, dependencies = {}) {
   }
   async function start(item) {
     const current = await status(item);
-    if (!['stopped', 'exited'].includes(current.state)) throw new Error(current.state === 'running' ? '此 JAR 已在运行。' : current.detail);
+    if (!['stopped', 'exited'].includes(current.state)) throw new Error(current.state === 'running' ? '此服务已在运行。' : current.detail);
     if (runtime.supervised) {
+      if (!isJar(item)) await launchSpec(item, runtime.detect);
       const result = await launchSupervisor(filename, item, runtime.launchDetached);
       return { output: result.output, status: await status(item) };
     }
-    const jar = await realpath(item.jar);
-    if (pathKey(jar) !== pathKey(item.jar) || !(await stat(jar)).isFile()) throw new Error('JAR 路径或链接目标已变化，请重新登记。');
-    const java = await runtime.detect({ executable: item.executable, env: effectiveEnvironment(item) });
-    if (!java.found) throw new Error(java.output);
+    const target = await launchSpec(item, runtime.detect);
+    const job = !isJar(item);
+    const spec = job ? { executable: await realpath(process.execPath), args: [jobRunner, item.id, target.executable, ...target.args] } : target;
+    const identityFields = launchIdentity(item, spec);
     const paths = jarPaths(item);
     for (const target of [paths.pidPath, paths.identityPath, ...(item.logMode === 'file' ? [paths.logPath] : [])]) await regular(target);
     // Only a PID proven absent may be cleared. Reserve with wx across managers.
@@ -159,24 +197,28 @@ export async function createJarManager(directory, dependencies = {}) {
     let output, child, identity;
     try {
       if (item.logMode === 'file' && !runtime.captureLogs) output = await open(paths.logPath, 'a', 0o600);
-      child = await runtime.launch(java.executable, [...item.jvmArgs, '-jar', jar, ...item.appArgs], paths.directory, output?.fd, effectiveEnvironment(item));
+      child = await runtime.launch(spec.executable, spec.args, paths.directory, output?.fd, effectiveEnvironment(item), job);
       children.set(item.id, child);
       await reservation.writeFile(String(child.pid));
       await reservation.sync();
       const startedAt = new Date().toISOString();
       // Replace any previous successful-stop record even when the new JVM exits immediately.
-      await atomic(paths.identityPath, { pid: child.pid, jar, executable: java.executable, created: null, startedAt, stopped: false });
+      await atomic(paths.identityPath, { pid: child.pid, ...identityFields, executable: spec.executable, created: null, startedAt, stopped: false });
       for (let attempt = 0; attempt < 12; attempt++) {
         const info = await runtime.inspect(child.pid);
         if (info && !info.unknown) {
-          identity = { pid: child.pid, jar, executable: java.executable, created: info.created, startedAt, stopped: false };
-          if (!matchesJar(item, info, identity)) throw new Error('启动的进程身份不符。');
+          identity = { pid: child.pid, ...identityFields, executable: spec.executable, created: info.created, startedAt, stopped: false };
+          if (!matchesService(item, info, identity)) throw new Error('启动的进程身份不符。');
           break;
         }
         if (child.exit()) break;
         await runtime.delay(150);
       }
-      if (!identity) throw new Error('启动后进程已退出或无法核实身份，请检查 Java、启动参数和日志。');
+      if (!identity) throw new Error('启动后进程已退出或无法核实身份，请检查服务入口、启动参数和日志。');
+      if (child.businessPid) {
+        const business = await runtime.inspect(child.businessPid);
+        if (business?.created) identity.business = { pid: child.businessPid, created: business.created };
+      }
       await atomic(paths.identityPath, identity);
       await runtime.delay(700);
       const result = await status(item);
@@ -186,8 +228,8 @@ export async function createJarManager(directory, dependencies = {}) {
       // Never kill an unidentified PID. Retain evidence for manual recovery.
       if (child) {
         const info = await runtime.inspect(child.pid);
-        if (identity && matchesJar(item, info, identity)) {
-          await runtime.signal(child.pid, true, identity.created).catch(() => {});
+        if (identity && matchesService(item, info, identity)) {
+          await runtime.signal(child.pid, true, identity.created, !isJar(item)).catch(() => {});
         }
       } else await unlink(paths.pidPath).catch(() => {});
       throw error;
@@ -203,8 +245,8 @@ export async function createJarManager(directory, dependencies = {}) {
     if (current.state !== 'running') throw new Error(current.detail);
     const paths = jarPaths(item), identity = await optional(paths.identityPath, true);
     const info = await runtime.inspect(current.pid);
-    if (!matchesJar(item, info, identity)) throw new Error('操作前进程身份已变化，已取消。');
-    await runtime.signal(current.pid, force, identity.created);
+    if (!matchesService(item, info, identity)) throw new Error('操作前进程身份已变化，已取消。');
+    await runtime.signal(current.pid, force, identity.created, !isJar(item));
     const deadline = Date.now() + item.stopTimeout * 1000;
     for (let attempt = 0; attempt < item.stopTimeout * 4 && Date.now() < deadline; attempt++) {
       const live = await runtime.inspect(current.pid);
@@ -214,7 +256,7 @@ export async function createJarManager(directory, dependencies = {}) {
         samples.delete(item.id);
         return { status: await status(item), output: force ? '已强制终止进程。' : '进程已停止。' };
       }
-      if (!matchesJar(item, live, identity)) throw new Error('等待停止时进程身份无法核实，保留 PID 文件。');
+      if (!matchesService(item, live, identity)) throw new Error('等待停止时进程身份无法核实，保留 PID 文件。');
       await runtime.delay(250);
     }
     throw new Error(`等待 ${item.stopTimeout} 秒仍未退出；可核对日志后选择“强制终止”。`);
@@ -225,11 +267,22 @@ export async function createJarManager(directory, dependencies = {}) {
     await Promise.all(state.instances.filter(item => item.logMode === 'console').map(item => supervisorRequest(item, 'console-revoke', 3000, { session: sessionKey(session) }).catch(() => {})));
   }
   async function request(action, value = {}, options = {}) {
-    if (['command', 'detect', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予 JAR 运行管理权限。');
-    if (['upsert', 'remove'].includes(action) && options.allowEdit === false) throw new Error('未授予 JAR 编辑权限。');
+    if (['command', 'detect', 'health-check', 'monitor-probe', 'startup-install', 'startup-remove', 'console-claim', 'console-input', 'console-eof', 'console-release'].includes(action) && options.allowControl === false) throw new Error('未授予服务运行管理权限。');
+    if (['upsert', 'remove'].includes(action) && options.allowEdit === false) throw new Error('未授予服务编辑权限。');
+    const selected = state.instances.find(item => item.id === (action === 'upsert' ? value.instance?.id : value.id));
+    if (options.allowBackend === false && (action === 'npm-scripts' || action === 'upsert' && !isJar(value.instance || {}) ||
+        selected && !isJar(selected) && !['log-tail', 'console-read', 'startup-get', 'monitor-probe'].includes(action))) {
+      throw Object.assign(new Error('未授予 npm 与可执行程序管理权限。'), { status: 403 });
+    }
+    if (action === 'npm-scripts') {
+      if (options.allowEdit === false) throw new Error('未授予编辑权限。');
+      return projectScripts(absolute(value.directory, '项目目录'));
+    }
     if (action === 'get') {
       const result = snapshot();
-      if (options.allowEdit === false) for (const item of result.instances) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
+      result.backendTypes = options.allowBackend !== false;
+      if (!result.backendTypes) result.instances = result.instances.filter(isJar);
+      for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;
     }
     if (action.startsWith('console-')) {
@@ -245,11 +298,12 @@ export async function createJarManager(directory, dependencies = {}) {
     }
     if (action === 'detect') return runtime.detect({ executable: value.executable ? absolute(value.executable, 'Java 路径') : '' });
     if (action === 'statuses') {
-      const result = []; for (const item of state.instances) result.push(await status(item)); return result;
+      const visible = options.allowBackend === false ? state.instances.filter(isJar) : state.instances;
+      const result = []; for (const item of visible) result.push(await status(item)); return result;
     }
     if (action === 'log-tail') return log(find(value.id));
     if (['config-list', 'config-read', 'config-save', 'config-backup'].includes(action)) {
-      if (options.allowEdit === false) throw new Error('未授予 JAR 编辑权限。');
+      if (options.allowEdit === false) throw new Error('未授予服务编辑权限。');
       return jarConfigs(folder, find(value.id), action, value);
     }
     if (action === 'upsert' || action === 'remove') {
@@ -258,25 +312,28 @@ export async function createJarManager(directory, dependencies = {}) {
         const item = find(value.id), current = await status(item);
         if (!['stopped', 'exited'].includes(current.state) || current.supervision?.active) throw new Error('请先停止并确认进程状态后再移除。');
         const startup = await autostart.get(item);
-        if (startup.enabled || startup.target || startup.error) throw new Error('请先关闭此 JAR 的系统自启，再移除记录。');
-        return commit(state.instances.filter(item => item.id !== value.id));
+        if (startup.enabled || startup.target || startup.error) throw new Error('请先关闭此服务的系统自启，再移除记录。');
+        return commit(state.instances.filter(item => item.id !== value.id), options);
       }
       const item = normalize(value.instance), existing = state.instances.find(old => old.id === item.id);
-      if (!/^[a-f0-9-]{36}$/.test(item.id)) throw new Error('JAR 标识无效。');
+      if (!/^[a-f0-9-]{36}$/.test(item.id)) throw new Error('服务标识无效。');
+      if (existing && (existing.kind || 'jar') !== (item.kind || 'jar')) throw new Error('已登记服务不能更换启动方式。');
       const previous = existing ? await status(existing) : null;
       if (existing && (!['stopped', 'exited'].includes(previous.state) || previous.supervision?.active)) {
         const { name: a, ...before } = existing, { name: b, ...after } = item;
-        if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('运行中或状态未确认时仅可修改显示名称，请先停止。');
+        if (!isDeepStrictEqual(before, after)) throw new Error('运行中或状态未确认时仅可修改显示名称，请先停止。');
       }
-      if (!existing && state.instances.length >= 100) throw new Error('最多登记 100 个 JAR。');
-      item.jar = await realpath(item.jar);
-      if (!(await stat(item.jar)).isFile()) throw new Error('JAR 不是普通文件。');
-      const instances = [...state.instances.filter(old => old.id !== item.id), item];
-      const paths = new Set();
-      for (const entry of instances) for (const target of [entry.jar, ...Object.values(jarPaths(entry)).slice(1)]) {
-        if (paths.has(pathKey(target))) throw new Error('JAR 已登记或 PID / 日志路径与其他记录冲突。'); paths.add(pathKey(target));
+      if (!existing && state.instances.length >= 100) throw new Error('最多登记 100 个服务。');
+      if (isJar(item)) item.jar = await realpath(item.jar);
+      else {
+        item.workDir = await realpath(item.workDir);
+        if (!(await stat(item.workDir)).isDirectory()) throw new Error('工作目录无效。');
+        if (item.kind === 'program') item.program = await realpath(item.program);
+        if (item.kind === 'npm' && !(await projectScripts(item.workDir)).includes(item.script)) throw new Error('package.json 中找不到所选 npm 脚本。');
       }
-      return commit(existing ? state.instances.map(old => old.id === item.id ? item : old) : [...state.instances, item]);
+      if (!(await stat(serviceEntry(item))).isFile()) throw new Error('服务入口不是普通文件。');
+      validatePaths([...state.instances.filter(old => old.id !== item.id), item]);
+      return commit(existing ? state.instances.map(old => old.id === item.id ? item : old) : [...state.instances, item], options);
     }
     if (action === 'command') {
       const item = find(value.id);
@@ -284,7 +341,7 @@ export async function createJarManager(directory, dependencies = {}) {
       if (value.command === 'stop') return stop(item, false);
       if (value.command === 'force-stop') return stop(item, true);
       if (value.command === 'restart') { await stop(item, false); return start(item); }
-      throw new Error('未知 JAR 命令。');
+      throw new Error('未知服务命令。');
     }
     if (action === 'health-check') {
       const item = find(value.id), current = await status(item);
@@ -292,28 +349,26 @@ export async function createJarManager(directory, dependencies = {}) {
         const result = await supervisorRequest(item, 'health-check', (item.health.timeout + 10) * 1000);
         if (result) return result.health;
       }
-      return current.state === 'running' ? probeHealth(item.health) : { state: 'stopped', detail: 'Java 进程未运行' };
+      return current.state === 'running' ? probeHealth(item.health) : { state: 'stopped', detail: '服务进程未运行' };
     }
     if (action === 'monitor-probe') {
       const { health } = find(value.id);
-      if (health.type === 'none') throw new Error('请先为关联 JAR 配置 HTTP/TCP 健康检查。');
+      if (health.type === 'none') throw new Error('请先为关联服务配置 HTTP/TCP 健康检查。');
       const timeout = Number.isInteger(value.timeout) ? Math.max(1, Math.min(60, value.timeout)) : health.timeout;
       return probeHealth({ ...health, timeout });
     }
     if (action === 'startup-get') return autostart.get(find(value.id));
     if (action === 'startup-install') {
       const item = find(value.id);
-      if (!(await stat(await realpath(item.jar))).isFile()) throw new Error('JAR 文件不可用。');
-      const java = await runtime.detect({ executable: item.executable, env: effectiveEnvironment(item) });
-      if (!java.found) throw new Error(java.output);
-      return autostart.install({ ...item, executable: java.executable }, value.mode);
+      const spec = await launchSpec(item, runtime.detect);
+      return autostart.install(isJar(item) ? { ...item, executable: spec.executable } : item, value.mode);
     }
     if (action === 'startup-remove') return autostart.remove(find(value.id));
-    throw new Error('未知 JAR 操作。');
+    throw new Error('未知服务操作。');
   }
   return {
     request(action, value, options) {
-      if (closed) return Promise.reject(new Error('JAR 管理器已关闭。'));
+      if (closed) return Promise.reject(new Error('后端管理器已关闭。'));
       if (action.startsWith('console-')) return request(action, value, options);
       const pending = queue.then(() => request(action, value, options)); queue = pending.catch(() => {}); return pending;
     },

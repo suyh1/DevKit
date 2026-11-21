@@ -8,7 +8,7 @@ export type SharingServices = {
   whiteboard: { enabled: boolean; edit: boolean };
   nginx: { enabled: boolean; edit: boolean; control: boolean };
   http: { enabled: boolean; edit: boolean; send: boolean };
-  jar: { enabled: boolean; edit: boolean; control: boolean };
+  jar: { enabled: boolean; edit: boolean; control: boolean; backend: boolean };
   monitor: { enabled: boolean; edit: boolean; control: boolean };
   logs: { enabled: boolean; jar: boolean; nginx: boolean; export: boolean; raw: boolean };
   'lan-hosts': { enabled: boolean; edit: boolean; diagnose: boolean; terminal: boolean; files: boolean; discover: boolean; wake: boolean; rdp: boolean };

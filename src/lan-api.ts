@@ -3,7 +3,7 @@ import { downloadBlob } from './files';
 import type { LanMonitorStatus } from './monitor-api';
 
 export type ManagedModule = 'jar' | 'nginx';
-export type HostGroup = { id: string; name: string; platform: string; revision: number; edit: boolean; control: boolean; error?: string; phase?: 'connecting' | 'deploying' | 'reading' | 'ready' | 'failed'; checkedAt?: string };
+export type HostGroup = { id: string; name: string; platform: string; revision: number; edit: boolean; control: boolean; backendTypes?: boolean; error?: string; phase?: 'connecting' | 'deploying' | 'reading' | 'ready' | 'failed'; checkedAt?: string };
 export type HostDraft = {
   name: string; address: string; mode: 'ssh' | 'share'; user: string; port: number; platform: 'linux' | 'win32'; auth: 'key' | 'password';
   modules: Record<ManagedModule, boolean>; password?: string; clearPassword?: boolean;

@@ -1,3 +1,4 @@
+import { serviceLocation } from './jar-api';
 import { useState, useSyncExternalStore } from 'react';
 import { Link2 } from 'lucide-react';
 import { copyText } from './motion-primitives';
@@ -117,7 +118,7 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
   };
   async function inventory(page: 'jar' | 'nginx', request: (action: 'get', value: unknown) => Promise<JarState | NginxState>) {
     const base = await request('get', { scope: 'inventory-local' });
-    const publish = (state: JarState | NginxState, host = window.devkitDesktop ? '本机' : '共享主机') => add(state.instances.map(item => ({ ...perModule(page, item.id, item.name, [host, 'jar' in item ? item.jar : item.main].join(' · ')), host })));
+    const publish = (state: JarState | NginxState, host = window.devkitDesktop ? '本机' : '共享主机') => add(state.instances.map(item => ({ ...perModule(page, item.id, item.name, [host, 'main' in item ? item.main : serviceLocation(item)].join(' · ')), host })));
     publish(base);
     await Promise.allSettled((base.groups || []).filter(group => group.id).map(async group => publish(await request('get', { scope: 'inventory-host', hostId: group.id }), group.name)));
   }

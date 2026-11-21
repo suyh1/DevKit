@@ -24,7 +24,7 @@ export function WorkspaceFeedback({ children }: { children: ReactNode }) {
   </Feedback.Provider>;
 }
 
-const permissions = { edit: '编辑', send: '发送请求', control: '运行管理', jar: 'JAR 日志', nginx: 'Nginx 日志' } as const;
+const permissions = { edit: '编辑', send: '发送请求', control: '运行管理', jar: '后端日志', nginx: 'Nginx 日志' } as const;
 export function workspaceRestriction<P extends WorkspaceModuleId>(page: P, ...required: (keyof SharingServices[P] & keyof typeof permissions)[]) {
   const access = remoteAccess();
   if (!access) return '';

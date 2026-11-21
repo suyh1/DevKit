@@ -36,7 +36,7 @@ export default function JarRuntimeSettings({ value, onChange }: { value: Runtime
     <details className="jar-setting-section"><summary>日志大小与保留策略</summary>
       <label className="jar-check"><input type="checkbox" checked={l.enabled} onChange={event => patch({ rotation: { ...l, enabled: event.target.checked } })} />启用日志轮转</label>
       {l.enabled && <div className="jar-form-grid">{number('单文件大小（MB）', l.maxMB, maxMB => patch({ rotation: { ...l, maxMB } }), 1, 1024)}{number('归档保留天数', l.days, days => patch({ rotation: { ...l, days } }), 1, 3650)}{number('最多归档文件数', l.files, files => patch({ rotation: { ...l, files } }), 1, 1000)}</div>}
-      <p className="jar-help">仅轮转本工具接收的标准输出与错误。归档保存在 JAR 同目录；超过天数或数量后删除工具生成的旧归档。静默模式不写日志。</p>
+      <p className="jar-help">仅轮转本工具接收的标准输出与错误。归档保存在 服务工作目录；超过天数或数量后删除工具生成的旧归档。静默模式不写日志。</p>
     </details>
     <details className="jar-setting-section"><summary>环境变量与开发 / 测试 / 生产档案</summary>
       <label>公共环境变量<textarea rows={4} placeholder={'TZ=Asia/Shanghai\nAPP_NAME=order-service'} value={value.envText} onChange={event => patch({ envText: event.target.value })} /></label>

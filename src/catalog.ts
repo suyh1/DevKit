@@ -14,7 +14,7 @@ export const workspaceModules = [
   { id: 'mock', name: '接口模拟服务', description: '发布可直接调用的局域网 HTTP 接口，配置多场景响应、延迟、跨域与调用记录。', category: '工作台', badge: '共享' },
   { id: 'whiteboard', name: '截图协作白板', description: '在共享截图或空白画布上同步绘制、圈选、连箭头和文字标注，可导出 PNG。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
-  { id: 'jar', name: 'JAR 管理', description: '按主机渐进加载 Java 应用，窄屏使用卡片，SSH 自动部署便携运行时，支持启停重启、日志、健康检查、系统自启和配置编辑。', category: '工作台', badge: '共享' },
+  { id: 'jar', name: '后端管理', description: '按主机管理 Java JAR、npm 项目和 Go 等可执行程序，支持启停、日志、控制台、健康检查、配置和系统自启。', category: '工作台', badge: '共享' },
   { id: 'lan-hosts', name: '局域网主机', description: '管理、发现和导入主机，支持 SSH 终端、SFTP、端口监控和网络唤醒。共享网页可按访客权限直连远程桌面。', category: '工作台', badge: '共享' },
 ] as const;
 

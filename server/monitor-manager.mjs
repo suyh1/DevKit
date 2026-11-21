@@ -278,8 +278,8 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
   async function sources(access = {}) {
     const result = [];
     if (access.allowProjects !== false) for (const profile of (await projects?.()?.get())?.profiles || []) for (const project of profile.projects) result.push({ label: `${profile.name} / ${project.name}`, source: { type: 'project', profileId: profile.id, projectId: project.id } });
-    if (access.allowJar !== false) for (const item of (await jar?.()?.request('get'))?.instances || []) result.push({ label: `JAR / ${item.name}`, source: { type: 'jar', id: item.id } });
-    if (access.allowRemoteJar !== false && access.allowJar !== false) result.push(...await lan?.()?.monitorJarSources?.(access.session) || []);
+    if (access.allowJar !== false) for (const item of (await jar?.()?.request('get', {}, { allowEdit: false, allowBackend: access.allowBackend !== false }))?.instances || []) result.push({ label: `后端 / ${item.name}`, source: { type: 'jar', id: item.id } });
+    if (access.allowRemoteJar !== false && access.allowJar !== false) result.push(...await lan?.()?.monitorJarSources?.(access.session, access.allowBackend !== false) || []);
     if (access.allowLan !== false) for (const item of lan?.()?.monitorTargets?.() || []) result.push({ label: `局域网主机 / ${item.name}`, source: { type: 'lan', id: item.id } });
     return result;
   }

@@ -55,7 +55,7 @@ app.whenReady().then(async () => {
       return window;
     }
     const viewer = await portal();
-    assert.equal(await js(viewer, `[...document.querySelectorAll('.jar-center button')].find(b=>b.textContent.trim()==='添加 JAR').disabled`), true);
+    assert.equal(await js(viewer, `[...document.querySelectorAll('.jar-center button')].find(b=>b.textContent.trim()==='添加服务').disabled`), true);
     assert.equal(await js(viewer, `[...document.querySelectorAll('.jar-center button')].find(b=>b.textContent.trim()==='取得输入控制权').disabled`), true);
     await fs.writeFile(path.join(output, 'readonly-console.png'), (await viewer.webContents.capturePage()).toPNG()); viewer.destroy();
     services.jar.control = true; await host.start(settings);

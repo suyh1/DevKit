@@ -225,7 +225,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     whiteboard: { enabled: false, edit: false },
     nginx: { enabled: true, edit: true, control: true },
     http: { enabled: false, edit: false, send: false },
-    jar: { enabled: false, edit: false, control: false },
+    jar: { enabled: false, edit: false, control: false, backend: false },
     monitor: { enabled: false, edit: false, control: false },
     logs: { enabled: false, jar: false, nginx: false, export: false, raw: false },
     'lan-hosts': { enabled: false, edit: false, diagnose: false, terminal: false, files: false, discover: false, wake: false, rdp: false },

@@ -57,7 +57,7 @@ export default function JarConsole({ id, name, active, close, stop, control = ca
       <button className="text-button jar-danger" disabled={busy || !control || !snapshot?.available} onClick={stop}><Square size={14} />停止应用</button>
     </div>
     <form className="jar-console-input" onSubmit={event => { event.preventDefault(); void task(async () => { await jarRequest('console-input', { ...payload(), text: input }); setInput(''); }); }}>
-      <input aria-label="发送给 Java 应用的输入" maxLength={4096} placeholder={control ? '应用输入，每次发送一行；不会执行系统 Shell' : '只读访问，未授予控制台输入权限'} value={input} disabled={busy || !control || !snapshot?.lease?.mine || !snapshot?.inputOpen} onChange={event => setInput(event.target.value)} />
+      <input aria-label="发送给服务的输入" maxLength={4096} placeholder={control ? '应用输入，每次发送一行；不会执行系统 Shell' : '只读访问，未授予控制台输入权限'} value={input} disabled={busy || !control || !snapshot?.lease?.mine || !snapshot?.inputOpen} onChange={event => setInput(event.target.value)} />
       <button className="run-button" disabled={busy || !control || !snapshot?.lease?.mine || !snapshot?.inputOpen} type="submit">发送</button>
       <button className="text-button" disabled={busy || !control || !snapshot?.lease?.mine || !snapshot?.inputOpen} type="button" onClick={() => void (async () => { if (await confirm({ title: '结束此应用的标准输入？', detail: '向应用发送 EOF，输入管道需要重新启动应用才能恢复。', confirm: '结束输入' })) await task(async () => { await jarRequest('console-eof', payload()); setSnapshot(current => current && ({ ...current, inputOpen: false, lease: null })); }); })()}>结束输入</button>
     </form>

@@ -31,7 +31,7 @@ export function sharingFromEnvironment(env, saved = {}) {
       edit: "DEVKIT_HTTP_EDIT",
       send: "DEVKIT_HTTP_SEND",
     },
-    jar: { enabled: 'DEVKIT_SHARE_JAR', edit: 'DEVKIT_JAR_EDIT', control: 'DEVKIT_JAR_CONTROL' },
+    jar: { enabled: 'DEVKIT_SHARE_JAR', edit: 'DEVKIT_JAR_EDIT', control: 'DEVKIT_JAR_CONTROL', backend: 'DEVKIT_JAR_BACKEND' },
     monitor: { enabled: 'DEVKIT_SHARE_MONITOR', edit: 'DEVKIT_MONITOR_EDIT', control: 'DEVKIT_MONITOR_CONTROL' },
     logs: { enabled: 'DEVKIT_SHARE_LOGS', jar: 'DEVKIT_LOGS_JAR', nginx: 'DEVKIT_LOGS_NGINX', export: 'DEVKIT_LOGS_EXPORT', raw: 'DEVKIT_LOGS_RAW' },
     'lan-hosts': {

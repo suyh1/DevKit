@@ -52,10 +52,37 @@ module.exports = async (window, output) => {
     await verifyHostEditor(window, output, click, wait);
     window.webContents.setBackgroundThrottling(false);
     await js('document.documentElement.dataset.theme="light"');
-    await openShared(window, 'JAR 管理', wait);
+    await openShared(window, '后端管理', wait);
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
     await checkDetectionControls(true);
-    await click('添加 JAR'); await wait('!!document.querySelector(".jar-dialog[open]")');
+    const project = path.join(folder, 'npm project');
+    await fs.mkdir(project);
+    await fs.writeFile(path.join(project, 'package.json'), JSON.stringify({ scripts: { 'serve:test': 'node server.cjs' } }));
+    await fs.writeFile(path.join(project, 'server.cjs'), "console.log('npm desktop ready'); setInterval(() => {}, 1000)");
+    await click('添加服务');
+    await wait('!!document.querySelector(".jar-dialog[open]")');
+    await click('npm 项目', '.jar-dialog');
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] });
+    await click('选择目录', '.jar-dialog');
+    await wait('document.querySelector(".jar-dialog code")?.textContent === "npm run serve:test"');
+    await click('保存服务', '.jar-dialog');
+    await wait('!document.querySelector(".jar-dialog[open]") && !!document.querySelector(".jar-table")');
+    const service = await js('window.devkitJar.request("get").then(r => r.data.instances.find(i => i.kind === "npm"))');
+    const backend = async (action, payload) => {
+      const response = await js('window.devkitJar.request(' + JSON.stringify(action) + ',' + JSON.stringify(payload) + ')');
+      assert.ok(!response.error, response.error); return response.data;
+    };
+    try {
+      await backend('command', { id: service.id, command: 'start' });
+      assert.match((await backend('log-tail', { id: service.id })).text, /npm desktop ready/);
+    } finally {
+      await backend('command', { id: service.id, command: 'force-stop' });
+      await backend('remove', { id: service.id, revision: (await backend('get')).revision });
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [jar] });
+    }
+    await click('刷新');
+    await wait('!document.querySelector(".jar-table") && !document.querySelector(".jar-heading .run-button").disabled');
+    await click('添加服务'); await wait('!!document.querySelector(".jar-dialog[open]")');
     if (await js('!matchMedia("(forced-colors: active)").matches')) {
       await js('document.querySelector(".jar-dialog select").showPicker()');
       await wait('!!document.querySelector(".jar-dialog select:open")');
@@ -83,7 +110,7 @@ module.exports = async (window, output) => {
     await js(`{const input=[...document.querySelectorAll('.jar-profile')].find(el=>el.querySelector('summary').textContent.startsWith('测试')).querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'APP_MODE=test');input.dispatchEvent(new Event('input',{bubbles:true}));}`);
     await js(`{const input=[...document.querySelectorAll('.jar-check')].find(el=>el.textContent.includes('非正常退出')).querySelector('input');input.click();}`);
     await fill('重试上限', '3');
-    await click('保存 JAR'); await wait('!document.querySelector(".jar-dialog[open]")');
+    await click('保存服务'); await wait('!document.querySelector(".jar-dialog[open]")');
     await wait('document.querySelector(".jar-table")?.textContent.includes("订单服务 · 测试环境")');
     await wait('document.querySelector(".jar-status")?.textContent === "已停止"');
     const state = await js('window.devkitJar.request("get").then(r=>r.data)');
@@ -148,7 +175,7 @@ module.exports = async (window, output) => {
     assert.match(await fs.readFile(configFile, 'utf8'), /name: sample/);
     await click('查看上一版', '.jar-config-actions');
     await wait('!!document.querySelector(".jar-configs .change-preview")');
-    await js('document.querySelector(\'button[aria-label="关闭 JAR 配置文件"]\').click()');
+    await js('document.querySelector(\'button[aria-label="关闭后端配置文件"]\').click()');
     await fs.writeFile(path.join(folder, item.logName), 'fixture log 中文\nready for inspection\n');
     await click('日志'); await wait('document.querySelector(".jar-log pre")?.textContent.includes("fixture log 中文")');
     await new Promise(resolve => setTimeout(resolve, 450));
@@ -183,7 +210,7 @@ module.exports = async (window, output) => {
     await js(`document.querySelector('.settings-page button[value="performance"]').click()`);
     await wait('document.documentElement.dataset.displayMode === "performance"');
     assert.equal(await js('JSON.parse(localStorage.getItem("devkit:preferences")).displayMode'), 'performance');
-    await openShared(window, 'JAR 管理', wait);
+    await openShared(window, '后端管理', wait);
     await wait('document.querySelector(".jar-summary").textContent.includes("每 15 秒")');
     window.show();
     window.focus();
@@ -210,7 +237,7 @@ module.exports = async (window, output) => {
         await js('document.querySelector(\'button[aria-label="关闭控制台"]\').click()');
         assert.equal(await js('document.querySelector(".jar-status").textContent'), '运行中');
         await click('控制台'); await wait('document.querySelector(".jar-console pre")?.textContent.includes("ECHO:console 中文")');
-        await click('停止'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止 JAR', '.confirm-dialog[open]');
+        await click('停止'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止服务', '.confirm-dialog[open]');
         await wait('document.querySelector(".jar-status")?.textContent === "已停止"');
       } finally { await js(`window.devkitJar.request('command',{id:${JSON.stringify(live.id)},command:'force-stop'})`); }
       await verifyLanHost(window, folder, liveJar, java.executable, click, wait);
@@ -403,9 +430,9 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await when(window, '!!document.querySelector(".lan-scan-fields")');
     await js(window, `document.querySelector('[aria-label="关闭主机扫描"]').click()`);
     await when(window, '!document.querySelector(".lan-scan-fields")');
-    await go('JAR 管理');
+    await go('后端管理');
     await wait('!document.querySelector(".jar-center button.run-button")?.disabled');
-    await click('添加 JAR');
+    await click('添加服务');
     await js(window, '{const field=document.querySelector(".jar-dialog select");field.selectedIndex=1;field.dispatchEvent(new Event("change",{bubbles:true}));}');
     await click('选择文件', '.jar-dialog');
     await wait('!!document.querySelector(".host-directory-path")');
@@ -416,7 +443,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await click('remote.jar', '.host-directory-list');
     await input(window, '.jar-dialog input[placeholder^="例如"]', '远端 Java');
     await input(window, '.jar-dialog input[placeholder^="留空"]', executable);
-    await click('保存 JAR', '.jar-dialog');
+    await click('保存服务', '.jar-dialog');
     await when(window, '[...document.querySelectorAll(".jar-table tbody")].some(group => group.textContent.includes("远程测试主机") && group.textContent.includes("远端 Java") && group.textContent.includes("已停止"))');
     id = (await jvm.request('get')).instances[0].id;
     assert.equal(await js(window, `window.devkitJar.request('get').then(result => result.data.instances.some(item => item.jar === ${JSON.stringify(remoteJar)}))`), false);
@@ -439,7 +466,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
       field.dispatchEvent(new Event('change', { bubbles: true }));
     }`);
     await when(gatewayWindow, 'document.querySelector(".jar-configs .cm-content")?.textContent.includes("port: 9002")');
-    await js(gatewayWindow, 'document.querySelector(\'button[aria-label="关闭 JAR 配置文件"]\').click()');
+    await js(gatewayWindow, 'document.querySelector(\'button[aria-label="关闭后端配置文件"]\').click()');
     await when(gatewayWindow, '!document.querySelector(".jar-config-dialog[open]")');
     await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='启动').click()`);
     await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '运行中'`, 35_000);

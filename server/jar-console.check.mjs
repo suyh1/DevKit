@@ -27,7 +27,7 @@ test('one writer lease expires, renews and revokes by session; restarted input i
 });
 test('existing sharing settings leave JAR closed; JAR grants are independent of project role', async () => {
   const old = emptySharingServices(); delete old.jar;
-  assert.deepEqual(sharingServices({ services: old }).jar, { enabled: false, edit: false, control: false });
+  assert.deepEqual(sharingServices({ services: old }).jar, { enabled: false, edit: false, control: false, backend: false });
   const calls = [], revoked = [];
   const manager = { request: async (action, value, options) => { calls.push({ action, value, options }); return { ok: true }; }, releaseConsoleSession: async token => revoked.push(token) };
   const workspaces = createSharedWorkspaces({ jar: () => manager });

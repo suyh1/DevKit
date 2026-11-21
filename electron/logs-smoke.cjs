@@ -90,7 +90,7 @@ module.exports = async (window, output) => {
     await remote.webContents.executeJavaScript(`(()=>{const e=document.querySelector('input[type=password]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'logs-smoke-only');e.dispatchEvent(new Event('input',{bubbles:true}))})()`, true); await delay(100); await remote.webContents.executeJavaScript(`document.querySelector('.portal-login .run-button').click()`, true);
     await wait(remote.webContents, `document.querySelectorAll('.log-source-list input[type=checkbox]').length===4`);
     assert.equal(await remote.webContents.executeJavaScript(`[...document.querySelectorAll('.log-sources button')].some(button =>
-      ['新建主机', '添加 JAR 来源', '添加 Nginx 来源'].includes(button.textContent.trim()) && !button.disabled && button.getClientRects().length)`),
+      ['新建主机', '添加后端来源', '添加 Nginx 来源'].includes(button.textContent.trim()) && !button.disabled && button.getClientRects().length)`),
       false, 'Read-only visitors have no actionable creation controls');
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-bar .portal-navigation').length`), 0);
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar .portal-navigation button').length`), 7);

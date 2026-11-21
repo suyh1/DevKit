@@ -36,6 +36,8 @@ jobs:
       - run: npm run test:docs
       - run: npm test
       - run: npm run test:projects
+      - name: Check backend process groups
+        run: node --test server/backend.check.mjs
       - run: npm run test:http
       - name: Check packaging scripts
         if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'

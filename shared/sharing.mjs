@@ -8,7 +8,7 @@ const fields = {
   whiteboard: ['edit'],
   nginx: ["edit", "control"],
   http: ["edit", "send"],
-  jar: ["edit", "control"],
+  jar: ["edit", "control", "backend"],
   monitor: ["edit", "control"],
   logs: ["jar", "nginx", "export", "raw"],
   'lan-hosts': ['edit', 'diagnose', 'terminal', 'files', 'discover', 'wake', 'rdp'],

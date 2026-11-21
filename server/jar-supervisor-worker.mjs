@@ -7,7 +7,7 @@ import { createJarManager, jarPaths, normalizeJar } from './jar-manager.mjs';
 import { createJarLogWriter } from './jar-log-writer.mjs';
 import { effectiveEnvironment, probeHealth, retryDecision } from './jar-policies.mjs';
 import { supervisorPath, supervisorRequest } from './jar-supervisor-client.mjs';
-import { inspectJava, protectSupervisorFile, detectJava } from './jar-process.mjs';
+import { inspectJava, protectSupervisorFile, detectJava, waitForLaunch } from './jar-process.mjs';
 import { StringDecoder } from 'node:string_decoder';
 import { createJarConsole } from './jar-console.mjs';
 
@@ -17,7 +17,7 @@ const registry = option('--registry'), id = option('--id'), fallbackJava = optio
 if (!path.isAbsolute(registry || '') || !/^[a-f0-9-]{36}$/.test(id || '')) throw new Error('守护启动参数无效。');
 const source = JSON.parse(await readFile(registry, 'utf8'));
 const selected = source.instances.find(item => item.id === id);
-if (!selected) throw new Error('JAR 记录不存在。');
+if (!selected) throw new Error('服务记录不存在。');
 const item = normalizeJar(selected);
 const endpointFile = supervisorPath(item), token = randomBytes(32).toString('hex');
 if (await supervisorRequest(item)) process.exit(0);
@@ -36,10 +36,10 @@ function serialize(action) { const result = operation.then(action); operation = 
 function cancelRetry() { clearTimeout(retryTimer); retryTimer = undefined; retryAt = undefined; }
 function schedule(exit) {
   if (!desired || terminating) return;
-  if (exit && exit.code !== 0) lastError = [lastError, exit.code !== null ? `Java 退出码：${exit.code}` : `Java 退出信号：${exit.signal}`].filter(Boolean).join('；');
+  if (exit && exit.code !== 0) lastError = [lastError, exit.code !== null ? `服务退出码：${exit.code}` : `服务退出信号：${exit.signal}`].filter(Boolean).join('；');
   const decision = retryDecision(item.restart, attempts, exit, startedAt);
   attempts = decision.attempts; phase = decision.state; retryAt = decision.nextRetryAt;
-  health = { state: item.health.type === 'none' ? 'disabled' : 'stopped', detail: 'Java 进程未运行' };
+  health = { state: item.health.type === 'none' ? 'disabled' : 'stopped', detail: '服务进程未运行' };
   if (phase === 'backoff') retryTimer = setTimeout(() => { retryTimer = undefined; retryAt = undefined; void serialize(() => attemptStart(false)).catch(error => { lastError = error.message; }); }, Math.max(0, retryAt - Date.now()));
 }
 async function attemptStart(manual) {
@@ -47,8 +47,8 @@ async function attemptStart(manual) {
   if (manual) { desired = true; attempts = 0; cancelRetry(); }
   const previous = (await manager.request('statuses'))[0];
   if (previous?.state === 'running') {
-    if (currentChild?.pid === previous.pid) return { output: 'JAR 已在运行。', ...info() };
-    phase = 'blocked'; desired = false; lastError = '检测到已有 Java 进程，需先停止再重新启动，以恢复日志接收和崩溃监视。';
+    if (currentChild?.pid === previous.pid) return { output: '服务已在运行。', ...info() };
+    phase = 'blocked'; desired = false; lastError = '检测到已有 服务进程，需先停止再重新启动，以恢复日志接收和崩溃监视。';
     throw new Error(lastError);
   }
   startedAt = Date.now(); lastExit = undefined; phase = 'starting'; lastError = ''; failures = 0; nextHealth = 0;
@@ -104,8 +104,8 @@ async function handle(command, payload = {}) {
   }
   if (command === 'status') return info();
   if (command === 'start-result') {
-    if (phase === 'running' || phase === 'backoff') return { output: phase === 'running' ? 'JAR 已启动，独立守护已启用。' : `启动失败，等待第 ${attempts} 次重试。`, ...info() };
-    throw new Error(lastError || 'JAR 未能启动。');
+    if (phase === 'running' || phase === 'backoff') return { output: phase === 'running' ? '服务已启动，独立守护已启用。' : `启动失败，等待第 ${attempts} 次重试。`, ...info() };
+    throw new Error(lastError || '服务未能启动。');
   }
   if (command === 'health-check') { await checkHealth(true); return info(); }
   if (command === 'start') return attemptStart(true);
@@ -143,10 +143,12 @@ try {
       const detected = await detectJava(options);
       return detected.found || !fallbackJava || options.executable ? detected : detectJava({ executable: fallbackJava });
     },
-    launch: async (executable, argv, cwd) => {
+    launch: async (executable, argv, cwd, _output, _env, job) => {
       if (!writer && item.logMode === 'file') writer = await createJarLogWriter(paths.logPath, item.rotation);
       const inherited = { ...process.env }; delete inherited.ELECTRON_RUN_AS_NODE;
-      const child = spawn(executable, argv, { cwd, env: effectiveEnvironment(item, inherited), detached: true, windowsHide: true, shell: false, stdio: [item.logMode === 'console' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore'] });
+      const env = effectiveEnvironment(item, inherited);
+      if (job) env.ELECTRON_RUN_AS_NODE = '1';
+      const child = spawn(executable, argv, { cwd, env, detached: true, windowsHide: true, shell: false, stdio: [item.logMode === 'console' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore', item.logMode !== 'silent' ? 'pipe' : 'ignore', ...(job ? ['ipc'] : [])] });
       child.stdin?.on('error', () => {});
       currentDrain = new Promise(resolve => child.once('close', resolve));
       let exit;
@@ -161,8 +163,8 @@ try {
       child.once('exit', (code, signal) => { exit = { code, signal }; lastExit = exit; consoleIO.finish();
         if (phase === 'running' && desired) void serialize(async () => { if (currentChild === child && phase === 'running' && desired) schedule(exit); });
       });
-      await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
-      currentChild = child; return { pid: child.pid, exit: () => exit };
+      const businessPid = await waitForLaunch(child, job);
+      currentChild = child; return { pid: child.pid, businessPid, exit: () => exit };
     },
   });
   const state = await manager.request('get'); await manager.request('upsert', { revision: state.revision, instance: item });

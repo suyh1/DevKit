@@ -71,7 +71,7 @@ export async function inspectJava(pid) {
       if (['Z', 'X'].includes(fields[0])) return null;
       // Linux exports start time in clock ticks; getconf provides the platform rate.
       const ticks = await clockTicks();
-      return { pid, executable, args: cmd.split('\0').filter(Boolean), created: fields[19], uptime: Math.max(0, Number(uptime.split(' ')[0]) - Number(fields[19]) / ticks), memory: Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] || 0) * 1024, cpuSeconds: (Number(fields[11]) + Number(fields[12])) / ticks };
+      return { pid, executable, args: cmd.split('\0').slice(0, -1), created: fields[19], uptime: Math.max(0, Number(uptime.split(' ')[0]) - Number(fields[19]) / ticks), memory: Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] || 0) * 1024, cpuSeconds: (Number(fields[11]) + Number(fields[12])) / ticks };
     }
     if (process.platform === 'win32') {
       const { stdout } = await ps(`$ErrorActionPreference='Stop'; $p=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if($p){@{pid=[int]$p.ProcessId;executable=$p.ExecutablePath;command=$p.CommandLine;created=$p.CreationDate.ToUniversalTime().Ticks.ToString();uptime=([DateTime]::UtcNow-$p.CreationDate.ToUniversalTime()).TotalSeconds;memory=[double]$p.WorkingSetSize;cpuSeconds=([double]$p.KernelModeTime+[double]$p.UserModeTime)/10000000}|ConvertTo-Json -Compress}`);
@@ -91,18 +91,34 @@ function clockTicks() {
     const value = Number(stdout.trim()); if (!(value > 0)) throw new Error('无法读取系统时钟频率'); return value;
   }).catch(error => { ticksPromise = undefined; throw error; });
 }
-export async function launchJar(executable, args, cwd, output, env = process.env) {
-  const child = spawn(executable, args, { cwd, env, detached: true, windowsHide: true, stdio: ['ignore', output ?? 'ignore', output ?? 'ignore'], shell: false });
+// A managed launcher acknowledges only after containment and the business spawn succeed.
+export function waitForLaunch(child, job) {
+  return new Promise((resolve, reject) => {
+    const timer = job && setTimeout(() => { child.kill(); finish(new Error('建立服务进程组超时。')); }, 20000);
+    const spawned = () => { if (!job) finish(); };
+    const reply = value => value.ready ? finish(null, value.pid) : finish(new Error(value.error || '服务启动失败。'));
+    const exited = () => finish(new Error('服务启动进程提前退出。'));
+    function finish(error, pid) {
+      clearTimeout(timer);
+      child.off('spawn', spawned).off('message', reply).off('exit', exited).off('error', finish);
+      if (error) reject(error); else resolve(pid);
+    }
+    child.once('spawn', spawned).once('exit', exited).once('error', finish);
+    if (job) child.once('message', reply);
+  });
+}
+export async function launchJar(executable, args, cwd, output, env = process.env, job = false) {
+  const child = spawn(executable, args, { cwd, env: job ? { ...env, ELECTRON_RUN_AS_NODE: '1' } : env, detached: true, windowsHide: true, stdio: ['ignore', output ?? 'ignore', output ?? 'ignore', ...(job ? ['ipc'] : [])], shell: false });
   let exit;
   child.on('exit', (code, signal) => { exit = { code, signal }; });
-  await new Promise((resolve, reject) => { child.once('error', reject); child.once('spawn', resolve); });
+  const businessPid = await waitForLaunch(child, job);
   child.unref();
-  return { pid: child.pid, exit: () => exit };
+  return { pid: child.pid, businessPid, exit: () => exit };
 }
-export async function signalJava(pid, force, created) {
+export async function signalJava(pid, force, created, job = false) {
   if (process.platform === 'win32') {
     // Re-check creation time inside the OS operation as well as in the manager.
     if (!/^\d+$/.test(created)) throw new Error('进程创建标识无效。');
     await ps(`$ErrorActionPreference='Stop'; $p=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if(!$p -or $p.CreationDate.ToUniversalTime().Ticks.ToString() -ne '${created}'){throw 'Process identity changed'}; Stop-Process -Id ${pid}${force ? ' -Force' : ''} -ErrorAction Stop`);
-  } else process.kill(pid, force ? 'SIGKILL' : 'SIGTERM');
+  } else process.kill(pid, force ? (job ? 'SIGUSR2' : 'SIGKILL') : 'SIGTERM');
 }

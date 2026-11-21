@@ -606,7 +606,7 @@ app
       await login();
       await wait('document.querySelector(".jar-instance")?.textContent.includes("审查测试应用")');
       await wait('[...document.querySelectorAll(".jar-instance button")].some(button => button.textContent.trim() === "设置" && !button.disabled)');
-      await button('添加 JAR', '.jar-heading button');
+      await button('添加服务', '.jar-heading button');
       await button('新建主机', '.jar-dialog button');
       await wait('location.hash === "#jar" && document.querySelector(".jar-dialog[open] .workspace-access-bubble")?.textContent.includes("未向当前访客共享")');
       await button('取消', '.jar-dialog button');
@@ -635,8 +635,8 @@ app
       assert.ok(!await js('document.body.innerText.includes("unsaved-audit-secret") || [...document.querySelectorAll("textarea")].some(e=>e.value.includes("audit-secret"))'));
       assert.ok(!await js('[...document.querySelectorAll(".jar-instance button")].some(e=>e.textContent.trim()==="日志"||e.textContent.trim()==="控制台")'));
       await button('日志中心', '.jar-instance button');
-      await wait('location.hash.startsWith("#jar") && document.querySelector(".workspace-access-bubble")?.textContent.includes("JAR 日志权限")');
-      for (const [page, resource] of [['jar', 'JAR 实例'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
+      await wait('location.hash.startsWith("#jar") && document.querySelector(".workspace-access-bubble")?.textContent.includes("后端日志权限")');
+      for (const [page, resource] of [['jar', '后端服务'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
         await js(`location.hash=${JSON.stringify('#'+page+'/not-a-resource')}`);
         await wait(`[...document.querySelectorAll('[role=status]')].some(e=>e.textContent.includes(${JSON.stringify(resource+'已移除或当前访客无权访问')}))`);
       }
