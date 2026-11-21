@@ -296,6 +296,22 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
               return json(error.status || 500, { error: error.status ? error.message : '读取共享内容失败。' });
             }
           }
+          if (url.pathname.startsWith('/api/knowledge/')) {
+            const access = services.knowledge;
+            if (!access.enabled) return json(404, { error: '未开放团队知识库共享。' });
+            if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
+            const knowledge = managers.knowledge?.();
+            if (!knowledge) return json(503, { error: '团队知识库暂不可用。' });
+            const action = url.pathname.slice('/api/knowledge/'.length);
+            const writing = !['list', 'history'].includes(action);
+            if (writing && !access.edit) return json(403, { error: '团队知识库为只读模式。' });
+            const input = await body();
+            ensureCurrentSession();
+            const result = await knowledge.request(action, input, { authorize: ensureCurrentSession, actor: session.visitor || '共享访客' });
+            ensureCurrentSession();
+            if (writing) audit.record(session.visitor, 'knowledge.' + action, 'ok');
+            return json(200, result);
+          }
           if (url.pathname.startsWith('/api/project-todos/')) {
             const access = services['project-todos'];
             if (!access.enabled) return json(404, { error: '未开放待办清单共享。' });

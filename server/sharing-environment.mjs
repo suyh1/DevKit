@@ -10,6 +10,7 @@ export function sharingFromEnvironment(env, saved = {}) {
     return env[name] === "true";
   };
   for (const [id, variables] of Object.entries({
+    knowledge: { enabled: 'DEVKIT_SHARE_KNOWLEDGE', edit: 'DEVKIT_KNOWLEDGE_EDIT' },
     'project-todos': { enabled: 'DEVKIT_SHARE_PROJECT_TODOS', edit: 'DEVKIT_PROJECT_TODOS_EDIT' },
     'file-shares': { enabled: 'DEVKIT_SHARE_FILE_SHARES' },
     transfer: { enabled: 'DEVKIT_SHARE_TRANSFER', edit: 'DEVKIT_TRANSFER_EDIT' },

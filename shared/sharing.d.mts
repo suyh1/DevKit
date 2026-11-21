@@ -1,5 +1,6 @@
 export type SharingServices = {
   projects: { enabled: boolean; edit: boolean; probe: boolean };
+  knowledge: { enabled: boolean; edit: boolean };
   'project-todos': { enabled: boolean; edit: boolean };
   'file-shares': { enabled: boolean };
   transfer: { enabled: boolean; edit: boolean };

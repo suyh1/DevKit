@@ -4,6 +4,7 @@ type DesktopBridge = { request(action: string, value?: unknown): Promise<unknown
 declare global {
   interface Window {
     devkitFileShares?: DesktopBridge;
+    devkitKnowledge?: DesktopBridge;
     devkitProjectTodos?: DesktopBridge;
   }
 }
@@ -17,7 +18,7 @@ export type FileShareState = { revision: number; shares: FileShare[] };
 export type TodoDocument = { id: string; name: string; body: string; published: boolean; revision: number };
 type TodoState = { documents: TodoDocument[]; selectedId?: string };
 
-async function desktopRequest<T>(bridge: DesktopBridge | undefined, action: string, value?: unknown) {
+export async function desktopRequest<T>(bridge: DesktopBridge | undefined, action: string, value?: unknown) {
   if (!bridge) throw new Error('请在 DevKit 桌面端打开此栏目。');
   const result = await bridge.request(action, value) as { data: T; error?: string; status?: number };
   if (result.error) throw Object.assign(new Error(result.error), { status: result.status });

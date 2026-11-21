@@ -27,7 +27,7 @@ module.exports = async (window, output) => {
     assert.equal(await js(`document.querySelector('.shared-sidebar-trigger').getAttribute('aria-expanded')`), 'false', 'Shared sidebar starts collapsed');
     await js(`document.querySelector('.shared-sidebar-trigger').click()`);
     await wait(window.webContents, `!!document.querySelector('#shared-sidebar-panel:popover-open')`);
-    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 12);
+    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 13);
     assert.equal(await js(`!!document.querySelector('#shared-sidebar-panel [title="局域网主机"]')`), true);
     await js(`document.querySelector('#shared-sidebar-panel [title="日志中心"]').click()`);
     await wait(window.webContents, `!document.querySelector('#shared-sidebar-panel:popover-open')`);
@@ -38,7 +38,7 @@ module.exports = async (window, output) => {
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
       const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('.shared-nav-item').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
-      assert.equal(geometry.count, 12); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
+      assert.equal(geometry.count, 13); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
       window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
       assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
       if (width === 1440) { window.show(); window.focus(); await delay(200); await fs.writeFile(path.join(output, 'shared-secondary-navigation.png'), (await window.webContents.capturePage()).toPNG()); }
@@ -82,7 +82,7 @@ module.exports = async (window, output) => {
     await fill('筛选日志内容', ''); await js(`document.querySelector('.log-toolbar input[type=checkbox]').click()`);
     await fs.writeFile(path.join(folder, 'app0.log'), 'INFO rotated-marker\n'); await wait(window.webContents, `document.querySelector('.log-pane pre').textContent.includes('rotated-marker')`);
     const socket = net.createServer(); await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve)); const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const services = { projects: { enabled: true, edit: false, probe: false }, nginx: { enabled: true, edit: false, control: false }, http: { enabled: true, edit: false, send: false }, jar: { enabled: true, edit: false, control: false }, monitor: { enabled: true, edit: false, control: false }, logs: { enabled: true, jar: true, nginx: true, export: false } };
+    const services = { knowledge: { enabled: true, edit: false }, projects: { enabled: true, edit: false, probe: false }, nginx: { enabled: true, edit: false, control: false }, http: { enabled: true, edit: false, send: false }, jar: { enabled: true, edit: false, control: false }, monitor: { enabled: true, edit: false, control: false }, logs: { enabled: true, jar: true, nginx: true, export: false } };
     await ipc('devkitProjects', 'start', { host: '127.0.0.1', port, password: 'logs-smoke-only', services });
     remote = new BrowserWindow({ width: 1440, height: 900, show: true, webPreferences: { partition: `logs-${Date.now()}`, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     await remote.loadURL(`http://127.0.0.1:${port}/#logs`); await wait(remote.webContents, `!!document.querySelector('.portal-login .run-button')&&!document.querySelector('.portal-login .run-button').disabled`);
@@ -92,7 +92,7 @@ module.exports = async (window, output) => {
       ['新建主机', '添加 JAR 来源', '添加 Nginx 来源'].includes(button.textContent.trim()) && !button.disabled && button.getClientRects().length)`),
       false, 'Read-only visitors have no actionable creation controls');
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-bar .portal-navigation').length`), 0);
-    assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar .portal-navigation button').length`), 6);
+    assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-sidebar .portal-navigation button').length`), 7);
     await remote.webContents.executeJavaScript(`document.querySelector('.log-source-list input').click()`, true); await wait(remote.webContents, `document.querySelector('.log-pane pre')?.textContent.includes('rotated-marker')`);
     assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.log-pane button[title^="导出"]').length`), 0);
     const id = (await ipc('devkitLogs', 'sources')).sources[0].id;
@@ -108,11 +108,12 @@ module.exports = async (window, output) => {
       assert.equal(await remote.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.log-center').scrollWidth<=document.querySelector('.log-center').clientWidth`), true, 'Log layout fits ' + width);
       if (width <= 780) {
         await remote.webContents.executeJavaScript(`document.querySelector('[aria-label="打开共享导航"]').click()`, true); await wait(remote.webContents, `!!document.querySelector('.portal-drawer[open]')`);
-        assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-drawer .portal-navigation button').length`), 6);
+        assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-drawer .portal-navigation button').length`), 7);
         remote.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); remote.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' }); await wait(remote.webContents, `!document.querySelector('.portal-drawer[open]')`);
       }
       remote.show(); remote.focus(); await fs.writeFile(path.join(output, `logs-shared-${width}.png`), (await remote.webContents.capturePage()).toPNG());
     }
+    await require('./knowledge-smoke.cjs')(window, remote, wait);
     console.log('Logs and navigation passed: four-source streaming, mask/filter/regex timeout, pause/resume/clear, rotation, export permissions, sidebar and keyboard-close mobile drawer.');
   } finally { remote?.destroy(); await ipc('devkitProjects', 'stop'); }
 };

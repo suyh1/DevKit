@@ -217,6 +217,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
   });
   assert.deepEqual(old, {
     projects: { enabled: true, edit: true, probe: true },
+    knowledge: { enabled: false, edit: false },
     'project-todos': { enabled: false, edit: false },
     'file-shares': { enabled: false },
     transfer: { enabled: false, edit: false },

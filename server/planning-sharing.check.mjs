@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, rmdir, symlink, unlink, writeFi
 import { createFileShares } from './file-shares.mjs';
 import { createProjectHost } from './project-host.mjs';
 import { createProjectStore } from './project-store.mjs';
+import { createKnowledgeBase } from './knowledge-base.mjs';
 import { createTodoLists } from './todo-lists.mjs';
 import { archiveTodo, changeTodoLine, isTodoDate, parseTodo, planTodoCommand, todoChildIndent, todoGroupAt, todoGroupDefaults, todoReferences } from '../shared/todo-text.mjs';
 import { emptySharingServices, sharingServices } from '../shared/sharing.mjs';
@@ -104,14 +105,15 @@ test('file shares persist independently, scope browsing and stream valid folder 
   }
 }));
 
-test('portal grants download and TODO access independently and serializes concurrent edits', async () => fixture(async root => {
+test('portal enforces file, knowledge and TODO permissions and serializes concurrent edits', async () => fixture(async root => {
   const configs = path.join(root, 'configs'), dist = path.join(root, 'dist'), file = path.join(root, 'readme.txt');
   await mkdir(path.join(dist, '.vite'), { recursive: true });
   await writeFile(path.join(dist, '.vite/manifest.json'), JSON.stringify({ 'portal.html': { file: 'portal.html' } }));
   await writeFile(file, 'portal download');
   const store = await createProjectStore(configs);
   const todos = await createTodoLists(configs), files = await createFileShares(configs);
-  const host = await createProjectHost(store, dist, { fileShares: () => files, projectTodos: () => todos });
+  const knowledge = await createKnowledgeBase(configs);
+  const host = await createProjectHost(store, dist, { fileShares: () => files, projectTodos: () => todos, knowledge: () => knowledge });
   try {
     const { shares: [share] } = await files.request('save', { revision: 0, value: {
       name: '访客共享', paths: [file], port: await freePort(), enabled: true, published: true,
@@ -119,6 +121,8 @@ test('portal grants download and TODO access independently and serializes concur
     const { selectedId: hiddenId } = await todos.request('create', { name: '私有', body: '☐ 主机内部任务' });
     const { selectedId: publishedId } = await todos.request('create', { name: '合作', published: true });
     const services = emptySharingServices(), viewer = emptySharingServices();
+    services.knowledge = { enabled: true, edit: true };
+    viewer.knowledge.enabled = true;
     services['project-todos'] = { enabled: true, edit: true };
     services['file-shares'].enabled = true;
     viewer['project-todos'].enabled = true;
@@ -140,6 +144,27 @@ test('portal grants download and TODO access independently and serializes concur
     }
     const readOnly = await login('viewer-test-only', 'viewer');
     const editor = await login('owner-test-only');
+    const article = { title: '部署', kind: '部署手册', body: '步骤 A' };
+    assert.equal((await post('knowledge/list', {})).status, 401);
+    assert.equal((await post('knowledge/create', article, readOnly)).status, 403);
+    const created = await (await post('knowledge/create', article, editor)).json();
+    const edits = await Promise.all([1, 2].map(() => post('knowledge/save', { ...created, body: '步骤 B' }, editor)));
+    assert.deepEqual(edits.map(reply => reply.status).sort(), [200, 409]);
+    const [current] = await (await post('knowledge/list', {}, readOnly)).json();
+    assert.equal(current.body, '步骤 B');
+    assert.equal(current.history, undefined);
+    const old = await (await post('knowledge/history', { id: current.id }, readOnly)).json();
+    assert.deepEqual(old, [created]);
+    const restore = { id: current.id, revision: 2, version: 1 };
+    assert.equal((await post('knowledge/restore', restore, readOnly)).status, 403);
+    const restored = await (await post('knowledge/restore', restore, editor)).json();
+    assert.equal(restored.revision, 3);
+    assert.equal(restored.body, article.body);
+    const reopened = await createKnowledgeBase(configs);
+    assert.deepEqual(await reopened.request('list'), [restored]);
+    assert.equal((await post('knowledge/remove', restored, readOnly)).status, 403);
+    assert.equal((await post('knowledge/remove', restored, editor)).status, 200);
+    assert.equal((await post('knowledge/history', restore, editor)).status, 404);
     const browse = origin + '/api/file-shares/browse/' + share.id + '/';
     assert.equal((await fetch(browse)).status, 401);
     assert.equal((await fetch(browse, { headers: { Cookie: readOnly } })).status, 404);

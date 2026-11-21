@@ -25,6 +25,7 @@ let nginxManager, nginxError = '';
 let jarManager, jarError = '';
 let lan, lanError = '';
 let collab, collabError = '', transferLinks, transferLinksError = '';
+let knowledge, knowledgeError = '';
 let fileShares, fileSharesError = '', projectTodos, projectTodosError = '';
 let monitorManager, monitorError = '';
 let logCenter;
@@ -195,6 +196,8 @@ app.whenReady().then(async () => {
     catch (error) { lanError = error.message; }
     try { fileShares = await (await import('./server/file-shares.mjs')).createFileShares(projectStorage.directory); }
     catch (error) { fileSharesError = error.message; }
+    try { knowledge = await (await import('./server/knowledge-base.mjs')).createKnowledgeBase(projectStorage.directory); }
+    catch (error) { knowledgeError = error.message; }
     try { projectTodos = await (await import('./server/todo-lists.mjs')).createTodoLists(projectStorage.directory); }
     catch (error) { projectTodosError = error.message; }
     try { collab = await (await import('./server/collab-store.mjs')).createCollabStore(projectStorage.directory); }
@@ -205,7 +208,7 @@ app.whenReady().then(async () => {
         transferLinks = await createTransferLinks(projectStorage.directory, path.join(__dirname, 'dist'), collab);
       } catch (error) { transferLinksError = error.message; }
     }
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, collab: () => collab });
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -364,6 +367,13 @@ app.whenReady().then(async () => {
       return { data: await fileShares.request(action, value) };
     } catch (error) { return { error: error.message, status: error.status }; }
   });
+  ipcMain.handle('devkit:knowledge', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的知识库请求。');
+    try {
+      if (!knowledge) throw new Error(knowledgeError || projectError || '知识库尚未准备好。');
+      return { data: await knowledge.request(action, value) };
+    } catch (error) { return { error: error.message, status: error.status }; }
+  });
   ipcMain.handle('devkit:project-todos', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的待办清单请求。');
     try {
@@ -472,6 +482,6 @@ app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await transferLinks?.close(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await transferLinks?.close(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); await knowledge?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

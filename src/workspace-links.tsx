@@ -17,6 +17,7 @@ import type { ProjectState } from '../shared/projects.mjs';
 import type { HostGroup } from './lan-api';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
 import type { FileShareState } from './planning-share-api';
+import { knowledgeRequest, type KnowledgePage } from './knowledge-api';
 import { parseTodo } from '../shared/todo-text.mjs';
 
 export type WorkspacePage = typeof workspaceModules[number]['id'];
@@ -74,6 +75,10 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
     projects: async () => {
       const state = await projectRequest<ProjectState>('get');
       add(state.profiles.flatMap(profile => profile.projects.map(item => perModule('projects', `${profile.id}:${item.id}`, item.name, profile.name))));
+    },
+    knowledge: async () => {
+      const pages = await knowledgeRequest<Pick<KnowledgePage, 'id' | 'title' | 'project' | 'kind'>[]>('list', { summary: true });
+      add(pages.map(item => perModule('knowledge', item.id, item.title, [item.project, item.kind].filter(Boolean).join(' · '))));
     },
     'project-todos': async () => {
       const state = await todoRequest(!window.devkitProjectTodos, 'get');

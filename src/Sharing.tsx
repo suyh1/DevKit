@@ -407,6 +407,8 @@ function SharingPanel({
                         permissions: [{ key: 'edit', label: '发送与移除', detail: '可向共享收件箱发送内容，也可从所有设备的收件箱移除条目。' }] },
                       { id: 'mock', name: '接口模拟服务', description: '多场景响应与调用记录',
                         permissions: [{ key: 'edit', label: '编辑与发布模拟接口', detail: '可维护响应场景、发布或撤下接口，以及更换调用地址。' }] },
+                      { id: 'knowledge', name: '团队知识库', description: '查看共享主机上的全部手册与版本历史',
+                        permissions: [{ key: 'edit', label: '编辑团队文档', detail: '可创建、编辑、恢复历史版本和删除文档。' }] },
                       { id: 'whiteboard', name: '截图协作白板', description: '截图与多人标注',
                         permissions: [{ key: 'edit', label: '创建与编辑白板', detail: '可上传截图、添加与移除标注，以及重命名或删除画板。' }] },
                       {
@@ -538,7 +540,7 @@ function SharingPanel({
                                 : service.id === 'mock' ? '模拟接口、调用地址和近期记录'
                                 : service.id === 'whiteboard' ? '白板、截图和全部标注'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
-                                : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
+                                : service.id === 'knowledge' ? '全部团队文档及历史版本' : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
                             。
                           </p>
                           {service.permissions.map((permission) => (

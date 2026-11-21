@@ -16,6 +16,7 @@ import { mergeGeoOutput } from './geography';
 import Overview, { type OverviewScreen } from './Overview';
 import Settings from './Settings';
 import ProjectCenter from './ProjectCenter';
+import KnowledgeBase from './KnowledgeBase';
 import TodoLists from './TodoLists';
 import { CollaborationPage } from './CollaborationPage';
 import FileShares from './FileShares';
@@ -248,6 +249,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'logs'} hidden={page !== 'logs'} className="workspace"><LogCenter active={page === 'logs'} /></div>
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench active={page === 'http'} initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter visible={page === 'projects'} /></div>
+        <div data-motion-page inert={page !== 'knowledge'} hidden={page !== 'knowledge'} className="workspace"><KnowledgeBase active={page === 'knowledge'} /></div>
         <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><TodoLists active={page === 'project-todos'} onOpenTool={id => openTool(id)} /></div>
         {(['transfer', 'mock', 'whiteboard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>

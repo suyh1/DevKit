@@ -247,6 +247,7 @@ export default function JarCenter({ active }: { active: boolean }) {
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
           <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'force-stop')}>强制终止</button>
+          <RelatedLink page="knowledge" id={`related:jar:${item.id}`}>关联手册</RelatedLink>
           <ResourceLink page="jar" id={item.id} />
         </details></td>
       </tr>;
