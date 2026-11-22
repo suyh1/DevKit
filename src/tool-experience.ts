@@ -1,3 +1,4 @@
+import { mapAnalysis } from './analysis/catalog';
 import type { Options, ToolId } from './tools';
 
 export type Workflow = 'geography' | 'format' | 'convert' | 'codec' | 'table' | 'lookup' | 'calculate' | 'permissions' | 'inspect' | 'schedule' | 'digest' | 'match' | 'compare' | 'stats' | 'generate' | 'color';
@@ -6,6 +7,7 @@ const entry = (workflow: Workflow, input: string, output: string, action: string
 
 // Explicit coverage: each tool chooses its interaction according to its data flow.
 export const toolExperiences: Record<ToolId, Experience> = {
+  ...mapAnalysis(s => entry(s.second ? 'compare' : 'convert', s.name + '输入', s.name + '结果', '开始处理', s.description)),
   'json-lines': entry('convert', '记录或数组', '转换结果', '转换记录', '每行一条 JSON 记录。选择转换方向与空行处理方式。'),
   'markdown-table': entry('table', '源表格', '表格结果', '转换表格', '以首行为表头。单元格换行转为 <br>，反向恢复为换行；字面量 <br> 按文本转义。'),
   'qr-code': entry('convert', '文本或链接', '二维码', '生成二维码', '使用 UTF-8 编码并在本机导出 PNG。'),

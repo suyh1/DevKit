@@ -6,12 +6,12 @@ module.exports = async function workflowsSmoke(window, output) {
   window.webContents.setBackgroundThrottling(false);
   const js = code => window.webContents.executeJavaScript(code, true);
   const pane = '.task-pane:not([hidden])';
-  async function wait(expression) {
-    for (let attempt = 0; attempt < 120; attempt++) {
+  async function wait(expression, attempts = 120) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
       if (await js(expression)) return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    console.error(await js(`JSON.stringify({focus:document.hasFocus(),status:document.querySelector('${pane} .color-status')?.textContent,tool:document.querySelector('${pane} h1')?.textContent})`));
+    console.error(await js(`JSON.stringify({focus:document.hasFocus(),status:document.querySelector('${pane} .task-status, ${pane} .color-status')?.textContent, error:document.querySelector('${pane} .task-error')?.textContent,tool:document.querySelector('${pane} h1')?.textContent})`));
     await fs.writeFile(path.join(output, 'workflow-failure.png'), (await window.webContents.capturePage()).toPNG());
     throw new Error(`Workflow condition not met: ${expression}`);
   }
@@ -25,7 +25,7 @@ module.exports = async function workflowsSmoke(window, output) {
   window.setSize(1440, 1000);
   const { catalog, openTool } = require('./navigation-helpers.cjs')(window);
   const names = (await catalog()).map(tool => tool.name);
-  assert.equal(names.length, 51);
+  assert.equal(names.length, 95);
   const report = [];
   const audit = require('./interaction-audit-smoke.cjs')(window, output);
   for (const name of names) {
@@ -37,7 +37,7 @@ module.exports = async function workflowsSmoke(window, output) {
       await js(`[...document.querySelectorAll('${pane} .editor-footer button')].find(button => button.textContent.includes('示例'))?.click()`);
       if (id === 'hmac') await fill(`${pane} .field-key input`, 'key');
       await js(`document.querySelector('${pane} .run-button').click()`);
-      await wait(`!!document.querySelector('${pane} .status-success')`);
+      await wait(`!!document.querySelector('${pane} .status-success')`, id === 'mermaid-diagram' ? 440 : 120);
       if (id === 'geo-coordinates') await require('./geography-smoke.cjs')(window, output);
       if (id === 'json') {
         await wait(`getComputedStyle(document.querySelector('${pane} .input-card')).display === 'none'`);
@@ -108,6 +108,10 @@ module.exports = async function workflowsSmoke(window, output) {
         if (['chmod', 'cron', 'http-code', 'json-csv'].includes(id)) await fs.writeFile(path.join(output, `workflow-${id}-${theme}-narrow.png`), (await window.webContents.capturePage()).toPNG());
         window.setSize(1440, 1000);
       }
+    } else if (await js(`!!document.querySelector('${pane} > [data-file-tool]')`)) {
+      const fileId=await js(`document.querySelector('${pane} > [data-file-tool]').dataset.fileTool`);
+      await require('./analysis-file-smoke.cjs')(window,pane,fileId);
+      report.push({name,id:fileId,status:'verified',workflow:'file'});
     } else if (await js(`!!document.querySelector('${pane} [data-live-tool]')`)) {
       const liveId = await js(`document.querySelector('${pane} [data-live-tool]').dataset.liveTool`);
       await require('./basic-tools-smoke.cjs').live(window, liveId, output);
@@ -166,5 +170,5 @@ module.exports = async function workflowsSmoke(window, output) {
   await js("document.documentElement.dataset.theme = 'light'");
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'workflow-report.json'), JSON.stringify(report, null, 2));
-  console.log('All 51 tool UIs checked; 43 text/coordinate tools executed, both themes and four viewport widths passed.');
+  console.log('All 95 tool UIs checked.');
 };

@@ -9,7 +9,7 @@ export function searchTools(query: string, favorites: ToolId[] = [], recent: Too
     const alias = (aliases[tool.id] ?? '').toLowerCase();
     const searchable = `${name} ${tool.category} ${tool.description} ${alias}`.toLowerCase();
     const matches = terms.every(term => searchable.includes(term) || subsequence(term, name));
-    const score = terms.reduce((total, term) => total + (name.includes(term) ? 30 : alias.includes(term) ? 20 : searchable.includes(term) ? 5 : 1), 0)
+    const score = terms.reduce((total, term) => total + (alias.split(/\s+/).includes(term) ? 32 : name.includes(term) ? 30 : alias.includes(term) ? 20 : searchable.includes(term) ? 5 : 1), 0)
       + (favorites.includes(tool.id) ? 5 : 0) + Math.max(0, 4 - recent.indexOf(tool.id)) * Number(recent.includes(tool.id));
     return { tool, matches, score, position };
   }).filter(item => item.matches).sort((left, right) => right.score - left.score || left.position - right.position).map(item => item.tool);

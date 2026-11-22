@@ -40,7 +40,8 @@ export default function FileChecksums() {
     try {
       const results = new Map<string, string>();
       for (const file of files) {
-        if (results.has(file.name) || /[\r\n\\]/.test(file.name))
+        const path = file.webkitRelativePath?.split('/').slice(1).join('/') || file.name;
+        if (results.has(path) || /[\r\n\\]/.test(file.name))
           throw new Error('请选择名称唯一且不含换行或反斜线的文件。');
         const digest = await fileDigest(
           file,
@@ -50,7 +51,7 @@ export default function FileChecksums() {
           },
           () => run !== generation.current,
         );
-        results.set(file.name, digest);
+        results.set(path, digest);
       }
       if (run === generation.current) {
         setRows(results);
@@ -143,6 +144,27 @@ export default function FileChecksums() {
         )}
       </div>
       <div className="checksum-actions">
+        <label>
+          计算目录
+          <input
+            type="file"
+            multiple
+            ref={(node) => node?.setAttribute('webkitdirectory', '')}
+            onChange={(e) => void calculate(Array.from(e.target.files ?? []))}
+          />
+        </label>
+        {rows.size > 0 && (
+          <button
+            disabled={busy}
+            onClick={() => {
+              setManifest(new Map(rows));
+              setManifestName('基准目录');
+              setStatus('基准已保存，请选择另一目录');
+            }}
+          >
+            将当前目录设为对照基准
+          </button>
+        )}
         {!!rows.size && (
           <button
             className="secondary-button"

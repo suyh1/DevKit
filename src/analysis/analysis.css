@@ -1,0 +1,170 @@
+.analysis-file summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+.analysis-file > label,
+.analysis-file fieldset label {
+  display: grid;
+  gap: 0.35rem;
+}
+.analysis-file textarea,
+.analysis-file select,
+.analysis-file input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='file']) {
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  color: inherit;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+.analysis-file textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 3.25rem;
+}
+.analysis-file fieldset {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+}
+.analysis-file button:not([class]),
+.data-table td > button {
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--accent-ink);
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.analysis-file button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.analysis-file .data-table {
+  max-height: 55vh;
+  overflow: auto;
+}
+.analysis-file {
+  min-width: 0;
+  padding: 18px;
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.analysis-file pre,
+.data-table dd pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 22rem;
+  overflow: auto;
+}
+.analysis-fields,
+.analysis-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.analysis-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 8rem;
+}
+.analysis-bars {
+  max-height: 18rem;
+  overflow: auto;
+}
+.analysis-bars > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 25%) 1fr;
+  gap: 8px;
+}
+.analysis-bars small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.analysis-bars span {
+  display: flex;
+  height: 12px;
+  align-self: center;
+}
+.analysis-bars i {
+  height: 100%;
+}
+.analysis-plan,
+.analysis-calendar {
+  max-height: 24rem;
+  overflow: auto;
+}
+.analysis-plan > div {
+  border-inline-start: 2px solid var(--line);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.analysis-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 2.4rem);
+  text-align: center;
+  margin: 8px 0;
+}
+.analysis-calendar span,
+.analysis-calendar strong {
+  padding: 4px;
+}
+.analysis-calendar [data-occurs] {
+  background: var(--accent);
+  color: white;
+  border-radius: 5px;
+}
+.analysis-grid {
+  position: relative;
+  display: grid;
+  min-height: 90px;
+  max-height: 360px;
+  overflow: auto;
+  align-content: stretch;
+}
+.analysis-grid > span {
+  background: var(--soft);
+  padding: 10px;
+  text-align: center;
+}
+.analysis-grid .grid-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  touch-action: none;
+  border: 0;
+  background: linear-gradient(90deg, transparent 40%, var(--accent) 40% 60%, transparent 60%);
+}
+.image-scroll {
+  overflow: auto;
+  max-height: 60vh;
+}
+.analysis-overlay {
+  position: relative;
+  line-height: 0;
+}
+.analysis-overlay img {
+  width: 100%;
+}
+.analysis-overlay img + img {
+  position: absolute;
+  inset: 0;
+}
+.analysis-heatmap {
+  max-width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+}

@@ -5,6 +5,7 @@ import { root, prepareDesktop } from './desktop-files.mjs';
 
 const staging = process.argv.includes('--packaged') ? path.join(root, 'artifacts', 'desktop-runtime', `DevKit-${process.platform}-${process.arch}`, 'resources', 'app.asar') : (await prepareDesktop(process.platform, process.arch)).staging;
 const environment = { ...process.env, DEVKIT_TEST_APP: staging, DEVKIT_TEST_OUTPUT: path.join(root, 'artifacts', 'electron-smoke') };
+environment.DEVKIT_TEST_ANALYSIS_ONLY = process.argv.includes('--analysis-only') ? '1' : '';
 environment.DEVKIT_TEST_BASIC_TOOLS_ONLY = process.argv.includes('--basic-tools-only') ? '1' : '';
 environment.DEVKIT_TEST_COMPONENTS_ONLY = process.argv.includes('--components-only') ? '1' : '';
 environment.DEVKIT_TEST_SHARING_SETTINGS_ONLY = process.argv.includes('--sharing-settings-only') ? '1' : '';

@@ -37,9 +37,14 @@ app.on('browser-window-created', (_event, window) => {
         throw new Error(`UI condition not met: ${expression}`);
       };
       await waitFor('[...document.querySelectorAll("button")].some(button => button.getAttribute("aria-label") === "新建JSON 格式化任务")');
+      if (process.env.DEVKIT_TEST_ANALYSIS_ONLY === '1') {
+        await require('./analysis-workflows-smoke.cjs')(window);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_BASIC_TOOLS_ONLY === '1') {
         await require('./basic-tools-smoke.cjs').basicTools(window, output);
         await require('./workflows-smoke.cjs')(window, output);
+        await require('./analysis-workflows-smoke.cjs')(window);
         clearTimeout(timeout); app.exit(0); return;
       }
       if (process.env.DEVKIT_TEST_COMPONENTS_ONLY === '1') {
@@ -236,6 +241,7 @@ app.on('browser-window-created', (_event, window) => {
       await window.webContents.executeJavaScript('new Promise(resolve => setTimeout(resolve, 200))');
       await fs.writeFile(path.join(output, 'preview-text-stats.png'), (await window.webContents.capturePage()).toPNG());
       await require('./workflows-smoke.cjs')(window, output);
+      await require('./analysis-workflows-smoke.cjs')(window);
       const saved = await window.webContents.executeJavaScript('window.devkitDesktop.saveText("本地离线保存", "saved.txt")');
       assert.match(saved, /已保存/); assert.equal(await fs.readFile(path.join(output, 'saved.txt'), 'utf8'), '本地离线保存');
       dialog.showSaveDialog = async () => ({ canceled: true });

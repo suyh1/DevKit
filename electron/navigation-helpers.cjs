@@ -27,8 +27,8 @@ module.exports = function navigationHelpers(window) {
     }
     await js('document.querySelector(\'button[aria-label="关闭分类工具面板"]\')?.click()');
     await wait('!document.querySelector(".category-panel")');
-    assert.equal(entries.length, 51);
-    assert.equal(new Set(entries.map(tool => tool.id)).size, 51);
+    assert.equal(entries.length, 95);
+    assert.equal(new Set(entries.map(tool => tool.id)).size, 95);
     catalogs.set(window, entries);
     return entries;
   }

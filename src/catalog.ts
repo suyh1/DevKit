@@ -1,3 +1,4 @@
+import { analysisTools } from './analysis/catalog';
 import type { ToolId } from './tools';
 
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
@@ -27,13 +28,13 @@ export function normalizeSharedModuleOrder(value: unknown, defaults: readonly Wo
 }
 
 export const categories = [
-  { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: ['json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'mock-data', 'env', 'properties', 'json-lines', 'markdown-table'] },
-  { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: ['json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status', 'semver'] },
-  { name: '编码与解析', key: 'encode', description: '编码转换与地址解析', ids: ['base64', 'gzip', 'url', 'html', 'url-inspect', 'query-string', 'unicode', 'qr-code'] },
-  { name: '文本与匹配', key: 'text', description: '比较、匹配与清理文本', ids: ['diff', 'regex', 'text', 'text-stats'] },
-  { name: '时间与数值', key: 'utility', description: '时间、数字、子网与地理坐标的计算', ids: ['timestamp', 'radix', 'cron', 'ipv4', 'geo-coordinates'] },
-  { name: '安全与标识', key: 'security', description: '摘要、权限、令牌与安全随机数', ids: ['hash', 'password', 'jwt', 'uuid', 'ulid', 'hmac', 'chmod'] },
-  { name: '颜色与设计', key: 'color', description: '取色、搭配与视觉探索', ids: ['color-picker', 'color-convert', 'color-palette', 'color-gradient', 'color-contrast', 'color-mix', 'css-unit', 'css-flex'] },
+  { name: '结构化数据', key: 'data', description: '整理数据与配置文件', ids: [...analysisTools.filter(tool => tool.category === '结构化数据').map(tool => tool.id), 'json', 'yaml', 'xml', 'csv-json', 'json-csv', 'json-path', 'json-schema', 'mock-data', 'env', 'properties', 'json-lines', 'markdown-table'] },
+  { name: '代码与查询', key: 'code', description: '转换类型、生成请求代码与整理查询', ids: [...analysisTools.filter(tool => tool.category === '代码与查询').map(tool => tool.id), 'json-code', 'type-json', 'sql', 'code-format', 'http-code', 'http-status', 'semver'] },
+  { name: '编码与解析', key: 'encode', description: '编码转换与地址解析', ids: [...analysisTools.filter(tool => tool.category === '编码与解析').map(tool => tool.id), 'base64', 'gzip', 'url', 'html', 'url-inspect', 'query-string', 'unicode', 'qr-code'] },
+  { name: '文本与匹配', key: 'text', description: '比较、匹配与清理文本', ids: [...analysisTools.filter(tool => tool.category === '文本与匹配').map(tool => tool.id), 'diff', 'regex', 'text', 'text-stats'] },
+  { name: '时间与数值', key: 'utility', description: '时间、数字、子网与地理坐标的计算', ids: [...analysisTools.filter(tool => tool.category === '时间与数值').map(tool => tool.id), 'timestamp', 'radix', 'cron', 'ipv4', 'geo-coordinates'] },
+  { name: '安全与标识', key: 'security', description: '摘要、权限、令牌与安全随机数', ids: [...analysisTools.filter(tool => tool.category === '安全与标识').map(tool => tool.id), 'hash', 'password', 'jwt', 'uuid', 'ulid', 'hmac', 'chmod'] },
+  { name: '颜色与设计', key: 'color', description: '取色、搭配与视觉探索', ids: [...analysisTools.filter(tool => tool.category === '颜色与设计').map(tool => tool.id), 'color-picker', 'color-convert', 'color-palette', 'color-gradient', 'color-contrast', 'color-mix', 'css-unit', 'css-flex'] },
 ];
 
 export const aliases: Partial<Record<ToolId, string>> = {

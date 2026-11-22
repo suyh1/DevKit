@@ -1,3 +1,4 @@
+import FileWorkbench from './analysis/FileWorkbench';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { downloadBlob, readText } from './files';
@@ -73,5 +74,5 @@ function FlexPanel({ task, onEdit, onNotice }: Props) {
 }
 
 export default function VisualWorkbench(props: Props) {
-  return <div className="visual-workbench" data-live-tool={props.task.toolId}>{props.task.toolId === 'qr-code' ? <QrPanel {...props} /> : <FlexPanel {...props} />}</div>;
+  return <div className="visual-workbench" data-live-tool={props.task.toolId}>{props.task.toolId === 'qr-code' ? <><QrPanel {...props} /><details><summary>从图片或截图识别二维码</summary><FileWorkbench id="qr-code"/></details></> : <FlexPanel {...props} />}</div>;
 }

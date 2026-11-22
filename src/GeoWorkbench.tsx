@@ -1,4 +1,5 @@
 import type { Notify } from './ToastStack';
+import UpgradePanel from './analysis/UpgradePanel';
 import { copyText } from './motion-primitives';
 import { MotionButton, MotionPresence, MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -58,7 +59,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
     {mode !== 'convert' && <button className="text-button" disabled={!current} onClick={() => usePoint(point, 'convert')}>送到格式转换</button>}
     {mode !== 'circle' && <button className="text-button" disabled={!current} onClick={() => usePoint(point, 'circle')}>用作圆心</button>}
   </div>;
-  return <div className="text-workbench geo-workbench workflow-geography" data-tool="geo-coordinates">
+  return <div className="text-workbench geo-workbench workflow-geography" data-tool="geo-coordinates"><UpgradePanel id="geo-coordinates" current={task.input}/>
     <SegmentedControl label="经纬度功能" value={mode} options={[{ value: 'convert', label: '格式转换' }, { value: 'circle', label: '圆周点计算' }, { value: 'extract', label: '文本提取' }]} onChange={value => { if (!busy) update({ mode: value }); }} />
     <p className="workflow-intro">{mode === 'convert' ? '输入十进制度或度分秒，同时得到两种表示。格式转换不改变坐标基准。' : mode === 'circle' ? '按地表距离和起始方位角计算圆周点；正东/正西的终点纬度可能变化。' : '提取有度分秒特征的坐标对，按方向识别经纬；无标识时采用指定顺序。'}</p>
     <section className="geo-panel" aria-label="坐标输入">

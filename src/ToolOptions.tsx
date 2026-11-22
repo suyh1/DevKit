@@ -1,3 +1,4 @@
+import { mapAnalysis } from './analysis/catalog';
 import { useId } from 'react';
 import SegmentedControl from './SegmentedControl';
 import { ShieldCheck } from 'lucide-react';
@@ -5,6 +6,7 @@ import type { Options, ToolId } from './tools';
 
 type Field = { key: string; label: string; entries?: [string, string][]; min?: number; max?: number; placeholder?: string; secret?: boolean };
 const fields: Partial<Record<ToolId, Field[]>> = {
+  ...mapAnalysis(s => Object.entries(s.labels).map(([key, value]) => typeof value === 'string' ? { key, label: value } : { key, label: ({aggregate:'汇总方式',sort:'排序或分组',mode:'视图',format:'输出格式',cache:'缓存范围',context:'请求场景'} as Record<string,string>)[key] ?? key, entries: value })),
   'json-schema': [{ key: 'mode', label: '处理方式', entries: [['infer', '推断 Schema'], ['validate', '校验样本']] }],
   'json-lines': [{ key: 'mode', label: '转换方向', entries: [['array', '记录 → 数组'], ['lines', '数组 → 记录']] }, { key: 'blank', label: '空行', entries: [['skip', '跳过'], ['error', '报错']] }],
   'markdown-table': [{ key: 'mode', label: '转换方向', entries: [['markdown', '转 Markdown'], ['delimited', '转 CSV / TSV']] }, { key: 'delimiter', label: '分隔符', entries: [['comma', 'CSV'], ['tab', 'TSV']] }],

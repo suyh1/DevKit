@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { defaultOptions, tools, type Options, type ToolId } from './tools';
+import { CaseList, validCases, type RegressionCase } from './analysis/Cases';
 import ToolOptions from './ToolOptions';
 import { copyText } from './motion-primitives';
 
@@ -18,7 +19,10 @@ const allowed: ToolId[] = [
   'text',
 ];
 const previewLimit = 8192;
-const previewLength = (text: string) => text.length > previewLimit ? `（预览前 ${previewLimit.toLocaleString()} / 共 ${text.length.toLocaleString()} 字符）` : '';
+const previewLength = (text: string) =>
+  text.length > previewLimit
+    ? `（预览前 ${previewLimit.toLocaleString()} / 共 ${text.length.toLocaleString()} 字符）`
+    : '';
 const prefix = 'devkit:recipe:';
 type Step = { tool: ToolId; options: Options };
 const makeStep = (tool: ToolId): Step => ({ tool, options: { ...defaultOptions[tool] } });
@@ -26,14 +30,22 @@ const label = (id: ToolId) => tools.find((t) => t.id === id)!.name;
 
 export default function ToolRecipes({ input }: { input: string }) {
   const [open, setOpen] = useState(false);
+  const [cases, setCases] = useState<RegressionCase[]>([]);
   const [steps, setSteps] = useState<Step[]>([makeStep('json')]);
   const [name, setName] = useState(''),
     [names, setNames] = useState<string[]>([]);
   const [report, setReport] = useState<{ name: string; input: string; output: string; error?: string }[]>([]);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
+  const interrupted = useRef(false);
   const cancel = useRef<(() => void) | undefined>(undefined);
-  useEffect(() => () => cancel.current?.(), []);
+  useEffect(
+    () => () => {
+      interrupted.current = true;
+      cancel.current?.();
+    },
+    [],
+  );
   function refresh() {
     try {
       setNames(
@@ -52,7 +64,10 @@ export default function ToolRecipes({ input }: { input: string }) {
   }
   function load(key: string) {
     try {
-      const data: Step[] = JSON.parse(localStorage.getItem(prefix + key) || 'null');
+      const saved = JSON.parse(localStorage.getItem(prefix + key) || 'null');
+      const data: Step[] = Array.isArray(saved) ? saved : saved?.steps;
+      const checks = Array.isArray(saved) ? [] : saved?.cases;
+      if (!validCases(checks)) throw Error('流程样例无效');
       if (
         !Array.isArray(data) ||
         !data.length ||
@@ -66,6 +81,7 @@ export default function ToolRecipes({ input }: { input: string }) {
         )
       )
         throw new Error('流程文件无效');
+      setCases(checks);
       change(data);
       setName(key);
       setMessage('');
@@ -73,38 +89,74 @@ export default function ToolRecipes({ input }: { input: string }) {
       setMessage(String(error));
     }
   }
-  async function run() {
+  async function run(regression = false) {
     const results = [];
-    let value = input;
+    interrupted.current = false;
+    const notices: string[] = [];
     setBusy(true);
     setReport([]);
     setMessage('');
     try {
-      for (const step of steps) {
-        try {
-          if (value.length > 2_000_000) throw new Error('步骤输入超过 2,000,000 字符。');
-          const output = await new Promise<string>((resolve, reject) => {
-            const worker = new Worker(new URL('./tool.worker.ts', import.meta.url), { type: 'module' });
-            const stop = (error?: string, result = '') => {
-              clearTimeout(timer);
-              worker.terminate();
-              cancel.current = undefined;
-              error ? reject(new Error(error)) : resolve(result);
-            };
-            const timer = setTimeout(() => stop('步骤处理超时。'), 10000);
-            cancel.current = () => stop('已取消。');
-            worker.onmessage = (event) => stop(event.data.error, event.data.output);
-            worker.onerror = () => stop('步骤执行失败。');
-            worker.postMessage({ id: step.tool, input: value, options: step.options });
-          });
-          results.push({ name: label(step.tool), input: value, output });
-          value = output;
-        } catch (error) {
-          results.push({ name: label(step.tool), input: value, output: '', error: String(error) });
-          break;
+      for (const [index, test] of (regression
+        ? cases
+        : [{ input, expected: '', step: undefined }]
+      ).entries()) {
+        if (interrupted.current) break;
+        let value = test.input;
+        for (const [si, step] of steps.entries()) {
+          try {
+            if (value.length > 2_000_000) throw new Error('步骤输入超过 2,000,000 字符。');
+            const output = await new Promise<string>((resolve, reject) => {
+              const worker = new Worker(new URL('./tool.worker.ts', import.meta.url), { type: 'module' });
+              const stop = (error?: string, result = '') => {
+                clearTimeout(timer);
+                worker.terminate();
+                cancel.current = undefined;
+                error ? reject(new Error(error)) : resolve(result);
+              };
+              const timer = setTimeout(() => stop('步骤处理超时。'), 10000);
+              cancel.current = () => stop('已取消。');
+              worker.onmessage = (event) => stop(event.data.error, event.data.output);
+              worker.onerror = () => stop('步骤执行失败。');
+              worker.postMessage({ id: step.tool, input: value, options: step.options });
+            });
+            if (!regression) results.push({ name: label(step.tool), input: value, output });
+            value = output;
+            if (regression && si + 1 === (test.step ?? steps.length)) {
+              notices.push(
+                '样例 ' +
+                  (index + 1) +
+                  ' · 步骤 ' +
+                  (si + 1) +
+                  ' ' +
+                  label(step.tool) +
+                  (output === test.expected
+                    ? ' · 通过'
+                    : ' · 失败，实际 ' + JSON.stringify(output.slice(0, 200))),
+              );
+              break;
+            }
+          } catch (error) {
+            results.push({ name: label(step.tool), input: value, output: '', error: String(error) });
+            if (regression)
+              notices.push(
+                '样例 ' +
+                  (index + 1) +
+                  ' · 步骤 ' +
+                  (si + 1) +
+                  ' ' +
+                  label(step.tool) +
+                  ' · ' +
+                  String(error),
+              );
+            break;
+          }
         }
+        if (regression && test.step && test.step > steps.length)
+          notices.push('样例 ' + (index + 1) + ' 指定的步骤不存在');
       }
       setReport(results);
+      setMessage(notices.join('\n'));
     } finally {
       setBusy(false);
     }
@@ -140,7 +192,7 @@ export default function ToolRecipes({ input }: { input: string }) {
                 disabled={!name.trim()}
                 onClick={() => {
                   try {
-                    localStorage.setItem(prefix + name.trim(), JSON.stringify(steps));
+                    localStorage.setItem(prefix + name.trim(), JSON.stringify({ version: 2, steps, cases }));
                     refresh();
                     setMessage('已保存步骤和参数');
                   } catch (e) {
@@ -191,6 +243,13 @@ export default function ToolRecipes({ input }: { input: string }) {
               />
             </section>
           ))}
+          <details>
+            <summary>流程回归样例</summary>
+            <CaseList cases={cases} change={setCases} steps={steps.length} />
+            <button disabled={!cases.length} onClick={() => void run(true)}>
+              运行全部样例
+            </button>
+          </details>
           <div className="recipe-actions">
             <button
               className="secondary-button"
@@ -205,8 +264,17 @@ export default function ToolRecipes({ input }: { input: string }) {
           </div>
         </fieldset>
       )}
-      {busy && <button onClick={() => cancel.current?.()}>取消流程</button>}
-      <p role="status">{message}</p>
+      {busy && (
+        <button
+          onClick={() => {
+            interrupted.current = true;
+            cancel.current?.();
+          }}
+        >
+          取消流程
+        </button>
+      )}
+      <pre role="status">{message}</pre>
       {report.map((row, i) => (
         <details key={i}>
           <summary>
@@ -214,7 +282,10 @@ export default function ToolRecipes({ input }: { input: string }) {
           </summary>
           <p>输入{previewLength(row.input)}</p>
           <pre>{row.input.slice(0, previewLimit)}</pre>
-          <p>{row.error || '输出'}{previewLength(row.output)}</p>
+          <p>
+            {row.error || '输出'}
+            {previewLength(row.output)}
+          </p>
           <pre>{row.output.slice(0, previewLimit)}</pre>
           {!row.error && (
             <button

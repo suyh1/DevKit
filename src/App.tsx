@@ -10,6 +10,8 @@ import { tools } from './tools';
 import type { Options, ToolId } from './tools';
 import { isColorTool } from './colors';
 import ColorWorkbench, { savedColors } from './ColorWorkbench';
+import FileWorkbench from './analysis/FileWorkbench';
+import {byAnalysis} from './analysis/catalog';
 import VisualWorkbench from './VisualWorkbench';
 import ToolWorkspace from './ToolWorkspace';
 import GeoWorkbench from './GeoWorkbench';
@@ -43,7 +45,7 @@ import { ConfirmationProvider } from './Confirmation';
 import { DisplayModeProvider } from './DisplayMode';
 
 type Page = 'home' | 'favorites' | 'recent' | 'settings' | 'task' | WorkspaceModuleId;
-type Job = { worker: Worker; timeout: ReturnType<typeof setTimeout> };
+type Job = { worker?: Worker; timeout: ReturnType<typeof setTimeout> };
 function readPreference(key: string): unknown { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
 function initialPreferences(): Preferences {
   const saved = readPreference('devkit:preferences');
@@ -117,15 +119,24 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
   }
   function stop(id: string) {
     const job = jobs.current.get(id);
-    if (job) { job.worker.terminate(); clearTimeout(job.timeout); jobs.current.delete(id); }
+    if (job) { job.worker?.terminate(); clearTimeout(job.timeout); jobs.current.delete(id); }
   }
   function cancel(id: string) { stop(id); patch(id, { status: 'cancelled', error: '' }); }
   function run(id: string) {
     const task = tasksRef.current.find(item => item.id === id);
-    if (!task || jobs.current.has(id) || isColorTool(task.toolId) || ['qr-code', 'css-flex'].includes(task.toolId)) return;
+    if (!task || byAnalysis.get(task.toolId)?.ext === 'file' || jobs.current.has(id) || isColorTool(task.toolId) || ['qr-code', 'css-flex'].includes(task.toolId)) return;
     patch(id, { status: 'running', error: '' });
     const started = performance.now();
     const fail = (error: string) => { stop(id); patch(id, { status: 'error', error }); };
+    if(task.toolId==='mermaid-diagram') {
+      const job:Job={ timeout:setTimeout(()=>fail('绘图超时，请缩小图形'),20000) };
+      jobs.current.set(id,job);
+      void import('./analysis/mermaid').then(module=>module.renderDiagram(task.input)).then(output=>{
+        if(jobs.current.get(id)!==job)return;
+        stop(id);patch(id,{status:'success',output,error:'',elapsed:Math.round(performance.now()-started)});
+      }).catch(error=>{if(jobs.current.get(id)===job)fail(String(error));});
+      return;
+    }
     try {
       const worker = new Worker(new URL('./tool.worker.ts', import.meta.url), { type: 'module' });
       const timeout = setTimeout(() => fail('处理超时，任务已停止。请缩小输入或简化表达式后重试。'), task.toolId === 'regex' ? 3000 : 10_000);
@@ -206,7 +217,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
     };
     const currentJobs = jobs.current;
     window.addEventListener('keydown', handler, true);
-    return () => { window.removeEventListener('keydown', handler, true); currentJobs.forEach(job => { job.worker.terminate(); clearTimeout(job.timeout); }); currentJobs.clear(); };
+    return () => { window.removeEventListener('keydown', handler, true); currentJobs.forEach(job => { job.worker?.terminate(); clearTimeout(job.timeout); }); currentJobs.clear(); };
   }, []);
   useEffect(() => {
     const media = window.matchMedia('(max-width: 760px)');
@@ -269,7 +280,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={(id, text, options) => openTool(id, true, text, options)} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} homeVisit={homeVisit} onBrowse={() => navigate('home', false, 'library')} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>
-{tasks.map(task => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId]; return <div data-motion-page inert={page !== 'task' || task.id !== activeId} key={task.id} id={`task-${task.id}`} role="tabpanel" aria-labelledby={`tab-${task.id}`} hidden={page !== 'task' || task.id !== activeId} className={`workspace task-pane ${isColorTool(task.toolId) ? 'color-workspace-shell' : 'text-workspace-shell'}`}><div className="page-heading workspace-banner"><span className={`tool-icon page-icon category-${categoryMeta[tool.category].key}`}><Icon size={23} /></span><div className="page-title"><h1>{tool.name}</h1></div><button className="secondary-button" title="新建同类独立任务" onClick={() => openTool(task.toolId, true)}><CopyPlus size={14} /><span>新任务</span></button><button className={`icon-button ${favorites.includes(task.toolId) ? 'is-favorite' : ''}`} title="收藏工具" aria-label={`${favorites.includes(task.toolId) ? '取消收藏' : '收藏'}${tool.name}`} aria-pressed={favorites.includes(task.toolId)} onClick={() => toggleFavorite(task.toolId)}><Star size={17} fill={favorites.includes(task.toolId) ? 'currentColor' : 'none'} /></button></div>{isColorTool(task.toolId) ? <ColorWorkbench mode={task.toolId} primary={sharedColor} onPrimary={setSharedColor} favorites={colorFavorites} onFavorites={setColorFavorites} /> : task.toolId === 'geo-coordinates' ? <GeoWorkbench task={task} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} /> : ['qr-code', 'css-flex'].includes(task.toolId) ? <VisualWorkbench task={task} onEdit={values => edit(task.id, values)} onNotice={notice} /> : <ToolWorkspace onDebug={config => { setHttpInitial({ config, key: Date.now() }); navigate('http'); }} task={task} preferences={preferences} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} onSend={(toolId, text, options) => openTool(toolId, true, text, options)} />}</div>; })}
+{tasks.map(task => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId]; return <div data-motion-page inert={page !== 'task' || task.id !== activeId} key={task.id} id={`task-${task.id}`} role="tabpanel" aria-labelledby={`tab-${task.id}`} hidden={page !== 'task' || task.id !== activeId} className={`workspace task-pane ${isColorTool(task.toolId) ? 'color-workspace-shell' : 'text-workspace-shell'}`}><div className="page-heading workspace-banner"><span className={`tool-icon page-icon category-${categoryMeta[tool.category].key}`}><Icon size={23} /></span><div className="page-title"><h1>{tool.name}</h1></div><button className="secondary-button" title="新建同类独立任务" onClick={() => openTool(task.toolId, true)}><CopyPlus size={14} /><span>新任务</span></button><button className={`icon-button ${favorites.includes(task.toolId) ? 'is-favorite' : ''}`} title="收藏工具" aria-label={`${favorites.includes(task.toolId) ? '取消收藏' : '收藏'}${tool.name}`} aria-pressed={favorites.includes(task.toolId)} onClick={() => toggleFavorite(task.toolId)}><Star size={17} fill={favorites.includes(task.toolId) ? 'currentColor' : 'none'} /></button></div>{byAnalysis.get(task.toolId)?.ext === 'file' ? <FileWorkbench id={task.toolId}/> : isColorTool(task.toolId) ? <ColorWorkbench mode={task.toolId} primary={sharedColor} onPrimary={setSharedColor} favorites={colorFavorites} onFavorites={setColorFavorites} /> : task.toolId === 'geo-coordinates' ? <GeoWorkbench task={task} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} /> : ['qr-code', 'css-flex'].includes(task.toolId) ? <VisualWorkbench task={task} onEdit={values => edit(task.id, values)} onNotice={notice} /> : <ToolWorkspace onDebug={config => { setHttpInitial({ config, key: Date.now() }); navigate('http'); }} task={task} preferences={preferences} onEdit={values => edit(task.id, values)} onRun={() => run(task.id)} onCancel={() => cancel(task.id)} onNotice={notice} onSend={(toolId, text, options) => openTool(toolId, true, text, options)} />}</div>; })}
       </div>
       <footer className="app-statusbar">{runningTasks.length > 0 && <ActionPopover className="running-tasks" label="运行中的任务" above trigger={`运行中 · ${runningTasks.length}`}>{runningTasks.map(task => <button key={task.id} onClick={() => focusTask(task.id)}>{tools.find(tool => tool.id === task.toolId)?.name}</button>)}</ActionPopover>}<span><ShieldCheck size={12} />{page === 'task' && currentTool && !isColorTool(currentTool.id) ? '文本任务仅保留在内存，主动保存除外' : page === 'knowledge' ? '知识库文档保存到知识库，写作草稿保存在本机' : '本地开发工作台'}</span><span>{tasks.length} / {MAX_TASKS} 个任务 · DevKit {packageInfo.version}</span></footer>
     </main>

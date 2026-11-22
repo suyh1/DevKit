@@ -1,3 +1,4 @@
+import ContrastMatrix from './analysis/ContrastMatrix';
 import SegmentedControl from './SegmentedControl';
 import { copyText } from './motion-primitives';
 import { MotionButton, MotionText, MotionDrop, MotionReveal, useMotionList } from './Motion';
@@ -161,7 +162,7 @@ export default function ColorWorkbench({ mode, primary, onPrimary: setPrimary, f
     invalidFields.push(mode === 'color-contrast' ? '背景颜色' : '终点颜色');
   const primaryControls = <><ColorField label={mode === 'color-contrast' ? '文字颜色' : '主颜色'} value={primary} onChange={setPrimary} /><label className="color-range">透明度 <strong>{first.color ? Math.round(first.color.a * 100) : 100}%</strong><input aria-label="主颜色透明度" type="range" min="0" max="100" value={first.color ? Math.round(first.color.a * 100) : 100} disabled={!first.color} onChange={event => first.color && setPrimary(hexColor({ ...first.color, a: Number(event.target.value) / 100 }, true))} /></label></>;
 
-  return <div className="color-workbench">
+  return <div className="color-workbench">{mode==='color-contrast' && <ContrastMatrix colors={favorites}/>}
     <div className="color-workspace-grid">
       <section className="color-panel color-control-panel"><div className="color-panel-heading"><h2>{mode === 'color-contrast' ? '颜色组合' : '颜色控制'}</h2><button className="text-button" onClick={() => setPrimary(randomColor())}><Shuffle size={14} />随机色</button></div>{primaryControls}
         {(mode === 'color-contrast' || mode === 'color-mix' || mode === 'color-gradient') && <><div className="color-separator" /><ColorField label={mode === 'color-contrast' ? '背景颜色' : '终点颜色'} value={secondary} onChange={setSecondary} /><button className="color-secondary-button" onClick={() => { setPrimary(secondary); setSecondary(primary); }}><ArrowLeftRight size={14} />交换颜色</button></>}

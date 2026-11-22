@@ -8,10 +8,10 @@ export const practicalDefaults: Record<PracticalToolId, Options> = {
   'url-inspect': {}, password: { length: '24', count: '5', charset: 'all', ambiguous: 'exclude' },
 };
 export const practicalTools: { id: PracticalToolId; name: string; english: string; category: string; description: string; sample: string }[] = [
-  { id: 'yaml', name: 'JSON ↔ YAML', english: 'JSON / YAML Converter', category: '数据处理', description: '转换配置文件，保留大整数，检测重复键与不兼容的 YAML 值。', sample: 'name: DevKit\nport: 1420\noffline: true\nplatforms:\n  - Windows\n  - Linux\n' },
+  { id: 'yaml', name: 'JSON ↔ YAML', english: 'JSON / YAML Converter', category: '数据处理', description: '转换配置文件，保留大整数，检测重复键与不兼容的 YAML 值。也支持 YAML 与 TOML 转换和不兼容值检查。', sample: 'name: DevKit\nport: 1420\noffline: true\nplatforms:\n  - Windows\n  - Linux\n' },
   { id: 'csv-json', name: 'CSV 转 JSON', english: 'CSV to JSON', category: '数据处理', description: '导入 CSV / TSV，支持表头、引号内换行与可选类型推断。', sample: 'name,city,id,note\nAlice,上海,001,"hello, world"\nBob,北京,002,"多行备注\n第二行"' },
-  { id: 'sql', name: 'SQL 格式化', english: 'SQL Formatter', category: '数据处理', description: '整理 SQL 缩进与关键字大小写，支持常用数据库方言，仅格式化、不执行。', sample: "select u.id,u.name,count(o.id) as order_count from users u left join orders o on u.id=o.user_id where u.active=true and u.city='上海' group by u.id,u.name order by order_count desc;" },
-  { id: 'diff', name: '文本与 JSON 差异', english: 'Text / JSON Diff', category: '效率工具', description: '支持两侧独立导入文件、交换来源，逐行比较文本并导出补丁，或按 JSON 字段路径比较新增、删除、修改和数组移动；可忽略指定字段路径，保留数字原文，可按业务标识匹配对象数组。', sample: 'name: DevKit\nversion: 0.4.0\noffline: true\ntools: 20\n' },
+  { id: 'sql', name: 'SQL 格式化', english: 'SQL Formatter', category: '数据处理', description: '整理 SQL 缩进与关键字大小写，支持常用数据库方言，仅格式化、不执行。可按字段与方言从 CSV 或 JSON 生成批量 INSERT。', sample: "select u.id,u.name,count(o.id) as order_count from users u left join orders o on u.id=o.user_id where u.active=true and u.city='上海' group by u.id,u.name order by order_count desc;" },
+  { id: 'diff', name: '文本与 JSON 差异', english: 'Text / JSON Diff', category: '效率工具', description: '支持两侧独立导入文件、交换来源，逐行比较文本并导出补丁，或按 JSON 字段路径比较新增、删除、修改和数组移动；可忽略指定字段路径，保留数字原文，可按业务标识匹配对象数组。可用共同祖先合并两个版本，逐块选择冲突内容。', sample: 'name: DevKit\nversion: 0.4.0\noffline: true\ntools: 20\n' },
   { id: 'url-inspect', name: 'URL 解析', english: 'URL Inspector', category: '编码转换', description: '拆解地址、路径与查询参数，保留同名参数；全程不发起网络请求。', sample: 'https://example.com:8443/api/users?name=%E5%BC%A0%E4%B8%89&tag=java&tag=ts&empty=#details' },
   { id: 'password', name: '随机密码生成', english: 'Secure Password Generator', category: '效率工具', description: '使用系统安全随机数批量生成密码，支持字符集、长度与排除易混淆字符。', sample: '' },
 ];
@@ -52,12 +52,12 @@ async function convertYaml(input: string, options: Options): Promise<string> {
   return options.mode === 'json-yaml' ? stringify(value, { lineWidth: 0, aliasDuplicateObjects: false }) : json;
 }
 
-export function parseCsv(input: string, delimiter: string): string[][] {
+export function parseCsv(input: string, delimiter: string, preserveBlankRecords = false, maxRows = 100_000): string[][] {
   const text = input.replace(/^\uFEFF/, '');
   if (!text) throw new Error('请输入 CSV 或 TSV 内容。');
   const rows: string[][] = []; let row: string[] = [], field = '', state: 'plain' | 'quoted' | 'closed' = 'plain', started = false;
   const cell = () => { row.push(field); field = ''; state = 'plain'; };
-  const line = () => { cell(); rows.push(row); row = []; started = false; if (rows.length > 100_000) throw new Error('最多支持 100,000 行，请缩小输入。'); };
+  const line = () => { cell(); rows.push(row); row = []; started = false; if (rows.length > maxRows) throw new Error('最多支持 '+maxRows.toLocaleString('en-US')+' 行，请缩小输入。'); };
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     if (state === 'quoted') {
@@ -66,7 +66,7 @@ export function parseCsv(input: string, delimiter: string): string[][] {
       continue;
     }
     if (char === delimiter) { cell(); started = true; }
-    else if (char === '\n' || char === '\r') { if (char === '\r' && text[i + 1] === '\n') i++; if (started || field || row.length) line(); }
+    else if (char === '\n' || char === '\r') { if (char === '\r' && text[i + 1] === '\n') i++; if (started || field || row.length || preserveBlankRecords) line(); }
     else if (char === '"' && !field && state === 'plain') { state = 'quoted'; started = true; }
     else { if (state === 'closed' || char === '"') throw new Error(`CSV 第 ${rows.length + 1} 条记录的引号格式不正确。`); field += char; started = true; }
   }

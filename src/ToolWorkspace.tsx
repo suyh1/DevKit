@@ -17,6 +17,14 @@ import ToolInput from './ToolInput';
 import HttpRequestInput from './HttpRequestInput';
 import ToolResult from './ToolResult';
 import { tools } from './tools';
+import { byAnalysis } from './analysis/catalog';
+import UpgradePanel, {Base64Files} from './analysis/UpgradePanel';
+import RegexCases from './analysis/Cases';
+import FileWorkbench from './analysis/FileWorkbench';
+import {largeReports} from './analysis/large-reports';
+import TableFields from './analysis/TableFields';
+import VisualResults from './analysis/VisualResults';
+import AnalysisTable from './analysis/AnalysisTable';
 import type { Options, ToolId } from './tools';
 import type { Preferences, Task } from './workbench';
 import { changeToolOption } from './workbench';
@@ -44,18 +52,21 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   const inputFile = useRef<HTMLInputElement>(null), split = useRef<HTMLDivElement>(null);
   const rightFile = useRef<HTMLInputElement>(null);
   const secondKey = active === 'json-schema' ? 'schema' : 'target';
-  const secondLabel = active === 'json-schema' ? 'JSON Schema' : active === 'env' ? '右侧配置' : '修改后文本';
+  const analysis = byAnalysis.get(active);
+  const compareFiles = active === 'diff' || !!analysis?.second;
+  const tableOutput = analysis?.ext === 'csv' || (analysis?.ext === 'auto' && !/^\s*[[{]/.test(task.output));
+  const secondLabel = analysis?.second || ( active === 'json-schema' ? 'JSON Schema' : active === 'env' ? '右侧配置' : '修改后文本');
   const presentation = developerPresentation(active, task.options);
   const inputLanguage: EditorLanguage = presentation?.input ?? (active === 'yaml' ? task.options.mode === 'json-yaml' ? 'json' : 'yaml' : active === 'sql' ? 'sql' : ['json', 'json-code', 'json-csv'].includes(active) ? 'json' : 'text');
   const outputLanguage: EditorLanguage = presentation?.output ?? (active === 'yaml' ? task.options.mode === 'json-yaml' ? 'yaml' : 'json' : active === 'sql' ? 'sql' : active === 'diff' ? 'diff' : ['json', 'jwt', 'regex', 'csv-json', 'url-inspect'].includes(active) ? 'json' : 'text');
-  const canPreview = (presentation?.preview ?? previewTools.includes(active)) && !(active === 'yaml' && outputLanguage === 'yaml') && !!task.output;
+  const canPreview = (tableOutput || (presentation?.preview ?? previewTools.includes(active))) && !(active === 'yaml' && outputLanguage === 'yaml') && !!task.output;
   const currentResult = task.status === 'success';
   const showPreview = preview && canPreview && currentResult;
   const wrapping = wrap ?? preferences.wrap, arrangement = layout ?? preferences.layout;
   useEffect(() => { if (task.status === 'success') setDocumentTab('output'); }, [task.status]);
   let jsonOutput = outputLanguage === 'json' && currentResult;
   if (task.output && task.output.length <= 300_000) { try { JSON.parse(task.output); jsonOutput = true; } catch { /* Plain text routing. */ } }
-  const destinations = tools.filter(item => ['base64', 'url', 'html', 'hash', 'text', 'text-stats', 'xml', 'gzip', 'regex', 'diff', 'unicode', 'code-format', 'type-json', ...(active === 'json-csv' ? ['csv-json', 'markdown-table'] : []), ...(active === 'markdown-table' && task.options.mode === 'delimited' ? ['csv-json'] : []), ...(jsonOutput ? ['json', 'json-code', 'json-csv', 'yaml', 'json-path', 'json-schema', ...(task.output.trimStart().startsWith('[') ? ['json-lines'] : [])] : [])].includes(item.id));
+  const destinations = tools.filter(item => ['base64', 'url', 'html', 'hash', 'text', 'text-stats', 'xml', 'gzip', 'regex', 'diff', 'unicode', 'code-format', 'type-json', ...(active === 'mybatis-sql' ? ['sql'] : []), ...(active === 'json-csv' ? ['csv-json', 'markdown-table'] : []), ...(active === 'markdown-table' && task.options.mode === 'delimited' ? ['csv-json'] : []), ...(jsonOutput ? ['json', 'json-code', 'json-csv', 'yaml', 'json-path', 'json-schema', ...(task.output.trimStart().startsWith('[') ? ['json-lines'] : [])] : [])].includes(item.id));
   const selectedDestination = destinations.some(item => item.id === destination) ? destination : 'base64';
 
   async function copy(text: string) {
@@ -84,7 +95,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     if (!generated) void load(file, right);
   }
   async function download() {
-    const extension = presentation?.extension ?? (active === 'json-csv' ? task.options.delimiter === 'tab' ? 'tsv' : 'csv' : outputLanguage === 'typescript' ? 'ts' : outputLanguage === 'diff' ? 'patch' : outputLanguage === 'text' ? 'txt' : outputLanguage);
+    const extension = (active==='tokens'&&task.options.format==='json'?'json':undefined) ?? (analysis?.ext === 'auto' ? tableOutput ? 'csv' : 'json' : analysis?.ext) ?? presentation?.extension ?? (active === 'json-csv' ? task.options.delimiter === 'tab' ? 'tsv' : 'csv' : outputLanguage === 'typescript' ? 'ts' : outputLanguage === 'diff' ? 'patch' : outputLanguage === 'text' ? 'txt' : outputLanguage);
     const root = /^[A-Za-z_$][A-Za-z\d_$]*$/.test(task.options.rootName || '') ? task.options.rootName : 'Root';
     try { await saveText(task.output, `${active === 'json-code' ? root : `devkit-${active}`}.${extension}`, onNotice); }
     catch (error) { onNotice(`保存失败：${String(error)}`, 'error'); }
@@ -109,7 +120,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   const outputHidden = focus === "input" || workflow === "format" && !focus && documentTab === "input";
   const inputPanel = <section aria-busy={fileBusy || busy} data-mode-hidden={inputHidden} inert={inputHidden} className={`editor-card input-card ${dragging ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); if (!busy && !fileBusy && !generated) setDragging(true); }} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDropCapture={event => dropFile(event)}>
     <MotionDrop active={dragging} /><div className="editor-title"><div className="editor-label"><span className="panel-dot" /><strong key={swaps} className={swaps ? "swap-left" : undefined}>{experience.input}</strong>{!compact && !generated && <small>{inputLanguage.toUpperCase()}</small>}</div><div className="editor-actions">{inputActions}{maximize('input')}</div></div>
-    <input ref={inputFile} type="file" hidden aria-label="选择输入文件" accept=".json,.jsonl,.ndjson,.yaml,.yml,.csv,.tsv,.sql,.txt,.log,.xml,.md,.js,.ts,.java,.css,.html,.patch,.env,.properties,.scss,.jsx,.tsx,.sh" onChange={event => { void load(event.target.files?.[0]); event.target.value = ''; }} />
+    <input ref={inputFile} type="file" hidden aria-label="选择输入文件" accept={analysis ? undefined : ".json,.jsonl,.ndjson,.yaml,.yml,.csv,.tsv,.sql,.txt,.log,.xml,.md,.js,.ts,.java,.css,.html,.patch,.env,.properties,.scss,.jsx,.tsx,.sh"} onChange={event => { void load(event.target.files?.[0]); event.target.value = ''; }} />
     {generated ? <div className="generator-config"><span className="result-kicker">{active === 'password' ? 'SECURE PASSWORD' : active.toUpperCase()}</span><h2>{active === 'password' ? '按需构造随机密码' : '批量生成唯一标识'}</h2>{options}{active !== 'password' && <label>生成数量<input aria-label={`${active.toUpperCase()} 生成数量`} type="number" min="1" max="1000" disabled={busy} value={task.input} onChange={event => editInput(event.target.value)} /><small>每次 1–1,000 个</small></label>}{run}<small>{active === 'ulid' ? 'ULID 含可见时间，不用于密码或令牌。' : '使用系统安全随机源，生成结果默认不落盘。'}</small></div> : <>
       {task.fileName && <FileMeta name={task.fileName} encoding={task.encoding || '文本'} />}
       {compact ? <div className="compact-form" onKeyDown={event => { if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !event.nativeEvent.isComposing && event.target instanceof HTMLInputElement && event.target.type !== 'checkbox' && !busy && !fileBusy) { event.preventDefault(); onRun(); } }}><div className="compact-options">{options}</div><ToolInput id={active} value={task.input} options={task.options} label={experience.input} placeholder={experience.placeholder} disabled={busy || fileBusy} onChange={editInput} /><div className="compact-run">{run}</div></div> : active === 'http-code' ? <HttpRequestInput value={task.input} disabled={busy || fileBusy} onChange={editInput} {...editorProps} /> : <div className="editor-body"><CodeEditor label={active === 'diff' ? '原始文本' : '输入内容'} language={inputLanguage} value={task.input} onChange={editInput} readOnly={busy || fileBusy} {...editorProps} placeholder="粘贴内容，或拖入本地文本文件…" /></div>}
@@ -121,7 +132,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     {active === 'json-schema' && task.options.mode !== 'validate' && currentResult && <button className="secondary-button" onClick={() => onEdit({ options: { ...task.options, mode: 'validate', schema: task.output } })}>用此 Schema 校验样本</button>}
     {(task.output || currentResult) && <div className="result-routing"><span><Send size={14} />发送到其他工具</span><select aria-label="结果发送目标" value={selectedDestination} onChange={event => setDestination(event.target.value as ToolId)}>{destinations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary-button" disabled={!currentResult || task.output.length > 2_000_000} onClick={() => onSend(selectedDestination, task.output, resultInputOptions(active, task.options, selectedDestination, outputLanguage))}>在新任务中打开<ArrowRight size={13} /></button>{!currentResult && <small>请重新处理后使用结果</small>}</div>}
     {active === 'regex' && task.options.mode === 'replace' && currentResult && <p className="preview-note">{task.matchCount} 个匹配</p>}
-    <ResultSelection onCopy={copy}><div className="raw-result motion-mode" inert={showPreview} hidden={showPreview}><CodeEditor label="处理结果" language={outputLanguage} value={task.output} readOnly {...editorProps} /></div>{showPreview && <div className="result-preview"><ToolResult id={active} text={task.output} source={task.input} options={task.options} expected={expected} onExpected={setExpected} onCopy={text => void copy(text)} /></div>}{!task.output && <div className="empty-state"><TerminalSquare size={30} strokeWidth={1.4} /><strong>{busy ? '正在你的设备上处理' : currentResult ? '处理完成，结果为空' : experience.output}</strong><p>{busy ? '可切换任务继续工作，也可以取消。' : currentResult ? '输出为 0 字符，可复制或导出空文本。' : generated ? '设置左侧参数后生成，可逐项复制结果。' : experience.hint}</p></div>}</ResultSelection>
+    <ResultSelection onCopy={copy}><div className="raw-result motion-mode" inert={showPreview} hidden={showPreview}><CodeEditor label="处理结果" language={outputLanguage} value={task.output} readOnly {...editorProps} /></div>{showPreview && <div className="result-preview">{tableOutput ? <AnalysisTable text={task.output} /> : <ToolResult id={active} text={task.output} source={task.input} options={task.options} expected={expected} onExpected={setExpected} onCopy={text => void copy(text)} />}</div>}{!task.output && <div className="empty-state"><TerminalSquare size={30} strokeWidth={1.4} /><strong>{busy ? '正在你的设备上处理' : currentResult ? '处理完成，结果为空' : experience.output}</strong><p>{busy ? '可切换任务继续工作，也可以取消。' : currentResult ? '输出为 0 字符，可复制或导出空文本。' : generated ? '设置左侧参数后生成，可逐项复制结果。' : experience.hint}</p></div>}</ResultSelection>
     {currentResult && workflow === 'codec' && <div className="conversion-summary"><span>输入 {task.input.length.toLocaleString()} 字符</span><ArrowRight size={13} /><span>输出 {task.output.length.toLocaleString()} 字符</span><small>差值 {task.output.length - task.input.length >= 0 ? '+' : ''}{(task.output.length - task.input.length).toLocaleString()}</small></div>}
     <div className="editor-footer"><span>{task.output.length.toLocaleString()} 字符 · {outputLanguage.toUpperCase()}</span>{currentResult ? <span className="success-text"><Check size={12} />当前结果</span> : task.output && <span className="previous-result">上次结果</span>}</div>
   </section>;
@@ -129,6 +140,9 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     {active === 'hash' && <FileChecksums />}
     <p className="workflow-intro">{experience.hint}</p>
     {!generated && !compact && <div className="toolbar">{options}{run}</div>}
+    {largeReports.has(active) && <details><summary>直接分析大文件（单文件最多 128 MiB）</summary><FileWorkbench id={active} preset={task.options}/></details>}
+    {analysis && <TableFields id={active} input={task.input} options={task.options} onChange={(key,value)=>onEdit({options:{...task.options,[key]:value}})}/>}
+    {analysis && (active==='css-grid'||currentResult) && <VisualResults id={active} input={task.input} output={currentResult?task.output:''} options={task.options} onOption={(key,value)=>onEdit({options:{...task.options,[key]:value}})}/>}
     <div className="workbench-controls"><span className={`task-status status-${task.status}`} role="status"><span />{statusLabels[task.status]}{task.elapsed !== null && ` · ${task.elapsed || '<1'} ms`}</span><div>{!compact && !generated && <button className="text-button" onClick={() => setWrap(!wrapping)} aria-pressed={wrapping}><WrapText size={14} />换行</button>}{adjustable && <button className="text-button" onClick={() => setLayout(arrangement === 'split' ? 'stack' : 'split')} aria-label="切换编辑区布局">{arrangement === 'split' ? <Rows2 size={14} /> : <Columns2 size={14} />}{arrangement === 'split' ? '上下布局' : '左右布局'}</button>}</div></div>
     <MotionPresence kind="panel" present={!!(task.status === 'stale' && task.output)}>{task.status === 'stale' && task.output && <div className="stale-banner">输入或配置已变化。此处保留上次结果，重新处理后更新。</div>}</MotionPresence>
     <MotionPresence kind="panel" present={!!(task.error)}>{task.error && <div className="task-error" role="alert"><AlertCircle size={17} /><div><strong>本次处理失败</strong><p>{task.error}</p></div><button className="text-button" onClick={onRun}>重试</button></div>}</MotionPresence>
@@ -137,10 +151,10 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     <div className={`editors experience-layout ${adjustable ? `editors-${arrangement}` : ''}`} data-focus={focus || undefined} data-document={documentTab} ref={split} style={{ '--split': `${ratio}%` } as CSSProperties}>
       {inputPanel}
       {workflow === 'compare' && <section className="editor-card target-card"
-        onDragOver={e => { if (active === 'diff') e.preventDefault(); }}
-        onDropCapture={e => { if (active === 'diff') dropFile(e, true); }}>
+        onDragOver={e => { if (compareFiles) e.preventDefault(); }}
+        onDropCapture={e => { if (compareFiles) dropFile(e, true); }}>
         <div className="editor-title"><strong key={swaps} className={swaps ? 'swap-right' : undefined}>{secondLabel}</strong><div className="editor-actions">
-          {active === 'diff' && <>
+          {compareFiles && <>
             <input type="file" hidden ref={rightFile} aria-label="选择右侧文件" onChange={e => { void load(e.target.files?.[0], true); e.target.value = ''; }} />
             <button className="icon-button" disabled={busy || fileBusy} aria-label="导入右侧文件" title="导入右侧文件" onClick={() => rightFile.current?.click()}><Upload size={14} /></button>
             <button className="text-button" disabled={busy || fileBusy} onClick={() => {
@@ -149,10 +163,10 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
                 options: { ...task.options, target: task.input, targetFileName: task.fileName ?? '', targetEncoding: task.encoding ?? '' } });
             }}><ArrowLeftRight size={14} />交换两份文本</button></>}
           <button className="icon-button" aria-label={'清空' + secondLabel} disabled={busy || fileBusy} onClick={() => {
-            setUndo(task); onEdit({ options: { ...task.options, [secondKey]: '', ...(active === 'diff' ? { targetFileName: '', targetEncoding: '' } : {}) } });
+            setUndo(task); onEdit({ options: { ...task.options, [secondKey]: '', ...(compareFiles ? { targetFileName: '', targetEncoding: '' } : {}) } });
           }}><Trash2 size={14} /></button>
         </div></div>
-        {active === 'diff' && task.options.targetFileName && <FileMeta name={task.options.targetFileName} encoding={task.options.targetEncoding || '文本'} />}
+        {compareFiles && task.options.targetFileName && <FileMeta name={task.options.targetFileName} encoding={task.options.targetEncoding || '文本'} />}
         <div className="editor-body"><CodeEditor label={secondLabel} language={active === 'json-schema' || task.options.mode === 'json' ? 'json' : 'text'}
           value={task.options[secondKey] || ''} onChange={value => onEdit({ options: { ...task.options, [secondKey]: value } })} readOnly={busy || fileBusy} {...editorProps} /></div>
         <div className="editor-footer">{(task.options[secondKey] || '').length.toLocaleString()} 字符</div>
@@ -160,6 +174,8 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
       {adjustable && <div className="split-handle" role="separator" aria-label="调整输入与结果宽度" aria-orientation="vertical" aria-valuemin={25} aria-valuemax={75} aria-valuenow={ratio} tabIndex={0} onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setRatio(value => Math.max(25, Math.min(75, value + (event.key === 'ArrowLeft' ? -2 : 2)))); } }} onDoubleClick={() => setRatio(50)} onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); if (split.current) split.current.dataset.resizing = "true"; }} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId) || !split.current) return; const rect = split.current.getBoundingClientRect(); setRatio(Math.max(25, Math.min(75, (event.clientX - rect.left) / rect.width * 100))); }} onPointerUp={event => event.currentTarget.releasePointerCapture(event.pointerId)} onLostPointerCapture={() => { if (split.current) delete split.current.dataset.resizing; }}><span /></div>}
       {outputPanel}
     </div>
+    {active==='regex'&&<RegexCases options={task.options}/>}
+    <UpgradePanel id={active} current={task.input}/>{active==='base64'&&<Base64Files/>}
     <ToolRecipes input={task.input} />
     <MotionDetails className="tool-help"><summary>使用提示与边界</summary><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></MotionDetails>
   </div>;

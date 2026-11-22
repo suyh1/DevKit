@@ -100,7 +100,7 @@ module.exports = async function designSmoke(window, output) {
   })()`);
   assert.equal(await js('document.querySelector(".home-launch").inert'), true);
   assert.equal(await js('document.querySelector(".home-catalog .category-filters, .home-catalog .library-scope")'), null);
-  assert.equal(await js('document.querySelectorAll(".tool-card").length'), 51);
+  assert.equal(await js('document.querySelectorAll(".tool-card").length'), 95);
   const firstCard = await js(`(() => {
     const rect = document.querySelector('.home-catalog .tool-card').getBoundingClientRect();
     return { x: Math.round(rect.left + rect.width * .7), y: Math.round(rect.top + rect.height * .35) };

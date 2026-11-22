@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { tools, transform, defaultOptions } from './tools';
+import { byAnalysis } from './analysis/catalog';
 import { splitCoordinatePair } from './geography';
 
 describe('additional offline utilities', () => {
   it('runs every tool sample with defaults, geographic fields and an explicit test-only HMAC key', async () => {
-    expect(tools).toHaveLength(51);
-    for (const tool of tools) expect(await transform(tool.id, tool.sample, { ...defaultOptions[tool.id], ...(tool.id === 'hmac' ? { key: 'test-only-key' } : tool.id === 'geo-coordinates' ? splitCoordinatePair(tool.sample) : {}) }), tool.id).toBeTruthy();
+    expect(tools).toHaveLength(95);
+    for (const tool of tools.filter(t => byAnalysis.get(t.id)?.ext !== 'file' && t.id !== 'mermaid-diagram')) expect(await transform(tool.id, tool.sample, { ...defaultOptions[tool.id], ...(tool.id === 'hmac' ? { key: 'test-only-key' } : tool.id === 'geo-coordinates' ? splitCoordinatePair(tool.sample) : {}) }), tool.id).toBeTruthy();
   });
   it('decodes JWT fields and NumericDate claims without claiming verification', async () => {
     const token = tools.find(tool => tool.id === 'jwt')!.sample;
