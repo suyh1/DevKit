@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 const entriesPerPage = 100;
 const scrollbars = readFileSync(new URL('../shared/scrollbars.css', import.meta.url), 'utf8');
 const focusStyles = readFileSync(new URL('../shared/focus.css', import.meta.url), 'utf8');
+const textControls = readFileSync(new URL('../shared/text-controls.css', import.meta.url), 'utf8');
 const maxArchiveEntries = 25_000;
 const maxDepth = 64;
 const collator = new Intl.Collator('zh-CN', { numeric: true });
@@ -129,6 +130,7 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
     --accent: var(--link);
     --accent-ink: light-dark(#fff, #171d30);
     --wash: light-dark(#f0f2f5, #22252a);
+    --text: var(--ink); --subtle: var(--muted); --soft: var(--wash);
   }
   ${scrollbars}
   * { box-sizing: border-box; }
@@ -159,6 +161,7 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
   form { display: flex; gap: 8px; min-width: 0; }
   input, button, .primary { min-height: 32px; font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
   input { min-width: 0; width: 176px; }
+  ${textControls}
   .primary { display: inline-flex; align-items: center; background: var(--link); color: var(--accent-ink); border-color: var(--link); text-decoration: none; }
   button { white-space: nowrap; }
   button, .primary { cursor: pointer; }
@@ -181,7 +184,7 @@ function page(share, base, relative, rows, { name, parent, archive, query = '', 
 </header>
 <section>
   <header class="tools"><h2>${name ? '文件与文件夹' : '共享内容'} <small>${total} 项</small></h2>
-    ${name ? `<form action="${escape(base + relative)}"><input name="q" type="search" maxlength="160" aria-label="筛选当前文件夹" placeholder="筛选文件名" value="${escape(query)}"><button>筛选</button></form>` : ''}
+    ${name ? `<form action="${escape(base + relative)}"><input class="text-control" name="q" type="search" maxlength="160" aria-label="筛选当前文件夹" placeholder="筛选文件名" value="${escape(query)}"><button>筛选</button></form>` : ''}
   </header>
   ${listItems ? `<ul>${listItems}</ul>` : query && hasEntries ? `<p class="empty">没有与“${escape(query)}”匹配的文件或文件夹。 <a href="${escape(base + relative)}">清除筛选</a></p>` : '<p class="empty">没有可显示的文件。</p>'}
 </section>

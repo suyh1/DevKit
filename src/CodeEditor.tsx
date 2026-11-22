@@ -1,8 +1,9 @@
+import { TextArea } from './TextControl';
 import { Component, lazy, Suspense, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Skeleton from './Skeleton';
 
-export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'sql' | 'nginx' | 'markdown' | 'diff' | 'text';
+export type EditorLanguage = 'json' | 'javascript' | 'typescript' | 'html' | 'xml' | 'java' | 'css' | 'yaml' | 'toml' | 'shell' | 'sql' | 'nginx' | 'markdown' | 'diff' | 'text';
 export type CodeEditorProps = { onReady?: (view: import('@codemirror/view').EditorView | null) => void; value: string; onChange?: (value: string) => void; label: string; language?: EditorLanguage; readOnly?: boolean; wrap?: boolean; placeholder?: string; tabSize?: number };
 const Editor = lazy(() => import('./CodeEditorView'));
 class EditorRecovery extends Component<{ children: ReactNode; editor: CodeEditorProps }, { failed: boolean }> {
@@ -11,7 +12,7 @@ class EditorRecovery extends Component<{ children: ReactNode; editor: CodeEditor
   render() {
     if (!this.state.failed) return this.props.children;
     const { editor } = this.props;
-    return <div className="editor-recovery"><p role="status">代码编辑器加载失败，已切换为纯文本模式。</p><textarea aria-label={editor.label} value={editor.value} readOnly={editor.readOnly} onChange={event => editor.onChange?.(event.target.value)} spellCheck={false} /></div>;
+    return <div className="editor-recovery"><p role="status">代码编辑器加载失败，已切换为纯文本模式。</p><TextArea embedded aria-label={editor.label} value={editor.value} readOnly={editor.readOnly} onChange={event => editor.onChange?.(event.target.value)} spellCheck={false} /></div>;
   }
 }
 function EditorPlaceholder({ show, onShow }: { show: boolean; onShow: (show: boolean) => void }) {

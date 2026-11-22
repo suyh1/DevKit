@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useState } from 'react';
 import { collab, useOperation } from './collab-api';
 import { copyText } from './motion-primitives';
@@ -58,7 +59,7 @@ export function TransferLinkSettings() {
           >
             <label>
               监听端口
-              <input
+              <TextInput
                 value={ports}
                 disabled={!links || op.busy}
                 onChange={(event) => setPorts(event.target.value)}

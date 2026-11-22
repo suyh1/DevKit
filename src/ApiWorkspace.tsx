@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
 import { canWriteWorkspace, remoteAccess } from './workspace-remote';
@@ -446,7 +447,7 @@ export default function ApiWorkspace({
                 </div>
                 <label className="api-search">
                   <Search size={14} />
-                  <input
+                  <TextInput
                     aria-label="搜索API接口"
                     placeholder="搜索名称、方法、路径或目录"
                     value={search}

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { useId, useMemo, useState } from 'react';
 import { CalendarDays, GitBranch, Layers, LayoutList, Link2, ListChecks, Play, Repeat2 } from 'lucide-react';
@@ -65,7 +66,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
   const fields = draft?.fields;
   const label = actions.find(([name]) => name === action)?.[1];
   const input = (name: string, placeholder: string, required = true) => fields && <label className="pc-field">{name}
-    <input required={required} maxLength={240} placeholder={placeholder} value={fields.primary} onChange={event => update({ primary: event.target.value })} />
+    <TextInput required={required} maxLength={240} placeholder={placeholder} value={fields.primary} onChange={event => update({ primary: event.target.value })} />
   </label>;
 
   const inTask = editable.some(({ task }) => task.line <= line && task.endLine >= line);
@@ -103,7 +104,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
         {action === 'defaults' && input('默认标签', '用空格分隔，例如 验收 运维')}
         {action === 'view' && <>
           {input('视图名称', '例如 待验收')}
-          <label className="pc-field">标签<input maxLength={80} value={fields.secondary} placeholder="例如 验收" onChange={event => update({ secondary: event.target.value })} /></label>
+          <label className="pc-field">标签<TextInput maxLength={80} value={fields.secondary} placeholder="例如 验收" onChange={event => update({ secondary: event.target.value })} /></label>
           <label className="pc-field">任务状态<select value={fields.option} onChange={event => update({ option: event.target.value })}>
             <option value="">全部状态</option>{todoViewStates.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
           </select></label>
@@ -122,7 +123,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
           </select></label>}
           {input('引用名称或 ID', fields.option === '共享' ? '例如 发布材料' : '例如 JSON 格式化')}
         </>}
-        {action === 'wait' && <label className="pc-field">等待对象<input maxLength={240} list={peopleList} value={fields.primary} onChange={e => update({ primary: e.target.value })} /><datalist id={peopleList}>{[...new Set(tasks.map(({task}) => task.waiting?.person).filter(Boolean))].map(person => <option key={person} value={person} />)}</datalist></label>}
+        {action === 'wait' && <label className="pc-field">等待对象<TextInput maxLength={240} list={peopleList} value={fields.primary} onChange={e => update({ primary: e.target.value })} /><datalist id={peopleList}>{[...new Set(tasks.map(({task}) => task.waiting?.person).filter(Boolean))].map(person => <option key={person} value={person} />)}</datalist></label>}
         {action === 'repeat' && <label className="pc-field">重复周期<select required value={fields.option} onChange={event => update({ option: event.target.value })}>
           <option value="">选择周期</option>{todoRepeatRules.map(rule => <option key={rule} value={rule}>{rule}</option>)}
         </select></label>}

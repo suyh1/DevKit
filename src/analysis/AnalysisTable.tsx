@@ -1,3 +1,4 @@
+import { TextInput } from '../TextControl';
 import { Fragment, useId, useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import ResultPager from '../ResultPager';
@@ -32,7 +33,7 @@ export function ResultTable({ records, columnLimit }: { records: string[][]; col
       <div className="analysis-table-tools">
         <label className="analysis-table-search">
           <Search size={15} aria-hidden="true" />
-          <input
+          <TextInput embedded
             type="search"
             aria-label="筛选结果"
             placeholder="筛选结果"

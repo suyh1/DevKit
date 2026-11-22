@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from './TextControl';
 import { permissionValue } from './tool-experience';
 import type { Options, ToolId } from './tools';
 
@@ -7,7 +8,7 @@ export default function ToolInput({ id, value, label, placeholder, disabled, onC
   const changeBit = (bit: number) => onChange(((permissions ?? 0) ^ bit).toString(8).padStart(4, '0'));
   const multiline = ['jwt', 'ulid', 'css-unit'].includes(id);
   return <div className={`focused-input input-${id}`}>
-    <label><span>{label}</span>{multiline ? <textarea aria-label="输入内容" value={value} onChange={event => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} spellCheck={false} rows={id === 'jwt' ? 4 : 3} /> : <input aria-label="输入内容" value={value} onChange={event => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} spellCheck={false} />}</label>
+    <label><span>{label}</span>{multiline ? <TextArea aria-label="输入内容" value={value} onChange={event => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} spellCheck={false} rows={id === 'jwt' ? 4 : 3} /> : <TextInput aria-label="输入内容" value={value} onChange={event => onChange(event.target.value)} disabled={disabled} placeholder={placeholder} spellCheck={false} />}</label>
     {id === 'timestamp' && <button className="secondary-button" disabled={disabled} onClick={() => onChange(new Date().toISOString())}>填入当前时间</button>}
     {id === 'cron' && <><div className="cron-fields">{['分', '时', '日', '月', '周'].map((name, index) => <div key={name}><code>{value.trim().split(/\s+/)[index] || '—'}</code><span>{name}</span></div>)}</div><div className="input-presets">{[['每 15 分钟', '*/15 * * * *'], ['每天 9 点', '0 9 * * *'], ['工作日 9 点', '0 9 * * 1-5']].map(([name, expression]) => <button className="secondary-button" key={name} disabled={disabled} onClick={() => onChange(expression)}>{name}</button>)}</div></>}
     {id === 'ipv4' && <div className="input-presets">{['192.168.1.42/24', '10.0.0.1/16', '192.168.1.0/31'].map(cidr => <button className="secondary-button" disabled={disabled} key={cidr} onClick={() => onChange(cidr)}>{cidr}</button>)}</div>}

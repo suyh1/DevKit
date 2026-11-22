@@ -1,3 +1,4 @@
+import { TextArea } from './TextControl';
 import { useRef, useState } from 'react';
 import { ArrowRight, ClipboardPaste, ScanLine } from 'lucide-react';
 import { MotionButton } from './Motion';
@@ -50,7 +51,7 @@ export default function SmartOpen({ onOpen }: { onOpen: (id: ToolId, text: strin
 
   return <section className="smart-open" aria-label="内容识别">
     <div className="smart-open-input">
-        <textarea ref={editor} aria-label="待识别内容" rows={3} maxLength={DETECTION_LIMIT} value={input}
+        <TextArea ref={editor} aria-label="待识别内容" rows={3} maxLength={DETECTION_LIMIT} value={input}
           placeholder="例如 JSON、URL 或时间戳…" spellCheck={false}
           onPaste={event => {
             const { selectionStart, selectionEnd, value } = event.currentTarget;

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { serviceLocation } from './jar-api';
 import { useState, useSyncExternalStore } from 'react';
 import { Link2 } from 'lucide-react';
@@ -65,7 +66,7 @@ export function ResourceLink({ page, id, compact = false }: { page: WorkspacePag
 
 function CopyResourceLink({ href, compact }: { href: string; compact: boolean }) {
   const [status, setStatus] = useState('');
-  const field = <input readOnly value={href} aria-label="资源链接" onFocus={event => event.target.select()} />;
+  const field = <TextInput readOnly value={href} aria-label="资源链接" onFocus={event => event.target.select()} />;
   const copy = () => void copyText(href).then(() => setStatus('链接已复制'), () => setStatus('复制链接失败'));
   const button = <button type="button" className="text-button" title={status || '复制资源链接'} aria-label={status || '复制资源链接'} onClick={copy}>
     <Link2 size={14} /><span aria-live="polite">{status || '复制链接'}</span></button>;

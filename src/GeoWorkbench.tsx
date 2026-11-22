@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import UpgradePanel from './analysis/UpgradePanel';
 import { copyText } from './motion-primitives';
@@ -42,7 +43,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
     try { const { text, encoding } = await readText(source); if (text.length > 300_000) throw new Error('文本提取最多支持 300,000 字符。'); setUndo(task); onEdit({ input: text, fileName: source.name, encoding }); }
     catch (error) { onNotice((error as Error).message, 'error'); }
   }
-  const field = (key: string, label: string, placeholder?: string) => <label className="geo-field"><span>{label}</span><input aria-label={label} value={o[key]} placeholder={placeholder} disabled={busy} autoComplete="off" spellCheck={false} onChange={e => update({ [key]: e.target.value })} /></label>;
+  const field = (key: string, label: string, placeholder?: string) => <label className="geo-field"><span>{label}</span><TextInput aria-label={label} value={o[key]} placeholder={placeholder} disabled={busy} autoComplete="off" spellCheck={false} onChange={e => update({ [key]: e.target.value })} /></label>;
   const select = (key: string, label: string, choices: [string, string][]) => ['unit', 'inputOrder', 'representation', 'order', 'headers', 'delimiter', 'style'].includes(key)
     ? <div className="geo-field"><span>{label}</span><SegmentedControl label={label} value={o[key]} disabled={busy}
         options={choices.map(([value, title]) => ({ value, label: title }))} onChange={value => update({ [key]: value })} /></div>
@@ -65,13 +66,13 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
     <section className="geo-panel" aria-label="坐标输入">
       {mode !== 'extract' ? <>
         <div className="geo-input-grid">{field(mode === 'circle' ? 'centerLon' : 'lon', mode === 'circle' ? '圆心经度' : '经度', '116.3913 或 116°23′28.68″E')}{field(mode === 'circle' ? 'centerLat' : 'lat', mode === 'circle' ? '圆心纬度' : '纬度', '39.9075 或 39°54′27″N')}</div>
-        <div className="geo-paste-pair"><label className="geo-field"><span>粘贴坐标对（仅拆分，保留原文格式）</span><input aria-label="粘贴坐标对" value={pairInput} disabled={busy} onChange={e => setPairInput(e.target.value)} placeholder="116.3913, 39.9075" /></label><button className="secondary-button" disabled={busy || !pairInput.trim()} onClick={() => { try { const p = splitCoordinatePair(pairInput, o.inputOrder); setUndo(task); update(mode === 'circle' ? { centerLon: p.lon, centerLat: p.lat } : p); } catch (error) { onNotice((error as Error).message, 'error'); } }}>填入经纬字段</button></div>
+        <div className="geo-paste-pair"><label className="geo-field"><span>粘贴坐标对（仅拆分，保留原文格式）</span><TextInput aria-label="粘贴坐标对" value={pairInput} disabled={busy} onChange={e => setPairInput(e.target.value)} placeholder="116.3913, 39.9075" /></label><button className="secondary-button" disabled={busy || !pairInput.trim()} onClick={() => { try { const p = splitCoordinatePair(pairInput, o.inputOrder); setUndo(task); update(mode === 'circle' ? { centerLon: p.lon, centerLat: p.lat } : p); } catch (error) { onNotice((error as Error).message, 'error'); } }}>填入经纬字段</button></div>
         {mode === 'circle' && <><div className="geo-input-grid">
           {field('radius', '半径', '例如 1000')}{select('unit', '半径单位', [['m', '米'], ['km', '千米']])}
           {select('algorithm', '圆周算法', [['ellipsoid', '椭球测地线 · WGS84（默认）'], ['sphere', '球面大圆 · 平均半径']])}
           {select('direction', '方向', [['north', '正北 · 0°'], ['east', '正东 · 90°'], ['south', '正南 · 180°'], ['west', '正西 · 270°'], ['all', '全部四方向']])}
         </div><p className="preview-note">{o.algorithm === 'ellipsoid' ? 'WGS84 参考椭球 · Karney 算法。请使用 WGS84 圆心坐标。' : '球面半径 6,371,008.8 米；用于球面模型计算，与椭球结果可能不同。'} 半径 0～10,000 km。不自动转换高德/百度坐标。</p></>}
-      </> : <><label className="geo-field"><span>包含度分秒坐标的文本</span><textarea aria-label="包含度分秒坐标的文本" value={task.input} disabled={busy} rows={8} spellCheck={false} placeholder="点位：东经116度23分28.68秒，北纬39度54分27秒" onChange={e => onEdit({ input: e.target.value })} /></label><div className="geo-inline">
+      </> : <><label className="geo-field"><span>包含度分秒坐标的文本</span><TextArea aria-label="包含度分秒坐标的文本" value={task.input} disabled={busy} rows={8} spellCheck={false} placeholder="点位：东经116度23分28.68秒，北纬39度54分27秒" onChange={e => onEdit({ input: e.target.value })} /></label><div className="geo-inline">
         {select('dedupe', '重复点', [['off', '保留原文顺序与重复点'], ['on', '按未舍入坐标去重']])}
         <button className="secondary-button" disabled={busy} onClick={() => file.current?.click()}><Upload size={14} />导入文本</button>
         <input hidden type="file" ref={file} aria-label="导入坐标文本" accept=".txt,.csv,.tsv,.log,.md" onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />

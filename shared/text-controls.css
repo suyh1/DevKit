@@ -1,0 +1,29 @@
+/* The host supplies width and field grouping. Embedded controls borrow their host's frame. */
+input.text-control, textarea.text-control {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, var(--muted));
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--accent);
+}
+input.text-control { min-height: 36px; }
+textarea.text-control { display: block; width: 100%; resize: vertical; line-height: 1.6; }
+.text-control::placeholder { color: var(--subtle); opacity: 1; }
+.text-control[data-hover]:enabled:not(:focus):not([readonly]) { border-color: var(--muted); }
+.text-control:focus {
+  border-color: var(--field-ink, var(--focus-ink));
+}
+.text-control[aria-invalid=true] { border-color: var(--error); }
+.text-control:is([readonly], :disabled) { background: var(--soft); }
+.text-control:disabled { color: var(--muted); cursor: not-allowed; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-display-mode=performance]) .text-control { transition: border-color 120ms ease-out; }
+}
+@media (forced-colors: active) {
+  .text-control:is(input, textarea) { border-color: ButtonText; }
+  .text-control:is(input, textarea):focus { outline: 2px solid Highlight; }
+}

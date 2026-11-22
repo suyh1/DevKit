@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from './TextControl';
 import { fileDigest, uploadIdentity } from './file-digest';
 import SegmentedControl from './SegmentedControl';
 import { useEffect, useRef, useState } from 'react';
@@ -319,7 +320,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           {!direct && (
             <label className="transfer-note">
               文字或链接
-              <textarea
+              <TextArea
                 disabled={op.busy}
                 aria-label="待发送内容"
                 maxLength={64000}
@@ -335,7 +336,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 <LockKeyhole size={14} />
                 取件密码 <small>{direct ? '必填' : '可选'}</small>
               </span>
-              <input
+              <TextInput
                 disabled={op.busy}
                 type="password"
                 maxLength={128}
@@ -543,7 +544,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                   });
                 }}
               >
-                <input
+                <TextInput
                   autoFocus
                   required
                   type="password"

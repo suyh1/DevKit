@@ -1,3 +1,4 @@
+import { TextArea } from './TextControl';
 import { useEffect, useId, useRef, useState } from "react";
 
 export default function ManualCopy() {
@@ -50,7 +51,7 @@ export default function ManualCopy() {
         浏览器未允许自动复制。下方文本已选中，请按 Ctrl+C（Mac 使用
         ⌘C），或使用右键菜单复制。
       </p>
-      <textarea
+      <TextArea
         ref={input}
         readOnly
         aria-label="待手动复制的文本"

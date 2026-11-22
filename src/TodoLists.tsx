@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import Skeleton from './Skeleton';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Check, Code2, Download, FileText, Link2, ListPlus, ListTree, Plus, RefreshCw, Save, Settings2, Trash2, Upload, X } from 'lucide-react';
@@ -294,7 +295,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         }, settings.current ? '清单设置已保存' : settings.imported !== undefined ? '清单已导入' : '清单已创建', true);
       }}>
         {settings.reference && <p>清单将包含引用 <code>{settings.reference}</code></p>}
-        <label className="pc-field">清单名称<input required maxLength={120} value={settings.name} onChange={event => setSettings({ ...settings, name: event.target.value })} /></label>
+        <label className="pc-field">清单名称<TextInput required maxLength={120} value={settings.name} onChange={event => setSettings({ ...settings, name: event.target.value })} /></label>
         {!portal && <label className="pc-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={settings.published} onChange={event => setSettings({ ...settings, published: event.target.checked })} />发布到共享工作台</label>}
         {settings.current?.published && <ResourceLink page="project-todos" id={settings.current.id} />}
         {formError && <p className="td-alert" role="alert">{formError}</p>}

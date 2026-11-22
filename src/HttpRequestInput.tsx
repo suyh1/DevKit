@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { MotionGroup } from './Motion';
 import { useEffect, useRef, useState } from 'react';
@@ -200,7 +201,7 @@ export default function HttpRequestInput({
             </label>
             <label>
               请求 URL
-              <input
+              <TextInput
                 aria-label="请求 URL"
                 disabled={disabled}
                 value={typeof config.url === 'string' ? config.url : ''}
@@ -259,7 +260,7 @@ export default function HttpRequestInput({
                   {authKind === 'bearer' && (
                     <label>
                       Token
-                      <input
+                      <TextInput
                         aria-label="Bearer Token"
                         type="password"
                         autoComplete="off"
@@ -273,7 +274,7 @@ export default function HttpRequestInput({
                     <>
                       <label>
                         用户名
-                        <input
+                        <TextInput
                           aria-label="Basic 用户名"
                           autoComplete="off"
                           value={username}
@@ -283,7 +284,7 @@ export default function HttpRequestInput({
                       </label>
                       <label>
                         密码
-                        <input
+                        <TextInput
                           aria-label="Basic 密码"
                           type="password"
                           autoComplete="off"

@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from '../TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronsLeftRight, ClipboardCopy, Download, FileInput, FileSearch, Play, X } from 'lucide-react';
 import LocalFilePicker from '../LocalFilePicker';
@@ -146,7 +147,7 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
   const text = (key: string, label: string, example = '') => (
     <label>
       {label}
-      <input value={o[key] ?? ''} placeholder={example} onChange={(e) => option(key, e.target.value)} />
+      <TextInput value={o[key] ?? ''} placeholder={example} onChange={(e) => option(key, e.target.value)} />
     </label>
   );
   const isImage = imageTools.has(id);
@@ -238,7 +239,7 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
                 </label>
                 <label>
                   或粘贴乱码文本
-                  <textarea
+                  <TextArea
                     value={pasteText}
                     onChange={(e) => {
                       reset();

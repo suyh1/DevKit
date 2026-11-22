@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { clearPortalPickups } from './publisher-pickups';
 import { themeStyles, normalizeThemeStyle } from './themes';
@@ -479,9 +480,9 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         .join(" · ");
   const loginForm = (
     <form onSubmit={(event) => void login(event)}>
-      <label>访客名称（共享口令登录可留空）<input autoComplete="username" maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} /></label>
+      <label>访客名称（共享口令登录可留空）<TextInput autoComplete="username" maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} /></label>
       <div className="portal-password"><label htmlFor="visitor-login-password">访问口令</label>
-        <div className="password-entry"><input id="visitor-login-password" type={showPassword ? "text" : "password"} autoComplete="current-password"
+        <div className="password-entry"><TextInput id="visitor-login-password" type={showPassword ? "text" : "password"} autoComplete="current-password"
           required value={password} onChange={event => setPassword(event.target.value)} />
           <button type="button" className="text-button" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "隐藏口令" : "显示口令"}</button></div>
       </div>

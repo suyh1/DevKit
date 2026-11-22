@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { SharingButton } from './Sharing';
 import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence, MotionDetails } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
@@ -423,7 +424,7 @@ export default function ProjectCenter({
           }}
         >
           <Field label="访问口令">
-            <input
+            <TextInput
               type="password"
               autoComplete="current-password"
               required
@@ -725,7 +726,7 @@ export default function ProjectCenter({
           <div className="pc-toolbar" hidden={!profile.projects.length}>
             <label className="pc-search">
               <Search size={15} />
-              <input
+              <TextInput
                 aria-label="搜索项目"
                 placeholder="搜索名称、编码、分组或地址…"
                 value={search}
@@ -1180,7 +1181,7 @@ export default function ProjectCenter({
                 </div>
                 <div className="pc-form-grid">
                   <Field label="项目名称">
-                    <input
+                    <TextInput
                       required
                       maxLength={100}
                       value={entry.name}
@@ -1190,7 +1191,7 @@ export default function ProjectCenter({
                     />
                   </Field>
                   <Field label="唯一编码">
-                    <input
+                    <TextInput
                       required
                       maxLength={100}
                       value={entry.code}
@@ -1200,7 +1201,7 @@ export default function ProjectCenter({
                     />
                   </Field>
                   <Field label="分组">
-                    <input
+                    <TextInput
                       maxLength={80}
                       value={entry.group}
                       onChange={(event) =>
@@ -1209,7 +1210,7 @@ export default function ProjectCenter({
                     />
                   </Field>
                   <Field label="说明">
-                    <input
+                    <TextInput
                       maxLength={1000}
                       value={entry.description}
                       onChange={(event) =>
@@ -1221,7 +1222,7 @@ export default function ProjectCenter({
                 <ResourceFields project={entry} change={resources => setEntry({ ...entry, resources })} />
                 <h3 className="pc-form-section">入口地址与参数</h3>
                 <Field label="HTTP(S) 地址模板">
-                  <input
+                  <TextInput
                     required
                     maxLength={4000}
                     placeholder="http://{{host}}:8080/"
@@ -1301,7 +1302,7 @@ export default function ProjectCenter({
                         })
                       }
                     />
-                    <input
+                    <TextInput
                       aria-label={`参数 ${index + 1} 名称`}
                       maxLength={200}
                       value={row.key}
@@ -1317,7 +1318,7 @@ export default function ProjectCenter({
                       }
                       placeholder="名称"
                     />
-                    <input
+                    <TextInput
                       aria-label={`参数 ${index + 1} 值`}
                       maxLength={2000}
                       value={row.value}
@@ -1390,7 +1391,7 @@ export default function ProjectCenter({
           >
             {errorBox}
             <Field label="档案名称">
-              <input
+              <TextInput
                 required
                 maxLength={100}
                 value={profileDraft.name}
@@ -1400,7 +1401,7 @@ export default function ProjectCenter({
               />
             </Field>
             <Field label="说明">
-              <input
+              <TextInput
                 maxLength={1000}
                 value={profileDraft.description}
                 onChange={(event) =>
@@ -1435,7 +1436,7 @@ export default function ProjectCenter({
             </p>
             {profileDraft.variables.map((row, index) => (
               <div className="pc-row" key={index}>
-                <input
+                <TextInput
                   required
                   aria-label={`变量 ${index + 1} 名称`}
                   maxLength={80}
@@ -1452,7 +1453,7 @@ export default function ProjectCenter({
                     })
                   }
                 />
-                <input
+                <TextInput
                   aria-label={`变量 ${index + 1} 值`}
                   data-variable-value={row.key}
                   maxLength={2000}
@@ -1689,7 +1690,7 @@ export default function ProjectCenter({
                 份快照。恢复先预览，再新增版本；恢复前的数据也会备份。
               </p>
               <div className="pc-backup-create">
-                <input
+                <TextInput
                   aria-label="快照名称"
                   maxLength={100}
                   value={snapshotName}

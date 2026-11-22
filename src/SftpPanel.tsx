@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Download, File, Folder, RefreshCw, Upload } from 'lucide-react';
 import { downloadSftp, lanRequest, uploadSftp } from './lan-api';
@@ -48,7 +49,7 @@ export default function SftpPanel({ session, portal }: { session: string; portal
     }}><Upload size={14} />上传</button></header>
     <form className="lan-sftp-path" onSubmit={event => { event.preventDefault(); void run(() => list(directory)); }}>
       <button type="button" className="icon-button" aria-label="上级目录" disabled={busy || !listing || listing.directory === listing.parent} onClick={() => void run(() => list(listing!.parent))}><ArrowUp size={15} /></button>
-      <input aria-label="SFTP 远程目录" value={directory} disabled={busy} spellCheck={false} onChange={event => setDirectory(event.target.value)} />
+      <TextInput aria-label="SFTP 远程目录" value={directory} disabled={busy} spellCheck={false} onChange={event => setDirectory(event.target.value)} />
       <button className="icon-button" aria-label="打开或刷新目录" disabled={busy || !directory.trim()}><RefreshCw size={14} /></button>
     </form>
     <ul>{listing?.entries.map(({ name, path, kind, size }) => <li key={path}>

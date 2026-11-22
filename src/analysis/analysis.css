@@ -107,6 +107,44 @@
   gap: 4px;
   min-width: 8rem;
 }
+.analysis-file.upgrade-workbench {
+  container: upgrade / inline-size;
+  width: 100%;
+  min-width: 0;
+  gap: 12px;
+  padding: clamp(12px, 2vw, 20px);
+}
+.upgrade-workbench > summary { line-height: 1.5; }
+.upgrade-tools, .upgrade-tools .analysis-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+}
+.upgrade-tools { justify-content: space-between; }
+.upgrade-tools .secondary-button { padding: 6px 10px; min-height: 32px; }
+.upgrade-documents, .upgrade-options.analysis-fields {
+  display: grid; align-items: start; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+.upgrade-options.analysis-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); }
+.upgrade-documents > label, .upgrade-options.analysis-fields label {
+  display: grid; min-width: 0; gap: 5px; font-size: 13px; color: var(--muted);
+}
+.upgrade-document {
+  min-width: 0; overflow: hidden; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--surface);
+}
+.upgrade-document > header {
+  display: flex; align-items: center; gap: 7px; padding: 7px 12px;
+  border-bottom: 1px solid var(--line); background: var(--soft); color: var(--text);
+  font: 600 13px/1.5 var(--font-ui);
+}
+.upgrade-document > header svg { color: var(--muted); }
+.upgrade-document:focus-within { border-color: var(--focus-ink); }
+.upgrade-document .motion-editor-stage { height: clamp(8rem, 18vh, 13rem); }
+.upgrade-document .cm-editor { height: 100%; }
+.upgrade-workbench > .upgrade-run { justify-self: end; margin: 0; }
+@container upgrade (min-width: 33rem) and (max-width: 49rem) {
+  .upgrade-documents > :last-child:nth-child(3) { grid-column: 1 / -1; }
+}
 .analysis-bars {
   max-height: 18rem;
   overflow: auto;

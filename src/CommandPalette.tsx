@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionReveal, MotionGroup } from './Motion';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { animate, reducedMotion } from './motion-primitives';
@@ -59,7 +60,7 @@ export default function CommandPalette({ open, onClose, onChoose, favorites = []
     else if (resource) openWorkspaceLink(resource.page, resource.id);
   }
   return <dialog ref={dialog} className="command-dialog motion-native" aria-label={onChoose ? '搜索工具与资源' : '搜索共享资源'} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="command-search"><Search size={21} /><input ref={input} aria-label={onChoose ? '搜索全部工具' : '搜索共享资源'} role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={index < total ? `command-${index}` : undefined} autoComplete="off" placeholder={onChoose ? '搜索工具、共享栏目或资源…' : '搜索栏目、实例、接口或监控…'} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} onKeyDown={event => {
+    <div className="command-search"><Search size={21} /><TextInput embedded ref={input} aria-label={onChoose ? '搜索全部工具' : '搜索共享资源'} role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={index < total ? `command-${index}` : undefined} autoComplete="off" placeholder={onChoose ? '搜索工具、共享栏目或资源…' : '搜索栏目、实例、接口或监控…'} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} onKeyDown={event => {
       if (event.key === 'ArrowDown') { event.preventDefault(); setIndex(old => Math.max(0, Math.min(old + 1, total - 1))); }
       if (event.key === 'ArrowUp') { event.preventDefault(); setIndex(old => Math.max(old - 1, 0)); }
       if (event.key === 'Enter' && index < total) { event.preventDefault(); choose(index, event.shiftKey); }

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
@@ -21,7 +22,7 @@ const scopeLabel = (roots: PublishedShare['roots']) => {
 };
 
 function ShareSearch({ query, change }: { query: string; change: (value: string) => void }) {
-  return <label className="pl-search"><Search size={16} /><input type="search" aria-label="搜索共享" placeholder="搜索共享"
+  return <label className="pl-search"><Search size={16} /><TextInput embedded type="search" aria-label="搜索共享" placeholder="搜索共享"
     value={query} onChange={event => change(event.target.value)} /></label>;
 }
 function ShareRoots({ roots }: { roots: { label: string; directory: boolean; path?: string }[] }) {
@@ -207,7 +208,7 @@ export default function FileShares({ active }: { active: boolean }) {
         void mutate('save', { id: editor.id, revision: editor.revision, value: { ...draft, port: Number(draft.port) } }, '文件共享已保存');
       }}>
         <div className="planning-form-grid">
-          <label>共享名称<input required value={draft.name} maxLength={120} onChange={event => change({ name: event.target.value })} /></label>
+          <label>共享名称<TextInput required value={draft.name} maxLength={120} onChange={event => change({ name: event.target.value })} /></label>
           <label>监听端口<input className="pl-mono" type="number" required min={1} max={65535} value={draft.port} onChange={event => change({ port: event.target.value })} /></label>
         </div>
         <fieldset className="pl-field-group"><legend>共享范围</legend>

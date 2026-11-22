@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './project-components';
 import { workspaceRestriction } from './related-workspaces';
@@ -93,7 +94,7 @@ export function KnowledgeResourcePicker({
         </footer>
       }
     >
-      <input
+      <TextInput
         type="search"
         aria-label="搜索资源"
         data-modal-focus

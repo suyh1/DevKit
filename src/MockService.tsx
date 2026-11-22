@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import type { ApiEndpoint } from '../shared/api-workspace.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -177,7 +178,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
         </div>
         <label className="collab-search">
           <Search size={16} />
-          <input
+          <TextInput
             aria-label="查找接口"
             placeholder="查找名称或路径"
             value={query}
@@ -285,7 +286,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                     <div className="collab-fields">
                       <label>
                         接口名称
-                        <input value={row.name} maxLength={100} onChange={(e) => patch({ name: e.target.value })} />
+                        <TextInput value={row.name} maxLength={100} onChange={(e) => patch({ name: e.target.value })} />
                       </label>
                       <label>
                         方法
@@ -297,7 +298,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       </label>
                       <label>
                         路径
-                        <input value={row.path} onChange={(e) => patch({ path: e.target.value })} />
+                        <TextInput value={row.path} onChange={(e) => patch({ path: e.target.value })} />
                       </label>
                     </div>
                   </fieldset>
@@ -361,7 +362,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                   <div className="collab-fields">
                     <label>
                       场景名称
-                      <input value={scenario.name} maxLength={60} onChange={(e) => changeScenario({ name: e.target.value })} />
+                      <TextInput value={scenario.name} maxLength={60} onChange={(e) => changeScenario({ name: e.target.value })} />
                     </label>
                     <label>
                       状态码
@@ -402,7 +403,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                     <div className="collab-fields">
                       <label>
                         参数名
-                        <input
+                        <TextInput
                           value={scenario.queryKey || ''}
                           onChange={(e) => changeScenario({ queryKey: e.target.value })}
                           placeholder="可选，例如 mode"
@@ -410,7 +411,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       </label>
                       <label>
                         参数值
-                        <input
+                        <TextInput
                           value={scenario.queryValue || ''}
                           onChange={(e) => changeScenario({ queryValue: e.target.value })}
                           placeholder="例如 empty"

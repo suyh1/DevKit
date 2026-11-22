@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { animate } from './motion-primitives';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react';
 import { ArrowUp, ArrowUpRight, ChevronDown, Clock3, LayoutGrid, List, Plus, Search, SearchX, Star } from 'lucide-react';
@@ -154,7 +155,7 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
         <div className="library-controls">
           <div className="library-search">
             <Search size={16} aria-hidden="true" />
-            <input ref={search} aria-label="筛选工具库" placeholder="搜索名称、用途或别名…" value={query} onChange={event => {
+            <TextInput embedded ref={search} aria-label="筛选工具库" placeholder="搜索名称、用途或别名…" value={query} onChange={event => {
               if (libraryPane.current) libraryPane.current.scrollTop = 0;
               setQuery(event.target.value);
             }} />

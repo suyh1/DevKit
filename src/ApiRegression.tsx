@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiEnvironment, ApiProject } from '../shared/api-workspace.mjs';
@@ -161,7 +162,7 @@ export default function ApiRegression({
             </label>
             <label>
               预期状态码
-              <input
+              <TextInput
                 placeholder="按接口定义"
                 value={s.status}
                 maxLength={3}
@@ -170,7 +171,7 @@ export default function ApiRegression({
             </label>
             <label>
               提取响应字段
-              <input
+              <TextInput
                 placeholder="/data/id"
                 value={s.pointer}
                 onChange={(e) => patch(i, { pointer: e.target.value })}
@@ -178,7 +179,7 @@ export default function ApiRegression({
             </label>
             <label>
               存为变量
-              <input
+              <TextInput
                 placeholder="projectId"
                 value={s.variable}
                 onChange={(e) => patch(i, { variable: e.target.value })}

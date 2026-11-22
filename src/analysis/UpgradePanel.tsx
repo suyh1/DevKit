@@ -1,4 +1,7 @@
+import { TextArea, TextInput } from '../TextControl';
 import { useEffect, useRef, useState } from 'react';
+import { FileCode2, Play } from 'lucide-react';
+import CodeEditor, { type EditorLanguage } from '../CodeEditor';
 import LocalFilePicker from '../LocalFilePicker';
 import { MotionButton, MotionDetails } from '../Motion';
 import SegmentedControl from '../SegmentedControl';
@@ -32,8 +35,8 @@ const specs: Record<
   },
   json: {
     title: '生成 JSON Patch 并在另一份文档预演',
-    sample: '{"id":1,"state":"open"}',
-    options: { patchMode: 'generate', target: '{"id":1,"state":"closed"}', third: '{"id":2,"state":"open"}' },
+    sample: '{\n  "id": 1,\n  "state": "open"\n}',
+    options: { patchMode: 'generate', target: '{\n  "id": 1,\n  "state": "closed"\n}', third: '{\n  "id": 2,\n  "state": "open"\n}' },
     labels: { patchMode: ['generate', 'apply'], target: '目标 JSON', third: '应用补丁的文档' },
     ext: 'json',
   },
@@ -144,7 +147,7 @@ export function Base64Files() {
         编码时附带 Data URL
       </label>
       <LocalFilePicker label="编码文件" onFiles={(files) => void encode(files[0])} />
-      <textarea
+      <TextArea
         aria-label="文件 Base64"
         rows={5}
         value={value}
@@ -155,7 +158,7 @@ export function Base64Files() {
       />
       <label>
         恢复文件名
-        <input value={name} onChange={(e) => setName(e.target.value)} />
+        <TextInput value={name} onChange={(e) => setName(e.target.value)} />
       </label>
       <div className="analysis-actions">
         <MotionButton className="secondary-button" disabled={!value} onClick={() => void copyText(value).catch(() => setError('复制失败'))}>复制编码</MotionButton>
@@ -165,6 +168,22 @@ export function Base64Files() {
     </MotionDetails>
   );
 }
+function DocumentInput({ label, value, onChange, language, mounted }: {
+  label: string; value: string; onChange: (value: string) => void; language: EditorLanguage; mounted: boolean;
+}) {
+  return <section className="upgrade-document" aria-label={label}>
+    <header><FileCode2 size={15} aria-hidden="true" />{label}</header>
+    {mounted && <CodeEditor language={language} label={label} value={value} onChange={onChange} wrap />}
+  </section>;
+}
+
+function inputLanguage(id: string, source: string, direction: string): EditorLanguage {
+  if (id === 'json' || (id === 'sql' && /^\s*[\[{]/.test(source))) return 'json';
+  if (id === 'yaml') return direction === 'yaml-toml' ? 'yaml' : 'toml';
+  if (id === 'http-code') return 'shell';
+  return 'text';
+}
+
 export default function UpgradePanel({ id, current }: { id: string; current?: string }) {
   const spec = specs[id];
   const [source, setSource] = useState(''),
@@ -175,9 +194,17 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
   const [chosen, choose] = useState<Record<number, 'a' | 'b' | 'o'>>({}),
     [width, resize] = useState(768);
   const worker = useRef<Worker | null>(null);
+  const [opened, setOpened] = useState(false);
   useEffect(() => () => worker.current?.terminate(), []);
   if (!spec) return null;
   const opts = { ...spec.options, ...o };
+  const applyPatch = id === 'json' && opts.patchMode === 'apply';
+  const documents = id === 'json' || id === 'diff';
+  const sourceLabel = id === 'json' ? (applyPatch ? 'JSON Patch' : '源 JSON') : id === 'diff' ? '本地版本'
+    : id === 'geo-coordinates' ? '起点（经度,纬度）' : '输入内容';
+  const sourceLanguage = inputLanguage(id, source, opts.direction);
+  const codeSource = documents || ['sql', 'yaml', 'http-code'].includes(id);
+  const scalarSource = id === 'cron';
   function clear() {
     worker.current?.terminate();
     worker.current = null;
@@ -185,6 +212,14 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
     setResult('');
     setError('');
     choose({});
+  }
+  function updateSource(value: string) {
+    clear();
+    setSource(value);
+  }
+  function updateOption(key: string, value: string) {
+    clear();
+    options({ ...o, [key]: value });
   }
   function run() {
     clear();
@@ -229,59 +264,59 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
       /* invalid fields */
     }
   return (
-    <MotionDetails className="analysis-file" data-upgrade={id}>
+    <MotionDetails className="analysis-file upgrade-workbench" data-upgrade={id}
+      onToggle={event => { if (event.currentTarget.open) setOpened(true); }}>
       <summary>{spec.title}</summary>
-      {id !== 'css-unit' && (
-        <label>
-          {id === 'diff' ? '本地版本' : id === 'geo-coordinates' ? '起点（经度,纬度）' : '输入内容'}
-          <textarea
-            rows={4}
-            value={source}
-            onChange={(e) => {
-              clear();
-              setSource(e.target.value);
-            }}
-          />
-        </label>
-      )}
-      <div className="analysis-actions">
-        <button
-          onClick={() => {
-            clear();
-            setSource(spec.sample);
-            options({ ...spec.options });
-          }}
-        >
-          填入示例
-        </button>
-        {current !== undefined && id !== 'css-unit' && (
+      <div className="upgrade-tools">
+        {id === 'json' && <SegmentedControl label="补丁模式" value={opts.patchMode}
+          options={['generate', 'apply'].map(value => ({ value, label: choiceNames[value] }))}
+          onChange={value => updateOption('patchMode', value)} />}
+        <div className="analysis-actions">
           <button
+            className="secondary-button"
             onClick={() => {
               clear();
-              setSource(current);
+              setSource(applyPatch ? '[\n  { "op": "replace", "path": "/state", "value": "closed" }\n]' : spec.sample);
+              options(applyPatch ? { ...spec.options, patchMode: 'apply' } : { ...spec.options });
             }}
           >
-            使用当前输入
+            填入示例
           </button>
-        )}
-        {id !== 'css-unit' && (
-          <LocalFilePicker
-            label="读取文件"
-            onFiles={async ([file]) => {
-              try {
-                const r = await readText(file);
-                clear();
-                setSource(r.text);
-              } catch (err) {
-                setError(String(err));
-              }
-            }}
-          />
-        )}
+          {current !== undefined && id !== 'css-unit' && (
+            <button
+              className="secondary-button"
+              onClick={() => updateSource(current)}
+            >
+              使用当前输入
+            </button>
+          )}
+          {id !== 'css-unit' && (
+            <LocalFilePicker
+              label="读取文件"
+              onFiles={async ([file]) => {
+                try {
+                  const r = await readText(file);
+                  updateSource(r.text);
+                } catch (err) {
+                  setError(String(err));
+                }
+              }}
+            />
+          )}
+        </div>
       </div>
-      <div className="analysis-fields">
+      {id !== 'css-unit' && <div className="upgrade-documents">
+        {codeSource ? <DocumentInput label={sourceLabel} language={sourceLanguage} mounted={opened}
+          value={source} onChange={updateSource} />
+          : <label>{sourceLabel}{scalarSource
+            ? <TextInput value={source} onChange={e => updateSource(e.target.value)} />
+            : <TextArea rows={4} value={source} onChange={e => updateSource(e.target.value)} />}</label>}
+        {documents && Object.entries(spec.labels).map(([key, label]) => typeof label === 'string' && !(applyPatch && key === 'target') &&
+          <DocumentInput key={key} label={label} value={opts[key]} language={sourceLanguage} mounted={opened}
+            onChange={value => updateOption(key, value)} />)}
+      </div>}
+      {!documents && Object.keys(spec.labels).length > 0 && <div className="analysis-fields upgrade-options">
         {Object.entries(spec.labels)
-          .filter(([k]) => !(id === 'json' && k === 'target' && opts.patchMode === 'apply'))
           .map(([k, label]) =>
             Array.isArray(label) ? (
               <div className="file-format" key={k}>
@@ -290,37 +325,19 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
                   label={modeNames[k]}
                   value={opts[k]}
                   options={label.map((value) => ({ value, label: choiceNames[value] ?? value }))}
-                  onChange={(value) => {
-                    clear();
-                    options({ ...o, [k]: value });
-                  }}
+                  onChange={value => updateOption(k, value)}
                 />
               </div>
             ) : (
               <label key={k}>
                 {label}
-                {['base', 'third', 'target'].includes(k) ? (
-                  <textarea
-                    value={opts[k]}
-                    rows={3}
-                    onChange={(e) => {
-                      clear();
-                      options({ ...o, [k]: e.target.value });
-                    }}
-                  />
-                ) : (
-                  <input
-                    value={opts[k]}
-                    onChange={(e) => {
-                      clear();
-                      options({ ...o, [k]: e.target.value });
-                    }}
-                  />
-                )}
+                {id === 'geo-coordinates'
+                  ? <TextArea rows={2} value={opts[k]} onChange={event => updateOption(k, event.target.value)} />
+                  : <TextInput value={opts[k]} onChange={event => updateOption(k, event.target.value)} />}
               </label>
             ),
           )}
-      </div>
+      </div>}
       {id === 'css-unit' && (
         <label>
           预览视口 {width}px
@@ -328,7 +345,8 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
           <span style={{ fontSize: size }}>响应式字号 {size.toFixed(2)}px</span>
         </label>
       )}
-      <button className="secondary-button" disabled={busy} onClick={run}>
+      <button className="run-button upgrade-run" disabled={busy} onClick={run}>
+        <Play size={14} aria-hidden="true" />
         {busy ? '处理中…' : '运行'}
       </button>
       {error && <p role="alert">{error}</p>}

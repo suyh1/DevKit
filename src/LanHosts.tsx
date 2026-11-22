@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { navigateTabList } from './tab-navigation';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
@@ -84,11 +85,11 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
           <legend>连接信息</legend>
           <div className={`lan-host-fields ${ssh ? 'lan-host-fields-ssh' : ''}`}>
             <label className="lan-field lan-address"><span>{ssh ? '主机名或 IP' : '共享地址'}</span>
-              <input data-modal-focus required autoComplete="off" spellCheck={false} value={draft.address} onChange={event => patch({ address: event.target.value })}
+              <TextInput data-modal-focus required autoComplete="off" spellCheck={false} value={draft.address} onChange={event => patch({ address: event.target.value })}
                 placeholder={ssh ? '192.168.1.20' : 'http://192.168.1.20:8765'} />
             </label>
             {ssh && <label className="lan-field lan-port"><span>端口</span><input required type="number" min={1} max={65535} value={draft.port || ''} onChange={event => patch({ port: Number(event.target.value) })} /></label>}
-            <label className="lan-field lan-host-name"><span>显示名称 <small>选填</small></span><input value={draft.name} onChange={event => patch({ name: event.target.value })} maxLength={120} placeholder="例如：测试服务器" /></label>
+            <label className="lan-field lan-host-name"><span>显示名称 <small>选填</small></span><TextInput value={draft.name} onChange={event => patch({ name: event.target.value })} maxLength={120} placeholder="例如：测试服务器" /></label>
             {ssh && <div className="lan-field lan-platform"><span>目标系统</span><SegmentedControl label="目标系统" value={draft.platform} options={[{ value: 'linux', label: 'Linux' }, { value: 'win32', label: 'Windows' }]} onChange={platform => patch({ platform })} /></div>}
           </div>
         </fieldset>
@@ -96,9 +97,9 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
         <fieldset className="lan-host-section">
           <legend>登录凭据</legend>
           <div className="lan-host-fields">
-            {!ssh && <label className="lan-field"><span>访客名称（选填）</span><input autoComplete="off" value={draft.visitor || ''} maxLength={48} onChange={event => patch({ visitor: event.target.value })} /></label>}
+            {!ssh && <label className="lan-field"><span>访客名称（选填）</span><TextInput autoComplete="off" value={draft.visitor || ''} maxLength={48} onChange={event => patch({ visitor: event.target.value })} /></label>}
             {ssh && <>
-              <label className="lan-field"><span>用户名</span><input required autoComplete="off" value={draft.user} maxLength={120} onChange={event => patch({ user: event.target.value })} /></label>
+              <label className="lan-field"><span>用户名</span><TextInput required autoComplete="off" value={draft.user} maxLength={120} onChange={event => patch({ user: event.target.value })} /></label>
               <label className="lan-field"><span>认证方式</span>
                 <select value={draft.auth} onChange={event => { setRevealed(false); setKeyError(''); setKeyName(''); patch({ auth: event.target.value as HostDraft['auth'], keyPath: undefined, privateKey: undefined, clearKey: false, password: '', clearPassword: false }); }}>
                   <option value="password">用户名与密码</option><option value="key">{portal ? 'SSH 私钥' : 'SSH Agent 或私钥'}</option>
@@ -127,7 +128,7 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
             </div>}
             {(!ssh || draft.auth === 'password' || customKey) && <div className="lan-password-row">
               <label className="lan-field"><span>{customKey ? '私钥解锁口令（选填）' : ssh ? 'SSH 密码' : '目标共享口令'}</span><span className="lan-password">
-                <input type={revealed ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} value={draft.password} maxLength={ssh ? 4096 : 128}
+                <TextInput type={revealed ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} value={draft.password} maxLength={ssh ? 4096 : 128}
                   onChange={event => patch({ password: event.target.value, clearPassword: false })} placeholder={hasCredential && !draft.clearPassword ? '已保存，留空沿用' : undefined} />
               </span></label>
               <button type="button" className="icon-button lan-password-toggle" aria-label={revealed ? '隐藏密码' : '显示密码'} onClick={() => setRevealed(value => !value)}>
@@ -162,15 +163,15 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
         <fieldset className="lan-host-section">
           <legend>分组与标签 <small>选填</small></legend>
           <div className="lan-host-fields">
-            <label className="lan-field"><span>分组</span><input value={draft.group || ''} maxLength={60} onChange={event => patch({ group: event.target.value })} placeholder="例如：生产环境" /></label>
-            <label className="lan-field"><span>标签</span><input value={tags} maxLength={490} onChange={event => setTags(event.target.value)} placeholder="以逗号分隔" /></label>
+            <label className="lan-field"><span>分组</span><TextInput value={draft.group || ''} maxLength={60} onChange={event => patch({ group: event.target.value })} placeholder="例如：生产环境" /></label>
+            <label className="lan-field"><span>标签</span><TextInput value={tags} maxLength={490} onChange={event => setTags(event.target.value)} placeholder="以逗号分隔" /></label>
           </div>
         </fieldset>
         <fieldset className="lan-host-section">
           <legend>远程桌面与唤醒 <small>选填</small></legend>
           <div className="lan-host-fields">
             <label className="lan-field"><span>远程桌面端口</span><input type="number" min={1} max={65535} value={draft.rdpPort || ''} onChange={event => patch({ rdpPort: Number(event.target.value) || undefined })} placeholder={ssh && draft.platform === 'win32' ? '默认 3389' : '例如：3389'} /></label>
-            <label className="lan-field"><span>设备 MAC 地址</span><input value={draft.mac || ''} onChange={event => patch({ mac: event.target.value })} maxLength={17} spellCheck={false} placeholder="00:11:22:33:44:55" /></label>
+            <label className="lan-field"><span>设备 MAC 地址</span><TextInput value={draft.mac || ''} onChange={event => patch({ mac: event.target.value })} maxLength={17} spellCheck={false} placeholder="00:11:22:33:44:55" /></label>
           </div>
         </fieldset>
         {error && <p className="lan-host-error" ref={formError} tabIndex={-1} role="alert">{error}</p>}
@@ -302,7 +303,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
     </div>}</header>
     {!available ? <p className="lan-note">局域网主机暂不可用。</p> : <div className={`lan-layout${allowed('terminal') ? '' : ' lan-layout-list'}`}>
       <aside className="lan-connections" aria-label="保存的主机连接">
-        <label className="lan-search"><Search size={16} /><input aria-label="搜索主机" placeholder="搜索名称、地址或标签" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <label className="lan-search"><Search size={16} /><TextInput embedded aria-label="搜索主机" placeholder="搜索名称、地址或标签" value={query} onChange={event => setQuery(event.target.value)} /></label>
         {linked && loaded && !linkedExists && <p className="pc-notice" role="status">{missingResourceLink('主机')}</p>}
         {!hosts.length && <p className="lan-note">{loaded || error ? '暂无已保存的连接。' : '正在读取主机清单…'}</p>}
         {!!hosts.length && !grouped.length && <p className="lan-note">没有匹配的主机。</p>}

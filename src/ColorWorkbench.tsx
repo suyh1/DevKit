@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import ContrastMatrix from './analysis/ContrastMatrix';
 import SegmentedControl from './SegmentedControl';
 import { copyText } from './motion-primitives';
@@ -31,7 +32,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         {result.error && <Pipette size={16} aria-hidden="true" />}
         <input type="color" aria-label={`${label}色板`} value={result.color ? hexColor(result.color, false) : '#000000'} onChange={event => onChange(hexColor({ ...parseColor(event.target.value), a: result.color?.a ?? 1 }))} />
       </span>
-      <input id={id} className="color-value-input" aria-label={label} aria-invalid={!!result.error} aria-describedby={result.error ? `${id}-error` : undefined} value={value} onChange={event => onChange(event.target.value)} spellCheck={false} maxLength={200} />
+      <TextInput embedded id={id} className="color-value-input" aria-label={label} aria-invalid={!!result.error} aria-describedby={result.error ? `${id}-error` : undefined} value={value} onChange={event => onChange(event.target.value)} spellCheck={false} maxLength={200} />
     </div>
     {result.error && <small id={`${id}-error`} role="alert" className="color-error">{label}格式无效。{result.error}</small>}
   </div>;

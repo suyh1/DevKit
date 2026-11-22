@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { defaultOptions, tools, type Options, type ToolId } from './tools';
 import { CaseList, validCases, type RegressionCase } from './analysis/Cases';
@@ -186,7 +187,7 @@ export default function ToolRecipes({ input }: { input: string }) {
             <div className="recipe-save">
               <label>
                 流程名称
-                <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+                <TextInput value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </label>
               <button
                 className="secondary-button"

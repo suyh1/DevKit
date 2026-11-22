@@ -44,11 +44,13 @@ def write_bundle(bundle):
             raise ValueError('Unsafe asset path')
         bundle.write(source, f'dist/{asset}')
     bundle.writestr('dist/.vite/manifest.json', json.dumps(entries, ensure_ascii=False))
+    for notice in sorted((root / 'dist/licenses').glob('*.txt')):
+        bundle.write(notice, f'dist/licenses/{notice.name}')
     for folder in ['server', 'shared']:
         for source in sorted((root / folder).iterdir()):
             if source.suffix in {'.mjs', '.sh', '.ps1'} and not source.name.endswith(('.check.mjs', '.test.mjs')):
                 bundle.write(source, f'{folder}/{source.name}')
-    for stylesheet in ('scrollbars.css', 'focus.css'):
+    for stylesheet in ('scrollbars.css', 'focus.css', 'text-controls.css'):
         bundle.write(root / 'shared' / stylesheet, 'shared/' + stylesheet)
     for name in json.loads((root / 'scripts/server-runtime.json').read_text(encoding='utf-8')):
         source_folder = root / 'node_modules' / name

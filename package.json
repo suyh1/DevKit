@@ -63,6 +63,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@faker-js/faker": "^10.6.0",
     "@formatjs/icu-messageformat-parser": "^3.5.23",
+    "@headlessui/react": "^2.2.10",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@lezer/highlight": "^1.2.5",
     "@noble/hashes": "2.4.0",

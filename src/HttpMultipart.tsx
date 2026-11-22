@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import { useId } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -39,9 +40,9 @@ export default function HttpMultipart({ fields, change, disabled }: { fields: Mu
     {fields && <>
       <p className="preview-note">发送时使用以下表单字段和文件。选中的内容仅保留在当前页面。每项最多 1 MB，整份表单最多 2 MB。</p>
       {fields.map((row, index) => <div className="http-multipart-row" key={index}>
-        <input aria-label={`表单字段名称 ${index + 1}`} placeholder="字段名" value={row.name} maxLength={255} onChange={event => patch(index, { name: event.target.value })} />
+        <TextInput aria-label={`表单字段名称 ${index + 1}`} placeholder="字段名" value={row.name} maxLength={255} onChange={event => patch(index, { name: event.target.value })} />
         <select aria-label={`表单字段类型 ${index + 1}`} value={row.kind} onChange={event => patch(index, { kind: event.target.value === 'file' ? 'file' : 'text', file: undefined })}><option value="text">文本</option><option value="file">文件</option></select>
-        {row.kind === 'text' ? <input aria-label={`表单字段值 ${index + 1}`} placeholder="文本值" value={row.value} onChange={event => patch(index, { value: event.target.value })} /> : <div><label className="secondary-button" htmlFor={`${join}-${index}`}>选择文件</label><input id={`${join}-${index}`} className="sr-only" type="file" aria-label={`选择表单文件 ${index + 1}`} onChange={event => { patch(index, { file: event.target.files?.[0] }); event.target.value = ''; }} /><small>{row.file ? `${row.file.name} · ${row.file.size.toLocaleString()} B` : '未选择文件'}</small></div>}
+        {row.kind === 'text' ? <TextInput aria-label={`表单字段值 ${index + 1}`} placeholder="文本值" value={row.value} onChange={event => patch(index, { value: event.target.value })} /> : <div><label className="secondary-button" htmlFor={`${join}-${index}`}>选择文件</label><input id={`${join}-${index}`} className="sr-only" type="file" aria-label={`选择表单文件 ${index + 1}`} onChange={event => { patch(index, { file: event.target.files?.[0] }); event.target.value = ''; }} /><small>{row.file ? `${row.file.name} · ${row.file.size.toLocaleString()} B` : '未选择文件'}</small></div>}
         <button type="button" className="icon-button" aria-label={`移除表单字段 ${index + 1}`} onClick={() => change(fields.length > 1 ? fields.filter((_, i) => index !== i) : [multipartField()])}><Trash2 size={14} /></button>
       </div>)}
       <button type="button" className="text-button" disabled={fields.length >= multipartLimits.rows} onClick={() => change([...fields, multipartField()])}><Plus size={14} />添加表单字段</button>

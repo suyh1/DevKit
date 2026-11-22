@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import ResultPager from './ResultPager';
 import SegmentedControl from './SegmentedControl';
 import { MotionButton, MotionDetails } from './Motion';
@@ -84,5 +85,5 @@ export default function ResultView({ toolId, text, source, onCopy, initialView =
   if (!parsed.node) return <p className="preview-note">{parsed.error}</p>;
   const filter = query.trim().toLowerCase();
   const table = parsed.node.kind === 'array' && view === 'table';
-  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>{table ? '原始精度' : '原始精度 · $ 复制路径'}</small></div>{table ? <TableView key={filter} node={parsed.node} query={filter} /> : filter && !'$'.includes(filter) && !parsed.node.raw.toLowerCase().includes(filter) ? <p role="status" className="preview-note">没有匹配的节点。</p> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={filter} onCopy={onCopy} /></div>}</div>;
+  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><TextInput aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>{table ? '原始精度' : '原始精度 · $ 复制路径'}</small></div>{table ? <TableView key={filter} node={parsed.node} query={filter} /> : filter && !'$'.includes(filter) && !parsed.node.raw.toLowerCase().includes(filter) ? <p role="status" className="preview-note">没有匹配的节点。</p> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={filter} onCopy={onCopy} /></div>}</div>;
 }

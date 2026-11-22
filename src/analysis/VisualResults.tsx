@@ -1,3 +1,4 @@
+import { TextArea } from '../TextControl';
 import { MotionButton, MotionDetails } from '../Motion';
 import { useEffect, useMemo, useState } from 'react';
 import { PlanTree, PauseChart, Calendar, GridPreview } from './Charts';
@@ -151,7 +152,7 @@ function EditableNotes({ text }: { text: string }) {
   useEffect(() => set(text), [text]);
   return (
     <section className="workbench-disclosure editable-notes">
-      <label>编辑更新说明<textarea rows={10} value={draft} onChange={(e) => { set(e.target.value); setStatus(''); }} /></label>
+      <label>编辑更新说明<TextArea rows={10} value={draft} onChange={(e) => { set(e.target.value); setStatus(''); }} /></label>
       <MotionButton className="secondary-button" onClick={() => void saveText(draft, '更新说明.md').then(setStatus).catch(e => setStatus(String(e)))}>保存编辑后的 Markdown</MotionButton>
       {status && <small role="status">{status}</small>}
     </section>

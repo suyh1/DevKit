@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import {
   createContext,
   useCallback,
@@ -349,7 +350,7 @@ function SharingPanel({
                       : "首次访问口令（至少 8 位）"
                   }
                 >
-                  <input
+                  <TextInput
                     type="password"
                     autoComplete="new-password"
                     required={!draft.hasPassword}
@@ -363,9 +364,9 @@ function SharingPanel({
                   <summary>HTTPS 与证书</summary>
                   <label><input role="switch" className="liquid-toggle" type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
                   {draft.tls && <div className="pc-form-grid">
-                    <Field label="PEM 证书绝对路径"><input required value={draft.tls.cert} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, cert: event.target.value } })} /></Field>
-                    <Field label="PEM 私钥绝对路径"><input required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
-                    <Field label="证书对应域名或 IPv4"><input placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
+                    <Field label="PEM 证书绝对路径"><TextInput required value={draft.tls.cert} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, cert: event.target.value } })} /></Field>
+                    <Field label="PEM 私钥绝对路径"><TextInput required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
+                    <Field label="证书对应域名或 IPv4"><TextInput placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
                   </div>}
                 </details>
                 <div className="sharing-services-heading">
@@ -601,8 +602,8 @@ function SharingPanel({
                     });
                     return <fieldset className="sharing-visitor" key={index}><legend>{visitor.name || '新访客'}</legend>
                       <div className="pc-form-grid">
-                        <Field label="访客名称"><input required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
-                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><input type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /><small aria-live="polite">{!visitor.password && existing ? '留空将保留原口令' : `${visitor.password?.length || 0}/128 位 · ${(visitor.password?.length || 0) >= 8 ? '已满足长度要求' : '至少需要 8 位'}`}</small></Field>
+                        <Field label="访客名称"><TextInput required maxLength={48} value={visitor.name} readOnly={existing} onChange={event => change({ ...visitor, name: event.target.value })} /></Field>
+                        <Field label={existing ? '更换口令（留空保留）' : '访问口令（至少 8 位）'}><TextInput type="password" required={!existing} autoComplete="new-password" minLength={8} maxLength={128} value={visitor.password || ''} onChange={event => change({ ...visitor, password: event.target.value || (existing ? undefined : '') })} /><small aria-live="polite">{!visitor.password && existing ? '留空将保留原口令' : `${visitor.password?.length || 0}/128 位 · ${(visitor.password?.length || 0) >= 8 ? '已满足长度要求' : '至少需要 8 位'}`}</small></Field>
                       </div>
                       {workspaceModules.map(item => {
                         const name = item.id, service = visitor.services[name];

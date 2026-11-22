@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Files } from 'lucide-react';
@@ -137,7 +138,7 @@ export default function FileChecksums() {
         {rows.size === 1 && (
           <label>
             <span>预期 SHA-256</span>
-            <input
+            <TextInput
               placeholder="输入比对摘要"
               value={expected}
               onChange={(e) => setExpected(e.target.value)}

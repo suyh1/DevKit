@@ -17,6 +17,8 @@ async function languageSupport(language: EditorLanguage) {
   if (language === 'java') return (await import('@codemirror/lang-java')).java();
   if (language === 'css') return (await import('@codemirror/lang-css')).css();
   if (language === 'yaml') return (await import('@codemirror/lang-yaml')).yaml();
+  if (language === 'toml') return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/toml')).toml);
+  if (language === 'shell') return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/shell')).shell);
   if (language === 'sql') return (await import('@codemirror/lang-sql')).sql();
   if (language === 'nginx') return (await import('./nginx-language')).nginx();
   if (language === 'diff') return StreamLanguage.define({ token(stream) { const char = stream.peek(); stream.skipToEnd(); return char === '+' ? 'inserted' : char === '-' ? 'deleted' : char === '@' ? 'meta' : null; } });
@@ -38,7 +40,7 @@ const highlighting = HighlightStyle.define([
 export default function CodeEditorView(props: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null), view = useRef<EditorView | null>(null);
   const initial = useRef(props), change = useRef(props.onChange), syncing = useRef(false);
-  const compartments = useRef({ editable: new Compartment(), wrapping: new Compartment(), language: new Compartment(), indent: new Compartment() });
+  const compartments = useRef({ editable: new Compartment(), wrapping: new Compartment(), language: new Compartment(), indent: new Compartment(), accessibleName: new Compartment() });
   change.current = props.onChange;
   useEffect(() => {
     if (!host.current) return;
@@ -53,7 +55,8 @@ export default function CodeEditorView(props: CodeEditorProps) {
           config.editable.of([EditorState.readOnly.of(!!values.readOnly), EditorView.editable.of(!values.readOnly || !!values.onChange)]),
           config.wrapping.of(values.wrap !== false ? EditorView.lineWrapping : []),
           placeholder(values.placeholder || ''),
-          EditorView.contentAttributes.of({ 'aria-label': values.label, 'aria-multiline': 'true', 'aria-readonly': String(!!values.readOnly), role: 'textbox', spellcheck: 'false', tabindex: '0' }),
+          EditorView.contentAttributes.of({ 'aria-multiline': 'true', role: 'textbox', spellcheck: 'false', tabindex: '0' }),
+          config.accessibleName.of(EditorView.contentAttributes.of({ 'aria-label': values.label, 'aria-readonly': String(!!values.readOnly) })),
           EditorView.updateListener.of(update => { if (update.docChanged && !syncing.current) change.current?.(update.state.doc.toString()); }),
         ],
       }),
@@ -70,6 +73,11 @@ export default function CodeEditorView(props: CodeEditorProps) {
       syncing.current = false;
     }
   }, [props.value]);
+  useEffect(() => {
+    view.current?.dispatch({ effects: compartments.current.accessibleName.reconfigure(
+      EditorView.contentAttributes.of({ 'aria-label': props.label, 'aria-readonly': String(!!props.readOnly) })
+    ) });
+  }, [props.label, props.readOnly]);
   useEffect(() => { view.current?.dispatch({ effects: compartments.current.editable.reconfigure([EditorState.readOnly.of(!!props.readOnly), EditorView.editable.of(!props.readOnly || !!change.current)]) }); }, [props.readOnly]);
   useEffect(() => {
     let cancelled = false;

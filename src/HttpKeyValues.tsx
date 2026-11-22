@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { Plus, Trash2 } from 'lucide-react';
 import { blankHttpRow } from './http-builder';
 import type { HttpRow } from './http-builder';
@@ -33,14 +34,14 @@ export default function HttpKeyValues({
             disabled={disabled}
             onChange={(event) => patch(index, { enabled: event.target.checked })}
           />
-          <label className="kv-label"><span>名称</span><input
+          <label className="kv-label"><span>名称</span><TextInput
             aria-label={`${label} ${index + 1} 名称`}
             placeholder="名称"
             value={row.key}
             disabled={disabled}
             onChange={(event) => patch(index, { key: event.target.value })}
           /></label>
-          <label className="kv-label"><span>值</span><input
+          <label className="kv-label"><span>值</span><TextInput
             aria-label={`${label} ${index + 1} 值`}
             placeholder="值"
             value={row.value}

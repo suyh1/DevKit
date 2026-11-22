@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
@@ -97,7 +98,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
               <>
                 <label>
                   画板名称
-                  <input
+                  <TextInput
                     aria-label="新画板名称"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -140,7 +141,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
             <h2>已有画板</h2>
             <label className="collab-search">
               <Search size={16} />
-              <input
+              <TextInput
                 aria-label="查找白板"
                 placeholder="查找白板"
                 value={query}
@@ -416,7 +417,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
               options={[{ value: '2', label: '2 px' }, { value: '4', label: '4 px' }, { value: '8', label: '8 px' }]} onChange={value => setWidth(Number(value))} />
           </div>
           {tool === 'text' && (
-            <input
+            <TextInput
               autoFocus
               aria-label="标注文字"
               placeholder="输入文字，再点画布定位"
@@ -460,7 +461,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
               <button onClick={() => setRename(board.name)}>重命名</button>
             ) : (
               <>
-                <input
+                <TextInput
                   aria-label="画板名称"
                   value={rename}
                   onChange={(e) => setRename(e.target.value)}

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
 import { SharingButton } from './Sharing';
@@ -291,7 +292,7 @@ export default function HttpWorkbench({
           <h2>
             请求集合 <small>{entries.length}/100</small>
           </h2>
-          <input
+          <TextInput
             className="http-collection-search"
             aria-label="搜索请求集合"
             placeholder="搜索集合…"
@@ -404,7 +405,7 @@ export default function HttpWorkbench({
           <div className="feature-toolbar">
             <label>
               请求名称
-              <input
+              <TextInput
                 aria-label="请求名称"
                 disabled={!!running}
                 value={name}
@@ -555,7 +556,7 @@ export default function HttpWorkbench({
                         <span className="preview-note">Ctrl / Cmd + F 搜索正文</span>
                       </>
                     ) : (
-                      <input
+                      <TextInput
                         aria-label="筛选响应头"
                         placeholder="筛选响应头…"
                         value={headerFilter}

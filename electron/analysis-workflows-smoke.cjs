@@ -65,6 +65,15 @@ module.exports = async function analysisWorkflows(window) {
       id + ' 结果',
       find(parent) + '.innerText.includes(' + JSON.stringify(expected) + ') && !!' + find(parent + ' pre'),
     );
+    if (id === 'json') {
+      await wait('三份 JSON 文档可编辑', find(parent) + '.querySelectorAll(".cm-content[contenteditable=true]").length === 3');
+      await clickLabel(parent, '应用已有补丁');
+      await wait('补丁编辑器', '!!' + find(parent + ' [role=textbox][aria-label="JSON Patch"]'));
+      await clickLabel(parent, '填入示例');
+      await clickLabel(parent, '运行');
+      await wait('补丁应用到预演文档', find(parent + ' pre') + '?.textContent.includes(\'"state": "closed"\')');
+      assert.equal(await js(find(parent) + '.querySelectorAll(".cm-content[contenteditable=true]").length'), 2);
+    }
     if (id === 'diff') {
       await js(find(parent + ' input[type=radio]') + '.click()');
       await wait(

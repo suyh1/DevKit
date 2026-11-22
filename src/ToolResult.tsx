@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useMemo, useState } from 'react';
 import { MotionButton, MotionDetails } from './Motion';
 import type { JsonChange } from './structured-diff';
@@ -64,7 +65,7 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   }
   if (id === 'hash' || id === 'hmac') {
     const equal = digestMatches(text, expected, id === 'hmac' ? options.format : 'hex');
-    return <div className="digest-result"><span className="result-kicker">{options.algorithm} · {id === 'hmac' ? options.format?.toUpperCase() : 'HEX'}</span><code className="digest-value">{text}</code><MotionButton variant="copy" className="secondary-button" onClick={() => onCopy(text)}><Copy size={14} />复制{ id === 'hash' ? '摘要' : '签名'}</MotionButton><label className="digest-compare">核对已有值<input aria-label="待核对摘要或签名" value={expected} onChange={event => onExpected(event.target.value)} placeholder="粘贴已有值进行核对" spellCheck={false} /></label>{equal !== null && <p role="status" className={equal ? 'success-text' : 'mismatch-text'}>{equal ? <Check size={16} /> : <AlertCircle size={16} />}{equal ? '完全一致' : '值不一致'}</p>}</div>;
+    return <div className="digest-result"><span className="result-kicker">{options.algorithm} · {id === 'hmac' ? options.format?.toUpperCase() : 'HEX'}</span><code className="digest-value">{text}</code><MotionButton variant="copy" className="secondary-button" onClick={() => onCopy(text)}><Copy size={14} />复制{ id === 'hash' ? '摘要' : '签名'}</MotionButton><label className="digest-compare">核对已有值<TextInput aria-label="待核对摘要或签名" value={expected} onChange={event => onExpected(event.target.value)} placeholder="粘贴已有值进行核对" spellCheck={false} /></label>{equal !== null && <p role="status" className={equal ? 'success-text' : 'mismatch-text'}>{equal ? <Check size={16} /> : <AlertCircle size={16} />}{equal ? '完全一致' : '值不一致'}</p>}</div>;
   }
   if (id === 'timestamp') return <Fields data={Object.fromEntries(text.split('\n').map(line => { const match = line.match(/^(\S+)\s+(.+)$/); return match ? [match[1], match[2]] : [line, '']; }))} onCopy={onCopy} />;
   if (id === 'radix') return <div className="number-result"><span className="result-kicker">BASE {options.from} → BASE {options.to}</span><code>{text}</code><MotionButton variant="copy" className="secondary-button" onClick={() => onCopy(text)}><Copy size={14} />复制数值</MotionButton><p className="preview-note">整数换算使用 BigInt，保留大整数精度。</p></div>;

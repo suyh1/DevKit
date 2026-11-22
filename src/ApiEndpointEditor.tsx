@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import SegmentedControl from './SegmentedControl';
 import { newProjectId } from './project-api';
@@ -79,7 +80,7 @@ export function ApiParameters({
                           <option key={value}>{value}</option>
                         ))}
                       </select>
-                      <input
+                      <TextInput
                         aria-label={`参数${index + 1}名称`}
                         value={row.name}
                         onChange={(event) =>
@@ -88,7 +89,7 @@ export function ApiParameters({
                       />
                       <MotionDetails className="api-parameter-schema">
                         <summary>约束Schema</summary>
-                        <textarea
+                        <TextArea
                           aria-label={`参数${index + 1}Schema`}
                           rows={4}
                           value={row.schema}
@@ -137,7 +138,7 @@ export function ApiParameters({
                       </label>
                     </td>
                     <td data-label="说明">
-                      <input
+                      <TextInput
                         aria-label={`参数${index + 1}说明`}
                         value={row.description}
                         onChange={(event) =>
@@ -148,7 +149,7 @@ export function ApiParameters({
                   </>
                 )}
                 <td data-label={valuesOnly ? "本次请求值" : "示例 / 默认调试值"}>
-                  <input
+                  <TextInput
                     aria-label={`参数${index + 1}示例`}
                     value={row.example}
                     onChange={(event) =>
@@ -230,7 +231,7 @@ export function ApiAuthEditor({
         {auth.type === "bearer" && (
           <label>
             Token
-            <input
+            <TextInput
               aria-label="API Bearer Token"
               value={auth.token}
               onChange={(event) => patch({ token: event.target.value })}
@@ -242,7 +243,7 @@ export function ApiAuthEditor({
           <>
             <label>
               用户名
-              <input
+              <TextInput
                 aria-label="API Basic 用户名"
                 value={auth.username}
                 onChange={(event) => patch({ username: event.target.value })}
@@ -250,7 +251,7 @@ export function ApiAuthEditor({
             </label>
             <label>
               密码
-              <input
+              <TextInput
                 aria-label="API Basic 密码"
                 type="password"
                 value={auth.password}
@@ -268,7 +269,7 @@ export function ApiAuthEditor({
             </div>
             <label>
               键名
-              <input
+              <TextInput
                 aria-label="API Key 名称"
                 value={auth.key}
                 onChange={(event) => patch({ key: event.target.value })}
@@ -276,7 +277,7 @@ export function ApiAuthEditor({
             </label>
             <label>
               值
-              <input
+              <TextInput
                 aria-label="API Key 值"
                 value={auth.value}
                 onChange={(event) => patch({ value: event.target.value })}
@@ -340,7 +341,7 @@ export default function ApiEndpointEditor({
         <div className="api-form-grid">
           <label>
             接口名称
-            <input
+            <TextInput
               aria-label="API接口名称"
               maxLength={100}
               value={endpoint.name}
@@ -374,7 +375,7 @@ export default function ApiEndpointEditor({
           </label>
           <label>
             接口路径
-            <input
+            <TextInput
               aria-label="API接口路径"
               value={endpoint.path}
               onChange={(event) => patch({ path: event.target.value })}
@@ -383,7 +384,7 @@ export default function ApiEndpointEditor({
           </label>
           <label className="api-wide">
             接口说明
-            <textarea
+            <TextArea
               aria-label="API接口说明"
               rows={3}
               value={endpoint.description}
@@ -392,7 +393,7 @@ export default function ApiEndpointEditor({
           </label>
           <label className="api-wide">
             独立服务地址（留空使用项目/环境）
-            <input
+            <TextInput
               aria-label="API独立服务地址"
               value={endpoint.server}
               onChange={(event) => patch({ server: event.target.value })}
@@ -474,7 +475,7 @@ export default function ApiEndpointEditor({
             <div className="api-form-grid">
               <label>
                 状态码
-                <input
+                <TextInput
                   aria-label={`响应${index + 1}状态码`}
                   value={row.status}
                   onChange={(event) =>
@@ -491,7 +492,7 @@ export default function ApiEndpointEditor({
               </label>
               <label>
                 说明
-                <input
+                <TextInput
                   aria-label={`响应${index + 1}说明`}
                   value={row.description}
                   onChange={(event) =>
@@ -507,7 +508,7 @@ export default function ApiEndpointEditor({
               </label>
               <label>
                 Content-Type
-                <input
+                <TextInput
                   aria-label={`响应${index + 1}类型`}
                   value={row.contentType}
                   onChange={(event) =>

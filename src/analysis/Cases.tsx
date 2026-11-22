@@ -1,3 +1,4 @@
+import { TextArea } from '../TextControl';
 import { useEffect, useState } from 'react';
 import type { Options } from '../tools';
 export type RegressionCase = { input: string; expected: string; step?: number };
@@ -31,7 +32,7 @@ export function CaseList({
           {(['input', 'expected'] as const).map((k) => (
             <label key={k}>
               {k === 'input' ? '输入' : '期望输出'}
-              <textarea
+              <TextArea
                 value={item[k]}
                 onChange={(e) => change(cases.map((c, j) => (i === j ? { ...c, [k]: e.target.value } : c)))}
               />

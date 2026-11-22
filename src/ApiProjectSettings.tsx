@@ -1,3 +1,4 @@
+import { TextArea, TextInput } from './TextControl';
 import { newProjectId } from './project-api';
 import type { ApiProject } from "../shared/api-workspace.mjs";
 import { Plus, Trash2 } from "lucide-react";
@@ -47,7 +48,7 @@ export default function ApiProjectSettings({
         <div className="api-form-grid">
           <label>
             项目名称
-            <input
+            <TextInput
               aria-label="API项目名称"
               required
               maxLength={100}
@@ -59,7 +60,7 @@ export default function ApiProjectSettings({
           </label>
           <label>
             默认服务地址
-            <input
+            <TextInput
               aria-label="API默认服务地址"
               value={draft.baseUrl}
               onChange={(event) =>
@@ -70,7 +71,7 @@ export default function ApiProjectSettings({
           </label>
           <label>
             文档版本
-            <input
+            <TextInput
               aria-label="API文档版本"
               value={draft.version}
               onChange={(event) =>
@@ -80,7 +81,7 @@ export default function ApiProjectSettings({
           </label>
           <label className="api-wide">
             项目说明
-            <textarea
+            <TextArea
               aria-label="API项目说明"
               rows={3}
               value={draft.description}
@@ -109,7 +110,7 @@ export default function ApiProjectSettings({
           </div>
           {draft.groups.map((name, index) => (
             <div className="api-settings-row" key={index}>
-              <input
+              <TextInput
                 aria-label={`目录${index + 1}名称`}
                 value={name}
                 onChange={(event) =>
@@ -179,7 +180,7 @@ export default function ApiProjectSettings({
               <div className="api-form-grid">
                 <label>
                   环境名称
-                  <input
+                  <TextInput
                     aria-label={`环境${index + 1}名称`}
                     value={env.name}
                     onChange={(event) =>
@@ -196,7 +197,7 @@ export default function ApiProjectSettings({
                 </label>
                 <label>
                   服务地址
-                  <input
+                  <TextInput
                     aria-label={`环境${index + 1}服务地址`}
                     value={env.baseUrl}
                     placeholder="留空使用项目默认地址"

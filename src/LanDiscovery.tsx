@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Radar } from 'lucide-react';
 import { lanRequest, type HostDraft } from './lan-api';
@@ -39,7 +40,7 @@ export default function LanDiscovery({ close, onChoose }: { close: () => void; o
         const network = interfaces.find(item => networkId(item) === event.target.value)!;
         setSelected(event.target.value); setRange(network.suggestion); setResult(undefined);
       }}>{interfaces.map(item => <option key={networkId(item)} value={networkId(item)}>{item.name} · {item.address}</option>)}</select></label>
-      <label className="lan-field"><span>IPv4 网段或起止地址</span><input value={range} maxLength={45} required disabled={busy} onChange={event => { setRange(event.target.value); setResult(undefined); }} /></label>
+      <label className="lan-field"><span>IPv4 网段或起止地址</span><TextInput value={range} maxLength={45} required disabled={busy} onChange={event => { setRange(event.target.value); setResult(undefined); }} /></label>
       <label className="lan-field"><span>SSH 探测端口</span><input type="number" min={1} max={65535} required value={port || ''} disabled={busy} onChange={event => { setPort(Number(event.target.value)); setResult(undefined); }} /></label>
     </form>
     <p className="lan-note">每次最多扫描所选网卡直连网段内的 256 个 IPv4 地址。邻居缓存仅供识别设备。</p>

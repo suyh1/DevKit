@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { ArrowLeft, Link2, PanelRightOpen, Save } from 'lucide-react';
@@ -255,7 +256,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
         </button>
       </header>
       <div className="kb-manuscript">
-        <input
+        <TextInput embedded
           className="kb-title-input"
           aria-label="文档标题"
           placeholder="无标题文档"
@@ -296,7 +297,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
           <div className="kb-properties">
             <label>
               目录
-              <input
+              <TextInput
                 list="kb-folders"
                 placeholder="未归档，如 基础知识 / 网络"
                 maxLength={240}
@@ -311,7 +312,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
             </datalist>
             <label>
               所属项目
-              <input
+              <TextInput
                 list="kb-projects"
                 maxLength={120}
                 value={draft.form.project}
@@ -325,7 +326,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
             </datalist>
             <label>
               标签（逗号分隔）
-              <input
+              <TextInput
                 value={draft.form.tags.join('，')}
                 onChange={(e) => patch({ tags: e.target.value.split(/[,，]/) })}
               />

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, FolderPlus, Plus, RefreshCw, Search } from 'lucide-react';
 import { useConfirmation } from './Confirmation';
@@ -256,7 +257,7 @@ export default function KnowledgeBase({
           <aside className="kb-library">
             <label className="kb-search">
               <Search size={16} />
-              <input
+              <TextInput embedded
                 type="search"
                 aria-label="知识库全文搜索"
                 placeholder="搜索标题或正文"
@@ -308,7 +309,7 @@ export default function KnowledgeBase({
                   });
                 }}
               >
-                <input
+                <TextInput
                   autoFocus
                   aria-label="目录路径"
                   placeholder="基础知识 / 网络"

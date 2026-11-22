@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { MotionDetails } from './Motion';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
@@ -490,7 +491,7 @@ export default function ApiDebug({
           )}
           {tab === "headers" && (
             <>
-              <input
+              <TextInput
                 aria-label="API筛选响应头"
                 placeholder="筛选名称或值"
                 value={headerFilter}

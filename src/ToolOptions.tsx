@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { mapAnalysis } from './analysis/catalog';
 import { useId } from 'react';
 import SegmentedControl from './SegmentedControl';
@@ -96,8 +97,8 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
           onChange={value => onChange(field.key, value)} />
       </div>;
     }
-    return <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>;
-  })}{toolId === 'timestamp' && options.mode === 'batch' && <label className="option"><span>目标 IANA 时区</span><input list={zoneList} disabled={busy} value={options.zone ?? 'UTC'} onChange={e => onChange('zone', e.target.value)} /><datalist id={zoneList}>{['UTC','Asia/Shanghai','Asia/Tokyo','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles'].map(zone => <option key={zone}>{zone}</option>)}</datalist></label>}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
+    return <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <TextInput disabled={busy} type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>;
+  })}{toolId === 'timestamp' && options.mode === 'batch' && <label className="option"><span>目标 IANA 时区</span><TextInput list={zoneList} disabled={busy} value={options.zone ?? 'UTC'} onChange={e => onChange('zone', e.target.value)} /><datalist id={zoneList}>{['UTC','Asia/Shanghai','Asia/Tokyo','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles'].map(zone => <option key={zone}>{zone}</option>)}</datalist></label>}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
 }
 
 

@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useEffect, useId, useState } from 'react';
 import { ArrowUp, File, FolderOpen } from 'lucide-react';
 import { Field, Modal } from './project-components';
@@ -28,7 +29,7 @@ export default function HostPathPicker({ name, kind, request, close, select }: {
     <div className="host-directory" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
       <div className="host-directory-path pc-field-action">
         <Field label="远程绝对目录">
-          <input placeholder="输入绝对目录" value={directory} spellCheck={false} onChange={event => setDirectory(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (!busy) void load(directory); } }} />
+          <TextInput placeholder="输入绝对目录" value={directory} spellCheck={false} onChange={event => setDirectory(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (!busy) void load(directory); } }} />
         </Field>
         <div className="host-directory-actions">
           <button type="button" className="text-button" aria-label="返回上级目录" disabled={busy || !listing?.parent} onClick={() => void load(listing!.parent)}><ArrowUp size={16} />上级</button>

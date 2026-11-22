@@ -1,3 +1,4 @@
+import { TextInput } from './TextControl';
 import { useState } from 'react';
 import { CalendarDays, GitBranch, ListTree, Play } from 'lucide-react';
 import { isTodoDate, todoReferences, todoTaskTitle } from '../shared/todo-text.mjs';
@@ -69,7 +70,7 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
   return <aside className="td-outline" aria-label="清单大纲">
     <h3>大纲</h3>
     <div className="td-outline-filters">
-      <input type="search" aria-label="筛选大纲" placeholder="搜索或输入 @标签" value={search} onChange={event => setSearch(event.target.value)} />
+      <TextInput type="search" aria-label="筛选大纲" placeholder="搜索或输入 @标签" value={search} onChange={event => setSearch(event.target.value)} />
       <select aria-label="筛选任务状态" value={view ? status : mode} onChange={event => setStatus(event.target.value)}>
         <option value="all">全部</option><option value="open">待办</option><option value="today">今日与逾期</option><option value="closed">已结束</option>
         <option value="resume">继续做</option><option value="waiting">等待回访</option><option value="follow-up">到期回访</option>
