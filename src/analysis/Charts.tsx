@@ -1,3 +1,4 @@
+import { MotionDetails } from '../Motion';
 import { useMemo, useRef, useState } from 'react';
 import { parseCsv } from '../practical';
 export function PlanTree({ text }: { text: string }) {
@@ -6,7 +7,7 @@ export function PlanTree({ text }: { text: string }) {
   const childParents = new Set(rows.map((r) => r[0].split('.').slice(0, -1).join('.')));
   const tree = rows.filter((r) => !hidden.some((k) => r[0].startsWith(k + '.')));
   return (
-    <details open>
+    <MotionDetails className="workbench-disclosure" open>
       <summary>执行计划树</summary>
       <div className="analysis-plan">
         {tree.slice(0, 400).map((r, i) => {
@@ -15,7 +16,7 @@ export function PlanTree({ text }: { text: string }) {
           return (
             <div key={r[0]} style={{ marginInlineStart: Math.min(level - 1, 12) * 15 }}>
               {expandable ? (
-                <button
+                <button className="icon-button"
                   aria-label={'展开或折叠节点 ' + r[0]}
                   aria-expanded={!hidden.includes(r[0])}
                   onClick={() =>
@@ -41,7 +42,7 @@ export function PlanTree({ text }: { text: string }) {
           );
         })}
       </div>
-    </details>
+    </MotionDetails>
   );
 }
 export function PauseChart({ text }: { text: string }) {
@@ -56,7 +57,7 @@ export function PauseChart({ text }: { text: string }) {
     rows = all.slice(at, at + 200);
   const max = Math.max(1, ...rows.map((r) => +r[3]));
   return (
-    <details open>
+    <MotionDetails className="workbench-disclosure" open>
       <summary>GC 停顿 · {all.length} 次</summary>
       <svg viewBox="0 0 800 130" role="img" aria-label="按日志先后绘制的停顿毫秒">
         {rows.map((r, i) => {
@@ -89,7 +90,7 @@ export function PauseChart({ text }: { text: string }) {
           />
         </label>
       )}
-    </details>
+    </MotionDetails>
   );
 }
 export function Calendar({ output, zone }: { output: string; zone: string }) {
@@ -119,14 +120,14 @@ export function Calendar({ output, zone }: { output: string; zone: string }) {
     offset = (new Date(Date.UTC(year, num - 1, 1)).getUTCDay() + 6) % 7,
     last = new Date(Date.UTC(year, num, 0)).getUTCDate();
   return (
-    <details open>
+    <MotionDetails className="workbench-disclosure" open>
       <summary>发生日期 · {zone}</summary>
       <nav>
-        <button disabled={!index} onClick={() => move(index - 1)}>
+        <button className="secondary-button" disabled={!index} onClick={() => move(index - 1)}>
           上一月
         </button>{' '}
         {month}{' '}
-        <button disabled={index === months.length - 1} onClick={() => move(index + 1)}>
+        <button className="secondary-button" disabled={index === months.length - 1} onClick={() => move(index + 1)}>
           下一月
         </button>
       </nav>
@@ -143,7 +144,7 @@ export function Calendar({ output, zone }: { output: string; zone: string }) {
           );
         })}
       </div>
-    </details>
+    </MotionDetails>
   );
 }
 export function GridPreview({

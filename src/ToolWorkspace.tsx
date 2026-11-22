@@ -140,7 +140,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     {active === 'hash' && <FileChecksums />}
     <p className="workflow-intro">{experience.hint}</p>
     {!generated && !compact && <div className="toolbar">{options}{run}</div>}
-    {largeReports.has(active) && <details><summary>直接分析大文件（单文件最多 128 MiB）</summary><FileWorkbench id={active} preset={task.options}/></details>}
+    {largeReports.has(active) && <MotionDetails className="workbench-disclosure"><summary>直接分析大文件（单文件最多 128 MiB）</summary><FileWorkbench id={active} preset={task.options}/></MotionDetails>}
     {analysis && <TableFields id={active} input={task.input} options={task.options} onChange={(key,value)=>onEdit({options:{...task.options,[key]:value}})}/>}
     {analysis && (active==='css-grid'||currentResult) && <VisualResults id={active} input={task.input} output={currentResult?task.output:''} options={task.options} onOption={(key,value)=>onEdit({options:{...task.options,[key]:value}})}/>}
     <div className="workbench-controls"><span className={`task-status status-${task.status}`} role="status"><span />{statusLabels[task.status]}{task.elapsed !== null && ` · ${task.elapsed || '<1'} ms`}</span><div>{!compact && !generated && <button className="text-button" onClick={() => setWrap(!wrapping)} aria-pressed={wrapping}><WrapText size={14} />换行</button>}{adjustable && <button className="text-button" onClick={() => setLayout(arrangement === 'split' ? 'stack' : 'split')} aria-label="切换编辑区布局">{arrangement === 'split' ? <Rows2 size={14} /> : <Columns2 size={14} />}{arrangement === 'split' ? '上下布局' : '左右布局'}</button>}</div></div>

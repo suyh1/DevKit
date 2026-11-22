@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
 import { debugOverrides, debugRequest } from './api-debug-draft';
@@ -298,7 +299,7 @@ export default function ApiDebug({
         <HttpMultipart fields={multipart} change={setMultipart} disabled={running} />
         {multipart ? <p className="preview-note">仍会校验接口参数。正文 Schema 适用于接口定义中的正文格式。</p> : <ApiBodyEditor endpoint={endpoint} onChange={changeRequest} />}
       </fieldset>
-      <details className="api-section">
+      <MotionDetails className="api-section">
         <summary>查看最终请求配置</summary>
         {request.value && (
           <>
@@ -323,7 +324,7 @@ export default function ApiDebug({
             </button>
           </>
         )}
-      </details>
+      </MotionDetails>
       {running && (
         <p><span role="status">正在发送请求</span>（<span role="timer" aria-live="off">{elapsed.toFixed(1)} 秒</span>）；取消和超时将终止连接、读取或解压。</p>
       )}

@@ -293,7 +293,6 @@ details.analysis-file[open] > :not(summary) { margin-block-start: 12px; }
 .favicon-package li svg { flex: none; width: 15px; height: 15px; color: var(--muted); }
 .favicon-package li div { flex: 1; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 8px; font: 12px/1.7 var(--font-mono); }
 .favicon-package li small { font: 12px/1.6 var(--font-ui); color: var(--muted); }
-.visual-workbench > details:has(.file-workbench) { grid-column: 1 / -1; }
 @container (max-width: 700px) {
   .file-workbench .file-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 }

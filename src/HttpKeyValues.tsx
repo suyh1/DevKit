@@ -27,7 +27,7 @@ export default function HttpKeyValues({
       {rows.map((row, index) => (
         <div className="http-kv-row" key={index}>
           <input
-            type="checkbox"
+            className="form-check" type="checkbox"
             aria-label={`${label} ${index + 1} 启用`}
             checked={row.enabled}
             disabled={disabled}

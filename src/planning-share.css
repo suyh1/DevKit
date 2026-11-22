@@ -194,6 +194,8 @@
 .pl-field-group { min-width: 0; display: grid; gap: 8px; padding: 12px; border: 1px solid var(--pl-line); border-radius: 7px; }
 .pl-field-group legend { padding-inline: 4px; font-weight: 580; }
 .pl-field-group .pl-button { justify-self: start; }
+.share-access-options .planning-check { flex-direction:row-reverse; align-items:center; justify-content:space-between; gap:16px; padding-block:5px; cursor:pointer; }
+.share-access-options .planning-check + .planning-check { border-top:1px solid var(--pl-line); padding-top:10px; }
 .pl-edit-rows { display: grid; gap: 4px; }
 .pl-edit-rows li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--pl-line); padding-block: 4px; }
 @container (max-width: 900px) {

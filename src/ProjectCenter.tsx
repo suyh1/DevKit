@@ -755,7 +755,7 @@ export default function ProjectCenter({
             <label className="pc-select-all">
               <input
                 ref={allSelected}
-                type="checkbox"
+                className="form-check" type="checkbox"
                 aria-label="选择当前结果"
                 checked={
                   !!projects.length &&
@@ -894,7 +894,7 @@ export default function ProjectCenter({
                   <div className="pc-card-top">
                     <label className="pc-card-select">
                       <input
-                        type="checkbox"
+                        className="form-check" type="checkbox"
                         aria-label={`选择 ${project.name}`}
                         disabled={busy}
                         checked={selected.includes(project.id)}
@@ -1241,7 +1241,7 @@ export default function ProjectCenter({
                 </p>
                 <label className="pc-check">
                   <input
-                    type="checkbox"
+                    role="switch" className="liquid-toggle" type="checkbox"
                     checked={entry.enabled}
                     onChange={(event) =>
                       setEntry({ ...entry, enabled: event.target.checked })
@@ -1288,7 +1288,7 @@ export default function ProjectCenter({
                   >
                     <input
                       aria-label={`参数 ${index + 1} 启用`}
-                      type="checkbox"
+                      className="form-check" type="checkbox"
                       checked={row.enabled}
                       onChange={(event) =>
                         setEntry({

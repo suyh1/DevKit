@@ -8,6 +8,7 @@ import './collaboration.css';
 import './segmented-control.css';
 import './motion.css';
 import './adaptations.css';
+import './workbench-forms.css';
 import '../shared/focus.css';
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');

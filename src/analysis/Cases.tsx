@@ -24,7 +24,7 @@ export function CaseList({
   steps?: number;
 }) {
   return (
-    <div>
+    <div className="regression-cases">
       {cases.map((item, i) => (
         <fieldset key={i}>
           <legend>样例 {i + 1}</legend>
@@ -55,10 +55,10 @@ export function CaseList({
               </select>
             </label>
           )}
-          <button onClick={() => change(cases.filter((_, j) => i !== j))}>移除样例</button>
+          <button className="text-button" onClick={() => change(cases.filter((_, j) => i !== j))}>移除样例</button>
         </fieldset>
       ))}
-      <button disabled={cases.length >= 30} onClick={() => change([...cases, { input: '', expected: '' }])}>
+      <button className="secondary-button" disabled={cases.length >= 30} onClick={() => change([...cases, { input: '', expected: '' }])}>
         新增样例
       </button>
     </div>

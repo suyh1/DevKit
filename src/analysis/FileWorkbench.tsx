@@ -291,7 +291,7 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
                 </label>
                 <label>
                   <input
-                    type="checkbox"
+                    className="form-check" type="checkbox"
                     checked={o.aa === 'on'}
                     onChange={(e) => option('aa', e.target.checked ? 'on' : 'off')}
                   />

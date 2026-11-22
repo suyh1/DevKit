@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -188,10 +189,10 @@ export default function FileShares({ active }: { active: boolean }) {
               <button className="pl-button pl-primary" type="button" disabled={!share.running || busy} onClick={() => void fileShareRequest('open', { id: share.id }).catch(failure => setError(failure.message))}><ArrowUpRight size={16} />打开网页</button>
               <button className="pl-button" type="button" disabled={busy} onClick={() => void mutate('toggle', { id: share.id, revision: state.revision, enabled: !share.running }, share.running ? '共享已停止' : '共享已启动')}>{share.running ? '停止' : '启动'}</button>
             </div>
-            {share.links.length > 0 && <details className="pl-share-links"><summary>分享链接 · {share.links.length} 个地址</summary>
+            {share.links.length > 0 && <MotionDetails className="pl-share-links"><summary>分享链接 · {share.links.length} 个地址</summary>
               {share.links.map(link => <div key={link}><code>{link}</code><button type="button" className="pl-text"
                 aria-label={`复制 ${new URL(link).host} 的共享链接`} onClick={() => copy(link)}><Copy size={16} />复制链接</button></div>)}
-            </details>}
+            </MotionDetails>}
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>
             <CreateRelated from="file-shares" page="project-todos" resource={share.id}>新建引用此共享的待办清单</CreateRelated>
             <ShareRoots roots={share.roots} />
@@ -217,11 +218,11 @@ export default function FileShares({ active }: { active: boolean }) {
           {draft.paths.length > 0 && <ul className="pl-edit-rows">{draft.paths.map(item => <li key={item}><code>{item}</code>
             <button type="button" className="pl-icon" aria-label={`移除路径 ${item}`} onClick={() => change({ paths: draft.paths.filter(value => value !== item) })}><X size={16} /></button></li>)}</ul>}
         </fieldset>
-        <fieldset className="pl-field-group"><legend>访问方式</legend>
-          <label className="planning-check"><input type="checkbox" checked={draft.enabled} onChange={event => change({ enabled: event.target.checked })} />启用共享并在下次启动时恢复</label>
-          <label className="planning-check"><input type="checkbox" checked={draft.lan} onChange={event => change({ lan: event.target.checked })} />允许局域网通过独立端口访问</label>
+        <fieldset className="pl-field-group share-access-options"><legend>访问方式</legend>
+          <label className="planning-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={draft.enabled} onChange={event => change({ enabled: event.target.checked })} />启用共享并在下次启动时恢复</label>
+          <label className="planning-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={draft.lan} onChange={event => change({ lan: event.target.checked })} />允许局域网通过独立端口访问</label>
           {draft.lan && <p className="pl-meta">持有完整 HTTP 链接的人可以直接下载。</p>}
-          <label className="planning-check"><input type="checkbox" checked={draft.published} onChange={event => change({ published: event.target.checked })} />发布到共享工作台，供获准访客下载</label>
+          <label className="planning-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={draft.published} onChange={event => change({ published: event.target.checked })} />发布到共享工作台，供获准访客下载</label>
         </fieldset>
         {editorError && <p className="pc-error" role="alert">{editorError}</p>}
         <div className="planning-actions planning-form-footer"><ModalCancel /><button className="pl-button pl-primary" disabled={!draft.paths.length}>保存共享</button></div>

@@ -428,12 +428,12 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                   )}
                   <div className="mock-publish">
                     <label className="collab-check">
-                      <input type="checkbox" checked={row.cors} onChange={(e) => patch({ cors: e.target.checked })} />
+                      <input role="switch" className="liquid-toggle" type="checkbox" checked={row.cors} onChange={(e) => patch({ cors: e.target.checked })} />
                       允许跨域调用
                     </label>
                     <label className="collab-check">
                       <input
-                        type="checkbox"
+                        role="switch" className="liquid-toggle" type="checkbox"
                         checked={row.published}
                         onChange={(e) => patch({ published: e.target.checked })}
                       />

@@ -341,7 +341,7 @@ function SharingPanel({
                     />
                   </Field>
                 </div>
-                <label><input type="checkbox" checked={draft.allowDefault !== false} onChange={event => setDraft({ ...draft, allowDefault: event.target.checked })} />允许使用通用共享口令</label>
+                <label><input role="switch" className="liquid-toggle" type="checkbox" checked={draft.allowDefault !== false} onChange={event => setDraft({ ...draft, allowDefault: event.target.checked })} />允许使用通用共享口令</label>
                 {draft.allowDefault !== false && <Field
                   label={
                     draft.hasPassword
@@ -361,7 +361,7 @@ function SharingPanel({
                 </Field>}
                 <details className="sharing-production">
                   <summary>HTTPS 与证书</summary>
-                  <label><input type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
+                  <label><input role="switch" className="liquid-toggle" type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
                   {draft.tls && <div className="pc-form-grid">
                     <Field label="PEM 证书绝对路径"><input required value={draft.tls.cert} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, cert: event.target.value } })} /></Field>
                     <Field label="PEM 私钥绝对路径"><input required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
@@ -502,7 +502,7 @@ function SharingPanel({
                       >
                         <label className="sharing-service-toggle">
                           <input
-                            type="checkbox"
+                            role="switch" className="liquid-toggle" type="checkbox"
                             aria-label={"开放" + service.name}
                             checked={policy.enabled}
                             onChange={(event) =>
@@ -547,7 +547,7 @@ function SharingPanel({
                           {service.permissions.map((permission) => (
                             <label key={permission.key}>
                               <input
-                                type="checkbox"
+                                className="form-check" type="checkbox"
                                 checked={
                                   (
                                     policy as unknown as Record<string, boolean>
@@ -607,8 +607,8 @@ function SharingPanel({
                       {workspaceModules.map(item => {
                         const name = item.id, service = visitor.services[name];
                         const patch = (key: string, value: boolean) => change({ ...visitor, services: { ...visitor.services, [name]: { ...service, [key]: value } } });
-                        return <div className="sharing-visitor-service" key={name}><label><input type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
-                          {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
+                        return <div className="sharing-visitor-service" key={name}><label><input className="form-check" type="checkbox" checked={service.enabled} disabled={!draft.services[name].enabled} onChange={event => patch('enabled', event.target.checked)} />{item.name}</label>
+                          {service.enabled && Object.entries(service).filter(([key]) => key !== 'enabled').map(([key, granted]) => <label key={key}><input className="form-check" type="checkbox" checked={granted} disabled={!((draft.services[name] as Record<string, boolean>)[key])} onChange={event => patch(key, event.target.checked)} />{labels[key]}</label>)}
                         </div>;
                       })}
                       <p className="sharing-effective"><strong>生效权限</strong> {grants.length ? grants.join('；') : '暂无可访问的栏目'}</p>
@@ -626,7 +626,7 @@ function SharingPanel({
                 </details>
                 <label className="pc-check">
                   <input
-                    type="checkbox"
+                    role="switch" className="liquid-toggle" type="checkbox"
                     checked={draft.autoStart}
                     onChange={(event) =>
                       setDraft({ ...draft, autoStart: event.target.checked })

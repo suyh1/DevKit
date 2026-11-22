@@ -50,7 +50,7 @@ export function CloseChoice({ onDone }: { onDone: () => void }) {
       </div>
       <p id={description}>可以退出软件，或最小化到系统托盘继续运行。托盘模式会保留当前草稿、请求和项目共享服务。</p>
       <label className="close-remember">
-        <input type="checkbox" checked={remember} disabled={busy} onChange={(event) => setRemember(event.target.checked)} />
+        <input className="form-check" type="checkbox" checked={remember} disabled={busy} onChange={(event) => setRemember(event.target.checked)} />
         记住我的选择，可在“偏好设置”中修改
       </label>
       {error && (

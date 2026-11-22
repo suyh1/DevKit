@@ -66,7 +66,7 @@ export default function ProjectComparison({
         {data.profiles.map((profile) => (
           <label key={profile.id}>
             <input
-              type="checkbox"
+              className="form-check" type="checkbox"
               checked={ids.includes(profile.id)}
               disabled={!ids.includes(profile.id) && ids.length >= 4}
               onChange={(event) =>
@@ -83,7 +83,7 @@ export default function ProjectComparison({
       </fieldset>
       <label className="pc-check pc-compare-filter">
         <input
-          type="checkbox"
+          role="switch" className="liquid-toggle" type="checkbox"
           checked={onlyChanged}
           onChange={(event) => setOnlyChanged(event.target.checked)}
         />

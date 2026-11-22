@@ -41,3 +41,6 @@
 .monitor-chart-plot input::-webkit-slider-thumb { appearance:none; width:2px; height:12px; }
 .monitor-chart-plot input::-moz-range-thumb { width:2px; }
 .monitor-chart-plot:has(input:focus-visible) { outline: var(--focus-outline); outline-offset:2px; }
+.monitor-event-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr)); gap:6px; margin-block:8px; }
+.monitor-event-choices label { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; line-height:1.5; cursor:pointer; }
+.monitor-event-choices label:has(:checked) { background:var(--tint); border-color:var(--accent); }

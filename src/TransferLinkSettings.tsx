@@ -68,7 +68,7 @@ export function TransferLinkSettings() {
             </label>
             {links?.filter(link => !link.short).map(link => (
               <label key={link.port}>
-                <input type="checkbox" disabled={op.busy} checked={shorten.includes(link.port)}
+                <input className="form-check" type="checkbox" disabled={op.busy} checked={shorten.includes(link.port)}
                   onChange={event => {
                     const checked = event.target.checked;
                     setShorten(current => checked ? [...current, link.port] : current.filter(port => port !== link.port));

@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef } from 'react';
 import type { KnowledgePage } from './knowledge-api';
 import { useCodeBlockColors } from './knowledge-code-blocks';
@@ -39,7 +40,7 @@ export function KnowledgeReader({
   return (
     <>
       {content.headings.length > 0 && (
-        <details className="kb-toc">
+        <MotionDetails className="kb-toc">
           <summary>本文目录 · {content.headings.length}</summary>
           <nav aria-label="本文目录">
             {content.headings.map((h) => (
@@ -59,7 +60,7 @@ export function KnowledgeReader({
               </div>
             ))}
           </nav>
-        </details>
+        </MotionDetails>
       )}
       <div
         className="kb-prose"

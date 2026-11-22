@@ -460,7 +460,7 @@ export default function HttpWorkbench({
           </div>
           <label className="http-sensitive">
             <input
-              type="checkbox"
+              className="form-check" type="checkbox"
               checked={includeSensitive}
               disabled={!!running}
               onChange={(event) => setIncludeSensitive(event.target.checked)}

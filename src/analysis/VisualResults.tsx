@@ -1,3 +1,4 @@
+import { MotionButton, MotionDetails } from '../Motion';
 import { useEffect, useMemo, useState } from 'react';
 import { PlanTree, PauseChart, Calendar, GridPreview } from './Charts';
 import { parseCsv } from '../practical';
@@ -120,7 +121,7 @@ function Timeline({ source, cpu }: { source: string; cpu: boolean }) {
     );
   }
   return (
-    <details open>
+    <MotionDetails className="workbench-disclosure" open>
       <summary>
         {cpu ? '采样自身用时' : '请求瀑布'} · 前 {bars.length} 项
       </summary>
@@ -141,18 +142,19 @@ function Timeline({ source, cpu }: { source: string; cpu: boolean }) {
           </div>
         ))}
       </div>
-    </details>
+    </MotionDetails>
   );
 }
 function EditableNotes({ text }: { text: string }) {
   const [draft, set] = useState(text);
+  const [status, setStatus] = useState('');
   useEffect(() => set(text), [text]);
   return (
-    <label>
-      编辑更新说明
-      <textarea rows={10} value={draft} onChange={(e) => set(e.target.value)} />
-      <button onClick={() => void saveText(draft, '更新说明.md')}>保存编辑后的 Markdown</button>
-    </label>
+    <section className="workbench-disclosure editable-notes">
+      <label>编辑更新说明<textarea rows={10} value={draft} onChange={(e) => { set(e.target.value); setStatus(''); }} /></label>
+      <MotionButton className="secondary-button" onClick={() => void saveText(draft, '更新说明.md').then(setStatus).catch(e => setStatus(String(e)))}>保存编辑后的 Markdown</MotionButton>
+      {status && <small role="status">{status}</small>}
+    </section>
   );
 }
 export default function VisualResults({
@@ -181,7 +183,7 @@ export default function VisualResults({
     return <Timeline source={output} cpu={id === 'cpu-profile'} />;
   if (id === 'svg-optimize')
     return (
-      <div className="analysis-fields">
+      <div className="svg-comparison">
         {[input, output].map((s, i) => (
           <figure key={i}>
             <SvgImage text={s} alt={i ? '优化结果' : '原始图像'} />

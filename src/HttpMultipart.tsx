@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import { useId } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { multipartLimits } from '../shared/http-multipart.mjs';
@@ -34,7 +35,7 @@ export default function HttpMultipart({ fields, change, disabled }: { fields: Mu
   const patch = (position: number, next: Partial<MultipartField>) => change(fields!.map((row, index) => index === position ? { ...row, ...next } : row));
   return <fieldset className="http-multipart" disabled={disabled}>
     <legend>请求体上传</legend>
-    <label><input type="checkbox" checked={!!fields} onChange={event => change(event.target.checked ? [multipartField()] : null)} /> multipart/form-data</label>
+    <label><input role="switch" className="liquid-toggle" type="checkbox" checked={!!fields} onChange={event => change(event.target.checked ? [multipartField()] : null)} /> multipart/form-data</label>
     {fields && <>
       <p className="preview-note">发送时使用以下表单字段和文件。选中的内容仅保留在当前页面。每项最多 1 MB，整份表单最多 2 MB。</p>
       {fields.map((row, index) => <div className="http-multipart-row" key={index}>
@@ -45,7 +46,7 @@ export default function HttpMultipart({ fields, change, disabled }: { fields: Mu
       </div>)}
       <button type="button" className="text-button" disabled={fields.length >= multipartLimits.rows} onClick={() => change([...fields, multipartField()])}><Plus size={14} />添加表单字段</button>
       {issue && <p className="preview-note">{issue}</p>}
-      <details><summary>表单预览</summary><ul>{fields.map((row, index) => <li key={index}>{row.name || '未命名字段'} · {row.kind === 'file' ? row.file?.name || '未选择文件' : `${new TextEncoder().encode(row.value).length} B 文本`}</li>)}</ul><small>请求会自动添加 Content-Type 和边界。</small></details>
+      <MotionDetails><summary>表单预览</summary><ul>{fields.map((row, index) => <li key={index}>{row.name || '未命名字段'} · {row.kind === 'file' ? row.file?.name || '未选择文件' : `${new TextEncoder().encode(row.value).length} B 文本`}</li>)}</ul><small>请求会自动添加 Content-Type 和边界。</small></MotionDetails>
     </>}
   </fieldset>;
 }

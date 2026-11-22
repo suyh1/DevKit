@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiEnvironment, ApiProject } from '../shared/api-workspace.mjs';
 import {
@@ -142,11 +143,11 @@ export default function ApiRegression({
     }
   }
   return (
-    <details className="devkit-panel api-regression">
+    <MotionDetails className="devkit-panel api-regression">
       <summary>接口集合回归</summary>
       <fieldset disabled={sending}>
         {steps.map((s, i) => (
-          <div className="devkit-fields" key={i}>
+          <div className="devkit-fields regression-step" key={i}>
             <label>
               步骤 {i + 1}
               <select value={s.id} onChange={(e) => patch(i, { id: e.target.value })}>
@@ -183,37 +184,47 @@ export default function ApiRegression({
                 onChange={(e) => patch(i, { variable: e.target.value })}
               />
             </label>
-            <button onClick={() => change(steps.filter((_, j) => j !== i))}>移除步骤</button>
+            <button className="text-button" onClick={() => change(steps.filter((_, j) => j !== i))}>
+              移除步骤
+            </button>
           </div>
         ))}
-        <button
-          disabled={!project.endpoints.length || steps.length >= 50}
-          onClick={() => change([...steps, first(project.endpoints[0].id)])}
-        >
-          追加接口
-        </button>
-        <button
-          disabled={!steps.length}
-          onClick={() => {
-            try {
-              localStorage.setItem(storageKey, JSON.stringify(steps));
-              setNotice('回归步骤已保存到此设备');
-            } catch (e) {
-              setNotice(String(e));
-            }
-          }}
-        >
-          保存回归步骤
-        </button>
-        <button
-          className="run-button"
-          disabled={!steps.length || !canSendHttp() || (!window.devkitHttp && !remoteAccess())}
-          onClick={() => void run()}
-        >
-          依次发送并校验
-        </button>
+        <div className="regression-actions">
+          <button
+            className="secondary-button"
+            disabled={!project.endpoints.length || steps.length >= 50}
+            onClick={() => change([...steps, first(project.endpoints[0].id)])}
+          >
+            追加接口
+          </button>
+          <button
+            className="secondary-button"
+            disabled={!steps.length}
+            onClick={() => {
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(steps));
+                setNotice('回归步骤已保存到此设备');
+              } catch (e) {
+                setNotice(String(e));
+              }
+            }}
+          >
+            保存回归步骤
+          </button>
+          <button
+            className="run-button"
+            disabled={!steps.length || !canSendHttp() || (!window.devkitHttp && !remoteAccess())}
+            onClick={() => void run()}
+          >
+            依次发送并校验
+          </button>
+        </div>
       </fieldset>
-      {active.current && <button onClick={() => active.current?.abort()}>停止回归</button>}
+      {active.current && (
+        <button className="secondary-button" onClick={() => active.current?.abort()}>
+          停止回归
+        </button>
+      )}
       <ol aria-live="polite">
         {report.map((r, i) => (
           <li key={i}>{r}</li>
@@ -221,6 +232,7 @@ export default function ApiRegression({
       </ol>
       {!!report.length && (
         <button
+          className="secondary-button"
           onClick={() =>
             void saveText(report.join('\n'), 'api-regression.txt')
               .then(setNotice)
@@ -231,6 +243,6 @@ export default function ApiRegression({
         </button>
       )}
       <p role="status">{notice}</p>
-    </details>
+    </MotionDetails>
   );
 }

@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import SegmentedControl from './SegmentedControl';
 import { newProjectId } from './project-api';
 import { Plus, Trash2 } from "lucide-react";
@@ -42,7 +43,7 @@ export function ApiParameters({
               <tr key={row.id}>
                 <td>
                   <input
-                    type="checkbox"
+                    className="form-check" type="checkbox"
                     aria-label={`参数${index + 1}启用`}
                     checked={row.enabled}
                     onChange={(event) =>
@@ -84,7 +85,7 @@ export function ApiParameters({
                           patch(row.id, { name: event.target.value })
                         }
                       />
-                      <details className="api-parameter-schema">
+                      <MotionDetails className="api-parameter-schema">
                         <summary>约束Schema</summary>
                         <textarea
                           aria-label={`参数${index + 1}Schema`}
@@ -95,7 +96,7 @@ export function ApiParameters({
                           }
                           placeholder='{"minLength":1}'
                         />
-                      </details>
+                      </MotionDetails>
                     </div>
                   )}
                 </td>
@@ -125,7 +126,7 @@ export function ApiParameters({
                     </td>
                     <td>
                       <input
-                        type="checkbox"
+                        className="form-check" type="checkbox"
                         aria-label={`参数${index + 1}必填`}
                         checked={row.required}
                         onChange={(event) =>

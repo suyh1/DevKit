@@ -134,7 +134,7 @@ function HostEditor({ active, host, seed, hosts, close, save, busy, error, porta
                 {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>}
-            {hasCredential && <label className="lan-clear-credential"><input type="checkbox" checked={!!draft.clearPassword} onChange={event => { setRevealed(false); patch({ clearPassword: event.target.checked, password: '' }); }} />清除已保存的凭据</label>}
+            {hasCredential && <label className="lan-clear-credential"><input className="form-check" type="checkbox" checked={!!draft.clearPassword} onChange={event => { setRevealed(false); patch({ clearPassword: event.target.checked, password: '' }); }} />清除已保存的凭据</label>}
             {ssh && <div className="lan-jump-row">
               <label className="lan-field"><span>SSH 跳板机 <small>选填</small></span>
                 <select value={draft.jumpHostId || ''} onChange={event => patch({ jumpHostId: event.target.value || undefined })}>

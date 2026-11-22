@@ -66,7 +66,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
         <SegmentedControl label="默认布局" value={preferences.layout} onChange={(layout) => update({ layout })}
           options={[{ value: 'split', label: '左右分栏' }, { value: 'stack', label: '上下布局' }]} />
       </div>
-      <label className="setting-row"><span><strong>自动换行</strong><small>长行在编辑区内折行显示</small></span><input className="liquid-toggle" type="checkbox" checked={preferences.wrap} onChange={event => update({ wrap: event.target.checked })} /></label></section>
+      <label className="setting-row"><span><strong>自动换行</strong><small>长行在编辑区内折行显示</small></span><input className="liquid-toggle" role="switch" type="checkbox" checked={preferences.wrap} onChange={event => update({ wrap: event.target.checked })} /></label></section>
     <WindowCloseSetting />
     <section className="settings-section">
       <h2><Monitor size={17} />性能</h2>

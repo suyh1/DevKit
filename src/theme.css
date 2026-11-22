@@ -16,6 +16,7 @@
 @import './theme-styles.css';
 @import './display-mode.css';
 @import './adaptations.css';
+@import './workbench-forms.css';
 @import './select.css';
 @import '../shared/focus.css';
 @import './focus-controls.css';

@@ -31,7 +31,7 @@ export default function LanHostImport({ close, onImport }: { close: () => void; 
       placeholder={format === 'csv' ? 'name,address,user,port,group,tags\n测试机,192.168.1.20,dev,22,测试,linux|api' : 'Host test\n  HostName 192.168.1.20\n  User dev\n  Port 22'} /></label>
     <p className="lan-note">{format === 'csv' ? '必填列 address。可选列 name、mode、user、port、platform、auth、group、tags、pinned、jar、nginx。标签用 | 分隔。' : '读取 Host、HostName、User 和 Port。密钥和跳板机可在导入后配置。'}</p>
     {rows && <ul className="lan-import-results">{rows.map(row => <li key={row.index}>
-      <label><input type="checkbox" disabled={!!row.error || busy} checked={selected.includes(row.index)} onChange={event => setSelected(current => event.target.checked ? [...current, row.index] : current.filter(index => index !== row.index))} />
+      <label><input className="form-check" type="checkbox" disabled={!!row.error || busy} checked={selected.includes(row.index)} onChange={event => setSelected(current => event.target.checked ? [...current, row.index] : current.filter(index => index !== row.index))} />
       <strong>{row.host?.name || `第 ${row.index + 1} 条`}</strong><span>{row.host?.address} {row.error}</span></label>
     </li>)}</ul>}
     {error && <p className="pc-error" role="alert">{error}</p>}

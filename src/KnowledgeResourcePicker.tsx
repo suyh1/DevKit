@@ -106,7 +106,7 @@ export function KnowledgeResourcePicker({
         {allowed.map((kind) => (
           <label key={kind}>
             <input
-              type="checkbox"
+              className="form-check" type="checkbox"
               checked={filters.includes(kind)}
               onChange={() =>
                 setFilters((old) => (old.includes(kind) ? old.filter((k) => k !== kind) : [...old, kind]))
@@ -120,7 +120,7 @@ export function KnowledgeResourcePicker({
         {visible.map((row) => (
           <label key={key(row)}>
             <input
-              type="checkbox"
+              className="form-check" type="checkbox"
               checked={selected.some((s) => key(s) === key(row))}
               onChange={() => toggle(row)}
             />

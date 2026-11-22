@@ -1,0 +1,106 @@
+/* Native inputs retain their label, checked state and keyboard behaviour. */
+input[type=checkbox]:is(.form-check, .liquid-toggle) {
+  box-sizing:border-box; flex:none; min-width:0; min-height:0; max-width:none; margin:0;
+  appearance:none; display:inline-grid; place-items:center; vertical-align:middle; cursor:pointer;
+  width:18px; height:18px; padding:0; border:1px solid var(--subtle); border-radius:5px;
+  background:var(--surface); color:var(--accent-ink);
+}
+input[type=checkbox].form-check::before {
+  content:''; width:9px; height:5px; border:solid currentColor; border-width:0 0 2px 2px;
+  transform:translateY(-1px) rotate(-45deg); opacity:0;
+}
+input[type=checkbox].liquid-toggle {
+  width:36px; height:21px; border-radius:12px; justify-content:start; padding:2px;
+  border-color:var(--muted); background:var(--muted); color:var(--surface);
+}
+input[type=checkbox].liquid-toggle::before {
+  content:''; width:15px; height:15px; border-radius:50%; background:currentColor;
+}
+input[type=checkbox]:is(.form-check,.liquid-toggle):checked,
+input[type=checkbox].form-check:indeterminate { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+input[type=checkbox].form-check:checked::before { opacity:1; }
+input[type=checkbox].form-check:indeterminate::before { width:9px; height:0; border-width:0 0 2px; transform:none; opacity:1; }
+.liquid-toggle:checked::before { transform:translateX(14px); }
+input[type=checkbox]:is(.form-check,.liquid-toggle):disabled { cursor:default; opacity:.5; }
+input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(--focus-outline); outline-offset:2px; }
+@media (prefers-reduced-motion:no-preference) {
+  :root:not([data-display-mode=performance]) .liquid-toggle::before { transition:transform 180ms var(--press-spring); }
+}
+@media (forced-colors:active) {
+  input[type=checkbox]:is(.form-check,.liquid-toggle) { appearance:auto; width:18px; height:18px; padding:0; }
+  input[type=checkbox]:is(.form-check,.liquid-toggle)::before { content:none; }
+}
+
+.number-stepper {
+  display:inline-grid; grid-template-columns:auto minmax(4ch,1fr) auto; align-items:stretch;
+  width:min(100%, 10rem); min-width:0; border:1px solid var(--line); border-radius:7px; background:var(--surface);
+}
+.option .number-stepper input[type=number] {
+  width:100%; min-width:0; text-align:center; font-variant-numeric:tabular-nums;
+  appearance:textfield; border:0; border-radius:0; padding:5px 2px; background:transparent;
+}
+.number-stepper input::-webkit-inner-spin-button { appearance:none; }
+.number-stepper button[type=button] {
+  display:grid; place-content:center; width:30px; min-height:32px; margin:0; padding:0;
+  background:transparent; border:0; border-radius:6px; color:var(--accent);
+}
+.number-stepper button:hover:enabled { background:var(--tint); }
+.number-stepper button:disabled { opacity:.4; }
+.toolbar > .options, .compact-options .options { align-items:end; }
+.toolbar > .options .option, .compact-options .option {
+  display:grid; gap:4px; min-width:0; max-width:100%; align-content:start;
+}
+.options .option > :is(span,label):first-child { font:500 12px/1.5 var(--font-ui); white-space:normal; color:var(--muted); }
+.option > .segmented-control { max-width:100%; min-width:0; }
+.options .option > :is(input,select) { max-width:100%; min-width:0; }
+.options .option > input:not([type=number]) { width:clamp(9rem,18vw,18rem); }
+.visual-controls .option > :is(select,.number-stepper) { width:100%; }
+
+.workbench-disclosure {
+  min-width:0; padding:12px 16px; border:1px solid var(--line); border-radius:var(--work-panel-radius,10px);
+  background:var(--surface); color:var(--text); font:13px/1.6 var(--font-ui);
+}
+.workbench-disclosure > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:24px; list-style:none; font-weight:600; cursor:pointer; }
+.workbench-disclosure > summary::-webkit-details-marker { display:none; }
+.workbench-disclosure > summary::after { content:''; flex:none; width:7px; height:7px; margin-inline-end:4px; border:solid var(--muted); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+.workbench-disclosure[open] > summary::after { transform:rotate(225deg); }
+.workbench-disclosure[data-motion-expanding=false] > summary::after { transform:rotate(45deg); }
+@media (prefers-reduced-motion:no-preference) {
+  :root:not([data-display-mode=performance]) .workbench-disclosure > summary::after { transition:transform 180ms ease; }
+}
+.workbench-disclosure[open] > summary { margin-bottom:12px; }
+.workbench-disclosure > svg { display:block; width:100%; }
+.workbench-disclosure > nav { display:flex; align-items:center; gap:10px; margin-block:8px; }
+.workbench-disclosure .analysis-calendar { max-width:100%; grid-template-columns:repeat(7,minmax(1.6rem,2.45rem)); gap:2px; }
+.workbench-disclosure .analysis-calendar [data-occurs] { color:var(--accent-ink); }
+.workbench-disclosure .analysis-plan > div { flex-wrap:wrap; }
+.analysis-fields.field-choices { align-items:center; gap:6px; }
+.analysis-fields.field-choices label {
+  display:flex; align-items:center; gap:6px; min-width:0; max-width:100%; padding:5px 10px; border:1px solid var(--line); border-radius:6px;
+  background:var(--surface); overflow-wrap:anywhere; cursor:pointer;
+}
+.analysis-file > label:has(> .form-check) { display:flex; align-items:center; gap:8px; }
+.field-choices label:has(:checked) { background:var(--tint); border-color:var(--accent); }
+.regression-cases { display:grid; gap:10px; min-width:0; justify-items:start; }
+.regression-cases > fieldset {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));
+  align-items:start; gap:10px; width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px;
+}
+.regression-cases label { display:grid; min-width:0; gap:4px; }
+.regression-cases textarea { width:100%; min-height:5rem; resize:vertical; }
+.regression-cases fieldset button { justify-self:end; align-self:end; }
+.api-regression .regression-step {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));
+  align-items:end; gap:10px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--soft);
+}
+.regression-step > label:first-child { grid-column:1/-1; }
+.regression-step :is(input,select) { width:100%; min-width:0; }
+.regression-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.regression-actions .run-button { margin-inline-start:0; }
+.editable-notes { display:grid; justify-items:start; gap:10px; }
+.editable-notes label { display:grid; width:100%; gap:6px; font-weight:600; }
+.editable-notes textarea { padding:10px; resize:vertical; font:13px/1.65 var(--font-mono); border:1px solid var(--line); background:var(--soft); color:var(--text); border-radius:8px; }
+.svg-comparison { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:12px; }
+.svg-comparison figure { display:grid; grid-template-rows:1fr auto; min-width:0; margin:0; overflow:hidden; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
+.svg-comparison img { display:block; width:100%; height:clamp(130px,22vh,230px); padding:12px; object-fit:contain; }
+.svg-comparison figcaption { padding:8px 12px; border-top:1px solid var(--line); color:var(--muted); font:12px/1.5 var(--font-mono); }

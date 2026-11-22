@@ -1,3 +1,4 @@
+import { MotionDetails } from './Motion';
 import type { ApiEndpoint, ApiProject } from "../shared/api-workspace.mjs";
 import ApiSchemaView from "./ApiSchemaView";
 import CodeEditor from "./CodeEditor";
@@ -64,12 +65,12 @@ export default function ApiDocumentation({
                         {row.required || row.location === "path" ? "是" : "否"}
                       </td>
                       <td>
-                        {(row.description?.length || 0) > 64 ? <details><summary>{row.name} · {row.type} · 参数说明</summary><p className="api-prose">{row.description}</p></details> : row.description || "—"}
+                        {(row.description?.length || 0) > 64 ? <MotionDetails><summary>{row.name} · {row.type} · 参数说明</summary><p className="api-prose">{row.description}</p></MotionDetails> : row.description || "—"}
                         {row.schema && (
-                          <details>
+                          <MotionDetails>
                             <summary>Schema约束</summary>
                             <pre>{row.schema}</pre>
-                          </details>
+                          </MotionDetails>
                         )}
                       </td>
                       <td>
@@ -99,7 +100,7 @@ export default function ApiDocumentation({
             <ApiSchemaView value={endpoint.requestSchema} />
           )}{" "}
           {endpoint.requestSchema && (
-            <details>
+            <MotionDetails>
               <summary>请求Schema</summary>
               <div className="api-code-editor">
                 <CodeEditor
@@ -110,7 +111,7 @@ export default function ApiDocumentation({
                   wrap
                 />
               </div>
-            </details>
+            </MotionDetails>
           )}
         </section>
       )}
@@ -128,7 +129,7 @@ export default function ApiDocumentation({
                 <div>
                   <h4>JSON Schema</h4>
                   <ApiSchemaView value={row.schema} />
-                  <details>
+                  <MotionDetails>
                     <summary>原始Schema</summary>
                     <div className="api-code-editor">
                       <CodeEditor
@@ -139,7 +140,7 @@ export default function ApiDocumentation({
                         wrap
                       />
                     </div>
-                  </details>
+                  </MotionDetails>
                 </div>
               )}
               {row.example && (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import LocalFilePicker from '../LocalFilePicker';
-import { MotionDetails } from '../Motion';
+import { MotionButton, MotionDetails } from '../Motion';
 import SegmentedControl from '../SegmentedControl';
 import { saveText, readText, downloadBlob } from '../files';
 import { copyText } from '../motion-primitives';
@@ -140,7 +140,7 @@ export function Base64Files() {
     <MotionDetails className="analysis-file" data-upgrade="base64">
       <summary>文件与 Base64 / Data URL 互转</summary>
       <label>
-        <input type="checkbox" checked={dataUrl} onChange={(e) => asUrl(e.target.checked)} />
+        <input className="form-check" type="checkbox" checked={dataUrl} onChange={(e) => asUrl(e.target.checked)} />
         编码时附带 Data URL
       </label>
       <LocalFilePicker label="编码文件" onFiles={(files) => void encode(files[0])} />
@@ -157,8 +157,10 @@ export function Base64Files() {
         恢复文件名
         <input value={name} onChange={(e) => setName(e.target.value)} />
       </label>
-      <button onClick={() => void copyText(value).catch(() => setError('复制失败'))}>复制编码</button>
-      <button onClick={restore}>还原并下载</button>
+      <div className="analysis-actions">
+        <MotionButton className="secondary-button" disabled={!value} onClick={() => void copyText(value).catch(() => setError('复制失败'))}>复制编码</MotionButton>
+        <MotionButton className="secondary-button" onClick={restore}>还原并下载</MotionButton>
+      </div>
       {error && <p role="alert">{error}</p>}
     </MotionDetails>
   );

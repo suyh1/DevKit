@@ -42,7 +42,7 @@ export default function JarConsole({ id, name, active, close, stop, control = ca
   return <section className="jar-log jar-console" aria-label={`${name} 应用控制台`}>
     <header><div><h2>{name} · 控制台</h2><p>关闭面板或断线后应用继续运行。输出仅在内存保留，最多 1 Mi 字符，不写标准输出日志文件。</p></div><button className="icon-button" aria-label="关闭控制台" onClick={close}><X size={17} /></button></header>
     <div className="jar-toolbar"><label className="jar-search"><Search size={14} /><input aria-label="搜索控制台输出" value={query} onChange={event => setQuery(event.target.value)} placeholder="筛选当前输出行" /></label><div className="jar-actions">
-      <label className="jar-auto"><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} />自动滚动</label>
+      <label className="jar-auto"><input role="switch" className="liquid-toggle" type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} />自动滚动</label>
       <button className="text-button" onClick={() => { setFollow(true); if (output.current) output.current.scrollTop = output.current.scrollHeight; }}>回到底部</button>
       <button className="text-button" onClick={() => { setText(''); setNotice('仅清空本页显示，不影响其他查看者。'); }}>清空显示</button>
       <button className="text-button" onClick={() => void task(async () => { await copyText(matches); setNotice('已复制控制台输出。'); })}><Copy size={14} />复制输出</button>

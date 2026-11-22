@@ -81,31 +81,6 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.setting-row input.liquid-toggle {
-  appearance: none;
-  width: 36px;
-  height: 21px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: var(--muted, #aaa);
-  cursor: pointer;
-  padding: 2px;
-}
-.liquid-toggle:before {
-  display: block;
-  content: '';
-  width: 15px;
-  height: 15px;
-  background: white;
-  border-radius: 100%;
-  transition: transform 0.18s;
-}
-.setting-row input.liquid-toggle:checked {
-  background: var(--accent, #147d64);
-}
-.liquid-toggle:checked:before {
-  transform: translateX(14px);
-}
 @media (min-width: 901px) {
   .shared-navigation {
     display: flex;

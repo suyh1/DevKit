@@ -72,6 +72,12 @@
 
 文件拖入和图上对照参考 [Bencho Upload dropzone](https://bencho.dev/blocks/upload-dropzone) 和 [Image compare](https://bencho.dev/blocks/image-compare)。键盘选取与拖放共用业务入口，保留原生文件和目录选择，参考 [React Spectrum DropZone](https://react-spectrum.adobe.com/v3/DropZone.html) 与 [react-dropzone](https://github.com/react-dropzone/react-dropzone) 的选取器兼容性说明。图标包内容按文件用途分组，参考 [Magic UI File Tree](https://magicui.design/docs/components/file-tree)。这些交互使用本地组件实现，离线可用。
 
+## 工具参数与工作台表单
+
+启用、暂停和权限设置沿用偏好面板的滑动开关。多选字段、批量操作和一次性确认保留方形勾选框。两者均使用原生输入接收焦点、响应空格键和传递禁用状态。滑块位移遵循减少动态效果和性能模式，高对比度模式使用系统控件。外观参考 [Bencho Liquid Toggle](https://bencho.dev/blocks/liquid-toggle)。
+
+有整数范围的工具参数可直接输入、用方向键修改或点击加减按钮，到达边界时禁用对应按钮。预览随参数更新，较宽的 Flex 容器只在画布内滚动。图表和诊断详情复用 MotionDetails，展开后可继续键盘导航。数值交互参考 [React Aria NumberField](https://react-aria.adobe.com/NumberField)。
+
 ## 验证
 
 单元测试覆盖弹簧生命周期、复制结果、异步操作来源和服务端渲染语义。完成生产构建后，可用 `node scripts/smoke-desktop.mjs --design-only` 验证工作台导航、搜索、卡片与减少动态效果，用 `--monitor-only` 验证检测样本和窄屏共享页面。

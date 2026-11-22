@@ -1,3 +1,4 @@
+import { MotionDetails } from '../Motion';
 import { useMemo } from 'react';
 import { parseCsv } from '../practical';
 const eligible = new Set(['reconcile', 'pivot', 'pseudonym']);
@@ -37,13 +38,13 @@ export default function TableFields({
     .map((x) => x.trim())
     .filter(Boolean);
   return (
-    <details className="analysis-file">
+    <MotionDetails className="analysis-file">
       <summary>从表头选择字段</summary>
-      <div className="analysis-fields">
+      <div className="analysis-fields field-choices">
         {header.map((name, i) => (
           <label key={i}>
             <input
-              type="checkbox"
+              className="form-check" type="checkbox"
               checked={keys.includes(name)}
               onChange={(e) =>
                 onChange(
@@ -67,6 +68,6 @@ export default function TableFields({
           </select>
         </label>
       )}
-    </details>
+    </MotionDetails>
   );
 }
