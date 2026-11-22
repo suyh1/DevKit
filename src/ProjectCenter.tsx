@@ -1158,7 +1158,7 @@ export default function ProjectCenter({
           wide
         >
           <ModalForm
-            footer={<footer>
+            footer={<footer className="pc-form-footer">
               <ModalCancel />
               <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
                 保存项目定义
@@ -1370,7 +1370,7 @@ export default function ProjectCenter({
           wide
         >
           <ModalForm
-            footer={<footer>
+            footer={<footer className="pc-form-footer">
               <ModalCancel />
               <MotionButton outcome={error ? "error" : ""} busy={busy} className="run-button" disabled={busy || !!draftError}>
                 保存配置档案

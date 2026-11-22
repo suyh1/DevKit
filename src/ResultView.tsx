@@ -1,3 +1,4 @@
+import ResultPager from './ResultPager';
 import SegmentedControl from './SegmentedControl';
 import { MotionButton, MotionDetails } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -43,14 +44,29 @@ function MatchView({ text, source }: { text: string; source: string }) {
 }
 
 function TableView({ node, query }: { node: JsonNode; query: string }) {
-  const matches = node.children.filter(child => child.node.raw.toLowerCase().includes(query));
-  const rows = matches.slice(0, 100).map(child => child.node);
+  const [page, setPage] = useState(0);
+  const matches = useMemo(() => node.children.filter(child => child.node.raw.toLowerCase().includes(query)), [node, query]);
   if (!matches.length && query) return <p role="status" className="preview-note">没有匹配的行。</p>;
-  if (rows.some(row => new Set(row.children.map(child => child.key)).size !== row.children.length))
-    return <p className="preview-note">结果含有同名字段，请切换到结构视图或源码查看全部值。</p>;
-  const keys = [...new Set(rows.flatMap(row => row.children.map(child => child.key)))].slice(0, 30);
-  if (node.kind !== 'array' || rows.some(row => row.kind === 'value')) return <p className="preview-note">此结果不适合表格展示，请使用结构或源码视图。</p>;
-  return <div className="table-preview"><p className="preview-note">共 {node.children.length} 行{query && ` · 匹配 ${matches.length} 行`} · 预览前 100 行、30 列 · 数字保持原始精度</p><table><thead><tr><th>#</th>{keys.map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={matches[index].key}><td>{Number(matches[index].key) + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}</tr>)}</tbody></table></div>;
+  const pages = Math.max(1, Math.ceil(matches.length / 100));
+  const current = Math.min(page, pages - 1);
+  const rows = matches.slice(current * 100, (current + 1) * 100);
+  const keys = [...new Set(rows.flatMap(({ node }) => node.children.map(child => child.key)))].slice(0, 30);
+  let notice = '';
+  if (node.kind !== 'array' || rows.some(({ node }) => node.kind === 'value')) {
+    notice = '此页含有不适合表格展示的值，请使用结构或源码视图。';
+  } else if (rows.some(({ node }) => new Set(node.children.map(child => child.key)).size !== node.children.length)) {
+    notice = '结果含有同名字段，请切换到结构视图或源码查看全部值。';
+  }
+  return <div className="json-table-result">
+    <p className="preview-note">共 {node.children.length} 行{query && ' · 匹配 ' + matches.length + ' 行'} · 每页最多 30 列 · 数字保持原始精度</p>
+    {notice ? <p className="preview-note">{notice}</p> : <div className="table-preview analysis-table-scroll">
+      <table><thead><tr><th scope="col">#</th>{keys.map(key => <th scope="col" key={key}>{key}</th>)}</tr></thead>
+        <tbody>{rows.map(({ key: index, node: row }) => <tr key={index}>
+          <td>{Number(index) + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}
+        </tr>)}</tbody>
+      </table></div>}
+    <ResultPager page={current} pages={pages} onPage={setPage} />
+  </div>;
 }
 
 export default function ResultView({ toolId, text, source, onCopy, initialView = 'tree' }: { toolId: ToolId; text: string; source: string; onCopy: (text: string) => void; initialView?: string }) {
@@ -68,5 +84,5 @@ export default function ResultView({ toolId, text, source, onCopy, initialView =
   if (!parsed.node) return <p className="preview-note">{parsed.error}</p>;
   const filter = query.trim().toLowerCase();
   const table = parsed.node.kind === 'array' && view === 'table';
-  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>{table ? '原始精度' : '原始精度 · $ 复制路径'}</small></div>{table ? <TableView node={parsed.node} query={filter} /> : filter && !'$'.includes(filter) && !parsed.node.raw.toLowerCase().includes(filter) ? <p role="status" className="preview-note">没有匹配的节点。</p> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={filter} onCopy={onCopy} /></div>}</div>;
+  return <div className="structured-preview"><div className="preview-toolbar"><label><Search size={14} /><input aria-label="搜索结果节点" placeholder="搜索字段或值…" value={query} onChange={event => setQuery(event.target.value)} /></label>{parsed.node.kind === 'array' && <SegmentedControl label="预览方式" value={view} options={[{ value: 'tree', label: '结构视图' }, { value: 'table', label: '表格视图' }]} onChange={setView} />}<small>{table ? '原始精度' : '原始精度 · $ 复制路径'}</small></div>{table ? <TableView key={filter} node={parsed.node} query={filter} /> : filter && !'$'.includes(filter) && !parsed.node.raw.toLowerCase().includes(filter) ? <p role="status" className="preview-note">没有匹配的节点。</p> : <div className="json-tree"><TreeNode node={parsed.node} label="$" path="$" depth={0} query={filter} onCopy={onCopy} /></div>}</div>;
 }

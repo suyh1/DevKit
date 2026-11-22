@@ -6,7 +6,7 @@ import type { TodoModel } from '../shared/todo-text.mjs';
 import { workspaceModules } from './catalog';
 import { RelatedLink, useWorkspaceGuard } from './related-workspaces';
 import { fileShareRequest, publishedShares, type FileShareState } from './planning-share-api';
-import { Modal, ModalCancel } from './project-components';
+import { Modal, ModalCancel, ModalForm } from './project-components';
 import type { TodoEditorHandle } from './TodoTextEditor';
 import { planTodoSyntax, todoRepeatRules, todoSyntaxFields, todoViewStates } from './todo-syntax-actions';
 import type { TodoSyntaxAction, TodoSyntaxFields } from './todo-syntax-actions';
@@ -88,7 +88,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
       })}</div></details>
     </div>
     {draft && fields && <Modal active={active} title={label!} closeLabel="关闭待办扩展操作" close={() => setDraft(null)} draft={fields} className="td-settings-dialog">
-      <form className="td-settings td-syntax-form" onSubmit={event => { event.preventDefault(); submit(); }}>
+      <ModalForm footer={<footer className="pc-form-footer"><ModalCancel /><button className="run-button" disabled={locked}>写入清单</button></footer>} className="td-settings td-syntax-form" onSubmit={event => { event.preventDefault(); submit(); }}>
         {action !== 'view' && <label className="pc-field">{action === 'defaults' ? '分组' : '应用到任务'}
           <select value={fields.target} required onChange={event => {
             setDraft({ ...draft, fields: todoSyntaxFields(draft.action, draft.model, Number(event.target.value), portal) });
@@ -134,8 +134,7 @@ export default function TodoSyntaxActions({ active, model, editor, line, locked,
             <option key={task.line} value={task.line}>{title} · 第 {task.line} 行</option>)}
         </select></label>}
         {error && <p className="td-alert" role="alert">{error}</p>}
-        <footer><ModalCancel /><button className="run-button" disabled={locked}>写入清单</button></footer>
-      </form>
+      </ModalForm>
     </Modal>}
   </>;
 }

@@ -18,12 +18,12 @@ export default function HttpKeyValues({
   }
   return (
     <div className="http-key-values" aria-label={label}>
-      <div className="http-kv-heading">
+      {rows.length > 0 && <div className="http-kv-heading">
         <span>启用</span>
         <span>名称</span>
         <span>值</span>
         <span />
-      </div>
+      </div>}
       {rows.map((row, index) => (
         <div className="http-kv-row" key={index}>
           <input

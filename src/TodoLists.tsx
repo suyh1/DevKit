@@ -5,7 +5,7 @@ import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { readText, saveText } from './files';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
 import type { FileShareState, TodoDocument } from './planning-share-api';
-import { Modal, ModalCancel } from './project-components';
+import { Modal, ModalCancel, ModalForm } from './project-components';
 import { SharingButton } from './Sharing';
 import type { TodoEditorHandle } from './TodoTextEditor';
 import TodoOutline, { needsTodoFollowUp } from './TodoOutline';
@@ -287,7 +287,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
     {settings && <Modal title={settings.current ? '清单设置' : settings.imported !== undefined ? '导入清单' : '新建清单'} closeLabel="关闭清单设置"
       description={settings.imported === undefined ? undefined : portal ? '文件将作为一份新清单发布到共享工作台。' : '文件将保存为一份新清单。'}
       active={active} close={closeSettingsForm} draft={{ name: settings.name, published: settings.published }} busy={busy} className="td-settings-dialog">
-      <form className="td-settings" onSubmit={event => {
+      <ModalForm footer={<footer className="pc-form-footer"><ModalCancel /><button className="run-button" disabled={busy}>{settings.imported !== undefined ? '导入' : '保存'}</button></footer>} className="td-settings" onSubmit={event => {
         event.preventDefault();
         void request(settings.current ? 'settings' : 'create', {
           id: settings.current?.id, revision: settings.current?.revision, name: settings.name, published: settings.published, body: settings.imported ?? (settings.reference ? `待办:\n- 查看共享资料 ${settings.reference}\n` : undefined),
@@ -298,8 +298,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
         {!portal && <label className="pc-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={settings.published} onChange={event => setSettings({ ...settings, published: event.target.checked })} />发布到共享工作台</label>}
         {settings.current?.published && <ResourceLink page="project-todos" id={settings.current.id} />}
         {formError && <p className="td-alert" role="alert">{formError}</p>}
-        <footer><ModalCancel /><button className="run-button" disabled={busy}>{settings.imported !== undefined ? '导入' : '保存'}</button></footer>
-      </form>
+      </ModalForm>
     </Modal>}
   </section>;
 }

@@ -104,3 +104,17 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 .svg-comparison figure { display:grid; grid-template-rows:1fr auto; min-width:0; margin:0; overflow:hidden; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
 .svg-comparison img { display:block; width:100%; height:clamp(130px,22vh,230px); padding:12px; object-fit:contain; }
 .svg-comparison figcaption { padding:8px 12px; border-top:1px solid var(--line); color:var(--muted); font:12px/1.5 var(--font-mono); }
+
+.env-changes, .json-table-result { display:grid; gap:10px; min-width:0; padding:12px; container-type:inline-size; }
+.env-changes > .segmented-control { justify-self:start; max-width:100%; }
+.env-change { padding:8px 12px; }
+.env-change summary code { overflow-wrap:anywhere; }
+.env-change dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; border:1px solid var(--line); border-radius:6px; overflow:hidden; margin:0; background:var(--line); }
+.env-change dl > div { padding:8px 12px; background:var(--soft); }
+.env-change dt { font-size:12px; color:var(--muted); }
+.env-change dd { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.json-table-result > .preview-note { margin:0; padding:0; }
+.result-preview > .analysis-data, .url-result > .analysis-data { padding:12px; }
+@container (max-width:350px) {
+  .env-change dl { grid-template-columns:minmax(0,1fr); }
+}

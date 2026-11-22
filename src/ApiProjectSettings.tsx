@@ -1,11 +1,12 @@
 import { newProjectId } from './project-api';
 import type { ApiProject } from "../shared/api-workspace.mjs";
 import { Plus, Trash2 } from "lucide-react";
-import { Modal, ModalCancel } from "./project-components";
+import { Modal, ModalCancel, ModalForm } from "./project-components";
 import HttpKeyValues from "./HttpKeyValues";
 
 export default function ApiProjectSettings({
   active,
+  creating,
   draft,
   onChange,
   onSave,
@@ -14,6 +15,7 @@ export default function ApiProjectSettings({
   error,
 }: {
   active: boolean;
+  creating: boolean;
   draft: ApiProject;
   onChange: (project: ApiProject) => void;
   onSave: () => void;
@@ -23,14 +25,19 @@ export default function ApiProjectSettings({
 }) {
   return (
     <Modal active={active}
-      title="API项目设置"
+      title={creating ? "新建 API 项目" : "编辑 API 项目"}
       closeLabel="关闭API项目设置"
       close={onClose}
       draft={draft}
       busy={busy}
       wide
     >
-      <form
+      <ModalForm footer={<footer className="pc-form-footer">
+          <ModalCancel />
+          <button className="run-button" disabled={busy} type="submit">
+            保存API项目
+          </button>
+        </footer>}
         onSubmit={(event) => {
           event.preventDefault();
           onSave();
@@ -255,13 +262,7 @@ export default function ApiProjectSettings({
             {error}
           </p>
         )}
-        <footer>
-          <ModalCancel />
-          <button className="run-button" disabled={busy} type="submit">
-            保存API项目
-          </button>
-        </footer>
-      </form>
+      </ModalForm>
     </Modal>
   );
 }

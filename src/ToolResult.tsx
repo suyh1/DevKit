@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
-import { MotionButton } from './Motion';
+import { MotionButton, MotionDetails } from './Motion';
 import type { JsonChange } from './structured-diff';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import type { Options, ToolId } from './tools';
 import ResultView from './ResultView';
+import ResultPager from './ResultPager';
+import SegmentedControl from './SegmentedControl';
+import { ResultTable } from './analysis/AnalysisTable';
 import { parseEnvSide } from './developer';
 import { parseCsv } from './practical';
 import { digestMatches } from './tool-experience';
@@ -14,9 +17,6 @@ const display = (value: unknown): string => value === null ? '无' : typeof valu
 function Fields({ data, onCopy }: { data: Record<string, unknown>; onCopy: (value: string) => void }) {
   return <dl className="detail-fields">{Object.entries(data).map(([label, value]) => <div key={label}><dt>{label}</dt><dd><code>{display(value)}</code><MotionButton variant="copy" className="icon-button" aria-label={`复制 ${label}`} onClick={() => onCopy(display(value))}><Copy size={13} /></MotionButton></dd></div>)}</dl>;
 }
-function Table({ rows }: { rows: string[][] }) {
-  return <div className="data-table"><p className="preview-note">共 {Math.max(0, rows.length - 1)} 行 · 预览前 100 行、30 列</p><table><thead><tr>{rows[0]?.slice(0, 30).map((cell, index) => <th key={index}>{cell || '空列名'}</th>)}</tr></thead><tbody>{rows.slice(1, 101).map((row, index) => <tr key={index}>{row.slice(0, 30).map((cell, column) => <td key={column}>{cell}</td>)}</tr>)}</tbody></table></div>;
-}
 function TimeScrubber({ times, zone }: { times: string[]; zone: string }) {
   const [index, setIndex] = useState(0);
   if (!times.length) return null;
@@ -26,24 +26,36 @@ function TimeScrubber({ times, zone }: { times: string[]; zone: string }) {
     <output>{times[selected]} · {zone}</output></label>;
 }
 function EnvChanges({ text, source, target }: { text: string; source: string; target: string }) {
-  const [page, setPage] = useState(0);
-  const groups = JSON.parse(text) as Record<string, string[]>;
+  const groups = useMemo(() => JSON.parse(text) as Record<string, string[]>, [text]);
   const values = useMemo(() => [parseEnvSide(source, '左侧'), parseEnvSide(target, '右侧')], [source, target]);
-  const pages = Math.max(1, ...Object.values(groups).map(keys => Math.ceil(keys.length / 100)));
+  const [group, setGroup] = useState(() => Object.keys(groups).find(name => groups[name].length) ?? Object.keys(groups)[0]);
+  const [page, setPage] = useState(0);
+  const keys = groups[group] ?? [];
+  const pages = Math.max(1, Math.ceil(keys.length / 50));
   const current = Math.min(page, pages - 1);
-  return <div>{pages > 1 && <div className="preview-toolbar"><button disabled={!current} onClick={() => setPage(current - 1)}>上一页</button><span>{current + 1} / {pages}</span><button disabled={current + 1 === pages} onClick={() => setPage(current + 1)}>下一页</button></div>}{Object.entries(groups).map(([group, keys]) => <section key={group}><h3>{group} · {keys.length}</h3>
-    {keys.slice(current * 100, current * 100 + 100).map(key => <details key={key}><summary>{key}</summary>
-      {values.map((side, i) => <p key={i}>{i === 0 ? '左侧' : '右侧'} · <code>{Object.hasOwn(side, key) ? JSON.stringify(side[key]) : '缺失'}</code></p>)}</details>)}
-    </section>)}</div>;
+  return <div className="env-changes">
+    <SegmentedControl label="差异类型" value={group}
+      options={Object.entries(groups).map(([name, items]) => ({ value: name, label: name + ' · ' + items.length }))}
+      onChange={name => { setGroup(name); setPage(0); }} />
+    {keys.slice(current * 50, current * 50 + 50).map(key => <MotionDetails key={key} className="workbench-disclosure env-change">
+      <summary><code>{key}</code></summary>
+      <dl>{values.map((side, i) => <div key={i}>
+        <dt>{i === 0 ? '左侧' : '右侧'}</dt>
+        <dd><code>{Object.hasOwn(side, key) ? JSON.stringify(side[key]) : '缺失'}</code></dd>
+      </div>)}</dl>
+    </MotionDetails>)}
+    {!keys.length && <p className="preview-note" role="status">此组没有差异</p>}
+    <ResultPager page={current} pages={pages} onPage={setPage} />
+  </div>;
 }
 export default function ToolResult({ id, text, source, options, expected, onExpected, onCopy }: Props) {
   const fallback = <ResultView toolId={id} text={text} source={source} onCopy={onCopy} initialView={id === 'csv-json' ? 'table' : 'tree'} />;
   // Large results retain the bounded structured preview or raw editor.
   if (text.length > 300_000) return <p className="preview-note">结果较大，请使用源码视图或导出文件查看完整内容。</p>;
   if (id === 'env' && options.mode === 'compare') return <EnvChanges text={text} source={source} target={options.target ?? ''} />;
-  if (id === 'timestamp' && options.mode === 'batch') return <Table rows={parseCsv(text, '\t')} />;
-  if (id === 'markdown-table') return <Table rows={parseCsv(options.mode === 'delimited' ? text : source, options.delimiter === 'tab' ? '\t' : ',')} />;
-  if (id === 'mock-data' && options.format === 'csv') { try { return <Table rows={parseCsv(text, ',')} />; } catch { return fallback; } }
+  if (id === 'timestamp' && options.mode === 'batch') return <ResultTable columnLimit={30} records={parseCsv(text, '\t')} />;
+  if (id === 'markdown-table') return <ResultTable columnLimit={30} records={parseCsv(options.mode === 'delimited' ? text : source, options.delimiter === 'tab' ? '\t' : ',')} />;
+  if (id === 'mock-data' && options.format === 'csv') { try { return <ResultTable columnLimit={30} records={parseCsv(text, ',')} />; } catch { return fallback; } }
   if (id === 'diff' && options.mode === 'json') {
     const report = JSON.parse(text) as JsonChange[] | { changes: JsonChange[]; ignored: number };
     const rows = Array.isArray(report) ? report : report.changes;
@@ -56,8 +68,8 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   }
   if (id === 'timestamp') return <Fields data={Object.fromEntries(text.split('\n').map(line => { const match = line.match(/^(\S+)\s+(.+)$/); return match ? [match[1], match[2]] : [line, '']; }))} onCopy={onCopy} />;
   if (id === 'radix') return <div className="number-result"><span className="result-kicker">BASE {options.from} → BASE {options.to}</span><code>{text}</code><MotionButton variant="copy" className="secondary-button" onClick={() => onCopy(text)}><Copy size={14} />复制数值</MotionButton><p className="preview-note">整数换算使用 BigInt，保留大整数精度。</p></div>;
-  if (id === 'css-unit') { const inputs = source.split(/\r?\n/).filter(line => line.trim()); return <Table rows={[[`原始值 · ${options.from}`, `换算值 · ${options.to}`], ...text.split('\n').map((line, index) => [inputs[index] || '', line])]} />; }
-  if (id === 'json-csv') { try { return <Table rows={parseCsv(text, options.delimiter === 'tab' ? '\t' : ',')} />; } catch { return <p className="preview-note">表格无法预览，请查看源码。</p>; } }
+  if (id === 'css-unit') { const inputs = source.split(/\r?\n/).filter(line => line.trim()); return <ResultTable columnLimit={30} records={[[`原始值 · ${options.from}`, `换算值 · ${options.to}`], ...text.split('\n').map((line, index) => [inputs[index] || '', line])]} />; }
+  if (id === 'json-csv') { try { return <ResultTable columnLimit={30} records={parseCsv(text, options.delimiter === 'tab' ? '\t' : ',')} />; } catch { return <p className="preview-note">表格无法预览，请查看源码。</p>; } }
   if (['hash', 'hmac', 'timestamp', 'radix', 'css-unit', 'json-csv'].includes(id)) return fallback;
   if (!['http-status', 'ipv4', 'chmod', 'cron', 'text-stats', 'url-inspect', 'jwt', 'ulid'].includes(id) || id === 'ulid' && options.mode !== 'parse') return fallback;
   let data: Record<string, unknown>;
@@ -70,7 +82,7 @@ export default function ToolResult({ id, text, source, options, expected, onExpe
   }
   if (id === 'ipv4') return <div className="subnet-result"><div className="subnet-summary"><span className="result-kicker">NETWORK / PREFIX</span><strong>{display(data.cidr)}</strong><div className="subnet-bits" aria-label={`网络位 ${data.prefix}，主机位 ${32 - Number(data.prefix)}`}>{Array.from({ length: 32 }, (_, index) => <span className={index < Number(data.prefix) ? 'network-bit' : ''} key={index} />)}</div><small>网络位 {display(data.prefix)} · 主机位 {32 - Number(data.prefix)}</small></div><Fields data={{ '子网掩码': data.netmask, '反掩码': data.wildcard, '网络地址': data.network, '广播地址': data.broadcast, '首个主机': data.firstHost, '末个主机': data.lastHost, '地址总数': data.totalAddresses, '可用主机': data.usableHosts }} onCopy={onCopy} /><p className="preview-note">{display(data.note)}</p></div>;
   if (id === 'chmod') return <div className="permission-result"><div className="permission-value"><strong>{display(data.octal)}</strong><code>{display(data.symbolic)}</code></div><Fields data={{ '所有者': (data.groups as { symbolic: string }[])[0].symbolic, '所属组': (data.groups as { symbolic: string }[])[1].symbolic, '其他人': (data.groups as { symbolic: string }[])[2].symbolic, '特殊权限': data.special, '命令参考（不执行）': data.command }} onCopy={onCopy} /><p className="preview-note">{display(data.note)}</p></div>;
-  if (id === 'url-inspect') return <div className="url-result"><Fields data={{ '协议': data.protocol, '主机': data.hostname, '端口': data.port || '默认', '路径': data.pathname, '片段': data.hash, 'Origin': data.origin, '用户名': data.username, '密码': data.password }} onCopy={onCopy} /><h3 className="result-section-title">查询参数 · {(data.query as unknown[]).length} 项</h3><Table rows={[[ '参数名', '值' ], ...(data.query as { name: string; value: string }[]).map(item => [item.name, item.value])]} /><p className="preview-note">重复参数按原始顺序保留。</p></div>;
+  if (id === 'url-inspect') return <div className="url-result"><Fields data={{ '协议': data.protocol, '主机': data.hostname, '端口': data.port || '默认', '路径': data.pathname, '片段': data.hash, 'Origin': data.origin, '用户名': data.username, '密码': data.password }} onCopy={onCopy} /><h3 className="result-section-title">查询参数 · {(data.query as unknown[]).length} 项</h3><ResultTable columnLimit={30} records={[[ '参数名', '值' ], ...(data.query as { name: string; value: string }[]).map(item => [item.name, item.value])]} /><p className="preview-note">重复参数按原始顺序保留。</p></div>;
   if (id === 'jwt') {
     const fields = jsonObjectFields(text);
     return <div className="jwt-result"><p className="preview-note">{display(data.notice)}</p>{[['header', 'Header · 算法与类型'], ['payload', 'Payload · 载荷'], ['dates', '时间声明 · UTC'], ['signature', 'Signature · 未验证']].map(([key, title]) => <section key={key}><h3>{title}</h3>{key === 'signature' ? <code>{display(data[key])}</code> : <ResultView toolId="json" text={fields.get(key)?.raw ?? '{}'} source="" onCopy={onCopy} />}</section>)}</div>;

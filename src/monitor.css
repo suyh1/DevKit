@@ -44,3 +44,13 @@
 .monitor-event-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr)); gap:6px; margin-block:8px; }
 .monitor-event-choices label { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; line-height:1.5; cursor:pointer; }
 .monitor-event-choices label:has(:checked) { background:var(--tint); border-color:var(--accent); }
+.monitor-form .pc-modal-body { container-type:inline-size; gap:12px; }
+.monitor-form .pc-field { margin:0; min-width:0; }
+.monitor-target, .monitor-timing { display:grid; align-items:start; gap:12px; }
+.monitor-target { grid-template-columns:minmax(12rem,.8fr) minmax(0,1.4fr); }
+.monitor-timing { grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); }
+.monitor-form .monitor-actions { justify-content:flex-start; margin:0; }
+.monitor-form fieldset .monitor-enabled { padding-block:4px; }
+@container (max-width:470px) {
+  .monitor-target, .monitor-identity { display:grid; grid-template-columns:minmax(0,1fr); }
+}

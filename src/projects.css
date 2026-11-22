@@ -939,6 +939,13 @@ body:has(.pc-login) {
   flex: none;
   margin: 0;
 }
+.pc-dialog footer.pc-form-footer:has(> .secondary-button:first-child:nth-last-child(2)) {
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  padding:12px var(--pc-dialog-inset);
+}
+.pc-dialog footer.pc-form-footer > :is(.run-button, .pl-primary):last-child { margin-inline-start:0; }
 .pc-dialog > .pc-discard {
   flex: none;
   margin: 8px var(--pc-dialog-inset);

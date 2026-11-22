@@ -105,7 +105,7 @@ module.exports = async function apiSmoke(window, output) {
     await wait('!!document.querySelector(".api-blank")');
     await click("新建API项目");
     await wait(
-      'document.querySelector("dialog[open] h2")?.textContent==="API项目设置"',
+      'document.querySelector("dialog[open] h2")?.textContent==="新建 API 项目"',
     );
     await input("API项目名称", "本地接口联调");
     await input("API默认服务地址", base);

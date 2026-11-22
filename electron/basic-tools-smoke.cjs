@@ -135,7 +135,10 @@ async function basicTools(window, output) {
   await open('env');
   await mode('compare');
   await drop('.input-card', 'dev.env', 'KEY=secret');
-  assert.deepEqual(JSON.parse(await result())['仅左侧'], ['KEY']);
+  await drop('.target-card', 'prod.env', 'REGION=cn');
+  const envDiff = JSON.parse(await result());
+  assert.deepEqual(envDiff['仅左侧'], ['KEY']);
+  assert.deepEqual(envDiff['仅右侧'], ['REGION']);
   await click('.result-preview details summary');
   assert.ok((await text('.result-preview details')).includes('secret'));
   await close();

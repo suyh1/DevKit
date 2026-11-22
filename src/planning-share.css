@@ -168,7 +168,7 @@
 /* File sharing editor */
 .pc-dialog.planning-editor-dialog { width: min(560px, calc(100vw - 32px)); }
 .planning-editor-dialog > header h2 { font-size: 18px; font-weight: 600; }
-.planning-form { display: grid; gap: 12px; min-width: 0; }
+.planning-form > .pc-modal-body { display: grid; gap: 12px; min-width: 0; }
 .planning-form label { font-size: 12px; }
 .planning-form label:not(.planning-check) { display: grid; gap: 6px; min-width: 0; font-weight: 550; }
 .planning-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -189,8 +189,6 @@
 .planning-form .pl-mono { font-family: var(--pl-mono) !important; }
 .planning-check { display: flex; align-items: start; gap: 8px; line-height: 1.5; }
 .planning-check input { margin-top: 2px; accent-color: var(--accent); }
-.planning-form-footer { justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--pl-line); }
-.planning-form-footer button { min-height: 36px; }
 .pl-field-group { min-width: 0; display: grid; gap: 8px; padding: 12px; border: 1px solid var(--pl-line); border-radius: 7px; }
 .pl-field-group legend { padding-inline: 4px; font-weight: 580; }
 .pl-field-group .pl-button { justify-self: start; }

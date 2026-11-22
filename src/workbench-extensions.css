@@ -100,6 +100,12 @@
 .checksum-fields small { overflow-wrap: anywhere; }
 .checksum-actions, .recipe-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .checksum-panel p:empty, .recipe-panel p:empty { margin: 0; }
+.recipe-result { margin-top:8px; }
+.recipe-result-values { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr)); gap:10px; }
+.recipe-result-values figure { margin:0; min-width:0; border-radius:8px; background:var(--soft); padding:10px 12px; }
+.recipe-result-values figcaption { color:var(--muted); font-size:12px; }
+.recipe-result-values pre { margin:6px 0 0; font:12px/1.6 var(--font-mono); overflow-wrap:anywhere; }
+.recipe-result > button { margin-top:10px; }
 .recipe-library { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .recipe-save {
   display: grid;

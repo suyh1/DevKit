@@ -908,6 +908,7 @@ export default function ApiWorkspace({
       )}
       {projectDraft && (
         <ApiProjectSettings active={active}
+          creating={!state.projects.some((item) => item.id === projectDraft.id)}
           draft={projectDraft}
           onChange={setProjectDraft}
           onClose={() => { setProjectDraft(null); if (relatedEndpoint.current) finishEndpoint(); }}
@@ -933,46 +934,8 @@ export default function ApiWorkspace({
       {imported && (
         <Modal
           title="API导入预览"
-          closeLabel="关闭API导入预览"
-          close={() => setImported(null)}
-          busy={busy}
-          wide
-        >
-          <h3>{imported.project.name}</h3>
-          <p>
-            {imported.project.endpoints.length} 个接口 ·{" "}
-            {imported.project.groups.length} 个目录 ·{" "}
-            {imported.project.environments.length} 个环境
-          </p>
-          <p>
-            将作为独立项目导入，保留现有项目。导入不发送请求，也不执行脚本。文件中的示例、正文和凭据会保存在本机。
-          </p>
-          {imported.warnings.length > 0 && (
-            <ul className="api-import-warnings">
-              {imported.warnings.map((text, index) => (
-                <li key={index}>{text}</li>
-              ))}
-            </ul>
-          )}
-          <ul className="api-import-list">
-            {imported.project.endpoints.slice(0, 100).map((item) => (
-              <li key={item.id}>
-                <span
-                  className={`api-method method-${item.method.toLowerCase()}`}
-                >
-                  {item.method}
-                </span>
-                <code>{item.path}</code>
-                <strong>{item.name}</strong>
-              </li>
-            ))}
-          </ul>
-          {error && (
-            <p className="api-error" role="alert">
-              {error}
-            </p>
-          )}
-          <footer>
+          className="api-import-dialog"
+          footer={<footer className="pc-form-footer">
             <ModalCancel />
             <button
               className="run-button"
@@ -993,7 +956,49 @@ export default function ApiWorkspace({
             >
               确认导入API项目
             </button>
-          </footer>
+          </footer>}
+          closeLabel="关闭API导入预览"
+          close={() => setImported(null)}
+          busy={busy}
+          wide
+        >
+          <header className="api-import-heading">
+            <h3>{imported.project.name}</h3>
+            <p>
+              {imported.project.endpoints.length} 个接口 ·{" "}
+              {imported.project.groups.length} 个目录 ·{" "}
+              {imported.project.environments.length} 个环境
+            </p>
+          </header>
+          <p>
+            将作为独立项目导入，保留现有项目。导入不发送请求，也不执行脚本。文件中的示例、正文和凭据会保存在本机。
+          </p>
+          {imported.warnings.length > 0 && (
+            <ul className="api-import-warnings">
+              {imported.warnings.map((text, index) => (
+                <li key={index}>{text}</li>
+              ))}
+            </ul>
+          )}
+          {imported.project.endpoints.length > 100 && <p>预览前 100 个接口，导入将保留全部接口。</p>}
+          <ul className="api-import-list" aria-label="待导入接口">
+            {imported.project.endpoints.slice(0, 100).map((item) => (
+              <li key={item.id}>
+                <span
+                  className={`api-method method-${item.method.toLowerCase()}`}
+                >
+                  {item.method}
+                </span>
+                <code>{item.path}</code>
+                <strong>{item.name}</strong>
+              </li>
+            ))}
+          </ul>
+          {error && (
+            <p className="api-error" role="alert">
+              {error}
+            </p>
+          )}
         </Modal>
       )}
     </section>

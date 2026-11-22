@@ -1,16 +1,24 @@
 import { Fragment, useId, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
+import ResultPager from '../ResultPager';
 import { parseCsv } from '../practical';
 
 export default function AnalysisTable({ text }: { text: string }) {
+  const records = useMemo(() => parseCsv(text, ',', true, Number.MAX_SAFE_INTEGER), [text]);
+  return <ResultTable records={records} />;
+}
+
+export function ResultTable({ records, columnLimit }: { records: string[][]; columnLimit?: number }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [selected, select] = useState<string[] | null>(null);
   const detailId = useId();
-  const [header, ...rows] = useMemo(() => parseCsv(text, ',', true, Number.MAX_SAFE_INTEGER), [text]);
+  const [columns = [], ...rows] = records;
+  const header = columns.slice(0, columnLimit);
   const needle = query.trim().toLocaleLowerCase();
   const visible = needle
-    ? rows.filter((row) => row.some((cell) => cell.toLocaleLowerCase().includes(needle)))
+    ? rows.filter((row) => row.some((cell, i) =>
+        (columnLimit === undefined || i < columnLimit) && cell.toLocaleLowerCase().includes(needle)))
     : rows;
   const pages = Math.max(1, Math.ceil(visible.length / 50));
   const current = Math.min(page, pages - 1);
@@ -37,6 +45,7 @@ export default function AnalysisTable({ text }: { text: string }) {
         </label>
         <span role="status">
           {needle ? visible.length + ' / ' + rows.length + ' 条匹配' : '共 ' + rows.length + ' 条'}
+          {header.length < columns.length && ' · 预览前 ' + header.length + ' 列'}
         </span>
       </div>
       <div className="analysis-table-scroll">
@@ -45,7 +54,7 @@ export default function AnalysisTable({ text }: { text: string }) {
             <tr>
               {header.map((label, i) => (
                 <th scope="col" key={i}>
-                  {label}
+                  {label || '空列名'}
                 </th>
               ))}
             </tr>
@@ -56,7 +65,7 @@ export default function AnalysisTable({ text }: { text: string }) {
               return (
                 <Fragment key={index}>
                   <tr data-selected={open || undefined}>
-                    {row.map((value, i) => (
+                    {row.slice(0, columnLimit).map((value, i) => (
                       <td key={i}>
                         {i === 0 ? (
                           <button
@@ -76,11 +85,11 @@ export default function AnalysisTable({ text }: { text: string }) {
                   </tr>
                   {open && (
                     <tr className="analysis-row-detail" id={detailId}>
-                      <td colSpan={header.length}>
+                      <td colSpan={Math.max(1, header.length)}>
                         <dl>
                           {header.map((label, i) => (
                             <div key={i}>
-                              <dt>{label}</dt>
+                              <dt>{label || '空列名'}</dt>
                               <dd>
                                 <pre>{row[i]}</pre>
                               </dd>
@@ -97,29 +106,7 @@ export default function AnalysisTable({ text }: { text: string }) {
         </table>
         {!visible.length && <p className="analysis-table-empty">{needle ? '没有匹配的记录' : '没有记录'}</p>}
       </div>
-      {pages > 1 && (
-        <nav aria-label="结果分页" className="analysis-pagination">
-          <button
-            className="icon-button"
-            aria-label="上一页"
-            disabled={!current}
-            onClick={() => move(current - 1)}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span>
-            {current + 1} / {pages}
-          </span>
-          <button
-            className="icon-button"
-            aria-label="下一页"
-            disabled={current >= pages - 1}
-            onClick={() => move(current + 1)}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </nav>
-      )}
+      <ResultPager page={current} pages={pages} onPage={move} />
     </div>
   );
 }

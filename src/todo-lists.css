@@ -182,14 +182,11 @@ button.td-preview-check:hover { border-color: var(--accent); background: var(--t
 .td-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-left: 2px solid var(--error); color: var(--error); background: var(--td-soft); }
 .pc-dialog.td-settings-dialog { width: min(420px, calc(100vw - 32px)); }
 .td-settings-dialog > header h2 { font-size: 18px; font-weight: 600; }
-.td-settings { display: grid; gap: 12px; }
+.td-settings > .pc-modal-body { display: grid; gap: 12px; }
 .td-settings :is(.pc-field, .pc-check) { margin: 0; }
 .td-settings .pc-field input { width: 100%; }
 .td-syntax-form .pc-field select { width: 100%; text-overflow: ellipsis; }
 .td-settings .pc-check input { flex: none; margin: 0; }
-.td-settings-dialog .td-settings > footer {
-  position: static; margin: 0; padding: 12px 0 0; justify-content: flex-end;
-}
 .td-settings footer button { min-height: 36px; }
 .td-settings .run-button { padding: 8px 12px; margin-inline-start: 0; font-size: 12px; }
 .td-delete { color: var(--error); }

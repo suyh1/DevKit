@@ -647,26 +647,42 @@
 .api-environment-card .http-key-values {
   margin-top: 16px;
 }
-.api-settings {
-  padding: 0 5px;
+.api-settings { container-type:inline-size; }
+.api-settings > .pc-modal-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 12px; align-items:start; }
+.api-settings > .pc-modal-body > :is(.api-form-grid,.api-error) { grid-column:1/-1; }
+.api-settings > .pc-modal-body > .api-form-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(6rem,.55fr); gap:12px; }
+.api-settings > .pc-modal-body:has(.api-environment-card) { grid-template-columns:minmax(0,1fr); }
+.api-settings .api-section { margin:0; padding:14px; border:1px solid var(--line); border-radius:8px; }
+.api-settings .api-section-heading { gap:8px; margin:0 0 8px; }
+.api-settings .api-section-heading h3 { margin:0; }
+.api-settings .api-empty-note { margin:6px 0 0; }
+.api-settings .api-environment-card { margin:10px 0; padding:12px; background:var(--soft); }
+@container (max-width:560px) {
+  .api-settings > .pc-modal-body > .api-form-grid, .api-settings > .pc-modal-body { grid-template-columns:minmax(0,1fr); }
 }
-.api-settings .api-section {
-  margin-top: 24px;
-}
+.api-import-heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 16px; }
+.api-import-heading :is(h3,p) { margin:0; overflow-wrap:anywhere; }
+.api-import-dialog .pc-modal-body { display:grid; align-content:start; gap:12px; }
+.api-import-dialog .pc-modal-body > :is(p,ul) { margin:0; }
 .api-import-list {
   list-style: none;
   padding: 0;
-  max-height: 300px;
-  overflow: auto;
+  margin-bottom:0;
 }
 .api-import-list li {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns:4rem minmax(0,1.4fr) minmax(0,1fr);
+  gap: 8px;
   align-items: center;
   padding: 11px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
-  flex-wrap: wrap;
+  overflow-wrap:anywhere;
+}
+.api-import-list .api-method { justify-self:start; }
+@media (max-width:600px) {
+  .api-import-list li { grid-template-columns:4rem minmax(0,1fr); }
+  .api-import-list strong { grid-column:2; }
 }
 .api-import-warnings {
   padding: 14px 14px 14px 30px;

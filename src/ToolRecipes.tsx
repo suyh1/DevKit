@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { defaultOptions, tools, type Options, type ToolId } from './tools';
 import { CaseList, validCases, type RegressionCase } from './analysis/Cases';
 import ToolOptions from './ToolOptions';
+import { MotionButton, MotionDetails } from './Motion';
 import { copyText } from './motion-primitives';
 
 const allowed: ToolId[] = [
@@ -246,7 +247,7 @@ export default function ToolRecipes({ input }: { input: string }) {
           <details>
             <summary>流程回归样例</summary>
             <CaseList cases={cases} change={setCases} steps={steps.length} />
-            <button disabled={!cases.length} onClick={() => void run(true)}>
+            <button className="secondary-button" disabled={!cases.length} onClick={() => void run(true)}>
               运行全部样例
             </button>
           </details>
@@ -265,7 +266,7 @@ export default function ToolRecipes({ input }: { input: string }) {
         </fieldset>
       )}
       {busy && (
-        <button
+        <button className="secondary-button"
           onClick={() => {
             interrupted.current = true;
             cancel.current?.();
@@ -276,19 +277,23 @@ export default function ToolRecipes({ input }: { input: string }) {
       )}
       <pre role="status">{message}</pre>
       {report.map((row, i) => (
-        <details key={i}>
+        <MotionDetails key={i} className="workbench-disclosure recipe-result">
           <summary>
             {i + 1}. {row.name} · {row.error ? '失败' : '完成'}
           </summary>
-          <p>输入{previewLength(row.input)}</p>
-          <pre>{row.input.slice(0, previewLimit)}</pre>
-          <p>
-            {row.error || '输出'}
-            {previewLength(row.output)}
-          </p>
-          <pre>{row.output.slice(0, previewLimit)}</pre>
+          <div className="recipe-result-values">
+            <figure>
+              <figcaption>输入{previewLength(row.input)}</figcaption>
+              <pre>{row.input.slice(0, previewLimit)}</pre>
+            </figure>
+            <figure>
+              <figcaption>{row.error ? '错误' : '输出'}{previewLength(row.output)}</figcaption>
+              {row.error && <p className="task-error">{row.error}</p>}
+              <pre>{row.output.slice(0, previewLimit)}</pre>
+            </figure>
+          </div>
           {!row.error && (
-            <button
+            <MotionButton variant="copy" className="secondary-button" aria-label="复制完整输出"
               onClick={() =>
                 void copyText(row.output)
                   .then(() => setMessage('已复制完整结果'))
@@ -296,9 +301,9 @@ export default function ToolRecipes({ input }: { input: string }) {
               }
             >
               复制完整输出
-            </button>
+            </MotionButton>
           )}
-        </details>
+        </MotionDetails>
       ))}
     </details>
   );

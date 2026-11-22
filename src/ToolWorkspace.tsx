@@ -53,7 +53,7 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   const rightFile = useRef<HTMLInputElement>(null);
   const secondKey = active === 'json-schema' ? 'schema' : 'target';
   const analysis = byAnalysis.get(active);
-  const compareFiles = active === 'diff' || !!analysis?.second;
+  const compareFiles = active === 'diff' || (active === 'env' && task.options.mode === 'compare') || !!analysis?.second;
   const tableOutput = analysis?.ext === 'csv' || (analysis?.ext === 'auto' && !/^\s*[[{]/.test(task.output));
   const secondLabel = analysis?.second || ( active === 'json-schema' ? 'JSON Schema' : active === 'env' ? '右侧配置' : '修改后文本');
   const presentation = developerPresentation(active, task.options);

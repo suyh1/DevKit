@@ -34,6 +34,18 @@ module.exports = async function resultDetails({ js, wait, fill, click, pane }) {
   await fill(filter, '');
   await wait(`!!${inPane('.json-tree')}`);
 
+  const firstPage = Array(100).fill('{"n":0}').join(',');
+  await preview('[' + firstPage + ',{"n":9007199254740993}]', 'pages.json');
+  await click('表格视图', pane + ' .preview-toolbar');
+  await js(`${inPane('.analysis-pagination [aria-label="下一页"]')}.click()`);
+  await wait(`${inPane('.table-preview tbody')}?.textContent.includes('9007199254740993')`);
+  assert.equal(await js(`${inPane('.table-preview tbody td')}.textContent`), '101');
+  await fill(filter, '9007199254740993');
+  await wait(`!${inPane('.analysis-pagination')}`);
+  assert.equal(await js(`${inPane('.table-preview tbody td')}.textContent`), '101');
+  await fill(filter, '');
+  await click('结构视图', pane + ' .preview-toolbar');
+
   await preview(JSON.stringify(Array.from({ length: 200 }, (_, i) => 'row-' + i)), 'rows.json');
   await js(`{
     const value = ${inPane('.json-tree .json-value')};
@@ -51,11 +63,12 @@ module.exports = async function resultDetails({ js, wait, fill, click, pane }) {
   await importJson(JSON.stringify(content), 'long.json');
   await js(`${inPane('.recipe-panel')}.open=true`);
   await click('用当前原文运行', pane + ' .recipe-panel');
-  await wait(`${inPane('.recipe-panel details p')}?.textContent.includes((9002).toLocaleString())`);
-  const lengths = await js(`[...${inPane('.recipe-panel details')}.querySelectorAll('pre')].map(el=>el.textContent.length)`);
+  await wait(`!!${inPane('.recipe-result summary')}`);
+  await js(`${inPane('.recipe-result summary')}.click()`);
+  await wait(`${inPane('.recipe-result[open] figcaption')}?.textContent.includes((9002).toLocaleString())`);
+  const lengths = await js(`[...${inPane('.recipe-result')}.querySelectorAll('pre')].map(el=>el.textContent.length)`);
   assert.deepEqual(lengths, [8192, 8192]);
-  await js(`${inPane('.recipe-panel details')}.open=true`);
-  await click('复制完整输出', pane + ' .recipe-panel');
+  await js(`${inPane('.recipe-result button[aria-label="复制完整输出"]')}.click()`);
   await wait(`${inPane('.recipe-panel')}.textContent.includes('已复制完整结果')`);
   assert.equal(await clipboard.readText(), JSON.stringify(content));
 };

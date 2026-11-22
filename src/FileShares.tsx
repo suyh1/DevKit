@@ -4,7 +4,7 @@ import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Copy, File, Files, Folder, FolderOpen, Globe2, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { useConfirmation } from './Confirmation';
-import { Modal, ModalCancel } from './project-components';
+import { Modal, ModalCancel, ModalForm } from './project-components';
 import { CreateRelated } from './related-workspaces';
 import { fileShareRequest, publishedShares } from './planning-share-api';
 import type { FileShare, FileShareState, PublishedShare } from './planning-share-api';
@@ -202,7 +202,7 @@ export default function FileShares({ active }: { active: boolean }) {
     </>}
     {editor && draft && <Modal title={editor.id ? '编辑文件共享' : '新建文件共享'} closeLabel="关闭文件共享编辑"
       close={() => setEditor(null)} draft={draft} busy={busy || choosing} className="planning-editor-dialog">
-      <form className="planning-form" onSubmit={event => {
+      <ModalForm footer={<footer className="pc-form-footer"><ModalCancel /><button className="pl-button pl-primary" disabled={!draft.paths.length}>保存共享</button></footer>} className="planning-form" onSubmit={event => {
         event.preventDefault();
         void mutate('save', { id: editor.id, revision: editor.revision, value: { ...draft, port: Number(draft.port) } }, '文件共享已保存');
       }}>
@@ -225,8 +225,7 @@ export default function FileShares({ active }: { active: boolean }) {
           <label className="planning-check"><input role="switch" className="liquid-toggle" type="checkbox" checked={draft.published} onChange={event => change({ published: event.target.checked })} />发布到共享工作台，供获准访客下载</label>
         </fieldset>
         {editorError && <p className="pc-error" role="alert">{editorError}</p>}
-        <div className="planning-actions planning-form-footer"><ModalCancel /><button className="pl-button pl-primary" disabled={!draft.paths.length}>保存共享</button></div>
-      </form>
+      </ModalForm>
     </Modal>}
   </section>;
 }
