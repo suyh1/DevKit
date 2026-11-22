@@ -5,6 +5,9 @@ import type { EditorLanguage } from './CodeEditor';
 export function resultInputOptions(source: ToolId, options: Options, target: ToolId, language: EditorLanguage): Options {
   // The YAML destination is offered only for results confirmed to be JSON,
   // including decoded text whose editor language is still plain text.
+  if (target === 'json-lines') return { mode: 'lines' };
+  if (source === 'json-csv' && target === 'markdown-table') return { mode: 'markdown', delimiter: options.delimiter };
+  if (source === 'markdown-table' && target === 'csv-json') return { delimiter: options.delimiter };
   if (target === 'yaml') return { mode: 'json-yaml' };
   if (target === 'type-json') return { language: language === 'java' ? 'java' : 'ts' };
   if (target === 'code-format') return { language: language === 'typescript' ? 'typescript' : language === 'css' ? options.language === 'scss' ? 'scss' : 'css' : language === 'html' ? 'html' : 'babel' };

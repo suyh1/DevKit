@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MotionButton } from './Motion';
 import type { JsonChange } from './structured-diff';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import type { Options, ToolId } from './tools';
 import ResultView from './ResultView';
+import { parseEnvSide } from './developer';
 import { parseCsv } from './practical';
 import { digestMatches } from './tool-experience';
 import { jsonObjectFields } from './result-model';
@@ -24,10 +25,24 @@ function TimeScrubber({ times, zone }: { times: string[]; zone: string }) {
     <input aria-label="选择触发时间" type="range" min={0} max={times.length - 1} value={selected} onChange={e => setIndex(Number(e.target.value))} />
     <output>{times[selected]} · {zone}</output></label>;
 }
+function EnvChanges({ text, source, target }: { text: string; source: string; target: string }) {
+  const [page, setPage] = useState(0);
+  const groups = JSON.parse(text) as Record<string, string[]>;
+  const values = useMemo(() => [parseEnvSide(source, '左侧'), parseEnvSide(target, '右侧')], [source, target]);
+  const pages = Math.max(1, ...Object.values(groups).map(keys => Math.ceil(keys.length / 100)));
+  const current = Math.min(page, pages - 1);
+  return <div>{pages > 1 && <div className="preview-toolbar"><button disabled={!current} onClick={() => setPage(current - 1)}>上一页</button><span>{current + 1} / {pages}</span><button disabled={current + 1 === pages} onClick={() => setPage(current + 1)}>下一页</button></div>}{Object.entries(groups).map(([group, keys]) => <section key={group}><h3>{group} · {keys.length}</h3>
+    {keys.slice(current * 100, current * 100 + 100).map(key => <details key={key}><summary>{key}</summary>
+      {values.map((side, i) => <p key={i}>{i === 0 ? '左侧' : '右侧'} · <code>{Object.hasOwn(side, key) ? JSON.stringify(side[key]) : '缺失'}</code></p>)}</details>)}
+    </section>)}</div>;
+}
 export default function ToolResult({ id, text, source, options, expected, onExpected, onCopy }: Props) {
   const fallback = <ResultView toolId={id} text={text} source={source} onCopy={onCopy} initialView={id === 'csv-json' ? 'table' : 'tree'} />;
   // Large results retain the bounded structured preview or raw editor.
   if (text.length > 300_000) return <p className="preview-note">结果较大，请使用源码视图或导出文件查看完整内容。</p>;
+  if (id === 'env' && options.mode === 'compare') return <EnvChanges text={text} source={source} target={options.target ?? ''} />;
+  if (id === 'timestamp' && options.mode === 'batch') return <Table rows={parseCsv(text, '\t')} />;
+  if (id === 'markdown-table') return <Table rows={parseCsv(options.mode === 'delimited' ? text : source, options.delimiter === 'tab' ? '\t' : ',')} />;
   if (id === 'mock-data' && options.format === 'csv') { try { return <Table rows={parseCsv(text, ',')} />; } catch { return fallback; } }
   if (id === 'diff' && options.mode === 'json') {
     const report = JSON.parse(text) as JsonChange[] | { changes: JsonChange[]; ignored: number };

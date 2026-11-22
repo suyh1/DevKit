@@ -9,19 +9,24 @@ import { developerDefaults, developerTools, isDeveloperTool, developerTransform 
 import type { DeveloperToolId } from './developer';
 import { extendedDefaults, extendedTools, isExtendedTool, extendedTransform } from './extended';
 import type { ExtendedToolId } from './extended';
+import { replaceMatches } from './regex-replace';
+import { timestampDate, timeRows } from './time-conversion';
 import { geoDefaults } from './geo-config';
 
-export type ToolId = 'mock-data' | 'geo-coordinates' | 'json' | 'json-code' | 'type-json' | 'json-csv' | 'base64' | 'url' | 'html' | 'timestamp' | 'hash' | 'uuid' | 'regex' | 'jwt' | 'radix' | 'text' | ColorToolId | PracticalToolId | DeveloperToolId | ExtendedToolId;
+export type ToolId = 'json-lines' | 'markdown-table' | 'qr-code' | 'semver' | 'css-flex' | 'mock-data' | 'geo-coordinates' | 'json' | 'json-code' | 'type-json' | 'json-csv' | 'base64' | 'url' | 'html' | 'timestamp' | 'hash' | 'uuid' | 'regex' | 'jwt' | 'radix' | 'text' | ColorToolId | PracticalToolId | DeveloperToolId | ExtendedToolId;
 export type LegacyToolId = 'json-java' | 'json-ts';
 export type Options = Record<string, string>;
 export const defaultOptions: Record<ToolId, Options> = {
   'mock-data': { source: 'example', count: '10', seed: 'devkit', format: 'json', rules: '{}' },
   'geo-coordinates': geoDefaults,
+  'json-lines': { mode: 'array', blank: 'skip' }, 'markdown-table': { mode: 'markdown', delimiter: 'comma' },
+  'qr-code': { level: 'M', size: '384' }, semver: { range: '^1.2.3' },
+  'css-flex': { direction: 'row', wrap: 'wrap', justify: 'flex-start', align: 'center', width: '360', gap: '12' },
   ...practicalDefaults,
   ...developerDefaults,
   ...extendedDefaults,
   json: { mode: 'format', indent: '2' }, base64: { mode: 'encode' }, url: { mode: 'encode' },
-  timestamp: { unit: 's' }, hash: { algorithm: 'SHA-256' }, uuid: {}, regex: { pattern: '[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}', flags: 'g' },
+  timestamp: { mode: 'single', unit: 's', zone: 'UTC' }, hash: { algorithm: 'SHA-256' }, uuid: {}, regex: { mode: 'match', replacement: '', pattern: '[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}', flags: 'g' },
   'json-code': { language: 'ts', rootName: 'Root', javaStyle: 'pojo', tsStyle: 'interface', annotations: 'none', value: 'include' },
   'type-json': { language: 'ts', rootName: '', optional: 'include', arrayLength: '1' },
   'json-csv': { delimiter: 'comma', excelSafe: 'on' }, html: { mode: 'encode' },
@@ -33,6 +38,11 @@ export const defaultOptions: Record<ToolId, Options> = {
 const definitions: { id: ToolId; name: string; english: string; category: string; description: string; sample: string }[] = [
   { id: 'mock-data', name: '批量 Mock 数据', english: 'Mock Data Generator', category: '结构化数据', description: '从 JSON 示例或常用 Schema 子集生成 1–1,000 份中文测试数据，支持字段规则、固定随机种子和 JSON/CSV 导出。纯本地生成，不是完整 Schema 校验器；规则优先于样本/Schema，最多 100,000 节点、20 层。', sample: '{"id":1,"name":"张三","email":"demo@example.com","city":"北京","active":true}' },
   { id: 'geo-coordinates', name: '经纬度工具', english: 'Geographic Coordinates', category: '时间与数值', description: '十进制度与度分秒互转；按圆心、半径及四方向计算椭球/球面圆周点；从文本提取度分秒坐标对。结果可逐项、整列或 CSV/TSV 复制，全部离线处理。', sample: '116.3913,39.9075' },
+  { id: 'json-lines', name: 'JSON Lines ↔ JSON 数组', english: 'JSON Lines NDJSON', category: '结构化数据', description: '逐行 JSON 与数组互转，保留数字原文，可选择空行策略并定位坏行。', sample: '{"id":9007199254740993}\n{"id":2}' },
+  { id: 'markdown-table', name: 'Markdown 表格转换', english: 'Markdown Table CSV TSV', category: '结构化数据', description: 'CSV / TSV 与 Markdown 表格双向转换，支持竖线、空单元格与多行字段。', sample: '编号,备注\n001,"开发,测试"\n002,A|B' },
+  { id: 'qr-code', name: '离线二维码生成', english: 'QR Code Generator', category: '编码与解析', description: '将文本或链接编码为二维码，预览并按尺寸、纠错级别导出 PNG。', sample: '你好，DevKit 😄' },
+  { id: 'semver', name: 'SemVer 版本范围检查', english: 'Semantic Version Range', category: '代码与查询', description: '按 npm 范围筛选版本，列出最高匹配版本、降序结果与无效行。', sample: '1.4.0\n2.0.0\n1.5.0-beta.1\n1.2.3' },
+  { id: 'css-flex', name: 'CSS Flex 布局预览', english: 'CSS Flexbox', category: '颜色与设计', description: '调节容器宽度、间距、方向、换行和对齐方式，实时预览并复制 CSS。', sample: '' },
   ...practicalTools,
   ...developerTools,
   ...extendedTools,
@@ -43,10 +53,10 @@ const definitions: { id: ToolId; name: string; english: string; category: string
   { id: 'base64', name: 'Base64 编解码', english: 'Base64 Encoder', category: '编码转换', description: '在文本与 Base64 之间转换，完整支持 UTF-8 中文。', sample: '你好，开发者！Hello, DevKit.' },
   { id: 'url', name: 'URL 编解码', english: 'URL Encoder', category: '编码转换', description: '编码或解码 URL 参数中的特殊字符。', sample: 'https://example.com/search?q=程序员&lang=中文' },
   { id: 'html', name: 'HTML 实体转换', english: 'HTML Entities', category: '编码转换', description: '转义 HTML 特殊字符；解码常见命名实体与数字实体。输出作为文本展示。', sample: '<div title="DevKit">你好 & welcome</div>' },
-  { id: 'timestamp', name: '时间戳转换', english: 'Timestamp Converter', category: '效率工具', description: '在 Unix 时间戳与日期之间转换，明确区分秒和毫秒；可填入当前时间，逐项复制 UTC、本地时间与时区。', sample: '1735689600' },
+  { id: 'timestamp', name: '时间戳转换', english: 'Timestamp Converter', category: '效率工具', description: '在 Unix 时间戳与日期之间转换，明确区分秒和毫秒；支持单值查看及批量按 IANA 时区转换，逐行报告错误并导出 TSV。', sample: '1735689600' },
   { id: 'hash', name: '哈希计算', english: 'Hash Generator', category: '数据处理', description: '为文本计算 SHA 摘要，或分块计算文件 SHA-256，支持批量核对和 SHA256SUMS 导入导出。', sample: 'Hello, DevKit!' },
   { id: 'uuid', name: 'UUID 生成', english: 'UUID Generator', category: '效率工具', description: '使用安全随机数批量生成 UUID v4。', sample: '5' },
-  { id: 'regex', name: '正则测试', english: 'Regex Playground', category: '数据处理', description: '测试 JavaScript 正则表达式，查看匹配位置和捕获分组。', sample: '联系 hello@example.com 或 dev@toolkit.dev' },
+  { id: 'regex', name: '正则测试', english: 'Regex Playground', category: '数据处理', description: '测试 JavaScript 正则表达式，查看匹配位置与捕获组，或用替换模板输出全文与匹配次数。', sample: '联系 hello@example.com 或 dev@toolkit.dev' },
   { id: 'jwt', name: 'JWT 解码', english: 'JWT Decoder', category: '数据处理', description: '查看 Header、Payload 和时间字段。仅解码，不验证签名或令牌可信性。', sample: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXZraXQiLCJuYW1lIjoiQWxpY2UiLCJpYXQiOjE3MzU2ODk2MDB9.c2FtcGxl' },
   { id: 'radix', name: '进制转换', english: 'Number Base Converter', category: '效率工具', description: '使用 BigInt 精确转换二、八、十、十六进制整数。', sample: '9007199254740993' },
   { id: 'text', name: '文本与命名转换', english: 'Text Transformer', category: '效率工具', description: '驼峰、下划线、大小写转换，以及逐行去重、排序与清理。', sample: 'user_profile_name\nHTTPResponseCode\nhello-world' },
@@ -88,7 +98,7 @@ export function formatJson(input: string, options: Options): string {
   return chunks.join('');
 }
 
-export async function transform(id: ToolId | LegacyToolId, input: string, options: Options = {}): Promise<string> {
+export async function transform(id: ToolId | LegacyToolId, input: string, options: Options = {}, onMatchCount?: (count: number) => void): Promise<string> {
   if (id === 'mock-data') return (await import('./mock-data')).generateMock(input, options);
   if (input.length > 2_000_000) throw new Error('输入超过 2 MB，请缩小内容后重试。');
   if (id === 'geo-coordinates') return (await import('./geography')).geographyTransform(input, options);
@@ -99,6 +109,11 @@ export async function transform(id: ToolId | LegacyToolId, input: string, option
   if (isDeveloperTool(id)) return developerTransform(id, input, options);
   if (isExtendedTool(id)) return extendedTransform(id, input, options);
   switch (id) {
+    case 'json-lines': return (await import('./record-tools')).jsonLines(input, options);
+    case 'markdown-table': return (await import('./record-tools')).markdownTable(input, options);
+    case 'semver': return (await import('./record-tools')).checkVersions(input, options);
+    case 'qr-code': return (await import('./visual-tools')).makeQr(input, options).createSvgTag();
+    case 'css-flex': return (await import('./visual-tools')).flexCss(options);
     case 'json': {
       if (options.mode === 'stringify') {
         JSON.parse(input);
@@ -139,21 +154,8 @@ export async function transform(id: ToolId | LegacyToolId, input: string, option
     }
     case 'url': return options.mode === 'decode' ? decodeURIComponent(input) : encodeURIComponent(input);
     case 'timestamp': {
-      const text = input.trim();
-      let date: Date;
-      if (/^-?\d+$/.test(text)) {
-        const value = Number(text);
-        if (!Number.isSafeInteger(value)) throw new Error('时间戳超出安全整数范围。');
-        date = new Date(value * (options.unit === 'ms' ? 1 : 1000));
-      } else {
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(text)) throw new Error('请输入整数时间戳，或带时区的 ISO 日期，例如 2025-01-01T08:00:00+08:00。');
-        const [year, month, day] = text.slice(0, 10).split('-').map(Number);
-        const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-        const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        if (month < 1 || month > 12 || day < 1 || day > days[month - 1] || Number(text.slice(11, 13)) > 23) throw new Error('日期无效，请检查月份、天数和小时。');
-        date = new Date(text);
-      }
-      if (!Number.isFinite(date.getTime())) throw new Error('日期无效或超出支持范围。');
+      if (options.mode === 'batch') return timeRows(input, options.unit, options.zone);
+      const date = timestampDate(input, options.unit);
       return `秒时间戳    ${Math.floor(date.getTime() / 1000)}\n毫秒时间戳  ${date.getTime()}\nUTC         ${date.toISOString()}\n本地时间    ${date.toLocaleString('zh-CN', { hour12: false })}\n本地时区    ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
     }
     case 'hash': {
@@ -171,6 +173,11 @@ export async function transform(id: ToolId | LegacyToolId, input: string, option
       if (!options.pattern) throw new Error('请输入正则表达式。');
       const flags = options.flags ?? 'g';
       const regex = new RegExp(options.pattern, flags);
+      if (options.mode === 'replace') {
+        const result = replaceMatches(input, regex, options.replacement ?? '');
+        onMatchCount?.(result.count);
+        return result.text;
+      }
       const matches: { match: string; index: number; groups: (string | null)[]; namedGroups?: Record<string, string> }[] = [];
       // exec permits both global and single-match patterns; cap results and advance empty matches.
       let match: RegExpExecArray | null;

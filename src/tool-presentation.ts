@@ -2,6 +2,13 @@ import type { ToolId, Options } from './tools';
 import type { EditorLanguage } from './CodeEditor';
 
 export function developerPresentation(id: ToolId, options: Options): { input: EditorLanguage; output: EditorLanguage; extension: string; preview?: boolean; sample?: string } | undefined {
+  if (id === 'json-lines') return options.mode === 'lines' ? { input: 'json', output: 'text', extension: 'jsonl', sample: '[{"id":9007199254740993},{"id":2}]' } : { input: 'text', output: 'json', extension: 'json', preview: true };
+  if (id === 'markdown-table') return { input: 'text', output: 'text', extension: options.mode === 'delimited' ? options.delimiter === 'tab' ? 'tsv' : 'csv' : 'md', preview: true,
+    sample: options.mode === 'delimited' ? '| 编号 | 备注 |\n| --- | --- |\n| 001 | 文档 |' : options.delimiter === 'tab' ? '编号\t备注\n001\t文档' : undefined };
+  if (id === 'semver') return { input: 'text', output: 'json', extension: 'json', preview: true };
+  if (id === 'json-schema' && options.mode === 'validate') return { input: 'json', output: 'text', extension: 'txt', preview: false };
+  if (id === 'regex' && options.mode === 'replace') return { input: 'text', output: 'text', extension: 'txt', preview: false };
+  if (id === 'timestamp' && options.mode === 'batch') return { input: 'text', output: 'text', extension: 'tsv', preview: true, sample: '1735689600\n1751328000\n待核对' };
   if (id === 'json' && options.mode === 'parse') return { input: 'json', output: 'json', extension: 'json', preview: true, sample: JSON.stringify('{"name":"DevKit","tags":["开发","测试"]}') };
   if (id === 'json' && options.mode === 'stringify') return { input: 'json', output: 'json', extension: 'json', preview: false };
   if (id === 'diff' && options.mode === 'json') return { input: 'json', output: 'json', extension: 'json', preview: true, sample: '{"id":9007199254740993,"name":"张三","active":true}' };

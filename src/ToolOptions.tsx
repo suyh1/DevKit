@@ -1,9 +1,22 @@
+import { useId } from 'react';
 import SegmentedControl from './SegmentedControl';
 import { ShieldCheck } from 'lucide-react';
 import type { Options, ToolId } from './tools';
 
 type Field = { key: string; label: string; entries?: [string, string][]; min?: number; max?: number; placeholder?: string; secret?: boolean };
 const fields: Partial<Record<ToolId, Field[]>> = {
+  'json-schema': [{ key: 'mode', label: '处理方式', entries: [['infer', '推断 Schema'], ['validate', '校验样本']] }],
+  'json-lines': [{ key: 'mode', label: '转换方向', entries: [['array', '记录 → 数组'], ['lines', '数组 → 记录']] }, { key: 'blank', label: '空行', entries: [['skip', '跳过'], ['error', '报错']] }],
+  'markdown-table': [{ key: 'mode', label: '转换方向', entries: [['markdown', '转 Markdown'], ['delimited', '转 CSV / TSV']] }, { key: 'delimiter', label: '分隔符', entries: [['comma', 'CSV'], ['tab', 'TSV']] }],
+  semver: [{ key: 'range', label: 'npm 版本范围', placeholder: '^1.2.3' }],
+  'qr-code': [{ key: 'level', label: '纠错级别', entries: [['L','L'],['M','M'],['Q','Q'],['H','H']] }, { key: 'size', label: '图片尺寸（px）', entries: [['256','256'],['384','384'],['512','512'],['1024','1024']] }],
+  'css-flex': [
+    { key: 'width', label: '容器宽度（px）', min: 120, max: 1200 }, { key: 'gap', label: '间距（px）', min: 0, max: 100 },
+    { key: 'direction', label: '主轴方向', entries: [['row','横向'],['row-reverse','横向反转'],['column','纵向'],['column-reverse','纵向反转']] },
+    { key: 'wrap', label: '换行', entries: [['nowrap','单行'],['wrap','换行'],['wrap-reverse','反向换行']] },
+    { key: 'justify', label: '主轴对齐', entries: [['flex-start','起点'],['center','居中'],['flex-end','终点'],['space-between','两端'],['space-around','环绕'],['space-evenly','等距']] },
+    { key: 'align', label: '交叉轴对齐', entries: [['stretch','拉伸'],['flex-start','起点'],['center','居中'],['flex-end','终点']] },
+  ],
   'mock-data': [{ key: 'source', label: '输入来源', entries: [['example', 'JSON 示例'], ['schema', 'Schema 子集']] }, { key: 'count', label: '记录数量', min: 1, max: 1000 }, { key: 'seed', label: '随机种子', placeholder: 'devkit' }, { key: 'format', label: '输出格式', entries: [['json', 'JSON'], ['csv', 'CSV']] }, { key: 'rules', label: '字段规则 JSON', placeholder: '{"id":"sequence","name":"name"}' }],
   xml: [{ key: 'mode', label: '处理方式', entries: [['format', '格式化'], ['compact', '压缩']] }, { key: 'indent', label: '缩进', entries: [['2', '2 空格'], ['4', '4 空格']] }],
   gzip: [{ key: 'mode', label: '转换方向', entries: [['compress', '文本 → GZip Base64'], ['decompress', 'GZip Base64 → 文本']] }],
@@ -17,7 +30,7 @@ const fields: Partial<Record<ToolId, Field[]>> = {
   'query-string': [{ key: 'mode', label: '转换方向', entries: [['decode', 'Query → JSON'], ['encode', 'JSON → Query']] }],
   'http-code': [{ key: 'style', label: '代码风格', entries: [['fetch', 'Fetch'], ['axios', 'Axios'], ['curl', 'cURL (POSIX shell)']] }],
   cron: [{ key: 'start', label: '起始 ISO 时间', placeholder: '留空使用当前时间' }, { key: 'count', label: '预览数量', min: 1, max: 50 }],
-  env: [{ key: 'mode', label: '转换方向', entries: [['decode', '.env → JSON'], ['encode', 'JSON → .env']] }],
+  env: [{ key: 'mode', label: '转换方向', entries: [['decode', '.env → JSON'], ['encode', 'JSON → .env'], ['compare', '按键比较']] }],
   properties: [{ key: 'mode', label: '转换方向', entries: [['decode', 'Properties → JSON'], ['encode', 'JSON → Properties']] }],
   hmac: [{ key: 'key', label: 'UTF-8 密钥', placeholder: '输入密钥', secret: true }, { key: 'algorithm', label: '算法', entries: [['SHA-256', 'SHA-256'], ['SHA-384', 'SHA-384'], ['SHA-512', 'SHA-512']] }, { key: 'format', label: '输出', entries: [['hex', 'HEX'], ['base64', 'Base64']] }],
   unicode: [{ key: 'mode', label: '转换方向', entries: [['encode', '文本 → Unicode'], ['decode', 'Unicode → 文本']] }],
@@ -52,13 +65,14 @@ const fields: Partial<Record<ToolId, Field[]>> = {
   url: [{ key: 'mode', label: '处理方式', entries: [['encode', '编码'], ['decode', '解码']] }],
   radix: [{ key: 'from', label: '输入进制', entries: [['2', '二进制'], ['8', '八进制'], ['10', '十进制'], ['16', '十六进制']] }, { key: 'to', label: '输出进制', entries: [['2', '二进制'], ['8', '八进制'], ['10', '十进制'], ['16', '十六进制']] }],
   text: [{ key: 'mode', label: '转换方式', entries: [['camel', 'camelCase 小驼峰'], ['pascal', 'PascalCase 大驼峰'], ['snake', 'snake_case 下划线'], ['kebab', 'kebab-case 连字符'], ['upper', '全部大写'], ['lower', '全部小写'], ['dedupe', '逐行去重'], ['sort', '逐行自然排序'], ['trim', '清理空白与空行']] }],
-  timestamp: [{ key: 'unit', label: '时间戳单位', entries: [['s', '秒 (s)'], ['ms', '毫秒 (ms)']] }],
+  timestamp: [{ key: 'mode', label: '处理方式', entries: [['single','单值'],['batch','批量']] }, { key: 'unit', label: '时间戳单位', entries: [['s', '秒 (s)'], ['ms', '毫秒 (ms)']] }],
   hash: [{ key: 'algorithm', label: '算法', entries: [['SHA-256', 'SHA-256'], ['SHA-384', 'SHA-384'], ['SHA-512', 'SHA-512'], ['SHA-1', 'SHA-1（兼容用途）']] }],
-  regex: [{ key: 'pattern', label: '表达式', placeholder: '输入 JavaScript 正则' }, { key: 'flags', label: '标志', placeholder: 'gim' }],
+  regex: [{ key: 'mode', label: '处理方式', entries: [['match', '匹配'], ['replace', '替换']] }, { key: 'pattern', label: '表达式', placeholder: '输入 JavaScript 正则' }, { key: 'flags', label: '标志', placeholder: 'gim' }],
 };
 
 export default function ToolOptions({ toolId, options, busy, onChange }: { toolId: ToolId; options: Options; busy: boolean; onChange: (key: string, value: string) => void }) {
-  const visibleFields: Field[] = [...(fields[toolId] ?? []), ...(toolId === 'ulid' && options.mode !== 'parse' ? [{ key: 'timestamp', label: '毫秒时间戳', placeholder: '留空使用当前时间' } as Field] : []), ...(toolId === 'json-code' ? options.language === 'java' ? [
+  const zoneList = useId();
+  const visibleFields: Field[] = [...(fields[toolId] ?? []), ...(toolId === 'regex' && options.mode === 'replace' ? [{ key: 'replacement', label: '替换模板', placeholder: '留空删除匹配文本' }] : []), ...(toolId === 'ulid' && options.mode !== 'parse' ? [{ key: 'timestamp', label: '毫秒时间戳', placeholder: '留空使用当前时间' } as Field] : []), ...(toolId === 'json-code' ? options.language === 'java' ? [
     { key: 'javaStyle', label: '生成风格', entries: [['pojo', 'POJO'], ['record', 'Record (Java 16+)']] } as Field,
     { key: 'annotations', label: '字段映射', entries: [['none', '无依赖'], ['jackson', 'Jackson 注解']] } as Field,
   ] : [
@@ -67,7 +81,7 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
   ] : toolId === 'type-json' && options.language !== 'java' ? [{ key: 'optional', label: '可选字段', entries: [['include', '包含示例'], ['exclude', '忽略']] } as Field] : [])];
   const showIndent = toolId !== 'json' || !['stringify', 'compact'].includes(options.mode);
   const notice = toolId === 'type-json' ? '生成示例值 · 不执行源码或还原真实数据' : toolId === 'hmac' ? '密钥仅在内存，默认不保存工作区' : toolId === 'http-code' ? '只生成代码，不发送请求' : toolId === 'cron' ? 'UTC · 五字段 Unix Cron' : toolId === 'jwt' ? '仅解码，不验证签名或可信性' : toolId === 'url-inspect' ? '保留重复参数，不访问地址' : toolId === 'uuid' ? '安全随机 UUID v4 · 最多 1,000 个' : '';
-  return <div className="options">{visibleFields.filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (!['arrayKey', 'ignorePaths'].includes(field.key) || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => {
+  return <div className="options">{visibleFields.filter(field => field.key !== 'blank' || options.mode !== 'lines').filter(field => showIndent || field.key !== 'indent').filter(field => toolId !== 'diff' || (!['arrayKey', 'ignorePaths'].includes(field.key) || options.mode === 'json') && (field.key !== 'ignoreWhitespace' || options.mode !== 'json')).map(field => {
     if (field.entries && field.entries.length <= 4) {
       return <div className={`option field-${field.key}`} key={field.key}>
         <span>{field.label}</span>
@@ -77,7 +91,7 @@ export default function ToolOptions({ toolId, options, busy, onChange }: { toolI
       </div>;
     }
     return <label className={`option field-${field.key}`} key={field.key}><span>{field.label}</span>{field.entries ? <select disabled={busy} value={options[field.key]} onChange={event => onChange(field.key, event.target.value)}>{field.entries.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select> : <input disabled={busy} type={field.secret ? 'password' : field.min !== undefined ? 'number' : 'text'} autoComplete={field.secret ? 'off' : undefined} spellCheck={field.secret ? false : undefined} min={field.min} max={field.max} step={field.min !== undefined ? 1 : undefined} value={options[field.key]} placeholder={field.placeholder} onChange={event => onChange(field.key, event.target.value)} />}</label>;
-  })}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
+  })}{toolId === 'timestamp' && options.mode === 'batch' && <label className="option"><span>目标 IANA 时区</span><input list={zoneList} disabled={busy} value={options.zone ?? 'UTC'} onChange={e => onChange('zone', e.target.value)} /><datalist id={zoneList}>{['UTC','Asia/Shanghai','Asia/Tokyo','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles'].map(zone => <option key={zone}>{zone}</option>)}</datalist></label>}{notice && <span className="toolbar-hint"><ShieldCheck size={14} />{notice}</span>}</div>;
 }
 
 

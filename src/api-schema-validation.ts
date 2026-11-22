@@ -24,10 +24,14 @@ for (const schema of [
   content,
 ])
   metaValidator.addSchema(structuredClone(schema) as Schema);
-export function checkApiSchema(
+export function checkApiSchema(schema: Schema | boolean, body: string): ApiCheck {
+  const { name, state, detail } = validateLocalSchema(schema, body);
+  return { name, state, detail };
+}
+export function validateLocalSchema(
   schema: Schema | boolean,
   body: string,
-): ApiCheck {
+): ApiCheck & { invalidSchema?: boolean } {
   try {
     const stack: (Schema | boolean)[] = [schema];
     while (stack.length) {
@@ -37,6 +41,7 @@ export function checkApiSchema(
         return {
           name: "JSON Schema",
           state: "fail",
+          invalidSchema: true,
           detail:
             "Schema定义无效：" +
             result.errors
@@ -115,7 +120,8 @@ export function checkApiSchema(
   } catch (error) {
     return {
       name: "JSON Schema",
-      state: "fail",
+      state: error instanceof Error && error.message.includes("Unresolved $ref") ? "skip" : "fail",
+      invalidSchema: true,
       detail: error instanceof Error ? error.message : String(error),
     };
   }

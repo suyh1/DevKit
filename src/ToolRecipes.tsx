@@ -11,6 +11,8 @@ const allowed: ToolId[] = [
   'unicode',
   'gzip',
   'yaml',
+  'json-lines',
+  'markdown-table',
   'csv-json',
   'json-csv',
   'text',

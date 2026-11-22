@@ -1,0 +1,13 @@
+.visual-workbench { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 1.5fr); gap: 16px; }
+.visual-controls, .visual-preview { min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+.visual-controls label { display: grid; gap: 8px; }
+.visual-controls textarea { min-height: 8rem; resize: vertical; }
+.visual-controls .options { flex-wrap: wrap; }
+.visual-preview { align-items: flex-start; }
+.visual-preview canvas { align-self: center; max-width: 100%; height: auto; image-rendering: pixelated; }
+.flex-scroll { max-width: 100%; overflow: auto; }
+.flex-stage { background: var(--soft); outline: 1px dashed currentColor; outline-offset: -1px; }
+.flex-stage > div { box-sizing: border-box; flex: none; width: 92px; min-height: 36px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); border-radius: 6px; }
+.flex-stage > div:nth-child(2) { min-height: 52px; }
+.visual-preview pre { white-space: pre-wrap; margin: 0; }
+@media (max-width: 850px) { .visual-workbench { grid-template-columns: minmax(0, 1fr); } }

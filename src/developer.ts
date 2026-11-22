@@ -6,20 +6,20 @@ import type { JsonNode } from './result-model';
 export type DeveloperToolId = 'code-format' | 'json-path' | 'json-schema' | 'query-string' | 'http-code' | 'cron' | 'env' | 'properties' | 'hmac' | 'unicode' | 'css-unit' | 'http-status';
 export const developerDefaults: Record<DeveloperToolId, Options> = {
   'code-format': { language: 'babel', indent: '2', quotes: 'single' },
-  'json-path': { path: '$.users[*].name' }, 'json-schema': {},
+  'json-path': { path: '$.users[*].name' }, 'json-schema': { mode: 'infer', schema: '' },
   'query-string': { mode: 'decode' }, 'http-code': { style: 'fetch' },
-  cron: { start: '', count: '10' }, env: { mode: 'decode' }, properties: { mode: 'decode' },
+  cron: { start: '', count: '10' }, env: { mode: 'decode', target: '' }, properties: { mode: 'decode' },
   hmac: { algorithm: 'SHA-256', key: '', format: 'hex' }, unicode: { mode: 'encode' },
   'css-unit': { from: 'px', to: 'rem', base: '16', viewport: '1440' }, 'http-status': {},
 };
 export const developerTools: { id: DeveloperToolId; name: string; english: string; category: string; description: string; sample: string }[] = [
   { id: 'code-format', name: '前端代码格式化', english: 'Code Formatter', category: '代码与查询', description: '使用本地 Prettier 整理 JS / JSX、TS / TSX、CSS / SCSS、HTML；仅格式化，不执行代码。每次最多 200,000 字符。', sample: 'const users=[{name:"Alice",active:true}];const names=users.map(user=>user.name)' },
   { id: 'json-path', name: 'JSON 路径提取', english: 'JSON Path Selector', category: '结构化数据', description: '支持 $.field、[0]、["字段"] 与 [*]，始终输出匹配值数组，保留数字原文。不是完整 JSONPath；最多 300,000 字符、8,000 节点。', sample: '{"users":[{"id":9007199254740993,"name":"Alice"},{"id":2,"name":"张三"}]}' },
-  { id: 'json-schema', name: 'JSON Schema 生成', english: 'JSON Schema Generator', category: '结构化数据', description: '根据样本生成 Draft 2020-12 Schema，合并数组对象与可选字段。样本推断不代表完整业务约束；最多 300,000 字符、8,000 节点。', sample: '{"users":[{"id":1,"name":"Alice"},{"id":2,"active":true}],"next":null}' },
+  { id: 'json-schema', name: 'JSON Schema 生成与校验', english: 'JSON Schema Generator', category: '结构化数据', description: '从样本推断 Draft 2020-12 Schema，或独立校验样本，列出字段路径与错误原因。样本推断不代表完整业务约束；最多 300,000 字符、8,000 节点。', sample: '{"users":[{"id":1,"name":"Alice"},{"id":2,"active":true}],"next":null}' },
   { id: 'query-string', name: 'Query 参数转换', english: 'Query String Converter', category: '编码与解析', description: 'Query 与 JSON 字符串对象互转，同名参数保留为数组，+ 按空格解码。输入为参数串（可带 ?），不接受完整 URL。', sample: 'name=%E5%BC%A0%E4%B8%89&tag=java&tag=react&empty=&q=hello+world' },
   { id: 'http-code', name: 'HTTP 请求代码生成', english: 'HTTP Request Snippets', category: '代码与查询', description: '从 JSON 请求配置生成 Fetch、Axios 或 POSIX shell cURL 代码。支持 method、url、headers、body，全程不发送请求；cURL 不适用于 PowerShell 引号规则。', sample: '{"method":"POST","url":"https://example.com/api/users","headers":{"Content-Type":"application/json"},"body":{"name":"张三"}}' },
   { id: 'cron', name: 'Cron 表达式预览', english: 'Cron Schedule Preview', category: '时间与数值', description: '五字段 Unix Cron（分 时 日 月 周），支持数字、*、范围、逗号与步长，0/7 为周日；日期与星期均受限时取或。按 UTC 预览未来最多 4 年，不创建定时任务；不支持 Quartz 秒字段、名称或 L/W/#。', sample: '*/15 9-18 * * 1-5' },
-  { id: 'env', name: '.env ↔ JSON', english: 'Environment Converter', category: '结构化数据', description: '转换平面字符串配置，支持 export、引号和注释；双引号支持 \\n、\\r、\\t、\\"、\\\\，不展开变量、不执行命令。拒绝重复键及多行引号。', sample: 'APP_NAME="DevKit"\nPORT=3000\nAPI_URL=https://example.com\nMESSAGE="你好\\n开发者"\n' },
+  { id: 'env', name: '.env ↔ JSON', english: 'Environment Converter', category: '结构化数据', description: '支持按键比较两份配置、逐项查看值及平面字符串配置互转，支持 export、引号和注释；双引号支持 \\n、\\r、\\t、\\"、\\\\，不展开变量、不执行命令。拒绝重复键及多行引号。', sample: 'APP_NAME="DevKit"\nPORT=3000\nAPI_URL=https://example.com\nMESSAGE="你好\\n开发者"\n' },
   { id: 'properties', name: 'Properties ↔ JSON', english: 'Java Properties Converter', category: '结构化数据', description: 'Java Properties 文本与 JSON 字符串对象互转，支持转义、Unicode、续行、空格或 =/: 分隔。拒绝重复键；输出使用 ASCII Unicode 转义。', sample: 'server.port=8080\napp.name=DevKit\nwelcome=\\u4f60\\u597d\npath=C:\\\\data\n' },
   { id: 'hmac', name: 'HMAC 签名', english: 'HMAC Generator', category: '安全与标识', description: '使用 UTF-8 密钥计算 HMAC SHA-256 / SHA-384 / SHA-512，输出 HEX 或 Base64，可核对已有签名。密钥与结果仅在内存；工作区默认排除此任务。', sample: 'The quick brown fox jumps over the lazy dog' },
   { id: 'unicode', name: 'Unicode 转义', english: 'Unicode Escape Converter', category: '编码与解析', description: '文本与 JavaScript Unicode 转义互转，支持 \\uXXXX、\\u{1F600} 和代理对；输出为文本，不执行。', sample: '你好，DevKit 😄' },
@@ -144,13 +144,26 @@ function envConvert(input: string, options: Options) {
     if (!/^[A-Za-z_][\w]*$/.test(key)) throw new Error(`无效环境变量名：${key}`);
     return `${key}=${JSON.stringify(value)}`;
   }).join('\n');
+  if (options.mode === 'compare') {
+    const left = parseEnvSide(input, '左侧'), right = parseEnvSide(options.target ?? '', '右侧');
+    return pretty({ '仅左侧': Object.keys(left).filter(key => !Object.hasOwn(right, key)),
+      '仅右侧': Object.keys(right).filter(key => !Object.hasOwn(left, key)),
+      '值有变化': Object.keys(left).filter(key => Object.hasOwn(right, key) && right[key] !== left[key]) });
+  }
+  return pretty(parseEnv(input));
+}
+export function parseEnvSide(input: string, side: string) {
+  try { return parseEnv(input); }
+  catch (error) { throw new Error(side + ' · ' + (error instanceof Error ? error.message : '格式无效')); }
+}
+function parseEnv(input: string) {
   const result: Record<string, string> = Object.create(null);
   for (const [index, line] of input.replace(/^\uFEFF/, '').split(/\r?\n/).entries()) {
     if (/^\s*(#|$)/.test(line)) continue;
     const match = /^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*(.*)$/.exec(line);
     if (!match) throw new Error(`.env 第 ${index + 1} 行格式无效。`);
     const [, key, raw] = match;
-    if (Object.hasOwn(result, key)) throw new Error(`重复变量：${key}`);
+    if (Object.hasOwn(result, key)) throw new Error(`第 ${index + 1} 行重复变量：${key}`);
     let value: string;
     if (raw.startsWith('"')) {
       const quoted = /^"(?:\\.|[^"\\])*"/.exec(raw)?.[0];
@@ -163,7 +176,7 @@ function envConvert(input: string, options: Options) {
     } else value = raw.split('#', 1)[0].trimEnd();
     result[key] = value;
   }
-  return pretty(result);
+  return result;
 }
 function propertiesConvert(input: string, options: Options) {
   const escape = (text: string, key: boolean) => text.split('').map((char, index) => {
@@ -237,7 +250,9 @@ export async function developerTransform(id: DeveloperToolId, input: string, opt
   switch (id) {
     case 'code-format': return formatCode(input, options);
     case 'json-path': return selectJson(input, options.path || '$');
-    case 'json-schema': return pretty({ $schema: 'https://json-schema.org/draft/2020-12/schema', ...inferSchema([jsonTree(input)]) });
+    case 'json-schema':
+      if (options.mode === 'validate') return (await import('./schema-sample')).validateSample(options.schema, input);
+      return pretty({ $schema: 'https://json-schema.org/draft/2020-12/schema', ...inferSchema([jsonTree(input)]) });
     case 'query-string': return queryString(input, options);
     case 'http-code': return httpCode(input, options);
     case 'cron': return cronPreview(input, options);

@@ -10,7 +10,7 @@ import type { WorkspaceModuleId } from './catalog';
 export type TaskStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'cancelled';
 export type Task = {
   id: string; toolId: ToolId; input: string; output: string; options: Options;
-  error: string; elapsed: number | null; status: TaskStatus; fileName?: string; encoding?: string;
+  matchCount?: number; error: string; elapsed: number | null; status: TaskStatus; fileName?: string; encoding?: string;
 };
 export type Preferences = {
   themeStyle: ThemeStyle; theme: 'system' | 'light' | 'dark'; fontSize: number; indent: '2' | '4'; wrap: boolean;
@@ -36,6 +36,7 @@ export function editTask(task: Task, patch: Partial<Task>): Task {
 }
 export function changeToolOption(task: Task, key: string, value: string): Partial<Task> {
   const options = { ...task.options, [key]: value };
+  if (task.toolId === 'json-schema' && key === 'mode' && value === 'validate' && task.status === 'success' && task.options.mode !== 'validate' && !options.schema) options.schema = task.output;
   if (task.toolId !== 'ulid' || key !== 'mode' || value === task.options.mode) return { options };
   const from = task.options.mode === 'parse' ? 'parseInput' : 'generateInput';
   const to = value === 'parse' ? 'parseInput' : 'generateInput';
@@ -92,7 +93,7 @@ export function importWorkspace(text: string): { tasks: Task[]; active: number }
       validateGeoOptions(options);
       if (entry.input.length > 300_000) throw new Error('经纬度文本超过 300,000 字符。');
     }
-    return { ...task, input: entry.input, output: entry.output, options, elapsed: null, status: 'stale' as const, fileName: typeof entry.fileName === 'string' ? entry.fileName.slice(0, 200) : undefined };
+    return { ...task, input: entry.input, output: entry.output, options, elapsed: null, status: 'stale' as const, encoding: typeof entry.encoding === 'string' ? entry.encoding.slice(0, 32) : undefined, fileName: typeof entry.fileName === 'string' ? entry.fileName.slice(0, 200) : undefined };
   });
   return { tasks, active: Number.isInteger(source.active) && source.active >= 0 && source.active < tasks.length ? source.active : 0 };
 }

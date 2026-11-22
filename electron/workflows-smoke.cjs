@@ -25,7 +25,7 @@ module.exports = async function workflowsSmoke(window, output) {
   window.setSize(1440, 1000);
   const { catalog, openTool } = require('./navigation-helpers.cjs')(window);
   const names = (await catalog()).map(tool => tool.name);
-  assert.equal(names.length, 46);
+  assert.equal(names.length, 51);
   const report = [];
   const audit = require('./interaction-audit-smoke.cjs')(window, output);
   for (const name of names) {
@@ -108,6 +108,10 @@ module.exports = async function workflowsSmoke(window, output) {
         if (['chmod', 'cron', 'http-code', 'json-csv'].includes(id)) await fs.writeFile(path.join(output, `workflow-${id}-${theme}-narrow.png`), (await window.webContents.capturePage()).toPNG());
         window.setSize(1440, 1000);
       }
+    } else if (await js(`!!document.querySelector('${pane} [data-live-tool]')`)) {
+      const liveId = await js(`document.querySelector('${pane} [data-live-tool]').dataset.liveTool`);
+      await require('./basic-tools-smoke.cjs').live(window, liveId, output);
+      report.push({ name, id: liveId, status: 'verified', workflow: 'live' });
     } else {
       assert.equal(await js(`!!document.querySelector('${pane} .color-workbench')`), true, name);
       const original = 'rgba(10, 20, 30, 0.5)';
@@ -162,5 +166,5 @@ module.exports = async function workflowsSmoke(window, output) {
   await js("document.documentElement.dataset.theme = 'light'");
   window.setSize(...size); window.setMinimumSize(...minimum);
   await fs.writeFile(path.join(output, 'workflow-report.json'), JSON.stringify(report, null, 2));
-  console.log('All 46 tool UIs checked; 40 text/coordinate tools executed, both themes and four viewport widths passed.');
+  console.log('All 51 tool UIs checked; 43 text/coordinate tools executed, both themes and four viewport widths passed.');
 };

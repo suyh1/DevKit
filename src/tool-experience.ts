@@ -6,6 +6,11 @@ const entry = (workflow: Workflow, input: string, output: string, action: string
 
 // Explicit coverage: each tool chooses its interaction according to its data flow.
 export const toolExperiences: Record<ToolId, Experience> = {
+  'json-lines': entry('convert', '记录或数组', '转换结果', '转换记录', '每行一条 JSON 记录。选择转换方向与空行处理方式。'),
+  'markdown-table': entry('table', '源表格', '表格结果', '转换表格', '以首行为表头。单元格换行转为 <br>，反向恢复为换行；字面量 <br> 按文本转义。'),
+  'qr-code': entry('convert', '文本或链接', '二维码', '生成二维码', '使用 UTF-8 编码并在本机导出 PNG。'),
+  semver: entry('convert', '版本列表', '版本范围检查', '检查版本', '每行输入一个版本，按 npm 范围筛选并降序排列。'),
+  'css-flex': entry('convert', '容器属性', '布局与 CSS', '预览布局', '调整参数后查看三个固定宽度子项的布局。'),
   'mock-data': entry('convert', 'JSON 示例 / Schema', '批量测试数据', '生成 Mock 数据', '从示例或 Schema 常用子集生成中文数据；同一种子及参数可复现。字段规则使用点分路径，数组元素用 []，例如 {"id":"sequence","name":"name","age":{"kind":"integer","min":18,"max":65}}。规则优先，示例数组取首项作为模板。'),
   'geo-coordinates': entry('geography', '经纬度与文本', '坐标结果', '处理坐标', '格式互转、椭球/球面圆周点和度分秒文本提取，共享精度与复制格式。'),
   json: entry('format', 'JSON 文档', '格式化与结构', '整理 JSON', '整理缩进后浏览结构，保留数字原文与重复字段。带外层引号的转义 JSON 可选择“字符串 → JSON”。'),
@@ -55,6 +60,10 @@ export const toolExperiences: Record<ToolId, Experience> = {
 };
 
 export function experienceFor(id: ToolId, options: Options): Experience {
+  if (id === 'timestamp' && options.mode === 'batch') return entry('table', '时间戳或 ISO 日期', '时区换算表', '批量转换', '每行一个值，错误保留在原行。复制或导出 TSV。');
+  if (id === 'json-schema' && options.mode === 'validate') return entry('compare', 'JSON 样本', '校验报告', '校验样本', '在右侧编辑 Draft 2020-12 Schema，再校验左侧样本。');
+  if (id === 'env' && options.mode === 'compare') return entry('compare', '左侧配置', '键名差异', '比较配置', '展开单项可查看两侧值。复制和导出仅含键名。');
+  if (id === 'regex' && options.mode === 'replace') return entry('match', '测试文本', '替换全文', '执行替换', '模板支持 $1、$<名称>、$& 和 $$。留空可删除匹配内容。');
   if (id === 'json' && options.mode === 'parse') return entry('convert', 'JSON 字符串', 'JSON 文档', '解析字符串', '粘贴包含外层双引号的 JSON 字符串，解开一层转义后按所选缩进显示。');
   if (id === 'json' && options.mode === 'stringify') return entry('convert', 'JSON 文档', 'JSON 字符串', '转为字符串', '将整份 JSON 原文编码为带双引号的字符串，保留原文中的空格和换行。');
   if (id === 'diff' && options.mode === 'json') return entry('compare', '原始 JSON', '字段差异', '对比结构', '按字段路径比较结构，对象键顺序忽略；数字按原文比较（1 与 1.0 视为不同）。对象数组可按指定字段匹配，缺失或重复标识会报错。');
