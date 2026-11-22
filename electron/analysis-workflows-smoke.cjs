@@ -25,7 +25,7 @@ module.exports = async function analysisWorkflows(window) {
     js(
       '[...' +
         find(parent) +
-        '.querySelectorAll("button")].find(b=>b.textContent.trim()===' +
+        '.querySelectorAll("button")].find(b=>(b.getAttribute("aria-label") || b.textContent.trim())===' +
         JSON.stringify(label) +
         ').click()',
     );

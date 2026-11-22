@@ -1,5 +1,6 @@
 import type { Opt } from './tabular';
 export const imageTools = new Set(['pixel-diff', 'image-compress', 'favicon-kit', 'qr-code']);
+export const faviconSizes = [16, 32, 48, 180, 192, 512] as const;
 export type ImageReport = { summary: string; files: { name: string; blob: Blob }[]; text?: string };
 export function canvas(w: number, h: number) {
   if (!w || !h || w * h > 24_000_000) throw Error('单幅图片上限为 2400 万像素');
@@ -76,7 +77,7 @@ export async function imageReport(id: string, file: File, o: Opt, right?: File):
   const { default: JSZip } = await import('jszip'),
     zip = new JSZip(),
     images = new Map<number, Uint8Array<ArrayBuffer>>();
-  for (const size of [16, 32, 48, 180, 192, 512]) {
+  for (const size of faviconSizes) {
     const c = canvas(size, size),
       ctx = c.getContext('2d')!,
       ratio = size / Math.max(w, h);
@@ -127,7 +128,7 @@ export async function imageReport(id: string, file: File, o: Opt, right?: File):
     '<link rel="icon" href="favicon.ico">\n<link rel="apple-touch-icon" href="icon-180.png">\n<link rel="manifest" href="site.webmanifest">';
   zip.file('links.html', text);
   return {
-    summary: '6 种 PNG 尺寸 · 3 尺寸 ICO · Web Manifest',
+    summary: faviconSizes.length + ' 种 PNG 尺寸 · 3 尺寸 ICO · Web Manifest',
     files: [{ name: 'site-icons.zip', blob: await zip.generateAsync({ type: 'blob' }) }],
     text,
   };

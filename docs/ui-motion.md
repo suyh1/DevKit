@@ -66,6 +66,12 @@
 
 采用 UI Motion 的 `PRIMITIVES.md` 及这些组件规范：`overlays/dialog`、`popover`、`drawer`，`navigation/tabs`，`buttons/action-button`、`copy-button`，`messages/toast`、`alert`，`expand/accordion`、`resizable-panels`，`toggles/segmented-control`，`tables/sortable-data-table`、`json-viewer`，`pickers/color-picker`，`editors/file-dropzone`，`loaders/skeleton-morph`。
 
+## 文件工作台
+
+文件工作台的 Bento 布局按容器宽度切换双栏与单栏。选择卡片复用触点倾斜、拖入反馈与键盘焦点，文件名复用 Marquee。参数少且互斥时使用 Segmented，运行、复制和下载使用 MotionButton。结果面板按真实处理状态显示 Skeleton、错误或产物。缩放或比较图像时，分界线可用原生滑杆的键盘操作调整。
+
+文件拖入和图上对照参考 [Bencho Upload dropzone](https://bencho.dev/blocks/upload-dropzone) 和 [Image compare](https://bencho.dev/blocks/image-compare)。键盘选取与拖放共用业务入口，保留原生文件和目录选择，参考 [React Spectrum DropZone](https://react-spectrum.adobe.com/v3/DropZone.html) 与 [react-dropzone](https://github.com/react-dropzone/react-dropzone) 的选取器兼容性说明。图标包内容按文件用途分组，参考 [Magic UI File Tree](https://magicui.design/docs/components/file-tree)。这些交互使用本地组件实现，离线可用。
+
 ## 验证
 
 单元测试覆盖弹簧生命周期、复制结果、异步操作来源和服务端渲染语义。完成生产构建后，可用 `node scripts/smoke-desktop.mjs --design-only` 验证工作台导航、搜索、卡片与减少动态效果，用 `--monitor-only` 验证检测样本和窄屏共享页面。

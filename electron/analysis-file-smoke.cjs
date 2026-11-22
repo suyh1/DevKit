@@ -65,15 +65,15 @@ module.exports = async (window, pane, id) => {
       ((selector, b64, name, id) => {
         const root = document.querySelector(selector),
           inputs = root.querySelectorAll('input[type=file]');
-        for (const field of id === 'pixel-diff' ? [inputs[0], inputs[1]] : [inputs[0]]) {
-          const dt = new DataTransfer();
-          dt.items.add(
-            new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], name, {
-              type: name.endsWith('.png') ? 'image/png' : '',
-            }),
-          );
-          field.files = dt.files;
-          field.dispatchEvent(new Event('change', { bubbles: true }));
+        const dt = new DataTransfer();
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        dt.items.add(new File([bytes], name, { type: name.endsWith('.png') ? 'image/png' : '' }));
+        inputs[0].files = dt.files;
+        inputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+        if (id === 'pixel-diff') {
+          const compare = new DataTransfer();
+          compare.items.add(new File([bytes], 'second.png', { type: 'image/png' }));
+          inputs[1].closest('label').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: compare }));
         }
       }).toString() +
       ')(' +
@@ -83,7 +83,11 @@ module.exports = async (window, pane, id) => {
   );
   const js = (code) => window.webContents.executeJavaScript(code, true),
     root = 'document.querySelector(' + JSON.stringify(selector) + ')';
-  await js(root + ".querySelector('.primary-button').click()");
+  if (id === 'pixel-diff') {
+    const files = await js('[...' + root + '.querySelectorAll(".file-source .file-name")].map(el => el.title)');
+    assert.deepEqual(files, [name, 'second.png']);
+  }
+  await js(root + ".querySelector('.file-run-actions .run-button').click()");
   for (let i = 0; i < 220; i++) {
     const text = await js(root + '.innerText');
     if (text.includes(expected)) {

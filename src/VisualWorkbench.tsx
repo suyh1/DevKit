@@ -1,4 +1,5 @@
 import FileWorkbench from './analysis/FileWorkbench';
+import LocalFilePicker from './LocalFilePicker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { downloadBlob, readText } from './files';
@@ -43,7 +44,7 @@ function QrPanel({ task, onEdit, onNotice }: Props) {
   return <>
     <section className="editor-card visual-controls" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void importFile(e.dataTransfer.files[0]); }}>
       <label>文本或链接<textarea maxLength={2_000_000} value={task.input} disabled={loading} onChange={e => onEdit({ input: e.target.value })} /></label>
-      <label>导入文本文件<input type="file" disabled={loading} onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ''; }} /></label>
+      <LocalFilePicker label="导入文本文件" disabled={loading} onFiles={files => void importFile(files[0])} />
       <ToolOptions toolId="qr-code" options={task.options} busy={loading} onChange={(key, value) => onEdit({ options: { ...task.options, [key]: value } })} />
     </section>
     <section className="editor-card visual-preview">

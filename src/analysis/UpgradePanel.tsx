@@ -1,8 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
+import LocalFilePicker from '../LocalFilePicker';
+import { MotionDetails } from '../Motion';
+import SegmentedControl from '../SegmentedControl';
 import { saveText, readText, downloadBlob } from '../files';
 import { copyText } from '../motion-primitives';
 import { clampValues, type MergeBlock } from './upgrades';
 import type { Opt } from './tabular';
+const modeNames: Record<string, string> = {
+  patchMode: '补丁模式',
+  unit: '单位',
+  direction: '转换方向',
+  style: '代码风格',
+  dialect: '方言',
+};
+const choiceNames: Record<string, string> = {
+  generate: '生成并预演',
+  apply: '应用已有补丁',
+  'yaml-toml': 'YAML → TOML',
+  'toml-yaml': 'TOML → YAML',
+};
 const specs: Record<
   string,
   { title: string; sample: string; options: Opt; labels: Record<string, string | string[]>; ext: string }
@@ -121,13 +137,13 @@ export function Base64Files() {
     }
   }
   return (
-    <details className="analysis-file" data-upgrade="base64">
+    <MotionDetails className="analysis-file" data-upgrade="base64">
       <summary>文件与 Base64 / Data URL 互转</summary>
       <label>
         <input type="checkbox" checked={dataUrl} onChange={(e) => asUrl(e.target.checked)} />
         编码时附带 Data URL
       </label>
-      <input aria-label="编码文件" type="file" onChange={(e) => void encode(e.target.files?.[0])} />
+      <LocalFilePicker label="编码文件" onFiles={(files) => void encode(files[0])} />
       <textarea
         aria-label="文件 Base64"
         rows={5}
@@ -144,7 +160,7 @@ export function Base64Files() {
       <button onClick={() => void copyText(value).catch(() => setError('复制失败'))}>复制编码</button>
       <button onClick={restore}>还原并下载</button>
       {error && <p role="alert">{error}</p>}
-    </details>
+    </MotionDetails>
   );
 }
 export default function UpgradePanel({ id, current }: { id: string; current?: string }) {
@@ -211,7 +227,7 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
       /* invalid fields */
     }
   return (
-    <details className="analysis-file" data-upgrade={id}>
+    <MotionDetails className="analysis-file" data-upgrade={id}>
       <summary>{spec.title}</summary>
       {id !== 'css-unit' && (
         <label>
@@ -247,73 +263,61 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
           </button>
         )}
         {id !== 'css-unit' && (
-          <label>
-            读取文件
-            <input
-              type="file"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (file)
-                  try {
-                    const r = await readText(file);
-                    clear();
-                    setSource(r.text);
-                  } catch (err) {
-                    setError(String(err));
-                  }
-              }}
-            />
-          </label>
+          <LocalFilePicker
+            label="读取文件"
+            onFiles={async ([file]) => {
+              try {
+                const r = await readText(file);
+                clear();
+                setSource(r.text);
+              } catch (err) {
+                setError(String(err));
+              }
+            }}
+          />
         )}
       </div>
       <div className="analysis-fields">
         {Object.entries(spec.labels)
           .filter(([k]) => !(id === 'json' && k === 'target' && opts.patchMode === 'apply'))
-          .map(([k, label]) => (
-            <label key={k}>
-              {typeof label === 'string'
-                ? label
-                : ({
-                    patchMode: '补丁模式（生成 / 应用）',
-                    unit: '单位',
-                    direction: '转换方向',
-                    style: '代码风格',
-                    dialect: '方言',
-                  }[k] ?? k)}
-              {Array.isArray(label) ? (
-                <select
+          .map(([k, label]) =>
+            Array.isArray(label) ? (
+              <div className="file-format" key={k}>
+                <span>{modeNames[k]}</span>
+                <SegmentedControl
+                  label={modeNames[k]}
                   value={opts[k]}
-                  onChange={(e) => {
+                  options={label.map((value) => ({ value, label: choiceNames[value] ?? value }))}
+                  onChange={(value) => {
                     clear();
-                    options({ ...o, [k]: e.target.value });
-                  }}
-                >
-                  {label.map((x) => (
-                    <option key={x} value={x}>
-                      {({ generate: '生成并预演', apply: '应用已有补丁' } as Record<string, string>)[x] ?? x}
-                    </option>
-                  ))}
-                </select>
-              ) : ['base', 'third', 'target'].includes(k) ? (
-                <textarea
-                  value={opts[k]}
-                  rows={3}
-                  onChange={(e) => {
-                    clear();
-                    options({ ...o, [k]: e.target.value });
+                    options({ ...o, [k]: value });
                   }}
                 />
-              ) : (
-                <input
-                  value={opts[k]}
-                  onChange={(e) => {
-                    clear();
-                    options({ ...o, [k]: e.target.value });
-                  }}
-                />
-              )}
-            </label>
-          ))}
+              </div>
+            ) : (
+              <label key={k}>
+                {label}
+                {['base', 'third', 'target'].includes(k) ? (
+                  <textarea
+                    value={opts[k]}
+                    rows={3}
+                    onChange={(e) => {
+                      clear();
+                      options({ ...o, [k]: e.target.value });
+                    }}
+                  />
+                ) : (
+                  <input
+                    value={opts[k]}
+                    onChange={(e) => {
+                      clear();
+                      options({ ...o, [k]: e.target.value });
+                    }}
+                  />
+                )}
+              </label>
+            ),
+          )}
       </div>
       {id === 'css-unit' && (
         <label>
@@ -363,6 +367,6 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
           </div>
         </>
       )}
-    </details>
+    </MotionDetails>
   );
 }

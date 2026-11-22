@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Files } from 'lucide-react';
+import LocalFilePicker from './LocalFilePicker';
 import { fileDigest } from './file-digest';
 import { readText, saveText } from './files';
 
@@ -144,15 +145,7 @@ export default function FileChecksums() {
         )}
       </div>
       <div className="checksum-actions">
-        <label>
-          计算目录
-          <input
-            type="file"
-            multiple
-            ref={(node) => node?.setAttribute('webkitdirectory', '')}
-            onChange={(e) => void calculate(Array.from(e.target.files ?? []))}
-          />
-        </label>
+        <LocalFilePicker label="计算目录" directory onFiles={files => void calculate(files)} />
         {rows.size > 0 && (
           <button
             disabled={busy}
