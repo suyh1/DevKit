@@ -593,6 +593,8 @@
 .mock-editor,
 .mock-calls {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
   gap: 16px;
   padding-block: 20px;
 }
@@ -610,6 +612,10 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+.mock-scenarios { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.mock-scenarios header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mock-scenario-select { display: none; }
+.mock-scenarios .collab-tools button { overflow-wrap: anywhere; }
 .collab-tools button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--tint);
@@ -972,8 +978,10 @@
     grid-column: 1/-1;
   }
   .mock-editor .collab-fields {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .mock-scenarios .mock-scenario-select { display: inline-flex; }
+  .mock-scenarios button[aria-pressed] { display: none; }
   .board-stage {
     flex-direction: column;
   }

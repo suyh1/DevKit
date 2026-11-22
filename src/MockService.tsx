@@ -302,31 +302,42 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                     </div>
                   </fieldset>
                 </details>
-                <h3>响应场景</h3><details className="scenario-picker"><summary>{dirty ? '草稿场景' : row.published ? '已发布场景' : '未发布场景'} · {row.scenarios[row.active]?.name}</summary>{dirty && saved?.published && <small>当前已发布 · {saved.scenarios[saved.active]?.name}</small>}{row.scenarios.map((item, i) => <button key={i} onClick={e => { setTab(i); e.currentTarget.closest('details')!.open = false; }}>{item.status} · {item.name}{row.active === i ? '（当前配置）' : ''}</button>)}</details>
-                <div className="collab-tools">
-                  {row.scenarios.map((item, i) => (
-                    <button key={i} aria-pressed={index === i} onClick={() => setTab(i)}>
-                      <code data-family={Math.floor(item.status / 100)}>{item.status}</code>
-                      {item.name}
-                      {row.active === i && (
-                        <CircleDot size={13} aria-label="生效场景">
-                          <title>生效场景</title>
-                        </CircleDot>
-                      )}
-                    </button>
-                  ))}
-                  {edit && (
-                    <button
-                      disabled={op.busy || row.scenarios.length >= 12}
-                      onClick={() => {
-                        patch({ scenarios: [...row.scenarios, { ...sample().scenarios[0], name: '新场景' }] });
-                        setTab(row.scenarios.length);
-                      }}
-                    >
-                      添加场景
-                    </button>
-                  )}
-                </div>
+                <section className="mock-scenarios" aria-label="响应场景">
+                  <header>
+                    <h3>响应场景</h3>
+                    {edit && (
+                      <button
+                        disabled={op.busy || row.scenarios.length >= 12}
+                        onClick={() => {
+                          patch({ scenarios: [...row.scenarios, { ...sample().scenarios[0], name: '新场景' }] });
+                          setTab(row.scenarios.length);
+                        }}
+                      >
+                        <Plus size={14} />添加场景
+                      </button>
+                    )}
+                  </header>
+                  <small>{dirty ? '草稿场景' : row.published ? '已发布场景' : '未发布场景'} · {row.scenarios[row.active].name}</small>
+                  {dirty && saved?.published && <small>当前已发布 · {saved.scenarios[saved.active].name}</small>}
+                  <div className="collab-tools">
+                    <select className="mock-scenario-select" aria-label="选择响应场景" value={index} onChange={e => setTab(Number(e.target.value))}>
+                      {row.scenarios.map((item, i) => (
+                        <option key={i} value={i}>{item.status} · {item.name}{row.active === i ? '（当前配置）' : ''}</option>
+                      ))}
+                    </select>
+                    {row.scenarios.map((item, i) => (
+                      <button key={i} aria-pressed={index === i} onClick={() => setTab(i)}>
+                        <code data-family={Math.floor(item.status / 100)}>{item.status}</code>
+                        {item.name}
+                        {row.active === i && (
+                          <CircleDot size={13} aria-label="生效场景">
+                            <title>生效场景</title>
+                          </CircleDot>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </section>
                 <fieldset disabled={!edit || op.busy}>
                   <div className="mock-code-panel">
                     <div>
@@ -350,7 +361,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                   <div className="collab-fields">
                     <label>
                       场景名称
-                      <input value={scenario.name} onChange={(e) => changeScenario({ name: e.target.value })} />
+                      <input value={scenario.name} maxLength={60} onChange={(e) => changeScenario({ name: e.target.value })} />
                     </label>
                     <label>
                       状态码

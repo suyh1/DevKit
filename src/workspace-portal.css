@@ -76,6 +76,8 @@
   .workspace-portal .api-shell { grid-template-columns:minmax(0,1fr); }
   .workspace-portal .api-sidebar { position:static; max-height:220px; border-right:0; }
   .workspace-portal .api-main { min-height:0; max-height:none; }
+  .workspace-portal .api-editor-top { position: static; }
+  .workspace-portal .api-editor-top .api-view-toolbar { margin-inline: 0; padding-inline: 0; }
   .workspace-portal .pc-heading,.workspace-portal .ng-heading { gap:10px; }
   .workspace-portal .pc-heading h1,.workspace-portal .ng-heading h1 { font-size:21px; }
   .workspace-portal .api-topline { gap:8px; }

@@ -194,18 +194,9 @@
   border-radius: 6px;
   padding: 5px 10px;
 }
-.scenario-picker {
-  margin-block: 6px;
-}
-.scenario-picker summary,
 .pl-share-links summary,
 .td-outline-details summary {
   cursor: pointer;
-}
-.scenario-picker button,
-.scenario-picker small {
-  margin: 4px;
-  padding: 4px;
 }
 .delay-stepper {
   align-self: end;

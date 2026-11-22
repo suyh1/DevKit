@@ -14,6 +14,8 @@ select option {
       align-items: center;
       column-gap: .65em;
       justify-content: space-between;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
 
     select::picker-icon {

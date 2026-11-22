@@ -215,6 +215,7 @@
   min-width: 0;
 }
 .api-blank {
+  overflow-wrap: anywhere;
   min-height: 420px;
   display: flex;
   align-items: center;
@@ -249,6 +250,7 @@
   overflow-wrap: anywhere;
 }
 .api-endpoint-header small {
+  overflow-wrap: anywhere;
   font-size: 11px;
   color: var(--muted);
 }
@@ -378,6 +380,8 @@
 .api-parameters table {
   min-width: 800px;
 }
+.api-parameters { container: api-parameters / inline-size; }
+.api-parameter-action button span, .api-parameter-check span { display: none; }
 .api-parameters table[aria-label="调试参数"] {
   min-width: 400px;
 }
@@ -474,6 +478,7 @@
 }
 .api-documentation > h2 {
   font-size: 23px;
+  overflow-wrap: anywhere;
 }
 .api-doc-facts {
   display: flex;
@@ -857,6 +862,23 @@
 
 .api-parameter-name {
   flex-wrap: wrap;
+}
+@container api-parameters (max-width: 580px) {
+  .api-parameters .api-table-scroll { border: 0; border-radius: 0; }
+  .api-parameters table[aria-label] { display: block; min-width: 0; }
+  .api-parameters thead { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+  .api-parameters tbody { display: grid; gap: 10px; }
+  .api-parameters tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+  .api-parameters td { grid-column: 1 / -1; min-width: 0; display: grid; align-content: start; gap: 4px; padding: 0; border: 0; }
+  .api-parameters td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--muted); }
+  .api-parameters td:nth-child(3):has(select), .api-parameters td:nth-child(4):has(input[type="checkbox"]) { grid-column: auto; }
+  .api-parameter-check { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; cursor: pointer; }
+  .api-parameters td:has(.api-parameter-check) { align-content: end; }
+  .api-parameters td input:not([type="checkbox"]), .api-parameters td select { min-width: 0; min-height: 36px; font-size: 13px; }
+  .api-parameters .api-parameter-name { min-width: 0; }
+  .api-parameter-name input { flex: 1 1 80px; }
+  .api-parameter-action button { width: auto; min-height: 40px; justify-self: end; gap: 6px; padding-inline: 8px; }
+  .api-parameter-action button span, .api-parameter-check span { display: inline; }
 }
 .api-parameter-schema {
   width: 100%;

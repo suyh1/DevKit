@@ -396,6 +396,17 @@ app
       await js(`{ const select = document.querySelector('select[aria-label="共享页面主题风格"]'); select.value = 'default'; select.dispatchEvent(new Event('change', { bubbles: true })); }`);
       await selector('.portal-appearance summary');
       assert.equal(await js('document.querySelector(".portal-bar").getBoundingClientRect().height <= 90'), true);
+      window.setContentSize(320, 740);
+      await delay(160);
+      const fits = selector => js(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        return !!el && el.clientWidth > 0 && el.scrollWidth <= el.clientWidth + 1;
+      })()`);
+      assert.ok(await fits('.api-project-select select'), 'Long project name fits the closed picker');
+      assert.ok(await fits('.api-parameters .api-table-scroll'), 'Parameter fields and remove action fit together');
+      await button("接口文档", ".api-tabs button");
+      assert.ok(await fits('.api-documentation > h2'), 'Document title wraps in full');
+      await button("接口设计", ".api-tabs button");
       for (const [width, height, zoom] of [
         [1920, 1080, 1],
         [1366, 768, 1.25],

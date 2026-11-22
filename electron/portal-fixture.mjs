@@ -116,7 +116,7 @@ export async function portalFixture(root) {
     }) });
     library = await createApiWorkspace(directory);
     const endpoint = newApiEndpoint("fixture-endpoint");
-    endpoint.name = "共享接口定义";
+    endpoint.name = "共享接口定义 " + "ReleaseCandidate".repeat(4);
     endpoint.parameters = [
       {
         id: "q",
@@ -136,7 +136,7 @@ export async function portalFixture(root) {
         projects: [
           {
             id: "fixture-project",
-            name: "共享接口项目",
+            name: "共享接口项目 " + "MobileWorkspace".repeat(4),
             description: "",
             baseUrl: "http://127.0.0.1:8080",
             version: "1",

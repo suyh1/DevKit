@@ -42,16 +42,17 @@ export function ApiParameters({
             {rows.map((row, index) => (
               <tr key={row.id}>
                 <td>
-                  <input
-                    className="form-check" type="checkbox"
-                    aria-label={`参数${index + 1}启用`}
-                    checked={row.enabled}
-                    onChange={(event) =>
-                      patch(row.id, { enabled: event.target.checked })
-                    }
-                  />
+                  <label className="api-parameter-check">
+                    <input
+                      className="form-check" type="checkbox"
+                      aria-label={`参数${index + 1}启用`}
+                      checked={row.enabled}
+                      onChange={(event) => patch(row.id, { enabled: event.target.checked })}
+                    />
+                    <span>启用</span>
+                  </label>
                 </td>
-                <td>
+                <td data-label="位置 / 参数">
                   {valuesOnly ? (
                     <>
                       <small>{row.location}</small>
@@ -102,7 +103,7 @@ export function ApiParameters({
                 </td>
                 {!valuesOnly && (
                   <>
-                    <td>
+                    <td data-label="类型">
                       <select
                         aria-label={`参数${index + 1}类型`}
                         value={row.type}
@@ -125,16 +126,17 @@ export function ApiParameters({
                       </select>
                     </td>
                     <td>
-                      <input
-                        className="form-check" type="checkbox"
-                        aria-label={`参数${index + 1}必填`}
-                        checked={row.required}
-                        onChange={(event) =>
-                          patch(row.id, { required: event.target.checked })
-                        }
-                      />
+                      <label className="api-parameter-check">
+                        <input
+                          className="form-check" type="checkbox"
+                          aria-label={`参数${index + 1}必填`}
+                          checked={row.required}
+                          onChange={(event) => patch(row.id, { required: event.target.checked })}
+                        />
+                        <span>必填</span>
+                      </label>
                     </td>
-                    <td>
+                    <td data-label="说明">
                       <input
                         aria-label={`参数${index + 1}说明`}
                         value={row.description}
@@ -145,7 +147,7 @@ export function ApiParameters({
                     </td>
                   </>
                 )}
-                <td>
+                <td data-label={valuesOnly ? "本次请求值" : "示例 / 默认调试值"}>
                   <input
                     aria-label={`参数${index + 1}示例`}
                     value={row.example}
@@ -160,7 +162,7 @@ export function ApiParameters({
                   />
                 </td>
                 {!valuesOnly && (
-                  <td>
+                  <td className="api-parameter-action">
                     <button
                       className="icon-button"
                       aria-label={`删除接口参数${index + 1}`}
@@ -169,6 +171,7 @@ export function ApiParameters({
                       }
                     >
                       <Trash2 size={14} />
+                      <span>移除参数</span>
                     </button>
                   </td>
                 )}

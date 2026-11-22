@@ -199,6 +199,8 @@ button.td-preview-check:hover { border-color: var(--accent); background: var(--t
 }
 @container (max-width: 430px) {
   .td-heading > .td-actions, .td-sheet-head > .td-actions { justify-content: flex-start; }
+  .td-shortcuts dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .td-shortcuts dt:not(:first-child) { margin-block-start: 8px; }
   .td-sheet-head { padding-inline: 8px; }
   .td-toolbar { padding-inline: 4px; }
   .td-status { padding-inline: 8px; }
