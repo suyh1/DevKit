@@ -60,7 +60,7 @@ export function MotionPresence({
         setMounted(false);
       }
     };
-    if (reducedMotion()) {
+    if (document.hidden || reducedMotion()) {
       end();
       return;
     }
@@ -83,9 +83,14 @@ export function MotionPresence({
       end();
       return;
     }
+    const finishWhenHidden = () => {
+      if (document.hidden) end();
+    };
+    document.addEventListener("visibilitychange", finishWhenHidden);
     animation.finished.then(end, end);
     return () => {
       generation.current++;
+      document.removeEventListener("visibilitychange", finishWhenHidden);
       animation.cancel();
       if (target) target.inert = false;
     };

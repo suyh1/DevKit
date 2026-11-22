@@ -248,7 +248,18 @@ module.exports = async function sharingSettingsSmoke(window, output) {
         window.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
         await wait('!document.querySelector(".sharing-panel select:open") && !!document.querySelector(".sharing-panel dialog[open]")');
       }
-      await close();
+      if (width === 375) {
+        const visible = window.isVisible();
+        window.hide();
+        try {
+          await wait('document.hidden');
+          await close();
+        } finally {
+          if (visible) window.show();
+        }
+      } else {
+        await close();
+      }
     }
     const sample = path.join(await fs.mkdtemp(path.join(output, 'file-share-')), 'sample.txt');
     const exportedFile = path.join(path.dirname(sample), 'desktop.todo');
