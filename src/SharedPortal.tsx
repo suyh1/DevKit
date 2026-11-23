@@ -1,6 +1,6 @@
 import FloatingDetails from './FloatingDetails';
 import ConfigStorage from './ConfigStorage';
-import LicenseDetails from './LicenseDetails';
+import AboutDetails from './AboutDetails';
 import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { clearPortalPickups } from './publisher-pickups';
@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download, Menu, X, Search, ListOrdered } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, Search, ListOrdered, ChevronRight, Info } from "lucide-react";
 import { workspaceModuleNav } from './ui';
 import { normalizeSharedModuleOrder, workspaceModules } from './catalog';
 import { WorkspaceFeedback } from './related-workspaces';
@@ -77,7 +77,7 @@ function remember(key: string, value: string) {
   }
 }
 
-function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: DisplayMode) => void }) {
+function PortalTheme({ mode, setMode, onAbout }: { mode: DisplayMode; setMode: (value: DisplayMode) => void; onAbout: () => void }) {
   const details = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     function closeOutside(event: PointerEvent) {
@@ -132,10 +132,24 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
       <SegmentedControl label="共享页面主题" value={theme}
         options={[{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色主题' }, { value: 'dark', label: '深色主题' }]} onChange={setTheme} />
       </div>
-      <section className="portal-about" aria-label="关于 DevKit"><span>关于 DevKit</span><LicenseDetails /></section>
+      <button type="button" className="portal-about" aria-haspopup="dialog" onClick={() => {
+        if (details.current) {
+          details.current.open = false;
+          details.current.querySelector('summary')?.focus({ preventScroll: true });
+        }
+        onAbout();
+      }}>关于 DevKit<ChevronRight size={14} aria-hidden="true" /></button>
       </div>
     </details>
   );
+}
+
+function PortalAbout({ close }: { close: () => void }) {
+  const [feedback, setFeedback] = useState('');
+  return <Modal title="关于 DevKit" className="portal-about-dialog" closeLabel="关闭关于 DevKit" close={close}
+    icon={<Info size={18} />} feedback={feedback}>
+    <AboutDetails onNotice={message => setFeedback(message)} />
+  </Modal>;
 }
 
 function RequestCode({ source, close }: { source: string; close: () => void }) {
@@ -243,6 +257,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   const orderedModules = order.map(id => modules.find(module => module.id === id)!);
   const [orderTrigger, setOrderTrigger] = useState<HTMLButtonElement | null>(null);
   const [collaborationActions, setCollaborationActions] = useState<HTMLDivElement | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     const desktop = matchMedia('(min-width:781px)'), resize = () => { if (desktop.matches) setDrawerOpen(false); };
@@ -519,7 +534,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         <div className="portal-account">
           {session?.authenticated && <button data-search-capsule className="secondary-button" aria-label="搜索共享资源" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /></button>}
           {session?.authenticated && services.jar.enabled && services.jar.edit && <ConfigStorage key={workspaceEpoch} portal />}
-          <PortalTheme mode={mode} setMode={setMode} />
+          <PortalTheme mode={mode} setMode={setMode} onAbout={() => setAboutOpen(true)} />
           {session?.authenticated && (
             <button
               className="text-button portal-logout"
@@ -531,7 +546,8 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
           )}
         </div>
       </header>
-      {session?.authenticated && <CommandPalette key={workspaceEpoch} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
+      {aboutOpen && <PortalAbout close={() => setAboutOpen(false)} />}
+      {session?.authenticated && <CommandPalette key={`search-${workspaceEpoch}`} open={searchOpen} onClose={() => setSearchOpen(false)} pages={available.map(item => item.id)} />}
       {session?.authenticated && <>
         <aside className="portal-sidebar"><div className="portal-nav-heading"><span className="portal-nav-caption">共享工作台</span>{sortAction}</div><PortalNavigation modules={available} page={page} navigate={navigate} /><p>共享主机 <strong>{location.host}</strong></p></aside>
         <NavigationSheet open={drawerOpen} close={() => setDrawerOpen(false)}><header><strong>共享工作台</strong>{sortAction}<button className="secondary-button" aria-label="关闭共享导航" onClick={() => setDrawerOpen(false)}><X size={18} /></button></header><PortalNavigation modules={available} page={page} navigate={navigate} /></NavigationSheet>

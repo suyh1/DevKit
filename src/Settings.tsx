@@ -3,18 +3,14 @@ import type { NoticeKind } from './ToastStack';
 import SegmentedControl from './SegmentedControl';
 import { themeStyles } from './themes';
 import { useRef } from 'react';
-import { Monitor, Download, Upload, RotateCcw, ShieldCheck, Keyboard, Info, Copy, Github, ArrowUpRight } from 'lucide-react';
+import { Monitor, Download, Upload, RotateCcw, ShieldCheck, Keyboard, Info } from 'lucide-react';
 import { tools } from './tools';
 import { defaultPreferences, validatePreferences, normalizeFavorites } from './workbench';
 import type { Preferences } from './workbench';
 import type { ToolId } from './tools';
 import { saveText } from './files';
 import { WindowCloseSetting } from './DesktopClose';
-import { MotionButton } from './Motion';
-import { copyText } from './motion-primitives';
-import { isProjectDesktop, openProjectUrl } from './project-api';
-import LicenseDetails from './LicenseDetails';
-import packageInfo from '../package.json';
+import AboutDetails from './AboutDetails';
 
 export default function Settings({ preferences, onChange, favorites, onFavorites, onNotice }: { preferences: Preferences; onChange: (value: Preferences) => void; favorites: ToolId[]; onFavorites: (value: ToolId[]) => void; onNotice: (message: string, kind?: NoticeKind, undo?: () => void) => void }) {
   const file = useRef<HTMLInputElement>(null);
@@ -82,30 +78,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
     <section className="settings-section"><h2><Keyboard size={17} />键盘操作</h2><dl className="shortcut-list"><div><dt>全局搜索</dt><dd>Ctrl / Cmd + K</dd></div><div><dt>执行当前任务</dt><dd>Ctrl / Cmd + Enter</dd></div><div><dt>查找文本</dt><dd>编辑器内 Ctrl / Cmd + F</dd></div><div><dt>新建同类任务</dt><dd>点击工具标题旁的 ＋</dd></div><div><dt>任务标签导航</dt><dd>方向键 / Home / End，Delete 关闭</dd></div><div><dt>离开编辑区</dt><dd>Esc，然后 Tab</dd></div></dl></section>
     <section className="settings-section" aria-labelledby="devkit-about-heading">
       <h2 id="devkit-about-heading"><Info size={17} aria-hidden="true" />关于 DevKit</h2>
-      <dl className="about-details">
-        <div><dt>版本</dt><dd>{packageInfo.version}</dd></div>
-        <div><dt>软件许可</dt><dd><LicenseDetails /></dd></div>
-        <div><dt>作者</dt><dd>{packageInfo.author.name}</dd></div>
-        <div><dt>联系邮箱</dt><dd className="about-contact">
-          <span>{packageInfo.author.email}</span>
-          <MotionButton type="button" variant="copy" className="secondary-button" onClick={async () => {
-            try { await copyText(packageInfo.author.email); onNotice('联系邮箱已复制', 'success'); }
-            catch (error) { onNotice(error instanceof Error ? error.message : '无法复制联系邮箱', 'error'); }
-          }}><Copy size={14} aria-hidden="true" />复制邮箱</MotionButton>
-        </dd></div>
-        <div><dt>项目地址</dt><dd>
-          <a className="about-repository" href={packageInfo.homepage} target="_blank" rel="noopener noreferrer"
-            aria-label="在浏览器打开 DevKit 的 GitHub 仓库" onClick={event => {
-              if (!isProjectDesktop()) return;
-              event.preventDefault();
-              void openProjectUrl(packageInfo.homepage).catch(() => onNotice('无法打开 DevKit 的 GitHub 仓库', 'error'));
-            }}>
-            <Github size={16} aria-hidden="true" />
-            <span>{packageInfo.homepage}</span>
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
-        </dd></div>
-      </dl>
+      <AboutDetails onNotice={onNotice} />
     </section>
   </div>;
 }

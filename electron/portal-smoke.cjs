@@ -231,6 +231,7 @@ app
       await button('保存顺序', '.shared-order-dialog button');
       await wait('document.querySelector(".portal-sidebar nav button")?.textContent === "项目中心"');
       await selector('[aria-label="搜索共享资源"]');
+      assert.equal(await js("document.querySelectorAll('.command-dialog').length"), 1);
       await fill('.command-dialog input', '共享接口定义');
       assert.equal(await js('document.querySelector(".command-dialog").getAttribute("aria-label")'), '搜索共享资源');
       await wait('[...document.querySelectorAll(".command-dialog button[role=option]")].some(button => button.textContent.includes("共享接口定义"))');
@@ -415,18 +416,32 @@ app
       await button("接口设计", ".api-tabs button");
       await selector('.portal-appearance summary');
       {
-        const about = ".portal-appearance .portal-about";
-        const sizes = await js(`[
-          document.querySelector('.portal-appearance .choice-field > span'),
-          document.querySelector('${about} > span'),
-          document.querySelector('${about} summary')
-        ].map(element => getComputedStyle(element).fontSize)`);
-        assert.deepEqual(sizes, [sizes[0], sizes[0], sizes[0]], 'About uses the same text size as the theme controls');
-        await selector(about + ' summary');
+        const { version, author, homepage } = require('../package.json');
+        const about = '.portal-about-dialog[open]';
+        assert.equal(await js("getComputedStyle(document.querySelector('.portal-about')).fontSize"), await js("getComputedStyle(document.querySelector('.portal-theme > span')).fontSize"));
+        await selector('.portal-about');
+        await wait(`!!document.querySelector('${about}') && !document.querySelector('.portal-appearance').open`);
+        assert.deepEqual(await js(`[...document.querySelectorAll('${about} dt')].map(term => term.textContent)`),
+          ['版本', '软件许可', '作者', '联系邮箱', '项目地址']);
+        assert.deepEqual(await js(`[...document.querySelectorAll('${about} dt')].filter(term => ['版本', '作者'].includes(term.textContent)).map(term => term.nextElementSibling.textContent)`), [version, author.name]);
+        assert.equal(await js(`document.querySelector('${about} .about-repository').href`), homepage);
+        assert.equal(await js(`document.querySelector('${about} .about-repository').target`), '_blank');
+        const [originalWidth, originalHeight] = window.getContentSize();
+        window.setContentSize(390, 844);
+        await wait(`innerWidth < 400 && document.querySelector('${about} .about-details').scrollWidth <= document.querySelector('${about} .about-details').clientWidth`);
+        await selector(about + ' .about-contact button');
+        await wait(`document.querySelector('${about} [role=status]')?.textContent === '联系邮箱已复制'`);
+        assert.equal(await clipboard.readText(), author.email);
+        await selector(about + ' .license-details summary');
         await wait(`document.querySelector('${about} [popover]')?.matches(':popover-open')`);
         assert.ok(await js(`document.querySelector('${about} pre').textContent.includes('# PolyForm Noncommercial License 1.0.0')`));
         key('Escape');
-        await wait(`!document.querySelector('${about} [popover]').matches(':popover-open') && document.querySelector('.portal-appearance').open`);
+        await wait(`!!document.querySelector('${about}') && !document.querySelector('${about} [popover]').matches(':popover-open') && document.activeElement === document.querySelector('${about} .license-details summary')`);
+        key('Escape');
+        await wait(`!document.querySelector('${about}') && document.activeElement === document.querySelector('.portal-appearance > summary')`);
+        window.setContentSize(originalWidth, originalHeight);
+        await wait('innerWidth > 780');
+        await selector('.portal-appearance > summary');
       }
       await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
       if (process.argv.includes('--legacy-popover')) {
