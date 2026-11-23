@@ -1,3 +1,4 @@
+import { followSurfaceHost } from './surface-visibility';
 import { MotionButton } from './Motion';
 import {
   createContext,
@@ -83,13 +84,21 @@ export function Modal({
     const dialog = ref.current;
     if (!active || !dialog) return;
     const before = document.activeElement;
-    dialog.showModal();
-    const initial = ref.current?.querySelector<HTMLElement>("[data-modal-focus]") ||
-      ref.current?.querySelector<HTMLElement>("input:not([type=checkbox]), select");
-    initial?.focus();
+    const stop = followSurfaceHost(dialog, visible => {
+      if (!visible) {
+        if (dialog.open) dialog.close();
+        return;
+      }
+      if (dialog.open) return;
+      dialog.showModal();
+      const initial = ref.current?.querySelector<HTMLElement>("[data-modal-focus]") ||
+        ref.current?.querySelector<HTMLElement>("input:not([type=checkbox]), select");
+      initial?.focus({ preventScroll: true });
+    });
     return () => {
+      stop();
       dialog.close();
-      if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus();
+      if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus({ preventScroll: true });
     };
   }, [active]);
   const returningToDraft = useRef(false);
@@ -183,6 +192,11 @@ export function Modal({
     </CloseDialog.Provider>
   );
 }
+/** A persistent list on wide layouts can use the same controls in a narrow-screen dialog. */
+export function OptionalPanel({ open, title, close, children }: { open: boolean; title: string; close: () => void; children: React.ReactNode }) {
+  return open ? <Modal title={title} closeLabel={'关闭' + title} close={close}>{children}</Modal> : <>{children}</>;
+}
+
 export function ModalCancel({
   children = "取消",
 }: {

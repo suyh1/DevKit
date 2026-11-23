@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import type { NoticeKind } from './ToastStack';
 import SegmentedControl from './SegmentedControl';
 import { themeStyles } from './themes';
@@ -45,7 +46,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
         <SegmentedControl label="界面密度" value={preferences.density} onChange={(density) => update({ density })}
           options={[{ value: 'comfortable', label: '舒适' }, { value: 'compact', label: '紧凑' }]} />
       </div>
-      <label className="setting-row"><span><strong>启动页面</strong><small>直接进入指定工具；不自动保存输入内容</small></span><select value={preferences.startup} onChange={event => update({ startup: event.target.value as Preferences['startup'] })}><option value="home">工作台总览</option>{tools.map(tool => <option key={tool.id} value={tool.id}>{tool.name}</option>)}</select></label><details className="setting-theme-library"><summary>主题风格 · {themeStyles.find(style => style.id === preferences.themeStyle)?.name}</summary><fieldset className="theme-picker">
+      <label className="setting-row"><span><strong>启动页面</strong><small>直接进入指定工具；不自动保存输入内容</small></span><select value={preferences.startup} onChange={event => update({ startup: event.target.value as Preferences['startup'] })}><option value="home">工作台总览</option>{tools.map(tool => <option key={tool.id} value={tool.id}>{tool.name}</option>)}</select></label><FloatingDetails className="setting-theme-library"><summary>主题风格 · {themeStyles.find(style => style.id === preferences.themeStyle)?.name}</summary><fieldset className="theme-picker">
       <legend>主题风格</legend>
       <p>每套风格都支持浅色、深色与跟随系统。</p>
       <div className="theme-options">{themeStyles.map(style => (
@@ -55,7 +56,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
           <strong>{style.name}</strong><small>{style.description}</small>
         </label>
       ))}</div>
-    </fieldset></details></section>
+    </fieldset></FloatingDetails></section>
     <section className="settings-section"><h2>编辑器</h2><label className="setting-row"><span><strong>代码字号</strong><small>应用到所有任务和颜色代码区域</small></span><span className="font-slider"><code style={{ fontSize: preferences.fontSize }}>Aa 01</code><input aria-label="代码字号" list="font-size-ticks" type="range" min={12} max={18} value={preferences.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /><datalist id="font-size-ticks">{[12,13,14,15,16,17,18].map(size => <option key={size} value={size} />)}</datalist><output>{preferences.fontSize} px</output></span></label>
       <div className="setting-row">
         <span><strong>默认缩进</strong><small>Tab 缩进即时生效；格式化默认值用于新任务</small></span>

@@ -109,7 +109,8 @@ module.exports = async function analysisWorkflows(window) {
   );
   await wait('编码精确保留字节', find(parent + ' textarea') + '.value.endsWith("AP+A")');
   await open('qr-code');
-  await js(find('[data-file-tool=qr-code]') + '.parentElement.open=true');
+  await js(find('[data-file-tool=qr-code]') + '.closest("details").querySelector("summary").click()');
+  await wait('二维码图片工具已打开', find('[data-file-tool=qr-code]') + '.closest("[popover]").matches(":popover-open")');
   const qr = require('qrcode-generator')(0, 'M');
   qr.addData('local-qr-check');
   qr.make();

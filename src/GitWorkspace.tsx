@@ -4,7 +4,6 @@ import {
   Archive,
   ArrowDown,
   ArrowUp,
-  Check,
   ChevronRight,
   CircleDot,
   Files,
@@ -27,6 +26,9 @@ import Skeleton from './Skeleton';
 import { ResourceLink, useWorkspaceResource } from './workspace-links';
 import { useCardLight } from './tool-card-motion';
 import GitStashes from './GitStashes';
+import { createPortal } from 'react-dom';
+import ActionPopover from './ActionPopover';
+import { ToastStack, type Notice } from './ToastStack';
 import GitDelivery from './GitDelivery';
 import { FileReview, ConflictReview } from './GitReview';
 import { MergeProgress, MergePanel } from './GitMerge';
@@ -91,7 +93,6 @@ function Changes({
   function itemLabel(file: Change, staged: boolean) {
     return file.conflict ? '冲突' : stateNames[staged ? file.index : file.work] || '改动';
   }
-  const [reviewList, setReviewList] = useState(false);
   const canCommit =
     !busy && !!message.trim() && stagedCount > 0 && !state.mergeHead && !state.files.some((f) => f.conflict);
   const commit = async (preview = false) => {
@@ -119,17 +120,12 @@ function Changes({
               <small>提交到本地分支</small>
               <strong>{branchName(state)}</strong>
             </div>
-            <button
-              type="button"
-              className="text-button"
-              aria-expanded={reviewList}
-              onClick={() => setReviewList(!reviewList)}
+            <ActionPopover
+              className="git-staged-menu"
+              triggerClassName="text-button"
+              label="查看已暂存文件"
+              trigger={'已暂存 ' + stagedCount + ' 个文件'}
             >
-              已暂存 {stagedCount} 个文件
-            </button>
-          </div>
-          {reviewList && (
-            <div className="git-staged-list">
               {sections[1].files.map((file) => (
                 <button
                   type="button"
@@ -143,8 +139,8 @@ function Changes({
                 </button>
               ))}
               {!stagedCount && <small>从下方差异预览中暂存文件或差异块。</small>}
-            </div>
-          )}
+            </ActionPopover>
+          </div>
           <label htmlFor="git-message">提交说明</label>
           <div className="git-commit-controls">
             <TextArea
@@ -564,7 +560,8 @@ export default function GitWorkspace({
     [selected, setSelected] = useState('');
   const [generation, bump] = useState(0),
     [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState({ message: '', error: false });
+  const [notice, setNotice] = useState<Notice>();
+  const noticeId = useRef(0);
   const confirm = useConfirmation(),
     resource = useWorkspaceResource('git');
   const list = useGitRead<Repository[]>(portal, 'list', {}, active, generation);
@@ -579,7 +576,8 @@ export default function GitWorkspace({
     if (active && resource) setSelected(resource);
   }, [active, resource]);
   const refresh = () => bump((n) => n + 1);
-  const report = (message: string, error = false) => setNotice({ message, error });
+  const report = (message: string, error = false) =>
+    setNotice(message ? { id: ++noticeId.current, kind: error ? 'error' : 'success', message } : undefined);
   async function manage(action: 'register' | 'publish' | 'remove') {
     if (busy) return;
     setBusy(true);
@@ -610,7 +608,7 @@ export default function GitWorkspace({
           return;
         await gitRequest(false, action, { id: repo.id, published: !repo.published });
         if (action === 'remove') setSelected('');
-        report(title + '完成');
+        // The repository selector and publish action already display the resulting state.
       }
       refresh();
     } catch (error) {
@@ -623,7 +621,7 @@ export default function GitWorkspace({
   const activeMode = historyOnly ? 'history' : mode;
   if (!active) return null;
   return (
-    <div ref={container} className="git-workspace">
+    <div ref={container} className="git-workspace" aria-busy={busy}>
       <header className="git-heading workspace-banner">
         <div>
           <FolderGit2 size={24} />
@@ -651,16 +649,14 @@ export default function GitWorkspace({
           </button>
         </div>
       </header>
-      {busy && (
-        <p role="status" className="git-notice">
-          正在处理仓库操作…
-        </p>
-      )}
-      {!busy && notice.message && (
-        <p className={notice.error ? 'git-error' : 'git-notice'} role={notice.error ? 'alert' : 'status'}>
-          {!notice.error && <Check size={15} />} {notice.message}
-        </p>
-      )}
+      {notice &&
+        createPortal(
+          <ToastStack
+            items={[notice]}
+            dismiss={(id) => setNotice((current) => (current?.id === id ? undefined : current))}
+          />,
+          (notice.kind === 'error' && container.current?.querySelector('dialog[open]')) || document.body,
+        )}
       {list.error ? (
         <p role="alert" className="git-error">
           {list.error}
@@ -724,7 +720,16 @@ export default function GitWorkspace({
                 {repo.published && <ResourceLink page="git" id={repo.id} compact />}
                 {!portal && (
                   <>
-                    {repo && !portal && <RepoGrants key={repo.id} repo={repo} onSaved={() => { refresh(); report('仓库授权已保存'); }} />}
+                    {repo && !portal && (
+                      <RepoGrants
+                        key={repo.id}
+                        repo={repo}
+                        onSaved={() => {
+                          refresh();
+                          report('仓库授权已保存');
+                        }}
+                      />
+                    )}
                     <button className="text-button" disabled={busy} onClick={() => void manage('publish')}>
                       <Globe2 size={14} />
                       {repo.published ? '撤下共享' : '发布到网页'}

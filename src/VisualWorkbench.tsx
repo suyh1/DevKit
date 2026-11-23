@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextArea } from './TextControl';
 import FileWorkbench from './analysis/FileWorkbench';
 import LocalFilePicker from './LocalFilePicker';
@@ -5,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { downloadBlob, readText } from './files';
 import { copyText } from './motion-primitives';
-import { MotionButton, MotionDetails } from './Motion';
+import { MotionButton } from './Motion';
 import { Code2, Copy, Download, PanelsTopLeft, QrCode, SlidersHorizontal } from 'lucide-react';
 import ToolOptions from './ToolOptions';
 import { flexCss, flexStyle, makeQr } from './visual-tools';
@@ -80,5 +81,5 @@ function FlexPanel({ task, onEdit, onNotice }: Props) {
 }
 
 export default function VisualWorkbench(props: Props) {
-  return <div className="visual-workbench" data-live-tool={props.task.toolId}><div className="visual-layout">{props.task.toolId === 'qr-code' ? <><QrPanel {...props} /><MotionDetails className="workbench-disclosure"><summary>从图片或截图识别二维码</summary><FileWorkbench id="qr-code"/></MotionDetails></> : <FlexPanel {...props} />}</div></div>;
+  return <div className="visual-workbench" data-live-tool={props.task.toolId}><div className="visual-layout">{props.task.toolId === 'qr-code' ? <><QrPanel {...props} /><FloatingDetails className="workbench-disclosure"><summary>从图片或截图识别二维码</summary><FileWorkbench id="qr-code"/></FloatingDetails></> : <FlexPanel {...props} />}</div></div>;
 }

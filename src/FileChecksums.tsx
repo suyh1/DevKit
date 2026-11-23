@@ -1,5 +1,5 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Files } from 'lucide-react';
 import LocalFilePicker from './LocalFilePicker';
@@ -83,7 +83,7 @@ export default function FileChecksums() {
     }
   }
   return (
-    <MotionDetails className="devkit-panel checksum-panel">
+    <FloatingDetails className="devkit-panel checksum-panel">
       <summary>文件 SHA-256 与批量校验</summary>
       <div
         className="checksum-fields"
@@ -205,6 +205,6 @@ export default function FileChecksums() {
         [...manifest.keys()]
           .filter((name) => !rows.has(name))
           .map((name) => <p key={name}>缺少文件 · {name}</p>)}
-    </MotionDetails>
+    </FloatingDetails>
   );
 }

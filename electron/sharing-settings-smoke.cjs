@@ -57,7 +57,7 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     );
     await openShortcut(".global-sharing-button");
     assert.deepEqual(await js('[...document.querySelectorAll(".sharing-service")].map(service => service.dataset.service).sort()'),
-      ['file-shares', 'http', 'jar', 'knowledge', 'lan-hosts', 'logs', 'mock', 'monitor', 'nginx', 'project-todos', 'projects', 'transfer', 'whiteboard']);
+      ['file-shares', 'git', 'http', 'jar', 'knowledge', 'lan-hosts', 'logs', 'mock', 'monitor', 'nginx', 'project-todos', 'projects', 'transfer', 'whiteboard']);
     assert.equal(
       await js(
         '[...document.querySelectorAll(".sharing-service-toggle input")].every(input=>!input.checked)',

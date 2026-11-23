@@ -1,3 +1,5 @@
+import { OptionalPanel } from './project-components';
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react';
@@ -88,7 +90,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
         </div>
       )}
       {(!selected || libraryOpen) && (
-        <aside id="board-library-panel" className="board-library">
+        <OptionalPanel open={libraryOpen} title="画板列表" close={() => setLibraryOpen(false)}><aside id="board-library-panel" className="board-library">
           <div className="board-create">
             <h2 className="section-title">
               <PanelsTopLeft />
@@ -168,7 +170,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
             {!list.value?.length && <p className="collab-muted">暂无画板</p>}
           </div>
           {(op.message || list.error) && <p role="status">{op.message || list.error}</p>}
-        </aside>
+        </aside></OptionalPanel>
       )}
       {selected ? (
         <BoardEditor key={selected} id={selected} active={active} edit={edit} refreshList={list.refresh} />
@@ -429,7 +431,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
         </div>
       )}
       {board && (
-        <details>
+        <FloatingDetails>
           <summary>标注记录（{board.marks.length}）</summary>
           {[...board.marks].reverse().map((mark) => (
             <div className="collab-log" key={mark.id}>
@@ -451,10 +453,10 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
               )}
             </div>
           ))}
-        </details>
+        </FloatingDetails>
       )}
       {edit && board && (
-        <details className="board-manage">
+        <FloatingDetails className="board-manage">
           <summary>管理画板</summary>
           <div className="collab-actions">
             {rename === undefined ? (
@@ -502,7 +504,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
               删除白板
             </button>
           </div>
-        </details>
+        </FloatingDetails>
       )}
     </section>
   );

@@ -1,3 +1,5 @@
+import { OptionalPanel } from './project-components';
+import FloatingDetails from './FloatingDetails';
 import { scenarioRules, validField, type FieldHint, type Rule } from '../shared/mock-request.mjs';
 import { resolveSchemaObject } from '../shared/mock-schema.mjs';
 import MockScenarioRules from './MockScenarioRules';
@@ -230,7 +232,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
           接口列表 <span className="collab-count">{list.value?.length ?? 0}</span>
         </button>
       )}
-      <aside id="mock-directory" className="collab-rail" data-open={listOpen || !row}>
+      <OptionalPanel open={listOpen} title="接口列表" close={() => setListOpen(false)}><aside id="mock-directory" className="collab-rail" data-open={listOpen || !row}>
         <div className="collab-bar">
           <h2>
             接口列表 <span className="collab-count">{list.value?.length ?? 0}</span>
@@ -278,7 +280,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
           </button>
         ))}
         {edit && (
-          <details className="mock-library-tools">
+          <FloatingDetails className="mock-library-tools">
             <summary>导入与数据集</summary>
             <button
               onClick={() =>
@@ -310,9 +312,9 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                 {item.name}
               </button>
             ))}
-          </details>
+          </FloatingDetails>
         )}
-      </aside>
+      </aside></OptionalPanel>
       <section className="collab-detail">
         {notice && (
           <p className="mock-notice" role="status">
@@ -392,7 +394,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
             </nav>
             {(!saved || row.id !== saved.id || panel === 'response') && (
               <div className="mock-editor">
-                <details className="mock-route" key={row.id || 'new'} open={!row.id}>
+                <FloatingDetails className="mock-route" key={row.id || 'new'} open={!row.id}>
                   <summary>
                     接口设置 <code>{row.path}</code>
                   </summary>
@@ -439,7 +441,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       </label>
                     </div>
                   </fieldset>
-                </details>
+                </FloatingDetails>
                 {row.dataset ? (
                   <MockDatasetEditor
                     dataset={row.dataset}
@@ -523,7 +525,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       disabled={!edit || op.busy}
                       change={changeScenario}
                     />
-                    <details className="mock-advanced">
+                    <FloatingDetails className="mock-advanced">
                       <summary>
                         场景设置{' '}
                         <small>
@@ -610,7 +612,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                           </div>
                         )}
                       </fieldset>
-                    </details>
+                    </FloatingDetails>
                   </>
                 )}
                 <fieldset disabled={!edit || op.busy}>
@@ -672,7 +674,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                   <>
                     <code className="collab-url">{href}</code>
                     {saved.projectKey && (
-                      <details>
+                      <FloatingDetails>
                         <summary>{saved.project} · 项目基础地址</summary>
                         <code className="collab-url">{new URL('/mock/' + saved.projectKey, href).href}</code>
                         <button
@@ -685,7 +687,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                         >
                           复制基础地址
                         </button>
-                      </details>
+                      </FloatingDetails>
                     )}
                     <div className="collab-actions">
                       <button onClick={() => openRequest()}>用 HTTP 调试打开</button>
@@ -733,7 +735,7 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                 </h3>
                 {!saved.history.length && <p>等待首次调用。</p>}
                 {saved.history.map((entry, i) => (
-                  <details className="mock-call" key={entry.at + ':' + i}>
+                  <FloatingDetails className="mock-call" key={entry.at + ':' + i}>
                     <summary>
                       <time>{new Date(entry.at).toLocaleTimeString()}</time>
                       <b>{entry.status}</b>
@@ -751,21 +753,21 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       </pre>
                     )}
                     {entry.headers && Object.keys(entry.headers).length > 0 && (
-                      <details>
+                      <FloatingDetails>
                         <summary>请求头</summary>
                         <pre>
                           {Object.entries(entry.headers)
                             .map(([name, value]) => name + ': ' + value)
                             .join('\n')}
                         </pre>
-                      </details>
+                      </FloatingDetails>
                     )}
                     {entry.body && <pre>{entry.body}</pre>}
                     {entry.omitted && <small>敏感字段、超长或非 JSON 正文已省略。</small>}
                     {entry.replayable && href && (
                       <button onClick={() => openRequest(entry)}>带入 HTTP 调试</button>
                     )}
-                  </details>
+                  </FloatingDetails>
                 ))}
               </section>
             )}

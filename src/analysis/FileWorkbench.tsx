@@ -1,9 +1,10 @@
+import FloatingDetails from '../FloatingDetails';
 import { TextArea, TextInput } from '../TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronsLeftRight, ClipboardCopy, Download, FileInput, FileSearch, Play, X } from 'lucide-react';
 import LocalFilePicker from '../LocalFilePicker';
 import SegmentedControl from '../SegmentedControl';
-import { MotionButton, MotionDetails } from '../Motion';
+import { MotionButton } from '../Motion';
 import FaviconPreview from './FaviconPreview';
 import FileMeta from '../FileMeta';
 import Skeleton from '../Skeleton';
@@ -346,11 +347,11 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
               </button>
             )}
           </div>
-          <MotionDetails className="file-guide"><summary>文件格式与使用说明</summary>
+          <FloatingDetails className="file-guide"><summary>文件格式与使用说明</summary>
           <p className="file-description">
             {byAnalysis.get(id)?.description ?? '选择二维码图片，或聚焦此区域后粘贴截图。'}
           </p>
-          </MotionDetails>
+          </FloatingDetails>
         </section>
         <section className="file-output-panel">
           {isKit ? (
@@ -386,10 +387,10 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
           {report?.rows && <AnalysisTable text={report.rows} />}
           {report?.sourceText && <pre>{report.sourceText}</pre>}
           {report?.data && (
-            <MotionDetails>
+            <FloatingDetails>
               <summary>查看导出数据</summary>
               <pre>{report.data.slice(0, 16000)}</pre>
-            </MotionDetails>
+            </FloatingDetails>
           )}
           {images?.text && <pre>{images.text}</pre>}
           {images && images.files.length > 1 ? (

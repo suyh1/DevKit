@@ -88,6 +88,7 @@ module.exports = async function collaborationSmoke(window, output) {
       address = await desktop('document.querySelector(".collab-invite p").textContent');
       assert.notEqual(new URL(address).hostname, '127.0.0.1');
     }
+    await desktop('document.querySelector(".collab-invite").closest("dialog").querySelector("[aria-label=关闭邀请设备]").click()');
     await browser.loadURL(address);
     await fill(web, '.portal-login input[type=password]', settings.password);
     await click(web, '.portal-login ', '登录');
@@ -423,7 +424,7 @@ module.exports = async function collaborationSmoke(window, output) {
     assert.equal(await web('document.querySelectorAll(".portal-context-row .portal-module-actions button").length'), 1);
     await click(web, '.portal-module-actions ', '邀请设备');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden]) #mock-invite")');
-    await click(web, '.portal-module-actions ', '邀请设备');
+    await web('document.querySelector("#mock-invite").closest("dialog").querySelector("[aria-label=关闭邀请设备]").click()');
     await wait(web, '!document.querySelector("#mock-invite")');
     await capture('collab-mock-mobile');
     const directoryToggle = current + '.mock-directory-toggle';

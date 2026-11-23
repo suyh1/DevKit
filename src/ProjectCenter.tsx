@@ -1,5 +1,6 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence, MotionDetails } from './Motion';
+import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
 import ProjectComparison from './ProjectComparison';
 import './features.css';
@@ -907,7 +908,7 @@ export default function ProjectCenter({
                       {project.description}
                     </p>
                   )}
-                  <MotionDetails className="pc-address">
+                  <FloatingDetails className="pc-address">
                     <summary
                       aria-label={`展开 ${project.name} 完整地址`}
                       title={result.error || result.url}
@@ -920,7 +921,7 @@ export default function ProjectCenter({
                     <div>
                       <code>{result.error || result.url}</code>
                     </div>
-                  </MotionDetails>
+                  </FloatingDetails>
                   {result.missingVariables.length > 0 && canEdit && <button type="button" className="text-button pc-repair-variable" onClick={() => manageVariables(result.missingVariables)}>填写缺少的变量：{result.missingVariables.join('、')}</button>}
                   {portal && result.localOnly && (
                     <small className="pc-invalid">
@@ -1006,7 +1007,7 @@ export default function ProjectCenter({
                         >
                           <Trash2 size={14} />
                         </MotionButton>
-                        <MotionDetails
+                        <details
                           className="pc-menu"
                           onClick={(event) => {
                             if (
@@ -1041,7 +1042,7 @@ export default function ProjectCenter({
                               复制定义
                             </MotionButton>
                           </div>
-                        </MotionDetails>
+                        </details>
                       </>
                     )}
                   </div>
@@ -1462,7 +1463,7 @@ export default function ProjectCenter({
                 暂无环境变量。不使用模板变量时可以留空。
               </p>
             )}
-            <MotionDetails className="pc-profile-preview">
+            <FloatingDetails className="pc-profile-preview">
               <summary>
                 查看此档案的项目地址预览（{profileDraft.projects.length}）
               </summary>
@@ -1477,7 +1478,7 @@ export default function ProjectCenter({
                   </div>
                 );
               })}
-            </MotionDetails>
+            </FloatingDetails>
             {draftError && (
               <p className="pc-validation" role="status">
                 {draftError}
@@ -1539,7 +1540,7 @@ export default function ProjectCenter({
               {importError}
             </p>
           )}
-          <MotionDetails className="pc-profile-preview">
+          <FloatingDetails className="pc-profile-preview">
             <summary>查看导入内容</summary>
             <p>
               配置档案：{imported.profiles.map((item) => item.name).join("、")}
@@ -1554,7 +1555,7 @@ export default function ProjectCenter({
             {imported.profiles.flatMap(item => item.projects).length > 50 && (
               <p>仅展示前 50 项，全部内容均参与导入。</p>
             )}
-          </MotionDetails>
+          </FloatingDetails>
           <footer>
             <ModalCancel />
             <MotionButton outcome={error ? "error" : ""} busy={busy}
@@ -1608,7 +1609,7 @@ export default function ProjectCenter({
                 ）。项目和档案将替换为快照内容，当前共享设置和访问口令保持不变。
               </p>
               <StateChanges current={data} next={restoring.data} />
-              <MotionDetails className="pc-profile-preview">
+              <FloatingDetails className="pc-profile-preview">
                 <summary>查看快照内容</summary>
                 <p>
                   档案：
@@ -1621,7 +1622,7 @@ export default function ProjectCenter({
                     </li>
                   ))}
                 </ul>
-              </MotionDetails>
+              </FloatingDetails>
               <footer>
                 <MotionButton outcome={error ? "error" : ""} busy={busy}
                   className="secondary-button"

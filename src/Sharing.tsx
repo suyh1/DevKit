@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TransferLinkSettings } from './TransferLinkSettings';
 import { TextInput } from './TextControl';
 import {
@@ -360,7 +361,7 @@ function SharingPanel({
                     onChange={(event) => setPassword(event.target.value)}
                   />
                 </Field>}
-                <details className="sharing-production">
+                <FloatingDetails className="sharing-production">
                   <summary>HTTPS 与证书</summary>
                   <label><input role="switch" className="liquid-toggle" type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
                   {draft.tls && <div className="pc-form-grid">
@@ -368,7 +369,7 @@ function SharingPanel({
                     <Field label="PEM 私钥绝对路径"><TextInput required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
                     <Field label="证书对应域名或 IPv4"><TextInput placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
                   </div>}
-                </details>
+                </FloatingDetails>
                 <div className="sharing-services-heading">
                   <h3>开放栏目</h3>
                   <p className="pc-hint">
@@ -591,7 +592,7 @@ function SharingPanel({
                     请至少选择一个服务后开启共享。如需关闭所有访问，请使用“停止共享”。
                   </p>
                 )}
-                <details className="sharing-production">
+                <FloatingDetails className="sharing-production">
                   <summary>访客权限{draft.visitors?.length ? `（${draft.visitors.length}）` : ''}</summary>
                   <p>每名访客使用自己的名称和口令。共享服务设置限定访客可获得的权限。</p>
                   {(draft.visitors || []).map((visitor, index) => {
@@ -623,14 +624,14 @@ function SharingPanel({
                     </fieldset>;
                   })}
                   <button type="button" className="secondary-button" disabled={(draft.visitors?.length || 0) >= 30} onClick={() => setDraft({ ...draft, visitors: [...(draft.visitors || []), { name: '', password: '', services: emptySharingServices() }] })}><Plus size={14} />添加访客</button>
-                </details>
-                <details className="sharing-production" onToggle={event => {
+                </FloatingDetails>
+                <FloatingDetails className="sharing-production" onToggle={event => {
                   if (!event.currentTarget.open) return;
                   void projectRequest<SharingAudit[]>('sharing-audit').then(setAudit).catch(failure => setError(failure.message));
                 }}><summary>访问记录</summary>
                   {audit ? <ul className="sharing-audit">{audit.map((item, index) => <li key={index}><time>{new Date(item.at).toLocaleString()}</time> · {item.visitor || '通用口令'} · {item.action} · {({ ok: '成功', failed: '失败', denied: '拒绝', revoked: '会话撤销' })[item.outcome] || item.outcome}</li>)}</ul> : <p>正在读取审计记录…</p>}
                   {audit?.length === 0 && <p>暂无访问记录。</p>}
-                </details>
+                </FloatingDetails>
                 <label className="pc-check">
                   <input
                     role="switch" className="liquid-toggle" type="checkbox"

@@ -1,3 +1,4 @@
+import FloatingDetails from '../FloatingDetails';
 import { TextArea } from '../TextControl';
 import { useEffect, useState } from 'react';
 import type { Options } from '../tools';
@@ -125,7 +126,7 @@ export default function RegexCases({ options }: { options: Options }) {
     };
   }, [cases, options, open]);
   return (
-    <details className="analysis-file" data-upgrade="regex" onToggle={(e) => toggle(e.currentTarget.open)}>
+    <FloatingDetails className="analysis-file" data-upgrade="regex" onToggle={(e) => toggle(e.currentTarget.open)}>
       <summary>正则回归样例</summary>
       <p>匹配模式每行填写一个期望匹配。替换模式填写替换后的全文。</p>
       <CaseList cases={cases} change={change} />
@@ -145,6 +146,6 @@ export default function RegexCases({ options }: { options: Options }) {
         <pre key={i}>{s}</pre>
       ))}
       <small>{message}</small>
-    </details>
+    </FloatingDetails>
   );
 }

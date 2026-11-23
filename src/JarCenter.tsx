@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import type { ServiceDraft } from './detection';
 import Skeleton from './Skeleton';
@@ -334,14 +335,14 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
-        </div><details className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? (item.nodePath ? 'npm · ' + item.nodePath : 'npm · 按 PATH 选择 Node.js') : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
+        </div><FloatingDetails className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? (item.nodePath ? 'npm · ' + item.nodePath : 'npm · 按 PATH 选择 Node.js') : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
           {!write && control && (!item.kind || item.kind === 'jar') && <JavaProbe key={item.executable} hostId={item.hostId || ''} executable={item.executable} disabled={busy} />}
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
           <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'force-stop')}>强制终止</button>
           <RelatedLink page="knowledge" id={`related:jar:${item.id}`}>关联手册</RelatedLink>
           <ResourceLink page="jar" id={item.id} />
-        </details></td>
+        </FloatingDetails></td>
       </tr>;
     })}</tbody>)}</table></div>}
     {readLogs && logId && <section className="jar-log"><header><div><h2>{state?.instances.find(item => item.id === logId)?.name} · 日志</h2><p>{log?.path}</p></div><button className="icon-button" aria-label="关闭日志" onClick={() => setLogId('')}><X size={17} /></button></header><p className="jar-help">{state?.instances.find(item => item.id === logId)?.logMode === 'silent' ? '静默模式不会写入标准输出；已有文件可能是历史日志。' : `显示最近 128 KB，自动刷新开启时每 ${logSeconds} 秒重新读取。`} {log?.truncated ? '前部内容已截断。' : ''}</p>{logError && <p className="jar-error" role="alert">{logError}</p>}<pre tabIndex={0} aria-label="服务日志内容">{log ? log.text || '暂无日志。' : '正在读取日志…'}</pre></section>}

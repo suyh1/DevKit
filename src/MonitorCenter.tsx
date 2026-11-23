@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
@@ -146,7 +147,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
           <span className={`monitor-status ${item.state}`}>{item.label}</span>
           <time dateTime={item.at}>{time(item.at)}</time>{'logJar' in item && item.logJar && <RelatedLink page="logs" id={'incident:' + Date.parse(item.at) + ':' + item.logJar}>查看故障前后 5 分钟日志</RelatedLink>}{item.detail && <p>{item.detail}</p>}
         </li>)}</ol> : <p>暂无故障、恢复或维护记录。</p>}
-        <details className="monitor-samples"><summary>最近检测记录</summary><ul>{current.samples.slice(-30).reverse().map((sample, index) => <li key={index}><span>{sample.ok ? '正常' : '失败'} · {sample.elapsed} ms</span><small>{time(sample.at)} · {sample.detail}</small></li>)}</ul></details>
+        <FloatingDetails className="monitor-samples"><summary>最近检测记录</summary><ul>{current.samples.slice(-30).reverse().map((sample, index) => <li key={index}><span>{sample.ok ? '正常' : '失败'} · {sample.elapsed} ms</span><small>{time(sample.at)} · {sample.detail}</small></li>)}</ul></FloatingDetails>
       </aside>}
     </div>}
     <MotionPresence kind="dialog" present={!!draft}>{draft && <Modal active={active} title={draft.id ? '编辑监控' : '添加监控'} closeLabel="关闭监控编辑" close={() => setDraft(null)} draft={{ ...draft, start, end }} busy={busy}>

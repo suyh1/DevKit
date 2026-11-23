@@ -1,9 +1,10 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { defaultOptions, tools, type Options, type ToolId } from './tools';
 import { CaseList, validCases, type RegressionCase } from './analysis/Cases';
 import ToolOptions from './ToolOptions';
-import { MotionButton, MotionDetails } from './Motion';
+import { MotionButton } from './Motion';
 import { copyText } from './motion-primitives';
 
 const allowed: ToolId[] = [
@@ -164,7 +165,7 @@ export default function ToolRecipes({ input }: { input: string }) {
     }
   }
   return (
-    <details
+    <FloatingDetails
       className="devkit-panel recipe-panel"
       onToggle={(e) => {
         setOpen(e.currentTarget.open);
@@ -245,13 +246,13 @@ export default function ToolRecipes({ input }: { input: string }) {
               />
             </section>
           ))}
-          <details>
+          <FloatingDetails>
             <summary>流程回归样例</summary>
             <CaseList cases={cases} change={setCases} steps={steps.length} />
             <button className="secondary-button" disabled={!cases.length} onClick={() => void run(true)}>
               运行全部样例
             </button>
-          </details>
+          </FloatingDetails>
           <div className="recipe-actions">
             <button
               className="secondary-button"
@@ -278,7 +279,7 @@ export default function ToolRecipes({ input }: { input: string }) {
       )}
       <pre role="status">{message}</pre>
       {report.map((row, i) => (
-        <MotionDetails key={i} className="workbench-disclosure recipe-result">
+        <FloatingDetails key={i} className="workbench-disclosure recipe-result">
           <summary>
             {i + 1}. {row.name} · {row.error ? '失败' : '完成'}
           </summary>
@@ -304,8 +305,8 @@ export default function ToolRecipes({ input }: { input: string }) {
               复制完整输出
             </MotionButton>
           )}
-        </MotionDetails>
+        </FloatingDetails>
       ))}
-    </details>
+    </FloatingDetails>
   );
 }

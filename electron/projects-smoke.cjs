@@ -27,7 +27,7 @@ module.exports = async function checkProjects(window, output, staging) {
     throw new Error(`Project UI condition not met: ${expression}`);
   };
   const click = async (text) => {
-    const expression = `[...document.querySelectorAll('.project-workspace button, .top-actions button, dialog[open] button')].find(button => button.textContent.trim() === ${JSON.stringify(text)})`;
+    const expression = `[...([...document.querySelectorAll('dialog:modal')].at(-1) || document).querySelectorAll('button')].find(button => button.getClientRects().length && button.textContent.trim() === ${JSON.stringify(text)})`;
     await wait(
       window.webContents,
       `!!${expression} && !${expression}.disabled`,

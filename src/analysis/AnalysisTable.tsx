@@ -1,5 +1,6 @@
 import { TextInput } from '../TextControl';
-import { Fragment, useId, useMemo, useState } from 'react';
+import { Modal } from '../project-components';
+import { useId, useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import ResultPager from '../ResultPager';
 import { parseCsv } from '../practical';
@@ -18,8 +19,11 @@ export function ResultTable({ records, columnLimit }: { records: string[][]; col
   const header = columns.slice(0, columnLimit);
   const needle = query.trim().toLocaleLowerCase();
   const visible = needle
-    ? rows.filter((row) => row.some((cell, i) =>
-        (columnLimit === undefined || i < columnLimit) && cell.toLocaleLowerCase().includes(needle)))
+    ? rows.filter((row) =>
+        row.some(
+          (cell, i) => (columnLimit === undefined || i < columnLimit) && cell.toLocaleLowerCase().includes(needle),
+        ),
+      )
     : rows;
   const pages = Math.max(1, Math.ceil(visible.length / 50));
   const current = Math.min(page, pages - 1);
@@ -33,7 +37,8 @@ export function ResultTable({ records, columnLimit }: { records: string[][]; col
       <div className="analysis-table-tools">
         <label className="analysis-table-search">
           <Search size={15} aria-hidden="true" />
-          <TextInput embedded
+          <TextInput
+            embedded
             type="search"
             aria-label="筛选结果"
             placeholder="筛选结果"
@@ -64,49 +69,47 @@ export function ResultTable({ records, columnLimit }: { records: string[][]; col
             {visible.slice(current * 50, current * 50 + 50).map((row, index) => {
               const open = selected === row;
               return (
-                <Fragment key={index}>
-                  <tr data-selected={open || undefined}>
-                    {row.slice(0, columnLimit).map((value, i) => (
-                      <td key={i}>
-                        {i === 0 ? (
-                          <button
-                            className="analysis-row-toggle"
-                            aria-expanded={open}
-                            aria-controls={open ? detailId : undefined}
-                            onClick={() => select(open ? null : row)}
-                          >
-                            <ChevronRight size={14} aria-hidden="true" />
-                            {value || '查看记录'}
-                          </button>
-                        ) : (
-                          value
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                  {open && (
-                    <tr className="analysis-row-detail" id={detailId}>
-                      <td colSpan={Math.max(1, header.length)}>
-                        <dl>
-                          {header.map((label, i) => (
-                            <div key={i}>
-                              <dt>{label || '空列名'}</dt>
-                              <dd>
-                                <pre>{row[i]}</pre>
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                <tr key={index} data-selected={open || undefined}>
+                  {row.slice(0, columnLimit).map((value, i) => (
+                    <td key={i}>
+                      {i === 0 ? (
+                        <button
+                          className="analysis-row-toggle"
+                          aria-expanded={open}
+                          aria-controls={open ? detailId : undefined}
+                          onClick={() => select(open ? null : row)}
+                        >
+                          <ChevronRight size={14} aria-hidden="true" />
+                          {value || '查看记录'}
+                        </button>
+                      ) : (
+                        value
+                      )}
+                    </td>
+                  ))}
+                </tr>
               );
             })}
           </tbody>
         </table>
         {!visible.length && <p className="analysis-table-empty">{needle ? '没有匹配的记录' : '没有记录'}</p>}
       </div>
+      {selected && (
+        <Modal title="记录详情" closeLabel="关闭记录详情" close={() => select(null)}>
+          <div className="analysis-row-detail" id={detailId}>
+            <dl>
+              {header.map((label, i) => (
+                <div key={i}>
+                  <dt>{label || '空列名'}</dt>
+                  <dd>
+                    <pre>{selected[i]}</pre>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </Modal>
+      )}
       <ResultPager page={current} pages={pages} onPage={move} />
     </div>
   );

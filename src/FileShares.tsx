@@ -1,5 +1,5 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { MotionDetails } from './Motion';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -189,10 +189,10 @@ export default function FileShares({ active }: { active: boolean }) {
               <button className="pl-button pl-primary" type="button" disabled={!share.running || busy} onClick={() => void fileShareRequest('open', { id: share.id }).catch(failure => setError(failure.message))}><ArrowUpRight size={16} />打开网页</button>
               <button className="pl-button" type="button" disabled={busy} onClick={() => void mutate('toggle', { id: share.id, revision: state.revision, enabled: !share.running }, share.running ? '共享已停止' : '共享已启动')}>{share.running ? '停止' : '启动'}</button>
             </div>
-            {share.links.length > 0 && <MotionDetails className="pl-share-links"><summary>分享链接 · {share.links.length} 个地址</summary>
+            {share.links.length > 0 && <FloatingDetails className="pl-share-links"><summary>分享链接 · {share.links.length} 个地址</summary>
               {share.links.map(link => <div key={link}><code>{link}</code><button type="button" className="pl-text"
                 aria-label={`复制 ${new URL(link).host} 的共享链接`} onClick={() => copy(link)}><Copy size={16} />复制链接</button></div>)}
-            </MotionDetails>}
+            </FloatingDetails>}
             <div className="pl-share-detail-title"><h3>共享范围</h3><small>{scopeLabel(share.roots)}</small></div>
             <CreateRelated from="file-shares" page="project-todos" resource={share.id}>新建引用此共享的待办清单</CreateRelated>
             <ShareRoots roots={share.roots} />

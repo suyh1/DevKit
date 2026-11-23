@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import Skeleton from './Skeleton';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -246,7 +247,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
             <button type="button" title="Alt+O" disabled={!editor || !todoReferences(model.lines[line - 1] ?? '').length} onClick={() => editor?.run('open-reference')}><Link2 size={15} />打开引用</button>
             <button type="button" title="查看原始语法" aria-pressed={sourceMode} onClick={() => setSourceMode(value => !value)}><Code2 size={15} />源码</button>
           </div></details>
-          <details className="td-shortcuts"><summary aria-label="语法与快捷键">语法</summary><div>
+          <FloatingDetails className="td-shortcuts"><summary aria-label="语法与快捷键">语法</summary><div>
             <dl>
               <dt>任务与日期</dt><dd><code>☐ 待办 @today @due(2026-12-01)</code></dd>
               <dt>子任务</dt><dd>在任务或续做点下缩进写 <code>☐ 子任务</code>，可逐层拆分、单独完成</dd>
@@ -261,7 +262,7 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
             </dl>
             <p><kbd>Ctrl/⌘+Enter</kbd> 切换任务符号　<kbd>Alt+D</kbd> 完成或勾选验收　<kbd>Alt+C</kbd> 取消</p>
             <p><kbd>Alt+S</kbd> 开始　<kbd>Alt+O</kbd> 打开引用　<kbd>Ctrl/⌘+Shift+A</kbd> 归档　<kbd>Ctrl/⌘+S</kbd> 保存</p>
-          </div></details>
+          </div></FloatingDetails>
         </div>
         {canEdit && <TodoSyntaxActions active={active} key={sheet.id} model={model} editor={editor} line={line} locked={locked} portal={portal} />}
         <div className="td-editor-layout" data-outline={outline}>

@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useEffect, useState } from 'react';
 import { collab, useOperation } from './collab-api';
@@ -50,7 +51,7 @@ export function TransferLinkSettings() {
   }
 
   return (
-    <details className="transfer-link-settings" onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <FloatingDetails className="transfer-link-settings" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>快速链接设置</summary>
       {open && (
         <div>
@@ -110,6 +111,6 @@ export function TransferLinkSettings() {
           {(loadError || op.message) && <p role="status">{loadError || op.message}</p>}
         </div>
       )}
-    </details>
+    </FloatingDetails>
   );
 }

@@ -1,3 +1,5 @@
+import FloatingDetails from './FloatingDetails';
+import { Modal as WorkspaceDialog } from './project-components';
 import { TextInput } from './TextControl';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
@@ -294,7 +296,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
           </button>
         </div>
         {properties && (
-          <div className="kb-properties">
+          <WorkspaceDialog title="文档属性" closeLabel="关闭文档属性" close={() => setProperties(false)}><div className="kb-properties">
             <label>
               目录
               <TextInput
@@ -331,7 +333,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
                 onChange={(e) => patch({ tags: e.target.value.split(/[,，]/) })}
               />
             </label>
-          </div>
+          </div></WorkspaceDialog>
         )}
         {(diskError || error) && (
           <p className="pc-notice" role="alert">
@@ -343,7 +345,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
             <h3>{conflict ? '处理版本冲突' : '原文档已删除'}</h3>
             {conflict && (
               <>
-                <details open>
+                <FloatingDetails>
                   <summary>
                     主机版本 v{conflict.revision} · {conflict.actor}
                   </summary>
@@ -353,7 +355,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
                       .join(' / ')}
                   </p>
                   <pre>{conflict.body}</pre>
-                </details>
+                </FloatingDetails>
                 <p>在下方草稿中合并需要保留的内容，再保存为新版本。</p>
                 <button
                   className="secondary-button"

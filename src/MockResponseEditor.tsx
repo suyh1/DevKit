@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { TextArea } from './TextControl';
 import { useEffect, useId, useState } from 'react';
 import { Braces, RefreshCw } from 'lucide-react';
@@ -242,7 +243,7 @@ export default function MockResponseEditor({
         )}
       </div>
       {dynamic && (
-        <details className="mock-fields-help">
+        <FloatingDetails className="mock-fields-help">
           <summary>请求字段与预览参数</summary>
           <div className="mock-generation">
             <label>
@@ -307,10 +308,10 @@ export default function MockResponseEditor({
             预览请求（JSON）
             <TextArea rows={4} value={context} onChange={(e) => setRequestDraft(e.target.value)} />
           </label>
-        </details>
+        </FloatingDetails>
       )}
       {generated && (
-        <details className="mock-fields-help">
+        <FloatingDetails className="mock-fields-help">
           <summary>可用字段与列表规则</summary>
           <p>
             把占位符作为完整的字符串值。普通 JSON
@@ -321,7 +322,7 @@ export default function MockResponseEditor({
               <code key={name}>{'{{' + name + '}}'}</code>
             ))}
           </div>
-        </details>
+        </FloatingDetails>
       )}
     </section>
   );

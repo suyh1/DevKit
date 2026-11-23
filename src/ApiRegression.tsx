@@ -1,5 +1,5 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { MotionDetails } from './Motion';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiEnvironment, ApiProject } from '../shared/api-workspace.mjs';
 import {
@@ -144,7 +144,7 @@ export default function ApiRegression({
     }
   }
   return (
-    <MotionDetails className="devkit-panel api-regression">
+    <FloatingDetails className="devkit-panel api-regression">
       <summary>接口集合回归</summary>
       <fieldset disabled={sending}>
         {steps.map((s, i) => (
@@ -244,6 +244,6 @@ export default function ApiRegression({
         </button>
       )}
       <p role="status">{notice}</p>
-    </MotionDetails>
+    </FloatingDetails>
   );
 }

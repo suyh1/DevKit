@@ -1,3 +1,4 @@
+import { Modal } from './project-components';
 import { useEffect, useRef, useState } from 'react';
 import { collab } from './collab-api';
 
@@ -28,7 +29,7 @@ export default function PublisherPickup({ id, receipt }: { id: string; receipt: 
     <button type="button" aria-expanded={password !== undefined} disabled={loading} onClick={() => void toggle()}>
       {password !== undefined ? '隐藏取件密码' : '查看我的取件密码'}
     </button>
-    {password !== undefined && <code aria-label="我发布的取件密码">{password}</code>}
+    {password !== undefined && <Modal title="我发布的取件密码" closeLabel="关闭取件密码" close={() => setPassword(undefined)}><code aria-label="我发布的取件密码">{password}</code></Modal>}
     {error && <small role="alert">{error}</small>}
   </div>;
 }

@@ -1,5 +1,5 @@
+import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { MotionDetails } from './Motion';
 import { useId } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { multipartLimits } from '../shared/http-multipart.mjs';
@@ -47,7 +47,7 @@ export default function HttpMultipart({ fields, change, disabled }: { fields: Mu
       </div>)}
       <button type="button" className="text-button" disabled={fields.length >= multipartLimits.rows} onClick={() => change([...fields, multipartField()])}><Plus size={14} />添加表单字段</button>
       {issue && <p className="preview-note">{issue}</p>}
-      <MotionDetails><summary>表单预览</summary><ul>{fields.map((row, index) => <li key={index}>{row.name || '未命名字段'} · {row.kind === 'file' ? row.file?.name || '未选择文件' : `${new TextEncoder().encode(row.value).length} B 文本`}</li>)}</ul><small>请求会自动添加 Content-Type 和边界。</small></MotionDetails>
+      <FloatingDetails><summary>表单预览</summary><ul>{fields.map((row, index) => <li key={index}>{row.name || '未命名字段'} · {row.kind === 'file' ? row.file?.name || '未选择文件' : `${new TextEncoder().encode(row.value).length} B 文本`}</li>)}</ul><small>请求会自动添加 Content-Type 和边界。</small></FloatingDetails>
     </>}
   </fieldset>;
 }

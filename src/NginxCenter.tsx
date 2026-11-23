@@ -1,3 +1,5 @@
+import { Modal as WorkspaceDialog } from './project-components';
+import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import { navigateTabList } from './tab-navigation';
 import PathSummary, { pathSuffix } from './PathSummary';
@@ -110,7 +112,7 @@ function InstanceForm({ active, instance, platform, groups, busy, error, submit,
         const found = await nginxRequest<NginxDetection>('detect', { ...draft, hostId }); setDetection(found.output);
         if (found.found) patch({ executable: found.executable, ...(setup === 'existing' ? { prefix: found.prefix } : {}) });
       })}><Search size={14} />{setup === 'create' ? '检测 nginx' : '检测 nginx 并填入运行目录'}</button></div>
-      {detection && <MotionDetails className="ng-detection-panel"><summary>{detection.split(/\r?\n/)[0]}<small>查看详情</small></summary><pre className="ng-detection">{detection}</pre></MotionDetails>}
+      {detection && <FloatingDetails className="ng-detection-panel"><summary>{detection.split(/\r?\n/)[0]}<small>查看详情</small></summary><pre className="ng-detection">{detection}</pre></FloatingDetails>}
       {setup === 'existing' && <><label>附属文件（每行一个绝对路径）<TextArea rows={4} aria-describedby={hintId('files')} value={manualFiles} onChange={event => setManualFiles(event.target.value)} placeholder="可自动解析 include，也可手动添加未引用的配置文件" />{hint('files')}</label>
       <button type="button" hidden={!canPick} className="file-pick-button" onClick={() => setPicker('files')}><Plus size={14} />选择附属文件</button>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}</>}
@@ -410,7 +412,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
                 <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
               </div>
             </header>
-            <MotionDetails key={current.id} className="ng-runtime">
+            <FloatingDetails key={current.id} className="ng-runtime">
               <summary><ChevronRight size={14} /><strong>实例路径</strong><span>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')} · {pathSuffix(current.main, state.instances.map(item => item.main))}</span></summary>
               <dl>
                 {hostFor(current) && <><dt>目标主机</dt><dd>{hostFor(current)!.name} · {hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}</dd></>}
@@ -420,7 +422,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
                 {status?.pidPath && <><dt>PID 文件</dt><dd>{status.pidPath}</dd></>}
                 {status?.detail && <><dt>运行状态</dt><dd>{status.detail}</dd></>}
               </dl>
-            </MotionDetails>
+            </FloatingDetails>
             <div className="ng-status-connection" role="status" data-stale={statusStale}>
               <span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span>
               <button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button>
@@ -450,7 +452,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
         </div>
       </>}</NginxControlDock>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
-      <div className="feature-toolbar">{readLogs && <button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button>}<button className="text-button" onClick={() => guard('logs', 'nginx') && openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button><RelatedLink page="knowledge" id={`related:nginx:${current.id}`}>关联手册</RelatedLink><ResourceLink page="nginx" id={current.id} /></div>{readLogs && <MotionPresence kind="panel" present={logsOpen}>{logsOpen && <NginxLogs key={current.id} id={current.id} active={active} />}</MotionPresence>}
+      <div className="feature-toolbar">{readLogs && <button className="secondary-button" aria-expanded={logsOpen} onClick={() => setLogsOpen(value => !value)}>{logsOpen ? '收起日志' : '查看日志'}</button>}<button className="text-button" onClick={() => guard('logs', 'nginx') && openWorkspaceLink('logs', `instance:${current.id}`)}>日志中心</button><RelatedLink page="knowledge" id={`related:nginx:${current.id}`}>关联手册</RelatedLink><ResourceLink page="nginx" id={current.id} /></div>{readLogs && logsOpen && <WorkspaceDialog title="实例日志" description={current.name} closeLabel="关闭实例日志" close={() => setLogsOpen(false)}><NginxLogs key={current.id} id={current.id} active={active} /></WorkspaceDialog>}
       <MotionGroup className="ng-file-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="配置文件">{documents.map(doc => <button key={doc.path} title={doc.path} aria-description={doc.path} role="tab" aria-selected={file === doc.path} tabIndex={file === doc.path ? 0 : -1} disabled={busy || pendingFields} onClick={() => { setFile(doc.path); setFieldPending({}); setQuery(''); }}><FileCode2 size={14} /><span>{documents.some(other => other.path !== doc.path && basename(other.path) === basename(doc.path)) ? pathSuffix(doc.path, documents.map(other => other.path)) : basename(doc.path)}</span><small>{doc.path === current.main ? '主' : '附属'}{drafts[doc.path] !== doc.content ? ' ●' : ''}</small></button>)}</MotionGroup>
       {file && <><div className="ng-editor-heading"><code title={file}>{file}</code><span className="sr-only" id={editorHelpId}>全文编辑填写完整指令；字段编辑只填参数，Enter或离开字段提交草稿，保存后再检查与重载。附属文件是否生效由include决定。</span><MotionGroup className="ng-actions" role="group" aria-label="配置编辑方式">{content.startsWith('\uFEFF') && <MotionButton busy={busy} className="text-button" disabled={busy || pendingFields || !currentEdit}  onClick={() => changeContent(content.slice(1))}>移除 UTF-8 BOM</MotionButton>}<button className={`text-button ${mode === 'fields' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'fields'} onClick={() => setMode('fields')}>字段配置</button><button className={`text-button ${mode === 'source' ? 'selected' : ''}`} disabled={pendingFields}  aria-pressed={mode === 'source'} onClick={() => setMode('source')}>全文编辑</button></MotionGroup></div>
       <fieldset className="ng-editor-fieldset" aria-describedby={editorHelpId} disabled={busy || !currentEdit}>

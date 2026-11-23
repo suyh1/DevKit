@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FolderDown, ShieldCheck, Users } from 'lucide-react';
 import { gitRequest, type Repository, type RepoLevel, type RepoPolicy } from './git-api';
 import { Modal, ModalCancel, ModalForm } from './project-components';
+import { pathSuffix } from './PathSummary';
 import { projectRequest, type Sharing } from './project-api';
 const labels: Record<RepoLevel, string> = {
   none: '不可访问',
@@ -140,68 +141,101 @@ function GrantsDialog({ repo, close, onSaved }: { repo: Repository; close: () =>
   );
 }
 export function CloneRepo({ onAdded, initialSource }: { initialSource?: string; onAdded: (repo: Repository) => void }) {
-  const [source, setSource] = useState(initialSource || ''),
-    [parent, setParent] = useState(''),
-    [busy, setBusy] = useState(false),
-    [error, report] = useState('');
+  const [open, setOpen] = useState(!!initialSource);
   useEffect(() => {
-    if (initialSource) setSource(initialSource);
+    if (initialSource) setOpen(true);
   }, [initialSource]);
   return (
-    <details open={initialSource !== undefined || undefined} className="git-host-panel">
-      <summary>
+    <>
+      <button className="secondary-button" type="button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
         <FolderDown size={15} />
         克隆仓库
-      </summary>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
+      </button>
+      {open && (
+        <CloneDialog key={initialSource} initialSource={initialSource} close={() => setOpen(false)} onAdded={onAdded} />
+      )}
+    </>
+  );
+}
+
+function CloneDialog({
+  onAdded,
+  initialSource = '',
+  close,
+}: {
+  initialSource?: string;
+  onAdded: (repo: Repository) => void;
+  close: () => void;
+}) {
+  const [source, setSource] = useState(initialSource),
+    [parent, setParent] = useState(''),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  return (
+    <Modal
+      title="克隆仓库"
+      icon={<FolderDown size={20} />}
+      close={close}
+      busy={busy}
+      closeLabel="关闭克隆仓库"
+      className="git-clone-dialog"
+    >
+      <ModalForm
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!source.trim() || !parent || busy) return;
           setBusy(true);
-          report('');
+          setError('');
           try {
             const list = await gitRequest<Repository[]>(false, 'clone', { source: source.trim(), parent });
             onAdded(list[list.length - 1]);
-            setSource('');
-            setParent('');
+            close();
           } catch (e) {
-            report((e as Error).message);
-          } finally {
+            setError((e as Error).message);
             setBusy(false);
           }
         }}
+        footer={
+          <footer className="pc-form-footer">
+            <ModalCancel />
+            <button className="run-button" disabled={busy || !parent || !source.trim()}>
+              {busy ? '正在克隆…' : '克隆并登记'}
+            </button>
+          </footer>
+        }
       >
-        <label>
-          仓库地址
+        <label className="pc-field">
+          <span>仓库地址</span>
           <input
-            placeholder="https://host/team/project.git"
+            placeholder="HTTPS、SSH 或本地仓库路径"
             value={source}
-            onChange={(e) => setSource(e.target.value)}
             required
+            onChange={(e) => setSource(e.target.value)}
           />
         </label>
-        <label>
-          保存到
+        <div className="pc-field">
+          <span>保存到</span>
           <button
             type="button"
             className="secondary-button"
-            disabled={busy}
             onClick={async () => {
               try {
                 const dir = await gitRequest<string>(false, 'choose-parent');
                 if (dir) setParent(dir);
               } catch (e) {
-                report((e as Error).message);
+                setError((e as Error).message);
               }
             }}
           >
-            {parent || '选择父目录'}
+            <span className="git-clone-parent" title={parent}>{parent ? pathSuffix(parent) : '选择父目录'}</span>
           </button>
-        </label>
-        <button className="run-button" disabled={busy || !parent || !source.trim()}>
-          {busy ? '正在克隆…' : '克隆并登记'}
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </form>
-    </details>
+        </div>
+        {error && (
+          <p role="alert" className="git-error">
+            {error}
+          </p>
+        )}
+      </ModalForm>
+    </Modal>
   );
 }

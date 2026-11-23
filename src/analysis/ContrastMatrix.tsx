@@ -1,8 +1,8 @@
-import { MotionDetails } from '../Motion';
+import FloatingDetails from '../FloatingDetails';
 import { contrastReport, parseColor } from '../colors';
 export default function ContrastMatrix({ colors }: { colors: string[] }) {
   return (
-    <MotionDetails className="analysis-file">
+    <FloatingDetails className="analysis-file">
       <summary>收藏色对比矩阵</summary>
       {colors.length < 2 ? (
         <p>收藏两种以上颜色后，可比较文字与背景的 WCAG 对比度。</p>
@@ -38,6 +38,6 @@ export default function ContrastMatrix({ colors }: { colors: string[] }) {
           </table>
         </div>
       )}
-    </MotionDetails>
+    </FloatingDetails>
   );
 }

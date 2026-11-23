@@ -732,6 +732,7 @@ app
       await wait('document.querySelector(".lan-center")?.textContent.includes("没有匹配的主机")');
       await fill('.lan-search input', '测试节点');
       await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
+      await selectHost('慢速目标');
       await button('启用端口监控', `${inventory} button`);
       await wait('document.querySelector(".monitor-detail h2")?.textContent==="慢速目标" && location.hash.startsWith("#monitor/lan-")');
       await button('立即检测', '.monitor-detail button');
@@ -742,6 +743,7 @@ app
       await button('监控历史', `${inventory} button`);
       await wait('location.hash.startsWith("#monitor/lan-")');
       await button('局域网主机', '.portal-sidebar button');
+      await selectHost('慢速目标');
       await button('查看日志', `${inventory} button`);
       await wait('document.querySelector(".log-source-list")?.textContent.includes("远程延迟日志")');
       assert.ok(!await js('document.querySelector(".log-source-list").textContent.includes("审查测试应用")'));
@@ -777,6 +779,7 @@ app
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("portal ssh ready")');
       await window.webContents.insertText('browser-echo');
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("browser-echo")');
+      await selectHost('网页 SSH 已编辑');
       await button('打开终端', '.lan-host-list button');
       await wait('document.querySelectorAll(".lan-terminal-tabs [role=tab]").length === 2');
       await js('document.querySelector(".lan-terminal-tabs [aria-selected=true]").focus()');
@@ -793,6 +796,7 @@ app
           document.querySelector('.xterm-rows').textContent.includes('browser-echo')`);
       }
       await selector('.portal-appearance summary');
+      await selectHost('网页 SSH 已编辑');
       await selector('.lan-host-list button[aria-label="移除 网页 SSH 已编辑"]');
       await button('移除连接', 'dialog[open] button');
       await wait('!document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑") && !document.querySelector(".lan-terminal-tabs")');

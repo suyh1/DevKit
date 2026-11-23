@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import type { Rule } from '../shared/mock-request.mjs';
 const labels = { query: '查询参数', path: '路径参数', header: '请求头', body: 'JSON 正文' };
 export default function MockScenarioRules({
@@ -13,7 +14,7 @@ export default function MockScenarioRules({
     change(rules.map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
   }
   return (
-    <details className="mock-match">
+    <FloatingDetails className="mock-match">
       <summary>
         场景匹配条件 <small>{rules.length ? rules.length + ' 项全部满足' : '无条件'}</small>
       </summary>
@@ -64,6 +65,6 @@ export default function MockScenarioRules({
           添加条件
         </button>
       )}
-    </details>
+    </FloatingDetails>
   );
 }

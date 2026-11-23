@@ -1,3 +1,5 @@
+import { Modal as WorkspaceDialog } from './project-components';
+import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import { fileDigest, uploadIdentity } from './file-digest';
 import SegmentedControl from './SegmentedControl';
@@ -390,7 +392,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
           <SegmentedControl label="筛选收件箱" value={filter}
             options={[{ value: 'all', label: '全部类型' }, { value: 'file', label: '文件' }, { value: 'text', label: '文字' }, { value: 'link', label: '链接' }]} onChange={setFilter} />
         </div>
-        <details className="transfer-storage">
+        <FloatingDetails className="transfer-storage">
           <summary>主机存储{storedBytes !== undefined && ' · 暂存文件 ' + sizeOf(storedBytes)}</summary>
           {!!storedBytes && <><div className="storage-meter" aria-hidden="true">{feed.value?.filter(item => item.kind === 'file' && !item.direct && item.size).map((item,index) => <i key={item.id} style={{flexGrow:item.size,backgroundColor:`hsl(${(index * 61 + 158) % 360} 45% 45%)`}} />)}</div><ul>{feed.value?.filter(item => item.kind === 'file' && !item.direct).map(item => <li key={item.id}>{item.name} · {sizeOf(item.size)} · {(item.size * 100 / storedBytes).toFixed(1)}%</li>)}</ul></>}
           <p>主机暂存的文件在移除或到期时释放空间。在线直传的文件保留在发送设备，由收件人直接下载。</p>
@@ -400,8 +402,8 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
               {directory ? directory + (directory.includes('\\') ? '\\' : '/') : '主机数据目录/'}collaboration
             </code>
           </small>
-        </details>
-        {op.message && <p role="status">{op.message}</p>}
+        </FloatingDetails>
+        {!pickupId && op.message && <p role="status">{op.message}</p>}
         {feed.error && <p role="status">{feed.value ? '收件箱刷新失败，显示上次读取的内容。' : '收件箱读取失败。'}{feed.error} <button onClick={() => void feed.refresh()}>重试</button></p>}
         {receiving && (
           <p role="status">
@@ -468,6 +470,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 <button
                   disabled={op.busy}
                   onClick={() => {
+                    op.clear();
                     setPickupId(item.id);
                     setPickup('');
                   }}
@@ -524,7 +527,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             </div>
             {receipt && <PublisherPickup id={item.id} receipt={receipt} />}
             {pickupId === item.id && (
-              <form
+              <WorkspaceDialog title="输入取件密码" closeLabel="关闭输入取件密码" close={() => { setPickupId(''); setPickup(''); }} busy={op.busy}><form
                 className="collab-bar"
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -565,7 +568,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 >
                   取消
                 </button>
-              </form>
+              </form>{op.message && <p role="alert">{op.message}</p>}</WorkspaceDialog>
             )}
             {destination && <RelatedLink {...destination}>打开共享资源</RelatedLink>}
             {revealed?.id === item.id && <button onClick={() => setRevealed(undefined)}>隐藏内容</button>}

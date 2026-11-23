@@ -259,7 +259,7 @@ module.exports = async function designSmoke(window, output) {
   await settle();
   const about = 'section[aria-labelledby="devkit-about-heading"]';
   assert.equal(await js('document.getElementById("devkit-about-heading").textContent'), '关于 DevKit');
-  assert.deepEqual(await js(`[...document.querySelectorAll('${about} dd')].slice(0, 2).map(item => item.textContent)`), [version, author.name]);
+  assert.deepEqual(await js(`['版本','作者'].map(label => [...document.querySelectorAll('${about} dt')].find(term => term.textContent === label)?.nextElementSibling?.textContent)`), [version, author.name]);
   assert.equal(await js('document.querySelector(".about-contact span").textContent'), author.email);
   assert.equal(await js('document.querySelector(".about-repository").href'), homepage);
   const previousClipboard = await clipboard.readText();
@@ -284,7 +284,11 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js(`(() => { const section = document.querySelector('${about}'); return section.scrollWidth <= section.clientWidth; })()`), true);
   await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
   console.log('About DevKit passed: package metadata, real clipboard, desktop browser handler and narrow layout.');
+  const libraryHeight = () => js('document.querySelector(".setting-theme-library").getBoundingClientRect().height');
+  const closedHeight = await libraryHeight();
   await js('document.querySelector(".setting-theme-library summary").click()');
+  await wait('document.querySelector(".setting-theme-library [popover]")?.matches(":popover-open")');
+  assert.equal(await libraryHeight(), closedHeight, 'opening the theme library leaves its row stationary');
   for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
     await js(`document.querySelector('input[name="theme-style"][value="${style}"]').click()`);
     for (const mode of ['light', 'dark']) {

@@ -83,5 +83,5 @@ export function useOperation() {
       setBusy(false);
     }
   }
-  return { busy, message, run };
+  return { busy, message, run, clear: () => setMessage('') };
 }

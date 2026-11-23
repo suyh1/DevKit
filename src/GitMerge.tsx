@@ -1,3 +1,4 @@
+import { Modal } from './project-components';
 import { useState } from 'react';
 import { GitMerge } from 'lucide-react';
 import { CommitComparison } from './GitHistory';
@@ -22,6 +23,7 @@ export function MergePanel({
   generation: number;
   mutate: GitMutation;
 }) {
+  const [open, setOpen] = useState(!!initialBranch);
   const [choice, setChoice] = useState(
       initialBranch
         ? (state.references.some((r) => r.kind === 'heads' && r.name === initialBranch) ? 'heads/' : 'remotes/') +
@@ -39,55 +41,83 @@ export function MergePanel({
         <GitMerge size={17} />
         <h3>比较与合并分支</h3>
       </header>
-      <label>
-        将此分支合入 <b>{state.branch}</b>
-        <select aria-label="比较目标分支" value={target ? choice : ''} onChange={(e) => setChoice(e.target.value)}>
-          <option value="">选择本地或远端分支</option>
-          {refs.map((r) => (
-            <option key={r.kind + '/' + r.name} value={r.kind + '/' + r.name}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {target && state.head && (
-        <>
-          <CommitComparison portal={portal} id={id} base={state.head} target={target.hash} generation={generation} />
-          {edit && (
-            <button
-              className="secondary-button"
-              disabled={
-                busy ||
-                !!state.mergeHead ||
-                !!state.files.length ||
-                state.branch === '(detached)' ||
-                target.hash === state.head
-              }
-              onClick={async () => {
-                if (
-                  await confirm({
-                    title: '合并到 ' + state.branch + '？',
-                    detail:
-                      '来源 ' +
-                      target.name +
-                      ' · ' +
-                      target.hash.slice(0, 8) +
-                      '。可以快进时直接更新，分叉时停在合并提交前供核对。',
-                    confirm: '开始合并',
-                  })
-                )
-                  await mutate(
-                    'merge',
-                    { name: 'refs/' + target.kind + '/' + target.name, target: target.hash },
-                    '已处理分支合并',
-                  );
-              }}
-            >
-              合并到 {state.branch}
-            </button>
-          )}
-          {edit && !!state.files.length && <small>请先提交或贮藏当前改动。</small>}
-        </>
+      <button type="button" className="secondary-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        选择分支比较
+      </button>
+      {open && (
+        <Modal
+          title="比较与合并分支"
+          description={'当前分支 · ' + state.branch}
+          closeLabel="关闭分支比较"
+          busy={busy}
+          close={() => setOpen(false)}
+        >
+          <div className="git-merge-dialog-body">
+            <label>
+              将此分支合入 <b>{state.branch}</b>
+              <select
+                aria-label="比较目标分支"
+                value={target ? choice : ''}
+                onChange={(e) => setChoice(e.target.value)}
+              >
+                <option value="">选择本地或远端分支</option>
+                {refs.map((r) => (
+                  <option key={r.kind + '/' + r.name} value={r.kind + '/' + r.name}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {target && state.head && (
+              <>
+                <CommitComparison
+                  portal={portal}
+                  id={id}
+                  base={state.head}
+                  target={target.hash}
+                  generation={generation}
+                />
+                {edit && (
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      busy ||
+                      !!state.mergeHead ||
+                      !!state.files.length ||
+                      state.branch === '(detached)' ||
+                      target.hash === state.head
+                    }
+                    onClick={async () => {
+                      if (
+                        await confirm({
+                          title: '合并到 ' + state.branch + '？',
+                          detail:
+                            '来源 ' +
+                            target.name +
+                            ' · ' +
+                            target.hash.slice(0, 8) +
+                            '。可以快进时直接更新，分叉时停在合并提交前供核对。',
+                          confirm: '开始合并',
+                        })
+                      )
+                        if (
+                          await mutate(
+                            'merge',
+                            { name: 'refs/' + target.kind + '/' + target.name, target: target.hash },
+                            '已处理分支合并',
+                          )
+                        )
+                          setOpen(false);
+                    }}
+                  >
+                    合并到 {state.branch}
+                  </button>
+                )}
+                {edit && !!state.files.length && <small>请先提交或贮藏当前改动。</small>}
+              </>
+            )}
+          </div>
+        </Modal>
       )}
     </section>
   );

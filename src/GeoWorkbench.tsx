@@ -1,8 +1,9 @@
+import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import UpgradePanel from './analysis/UpgradePanel';
 import { copyText } from './motion-primitives';
-import { MotionButton, MotionPresence, MotionDetails } from './Motion';
+import { MotionButton, MotionPresence } from './Motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Copy, Download, FlaskConical, Square, Upload, Undo2 } from 'lucide-react';
 import SegmentedControl from './SegmentedControl';
@@ -78,12 +79,12 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
         <input hidden type="file" ref={file} aria-label="导入坐标文本" accept=".txt,.csv,.tsv,.log,.md" onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />
         <span className="preview-note">{task.input.length.toLocaleString()} / 300,000 字符 · 最多 5,000 对</span>
       </div></>}
-      <MotionDetails className="geo-format"><summary>坐标顺序与精度</summary><div className="geo-inline geo-settings">
+      <FloatingDetails className="geo-format"><summary>坐标顺序与精度</summary><div className="geo-inline geo-settings">
         {select('inputOrder', '原文无标识时的顺序', [['lon-lat', '经度、纬度'], ['lat-lon', '纬度、经度']])}
         {select('decimals', '十进制度小数位', Array.from({ length: 11 }, (_, i) => [String(i), String(i)]))}
         {select('seconds', '秒的小数位', Array.from({ length: 7 }, (_, i) => [String(i), String(i)]))}
         {select('style', '度分秒样式', [['symbols', '符号 + E/W/N/S'], ['chinese', '中文度分秒']])}
-      </div></MotionDetails>
+      </div></FloatingDetails>
       <div className="editor-footer geo-run-row"><div><button disabled={busy} onClick={sample}><FlaskConical size={14} />示例</button>{undo && <button disabled={busy} onClick={() => { onEdit({ input: undo.input, options: undo.options, fileName: undo.fileName, encoding: undo.encoding }); setUndo(null); }}><Undo2 size={14} />撤销填入/示例/导入</button>}</div><div className="run-actions">{busy && <button className="secondary-button" onClick={onCancel}><Square size={13} />取消</button>}<MotionButton trackBusy outcome={task.status === "success" ? "success" : task.status === "error" ? "error" : ""} busy={busy} className="run-button" disabled={busy} onClick={onRun}><ArrowRight size={15} />{busy ? '正在处理' : mode === 'convert' ? '转换坐标' : mode === 'circle' ? '计算圆周点' : '提取坐标'}<kbd>Ctrl ↵</kbd></MotionButton></div></div>
     </section>
     <div className="geo-inline"><span role="status" className={`task-status status-${status}`}><span />{statuses[status]}{task.status === 'success' && task.elapsed !== null && ` · ${task.elapsed} ms`}</span>{result && !current && <span className="preview-note">保留上次结果，请重新处理后复制。</span>}</div>
@@ -98,15 +99,15 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
         <div className="geo-table-scroll"><table className="geo-table"><thead><tr><th>序号 / 来源行</th><th>{o.order === 'lat-lon' ? '纬度' : '经度'}</th><th>{o.order === 'lat-lon' ? '经度' : '纬度'}</th><th>原文 / 操作</th></tr></thead><tbody>{result.points.slice(page * 50, page * 50 + 50).map((point, i) => <tr key={page * 50 + i}><td>{page * 50 + i + 1} / 行 {point.line}</td>{coordinateCells(point, o).map((value, j) => <td key={j}><code>{value}</code></td>)}<td><span className="geo-source">{point.source}</span><button className="text-button" disabled={!current} onClick={() => void copy(coordinatesText([point], { ...o, headers: 'off' }))}>复制此行</button><button className="text-button" disabled={!current} onClick={() => usePoint(point, 'circle')}>用作圆心</button></td></tr>)}</tbody></table></div>
         {result.points.length > 50 && <div className="geo-inline"><button className="secondary-button" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1} / {Math.ceil(result.points.length / 50)} 页 · 复制全部包含所有页</span><button className="secondary-button" disabled={(page + 1) * 50 >= result.points.length} onClick={() => setPage(page + 1)}>下一页</button></div>}
       </> : <p className="preview-note">{result ? '没有确认有效的坐标对。请检查输入及下方待核对项。' : '填写坐标或载入示例后运行。结果可复制为十进制度或度分秒。'}</p>}
-      <MotionDetails className="geo-format"><summary>复制与导出格式</summary>
+      <FloatingDetails className="geo-format"><summary>复制与导出格式</summary>
       <div className="geo-inline">
         {select('representation', '复制格式', [['decimal', '十进制度'], ['dms', '度分秒']])}
         {select('order', '复制顺序', [['lon-lat', '经度、纬度'], ['lat-lon', '纬度、经度']])}
         {select('delimiter', '分隔符', [['comma', '逗号 CSV'], ['tab', '制表符 TSV']])}
         {select('headers', '表头', [['off', '不带表头'], ['on', '带表头']])}
       </div>
-      </MotionDetails>
-      {!!result?.issues.length && <MotionDetails className="geo-issues" open><summary>待核对 {result.issues.length} 项（不进入复制结果）</summary>{result.issues.slice(0, 200).map((issue, i) => <div key={i}><strong>行 {issue.line} · {issue.reason}</strong><code>{issue.source}</code></div>)}{result.issues.length > 200 && <p>仅展示前 200 项，请缩小输入以逐项核对。</p>}</MotionDetails>}
+      </FloatingDetails>
+      {!!result?.issues.length && <FloatingDetails className="geo-issues"><summary>待核对 {result.issues.length} 项（不进入复制结果）</summary>{result.issues.slice(0, 200).map((issue, i) => <div key={i}><strong>行 {issue.line} · {issue.reason}</strong><code>{issue.source}</code></div>)}{result.issues.length > 200 && <p>仅展示前 200 项，请缩小输入以逐项核对。</p>}</FloatingDetails>}
     </section>
     <UpgradePanel id="geo-coordinates" current={task.input}/>
   </div>;

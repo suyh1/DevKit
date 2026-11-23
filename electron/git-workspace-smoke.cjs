@@ -116,6 +116,12 @@ module.exports = async function gitSmoke(window, installation, output) {
     await require('./navigation-helpers.cjs')(window).openWorkspace('Git 仓库管理');
     await wait(desktop, 'document.querySelector(".git-empty h2")');
     await checkAppearance(desktop, window.webContents, '.git-empty');
+    const top = execute => execute('document.querySelector(".git-heading").getBoundingClientRect().height');
+    const beforeClone = await top(desktop);
+    await chooseText(desktop, '克隆仓库');
+    await wait(desktop, 'document.querySelector(".git-clone-dialog:modal input")');
+    assert.equal(await top(desktop), beforeClone);
+    await click(desktop, '.git-clone-dialog [aria-label="关闭克隆仓库"]');
     await chooseText(desktop, '选择工作目录');
     await wait(desktop, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
     const text = await desktop('document.querySelector(".git-hero h2").textContent');
@@ -128,19 +134,29 @@ module.exports = async function gitSmoke(window, installation, output) {
     await desktop(
       '(()=>{const field=document.querySelector("#git-message"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,"网页审阅样本"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
     );
+    const editorTop = () => desktop('document.querySelector("#git-message").getBoundingClientRect().top');
+    const beforePreview = await editorTop();
+    await click(desktop, '.git-staged-menu > button');
+    await wait(desktop, 'document.querySelector(".git-staged-menu :popover-open")?.textContent.includes("README.md")');
+    assert.equal(await editorTop(), beforePreview);
+    await click(desktop, '.git-staged-menu .action-popover button');
     await click(desktop, '.git-submit-next');
     await wait(desktop, 'document.querySelector(".git-hero-main p")?.textContent.includes("网页审阅样本")');
     await wait(desktop, 'document.querySelector(".git-push-preview ul")?.textContent.includes("网页审阅样本")');
     await desktop('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     await checkAppearance(desktop, window.webContents, '.git-hero', 'git-push');
+    assert.equal(await editorTop(), beforePreview, 'preview keeps the commit editor in place');
     await fs.writeFile(path.join(output, 'git-push-preview.png'), (await window.webContents.capturePage()).toPNG());
     await click(desktop, '.git-push-preview .run-button');
-    await wait(desktop, 'document.querySelector(".git-notice")?.textContent.includes("origin/main")');
+    await wait(desktop, 'document.querySelector(".notice-stack")?.textContent.includes("origin/main")');
     assert.equal(git('rev-parse', '--abbrev-ref', '@{u}').toString().trim(), 'origin/main');
+    const beforePublish = await editorTop();
     await chooseText(desktop, '发布到网页');
     await click(desktop, '.confirm-dialog[open] .confirm-discard');
     await wait(desktop, 'document.querySelector(".git-repo-bar")?.textContent.includes("撤下共享")');
 
+    assert.equal(await desktop('document.body.innerText.includes("发布仓库完成")'), false);
+    assert.equal(await editorTop(), beforePublish);
     const socket = net.createServer();
     await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port;
@@ -242,6 +258,20 @@ module.exports = async function gitSmoke(window, installation, output) {
     await click(web, '.confirm-dialog[open] .confirm-discard');
     await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Browser editor")');
     assert.equal(git('status', '--porcelain').toString().trim(), '');
+    const cloneParent = path.join(installation, 'clone-parent');
+    await fs.mkdir(cloneParent);
+    dialog.showOpenDialog = async () => ({ canceled:false, filePaths:[cloneParent] });
+    await chooseText(desktop, '克隆仓库');
+    await wait(desktop, 'document.querySelector(".git-clone-dialog:modal input")');
+    await desktop('(()=>{const input=document.querySelector(".git-clone-dialog input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,' + JSON.stringify(remote) + ');input.dispatchEvent(new Event("input",{bubbles:true}));})()');
+    await chooseText(desktop, '选择父目录');
+    await wait(desktop, 'document.querySelector(".git-clone-dialog .pc-field button")?.textContent.includes("clone-parent")');
+    await desktop('Promise.allSettled(document.querySelector(".git-clone-dialog").getAnimations({subtree:true}).map(a=>a.finished)).then(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))');
+    await fs.writeFile(path.join(output, 'git-clone-dialog.png'), (await window.webContents.capturePage()).toPNG());
+    assert.ok(await desktop('(()=>{const body=document.querySelector(".git-clone-dialog .pc-modal-body");return body.scrollWidth <= body.clientWidth + 1})()'));
+    await chooseText(desktop, '克隆并登记');
+    await wait(desktop, '!document.querySelector(".git-clone-dialog") && document.querySelector(".git-repo-bar select")?.selectedOptions[0]?.textContent.includes("atlas-origin")');
+    assert.match(await fs.readFile(path.join(cloneParent,'atlas-origin','README.md'),'utf8'), /Reviewed change/);
     console.log('Git desktop workflow, mobile review, visitor permissions, web staging and stash passed.');
   } finally {
     dialog.showOpenDialog = originalPicker;

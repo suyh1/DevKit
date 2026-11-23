@@ -1,4 +1,4 @@
-import { MotionDetails } from './Motion';
+import FloatingDetails from './FloatingDetails';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { NginxReloadState } from './nginx-api';
@@ -43,7 +43,5 @@ export function NginxControlDock({ active, children, scrollRoot }: {
 
 export type NginxOutput = { ok: boolean; command: string; output: string; reloadState?: NginxReloadState };
 export function NginxCommandOutput({ output }: { output: NginxOutput }) {
-  const [expanded, setExpanded] = useState(true);
-  useEffect(() => { setExpanded(true); }, [output]);
-  return <MotionDetails open={expanded} onToggle={event => setExpanded(event.currentTarget.open)} className={`ng-output ${output.ok ? 'success' : 'failure'}`}><summary>{output.reloadState === 'unconfirmed' ? '已发送重载信号 · 生效待确认' : output.ok ? '命令执行成功' : '命令未完成'}<small>{expanded ? '收起执行详情' : '展开执行详情'}</small></summary><div className="ng-output-body"><code>{output.command}</code><pre>{output.output || '无输出'}</pre></div></MotionDetails>;
+  return <FloatingDetails className={`ng-output ${output.ok ? 'success' : 'failure'}`}><summary>{output.reloadState === 'unconfirmed' ? '已发送重载信号 · 生效待确认' : output.ok ? '命令执行成功' : '命令未完成'}<small>查看执行详情</small></summary><div className="ng-output-body"><code>{output.command}</code><pre>{output.output || '无输出'}</pre></div></FloatingDetails>;
 }

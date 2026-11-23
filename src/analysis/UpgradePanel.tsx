@@ -1,9 +1,10 @@
+import FloatingDetails from '../FloatingDetails';
 import { TextArea, TextInput } from '../TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { FileCode2, Play } from 'lucide-react';
 import CodeEditor, { type EditorLanguage } from '../CodeEditor';
 import LocalFilePicker from '../LocalFilePicker';
-import { MotionButton, MotionDetails } from '../Motion';
+import { MotionButton } from '../Motion';
 import SegmentedControl from '../SegmentedControl';
 import { saveText, readText, downloadBlob } from '../files';
 import { copyText } from '../motion-primitives';
@@ -140,7 +141,7 @@ export function Base64Files() {
     }
   }
   return (
-    <MotionDetails className="analysis-file" data-upgrade="base64">
+    <FloatingDetails className="analysis-file" data-upgrade="base64">
       <summary>文件与 Base64 / Data URL 互转</summary>
       <label>
         <input className="form-check" type="checkbox" checked={dataUrl} onChange={(e) => asUrl(e.target.checked)} />
@@ -165,7 +166,7 @@ export function Base64Files() {
         <MotionButton className="secondary-button" onClick={restore}>还原并下载</MotionButton>
       </div>
       {error && <p role="alert">{error}</p>}
-    </MotionDetails>
+    </FloatingDetails>
   );
 }
 function DocumentInput({ label, value, onChange, language, mounted }: {
@@ -264,7 +265,7 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
       /* invalid fields */
     }
   return (
-    <MotionDetails className="analysis-file upgrade-workbench" data-upgrade={id}
+    <FloatingDetails className="analysis-file upgrade-workbench" data-upgrade={id}
       onToggle={event => { if (event.currentTarget.open) setOpened(true); }}>
       <summary>{spec.title}</summary>
       <div className="upgrade-tools">
@@ -387,6 +388,6 @@ export default function UpgradePanel({ id, current }: { id: string; current?: st
           </div>
         </>
       )}
-    </MotionDetails>
+    </FloatingDetails>
   );
 }

@@ -1,5 +1,5 @@
+import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
-import { MotionDetails } from './Motion';
 import SegmentedControl from './SegmentedControl';
 import { newProjectId } from './project-api';
 import { Plus, Trash2 } from "lucide-react";
@@ -87,7 +87,7 @@ export function ApiParameters({
                           patch(row.id, { name: event.target.value })
                         }
                       />
-                      <MotionDetails className="api-parameter-schema">
+                      <FloatingDetails className="api-parameter-schema">
                         <summary>约束Schema</summary>
                         <TextArea
                           aria-label={`参数${index + 1}Schema`}
@@ -98,7 +98,7 @@ export function ApiParameters({
                           }
                           placeholder='{"minLength":1}'
                         />
-                      </MotionDetails>
+                      </FloatingDetails>
                     </div>
                   )}
                 </td>

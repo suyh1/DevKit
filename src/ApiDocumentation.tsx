@@ -1,4 +1,4 @@
-import { MotionDetails } from './Motion';
+import FloatingDetails from './FloatingDetails';
 import type { ApiEndpoint, ApiProject } from "../shared/api-workspace.mjs";
 import ApiSchemaView from "./ApiSchemaView";
 import CodeEditor from "./CodeEditor";
@@ -65,12 +65,12 @@ export default function ApiDocumentation({
                         {row.required || row.location === "path" ? "是" : "否"}
                       </td>
                       <td>
-                        {(row.description?.length || 0) > 64 ? <MotionDetails><summary>{row.name} · {row.type} · 参数说明</summary><p className="api-prose">{row.description}</p></MotionDetails> : row.description || "—"}
+                        {(row.description?.length || 0) > 64 ? <FloatingDetails><summary>{row.name} · {row.type} · 参数说明</summary><p className="api-prose">{row.description}</p></FloatingDetails> : row.description || "—"}
                         {row.schema && (
-                          <MotionDetails>
+                          <FloatingDetails>
                             <summary>Schema约束</summary>
                             <pre>{row.schema}</pre>
-                          </MotionDetails>
+                          </FloatingDetails>
                         )}
                       </td>
                       <td>
@@ -100,7 +100,7 @@ export default function ApiDocumentation({
             <ApiSchemaView value={endpoint.requestSchema} />
           )}{" "}
           {endpoint.requestSchema && (
-            <MotionDetails>
+            <FloatingDetails>
               <summary>请求Schema</summary>
               <div className="api-code-editor">
                 <CodeEditor
@@ -111,7 +111,7 @@ export default function ApiDocumentation({
                   wrap
                 />
               </div>
-            </MotionDetails>
+            </FloatingDetails>
           )}
         </section>
       )}
@@ -129,7 +129,7 @@ export default function ApiDocumentation({
                 <div>
                   <h4>JSON Schema</h4>
                   <ApiSchemaView value={row.schema} />
-                  <MotionDetails>
+                  <FloatingDetails>
                     <summary>原始Schema</summary>
                     <div className="api-code-editor">
                       <CodeEditor
@@ -140,7 +140,7 @@ export default function ApiDocumentation({
                         wrap
                       />
                     </div>
-                  </MotionDetails>
+                  </FloatingDetails>
                 </div>
               )}
               {row.example && (

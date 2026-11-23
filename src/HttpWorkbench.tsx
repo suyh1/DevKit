@@ -1,3 +1,4 @@
+import { OptionalPanel } from './project-components';
 import { TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
@@ -286,7 +287,7 @@ export default function HttpWorkbench({
           <span>请求集合 <small>{entries.length}/100</small></span>
           <ChevronDown size={16} aria-hidden="true" />
         </button>
-        <aside ref={collection} id={collectionId} className="http-collection" aria-label="请求集合" data-open={collectionOpen}>
+        <OptionalPanel open={collectionOpen} title="请求集合" close={() => setCollectionOpen(false)}><aside ref={collection} id={collectionId} className="http-collection" aria-label="请求集合" data-open={collectionOpen}>
           <h2>
             请求集合 <small>{entries.length}/100</small>
           </h2>
@@ -398,7 +399,7 @@ export default function HttpWorkbench({
             ))}
             {!history.length && <p className="preview-note">发送后记录最近 20 次请求。</p>}
           </section>
-        </aside>
+        </aside></OptionalPanel>
         <div className="http-main">
           <div className="feature-toolbar">
             <label>

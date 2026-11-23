@@ -1,3 +1,4 @@
+import FloatingDetails from './FloatingDetails';
 import { Modal } from './project-components';
 import { useCardLight } from './tool-card-motion';
 import { useEffect, useState, useRef } from 'react';
@@ -46,7 +47,7 @@ export function ResourceFields({
     };
   }, [open]);
   return (
-    <details className="devkit-panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <FloatingDetails className="devkit-panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>关联运维资源</summary>
       {loading && <small>正在读取可用资源…</small>}
       <div className="devkit-fields">
@@ -81,7 +82,7 @@ export function ResourceFields({
           );
         })}
       </div>
-    </details>
+    </FloatingDetails>
   );
 }
 

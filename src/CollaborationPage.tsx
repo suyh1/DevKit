@@ -1,3 +1,4 @@
+import { Modal as WorkspaceDialog } from './project-components';
 import { createPortal } from 'react-dom';
 import { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
@@ -77,8 +78,8 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
         </div>
         {inviteButton}
       </header>}
-      {invite && (
-        <div className="collab-invite" id={module + '-invite'}>
+      {active && invite && (
+        <WorkspaceDialog title="邀请设备" closeLabel="关闭邀请设备" close={() => setInvite(false)}><div className="collab-invite" id={module + '-invite'}>
           {addresses.length > 1 && (
             <label>
               共享主机地址
@@ -119,7 +120,7 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
           ) : (
             <span>在桌面顶栏的“局域网共享”中开放此栏目，并选择局域网监听地址，即可邀请其他设备。</span>
           )}
-        </div>
+        </div></WorkspaceDialog>
       )}
       {module === 'transfer' ? (
         <QuickTransfer origin={origin} active={active} edit={edit} directory={window.devkitCollab ? status?.directory : undefined} />
