@@ -103,7 +103,7 @@ app
             await delay(60);
             return;
           }
-          const panel = await js(`(()=>{const e=(${expression})?.closest('.pc-profiles,.pc-content');if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,above:(${expression}).getBoundingClientRect().top<r.top}})()`);
+          const panel = await js(`(()=>{const e=(${expression})?.closest('.portal-navigation,.pc-profiles,.pc-content');if(!e)return null;const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,above:(${expression}).getBoundingClientRect().top<r.top}})()`);
           await wheel((panel?.above ?? hit.above) ? -400 : 400, panel?.x ?? (hit.sidebar ? hit.x : undefined), panel?.y);
         }
         throw Error("Target cannot be reached by scrolling: " + expression);
@@ -186,6 +186,31 @@ app
       window.webContents.focus();
       await login();
       console.log('Portal: authenticated');
+      {
+        const [width, height] = window.getContentSize();
+        const list = "document.querySelector('.portal-sidebar .portal-navigation')";
+        const fixedPositions = () => js(`[
+          document.querySelector('.portal-nav-heading').getBoundingClientRect().top,
+          document.querySelector('.portal-sidebar > p').getBoundingClientRect().bottom,
+          document.querySelector('.portal-sidebar').scrollTop,
+          document.querySelector('.portal-content').scrollTop,
+          document.scrollingElement.scrollTop
+        ]`);
+        await wait(`${list}.scrollHeight === ${list}.clientHeight`);
+        window.setContentSize(width, 280);
+        await wait(`${list}.clientHeight > 0 && ${list}.scrollHeight > ${list}.clientHeight`);
+        const before = await fixedPositions();
+        assert.ok(before[0] >= 0 && before[1] <= await js('innerHeight'));
+        const center = await js(`(() => { const r = ${list}.getBoundingClientRect(); return { x: r.left + r.width/2, y: r.top + r.height/2 }; })()`);
+        await wheel(18000, center.x, center.y);
+        await wait(`${list}.lastElementChild.getBoundingClientRect().bottom <= ${list}.getBoundingClientRect().bottom + 1`);
+        assert.deepEqual(await fixedPositions(), before, 'Scrolling to the last module leaves the heading, host and page in place');
+        await wheel(-18000, center.x, center.y);
+        await wait(`${list}.scrollTop === 0`);
+        assert.deepEqual(await fixedPositions(), before);
+        window.setContentSize(width, height);
+        await wait(`${list}.scrollHeight === ${list}.clientHeight`);
+      }
       await button('排序', '.portal-sidebar button');
       await wait('document.querySelectorAll(".shared-order-list li").length === 3');
       await selector('.shared-order-list [aria-label="上移Nginx 配置"]');
