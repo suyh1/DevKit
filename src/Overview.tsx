@@ -7,14 +7,15 @@ import { expandToolCard, useCardLight } from './tool-card-motion';
 import SegmentedControl from './SegmentedControl';
 import SmartOpen from './SmartOpen';
 import { searchTools } from './discovery';
-import { tools, type Options, type ToolId } from './tools';
+import { tools, type ToolId } from './tools';
+import type { Suggestion } from './detection';
 import { categoryMeta, categoryOrder, toolIcons } from './ui';
 import type { Task } from './workbench';
 
 export type OverviewScreen = 'launch' | 'library';
 
 type Props = {
-  onDetect: (id: ToolId, text: string, options?: Options) => void;
+  onDetect: (match: Suggestion) => void;
   onChoose: (id: ToolId, fresh?: boolean) => void;
   favorites: ToolId[];
   onFavorite: (id: ToolId) => void;
@@ -227,7 +228,7 @@ export default function Overview({ onDetect, onChoose, favorites, onFavorite, mo
           <div className="home-launch-content">
             <header className="overview-heading home-heading">
               <h1 id="overview-title">开发工作台</h1>
-              <p>粘贴内容，匹配本机工具</p>
+              <p>粘贴内容，匹配本机工具和共享栏目</p>
             </header>
             <SmartOpen onOpen={onDetect} />
             <div className="quick-start" role="group" aria-label={tasks.length ? '继续工作' : '常用工具'}>

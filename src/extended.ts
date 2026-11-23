@@ -78,7 +78,7 @@ function parseIPv4(input: string): number {
   return parts.reduce((result, part) => result * 256 + Number(part), 0);
 }
 const address = (value: number) => [24, 16, 8, 0].map(shift => (value >>> shift) & 255).join('.');
-function ipv4(input: string) {
+export function ipv4(input: string) {
   const parts = input.trim().split('/');
   if (parts.length !== 2) throw new Error('请输入 IPv4/前缀，例如 192.168.1.42/24 或 192.168.1.42/255.255.255.0。');
   const ip = parseIPv4(parts[0]);

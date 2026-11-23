@@ -103,6 +103,7 @@
 .smart-open-results { padding: 10px 11px 11px; border-top: 1px solid var(--line); }
 .smart-open-results > p { margin: 0 4px 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .smart-open-results > p span { margin-inline-start: 4px; font-variant-numeric: tabular-nums; }
+.smart-open-results summary { padding: 8px 4px; cursor: pointer; color: var(--muted); font-size: 12px; }
 .smart-suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 7px; }
 .smart-suggestion {
   display: flex;

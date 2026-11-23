@@ -80,9 +80,30 @@ module.exports = async function designSmoke(window, output) {
       await js('document.querySelector(".smart-open-paste").click()');
       assert.equal(await js('document.activeElement.matches(".smart-open textarea")'), true);
       window.webContents.paste();
-      await wait('document.querySelectorAll(".smart-suggestion").length === 3');
+      await wait('[...document.querySelectorAll(".smart-suggestion strong")].some(el => el.textContent === "JSON 格式化")');
+      await js('document.querySelector(".smart-open-results summary").click()');
+      await wait('!!document.querySelector(".smart-open-results details[open] .smart-suggestion")');
       await js('document.querySelector(".smart-open-actions .text-button").click()');
       await wait('!document.querySelector(".smart-suggestion")');
+      async function paste(content) {
+        await clipboard.writeText(content);
+        await js('document.querySelector(".smart-open-paste").click()');
+        window.webContents.paste();
+      }
+      await paste('#1984ae');
+      await wait('document.querySelectorAll(".smart-suggestion").length === 6');
+      await js('document.querySelector(".smart-suggestion").click()');
+      await wait('document.querySelector(".task-pane:not([hidden]) input[aria-label=主颜色]")?.value === "#1984ae"');
+      await js('document.querySelector(".task-tab.selected .tab-close").click()');
+      await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
+      await wait('!!document.querySelector(".overview-workspace:not([hidden]) .smart-open-paste")');
+      await js('document.querySelector(".smart-open-actions .text-button")?.click()');
+      await paste('- [ ] 核对输入');
+      await wait('[...document.querySelectorAll(".smart-open-results[aria-label=共享栏目] button")].some(el => el.textContent.includes("待办清单"))');
+      await js('[...document.querySelectorAll(".smart-open-results[aria-label=共享栏目] button")].find(el => el.textContent.includes("待办清单")).click()');
+      await wait('!!document.querySelector(".workspace:not([hidden]) .td-heading")');
+      await js('document.querySelector(\'.sidebar button[title="工作台"]\').click()');
+      await wait('!!document.querySelector(".overview-workspace:not([hidden]) .smart-open-paste")');
     } finally {
       if (previousClipboard) await clipboard.writeText(previousClipboard);
       else clipboard.clear();

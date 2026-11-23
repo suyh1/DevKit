@@ -3,9 +3,8 @@ import { useRef, useState } from 'react';
 import { ArrowRight, ClipboardPaste, ScanLine } from 'lucide-react';
 import { MotionButton } from './Motion';
 import { DETECTION_LIMIT, detectTools, type Suggestion } from './detection';
-import { tools, type Options, type ToolId } from './tools';
 
-export default function SmartOpen({ onOpen }: { onOpen: (id: ToolId, text: string, options?: Options) => void }) {
+export default function SmartOpen({ onOpen }: { onOpen: (match: Suggestion) => void }) {
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [error, setError] = useState('');
@@ -52,7 +51,7 @@ export default function SmartOpen({ onOpen }: { onOpen: (id: ToolId, text: strin
   return <section className="smart-open" aria-label="内容识别">
     <div className="smart-open-input">
         <TextArea ref={editor} aria-label="待识别内容" rows={3} maxLength={DETECTION_LIMIT} value={input}
-          placeholder="例如 JSON、URL 或时间戳…" spellCheck={false}
+          placeholder="例如色值、链接、配置片段或工具名…" spellCheck={false}
           onPaste={event => {
             const { selectionStart, selectionEnd, value } = event.currentTarget;
             const text = event.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
@@ -77,13 +76,18 @@ export default function SmartOpen({ onOpen }: { onOpen: (id: ToolId, text: strin
       </div>
     </div>
     {error && <p role="alert" className="smart-open-error">{error}</p>}
-    {suggestions.length > 0 && <div className="smart-open-results">
-      <p role="status">推荐工具 <span>{suggestions.length}</span></p>
-      <div className="smart-suggestions">{suggestions.map(suggestion => <button type="button" className="smart-suggestion" key={suggestion.id}
-        onClick={() => onOpen(suggestion.id, input, suggestion.options)}>
-        <span><strong>{tools.find(tool => tool.id === suggestion.id)!.name}</strong><small>{suggestion.reason}</small></span>
-        <ArrowRight size={15} aria-hidden="true" />
-      </button>)}</div>
-    </div>}
+    {(['tool', 'workspace'] as const).map(kind => {
+      const matches = suggestions.filter(match => match.kind === kind);
+      if (!matches.length) return null;
+      const button = (match: Suggestion) => <button type="button" className="smart-suggestion" key={match.id} onClick={() => onOpen(match)}>
+        <span><strong>{match.name}</strong><small>{match.reason}</small></span><ArrowRight size={15} aria-hidden="true" />
+      </button>;
+      return <section key={kind} className="smart-open-results" aria-label={kind === 'tool' ? '本机工具' : '共享栏目'}>
+        <p role="status">{kind === 'tool' ? '本机工具' : '共享栏目'} <span>{matches.length}</span></p>
+        <div className="smart-suggestions">{matches.slice(0, 6).map(button)}</div>
+        {matches.length > 6 && <details><summary>更多匹配（{matches.length - 6}）</summary>
+          <div className="smart-suggestions">{matches.slice(6).map(button)}</div></details>}
+      </section>;
+    })}
   </section>;
 }

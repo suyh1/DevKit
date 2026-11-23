@@ -101,7 +101,7 @@ describe('research-driven offline additions', () => {
 describe('explicit content recommendations', () => {
   it('recommends a useful JSON pipeline with the correct conversion direction', () => {
     const suggestions = detectTools('[{"id":9007199254740993}]');
-    expect(suggestions.map(item => item.id)).toEqual(['json', 'json-code', 'json-csv', 'yaml']);
+    expect(suggestions.slice(0, 4).map(item => item.id)).toEqual(['json', 'json-code', 'json-csv', 'yaml']);
     expect(suggestions.find(item => item.id === 'yaml')!.options).toEqual({ mode: 'json-yaml' });
   });
   it('recognizes encodings, timestamps and source types with appropriate options', () => {
