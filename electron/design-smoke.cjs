@@ -234,7 +234,7 @@ module.exports = async function designSmoke(window, output) {
   await wait('!document.documentElement.hasAttribute("data-expanding-card")');
   await js('document.querySelector(".task-tab.selected .tab-close").click()');
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
-  for (const name of ['日志中心', '监控中心', 'HTTP 调试', 'Nginx 配置', '后端管理', '局域网主机', '项目中心']) {
+  for (const name of ['日志中心', '监控中心', 'HTTP 调试', 'Nginx 配置', '服务管理', '局域网主机', '项目中心']) {
     await openWorkspace(name);
     const title = JSON.stringify(name);
     await wait(`[...document.querySelectorAll('.workspace-banner h1')].some(heading => heading.textContent === ${title} && heading.getClientRects().length)`);

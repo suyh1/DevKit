@@ -14,7 +14,7 @@ import './workbench-extensions.css';
 
 const modules = ['http', 'jar', 'nginx', 'monitor'] as const;
 type Module = (typeof modules)[number];
-const labels = { http: 'API 项目', jar: '后端服务', nginx: 'Nginx 实例', monitor: '监控项' };
+const labels = { http: 'API 项目', jar: '应用服务', nginx: 'Nginx 实例', monitor: '监控项' };
 const allowed = (module: Module) => !remoteAccess() || !!remoteAccess()?.services?.[module]?.enabled;
 
 export function ResourceFields({

@@ -24,7 +24,7 @@ import './lan-hosts.css';
 const SshTerminal = lazy(() => import('./SshTerminal'));
 const RemoteDesktop = lazy(() => import('./RemoteDesktop'));
 const empty: HostDraft = { mode: 'ssh', name: '', address: '', user: '', port: 22, platform: 'linux', auth: 'password', modules: { jar: false, nginx: false } };
-const titles = { jar: '后端管理', nginx: 'Nginx 配置' };
+const titles = { jar: '服务管理', nginx: 'Nginx 配置' };
 const endpoint = (host: LanHost) => host.mode === 'share' ? host.address : `${host.user ? `${host.user}@` : ''}${host.address.includes(':') ? `[${host.address}]` : host.address}:${host.port}`;
 const loopback = /^(localhost\.?|127\.(?:\d+\.){2}\d+|\[::1\])$/i;
 function workbenchLink(address: string) {
@@ -327,7 +327,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
           <div className="pc-actions" id={`lan-actions-${host.id}`} hidden={currentHost?.id !== host.id}>
             {host.mode === 'ssh' ? allowed('terminal') && <button className="secondary-button" disabled={busy || !host.fingerprint && !(allowed('edit') && allowed('diagnose'))} title={!host.fingerprint ? '首次连接需核对 SSH 指纹' : undefined} onClick={() => void task(async () => { if (host.fingerprint || await verify(host)) { const id = nextTab++; setTabs(items => [...items, { id, host }]); setSelected(id); } })}><Terminal size={14} />打开终端</button> : portal ? link && <a className="text-button" href={link} target="_blank" rel="noreferrer"><ExternalLink size={14} />打开工作台</a> : <button className="secondary-button" disabled={busy} onClick={() => void task(async () => { const result = await window.devkitDesktop?.openLanHost?.(host.address, host.modules.nginx && !host.modules.jar ? 'nginx' : 'jar'); if (!result || result.error) throw new Error(result?.error || '远程工作台不可用。'); })}><ExternalLink size={14} />打开工作台</button>}
             {(['jar', 'nginx'] as const).filter(module => host.modules[module] || portal && !allowed('edit')).map(module =>
-              <button type="button" className="text-button" key={module} disabled={busy} onClick={() => viewInstances(module, host)}>{module === 'jar' ? '查看后端服务' : '查看 Nginx 实例'}</button>)}
+              <button type="button" className="text-button" key={module} disabled={busy} onClick={() => viewInstances(module, host)}>{module === 'jar' ? '查看应用服务' : '查看 Nginx 实例'}</button>)}
             {allowed('diagnose') && <button className="text-button" disabled={busy} onClick={() => void task(() => diagnose(host))}>测试连接</button>}
             {host.jumpHostId && <RelatedLink page="lan-hosts" id={host.jumpHostId}>查看跳板机</RelatedLink>}
             {(portal || monitorAvailable) && <button className="text-button" disabled={busy} onClick={() => { if (status ? guard('monitor') : guard('monitor', 'edit', 'control')) void task(async () => onOpenMonitor(status?.id || await ensureLanMonitor(host))); }}>{status ? '监控历史' : '启用端口监控'}</button>}

@@ -170,7 +170,7 @@ try {
   await host.request("backup", "POST", { name: "可迁移快照" });
   assert.equal(
     JSON.parse(
-      await readFile(path.join(installation, `configs/profile-${Buffer.from(state.profiles[0].id).toString("hex")}.json`), "utf8"),
+      await readFile(path.join(installation, `configs/projects/profile-${Buffer.from(state.profiles[0].id).toString("hex")}.json`), "utf8"),
     ).projects[0].name,
     "目录迁移验收",
   );
@@ -191,7 +191,7 @@ try {
   await cp(path.join(installation,'configs'),path.join(copied,'configs'),{recursive:true});
   const quickPort = await freePort();
   const token = randomBytes(24).toString('hex');
-  await writeFile(path.join(copied, 'configs/transfer-links.json'), JSON.stringify([{ port: quickPort, token }]));
+  await writeFile(path.join(copied, 'configs/sharing/transfer-links.json'), JSON.stringify([{ port: quickPort, token }]));
   host = await launch(copied, true, quickPort);
   const quick = `http://127.0.0.1:${quickPort}/t/${token}/`;
   const build = JSON.parse(await readFile(path.join(copied, 'dist/.vite/manifest.json'), 'utf8'));

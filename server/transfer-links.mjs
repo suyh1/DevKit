@@ -8,7 +8,8 @@ import { downloadTransfer } from './transfer-download.mjs';
 import { listen, closeListener } from './http-listener.mjs';
 import { fail } from './collab-record.mjs';
 
-export const transferLinksFile = 'transfer-links.json';
+import { configGroup } from './config-layout.mjs';
+export const transferLinksFile = path.join('sharing', 'transfer-links.json');
 const page = 'transfer.html';
 const validPort = (port) => Number.isInteger(port) && port >= 1 && port <= 65535;
 const operations = new Set([
@@ -113,6 +114,7 @@ async function openLink({ port, token }, dist, manager, active) {
 }
 
 export async function createTransferLinks(directory, dist, manager) {
+  await configGroup(directory, 'sharing');
   const filename = path.join(directory, transferLinksFile);
   let links = [];
   try {

@@ -7,10 +7,10 @@ export function newJarClientId() {
   const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-export type BackendKind = 'jar' | 'npm' | 'program';
-export const serviceLocation = (item: JarInstance) => item.kind === 'npm' ? item.workDir || '' : item.kind === 'program' ? item.program || '' : item.jar || '';
+export type BackendKind = 'jar' | 'npm' | 'program' | 'script';
+export const serviceLocation = (item: JarInstance) => item.kind === 'npm' ? item.workDir || '' : item.kind === 'script' ? item.script || '' : item.kind === 'program' ? item.program || '' : item.jar || '';
 export type JarInstance = JarPolicies & { id: string; hostId?: string; name: string; jar?: string; kind?: BackendKind; workDir?: string; program?: string; script?: string; nodePath?: string; executable: string; jvmArgs: string[]; appArgs: string[]; logMode: 'file' | 'silent' | 'console'; pidName: string; logName: string; stopTimeout: number };
-export type JarState = { backendTypes?: boolean; backendChecks?: boolean; supportsNodePath?: boolean; runtimeDiscovery?: boolean; schemaVersion: number; revision: number; instances: JarInstance[]; platform: string; directory: string; groups?: HostGroup[] };
+export type JarState = { backendTypes?: boolean; backendChecks?: boolean; supportsScripts?: boolean; supportsNodePath?: boolean; runtimeDiscovery?: boolean; schemaVersion: number; revision: number; instances: JarInstance[]; platform: string; directory: string; groups?: HostGroup[] };
 export type JarHealth = { state: 'disabled' | 'unknown' | 'starting' | 'stopped' | 'healthy' | 'degraded' | 'unhealthy'; detail: string; checkedAt?: string; latency?: number; failures?: number };
 export type JarStatus = { id: string; state: 'running' | 'stopped' | 'exited' | 'unknown'; detail: string; checkedAt: string; pid?: number; businessPid?: number; uptime?: number; memory?: number; cpu?: number; size?: number; fileMissing?: boolean; executable?: string; pidPath: string; logPath: string; startedAt?: string; health?: JarHealth; supervision?: { active: boolean; state: string; attempts: number; nextRetryAt?: string; lastError?: string; logError?: string; profile?: string; pid?: number } };
 export type JarStartup = { enabled: boolean; mode: 'login' | 'boot'; platform: string; target?: string; installedAt?: string; error?: string };

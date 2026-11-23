@@ -41,12 +41,12 @@ export function createJarAutostart(registry, dependencies = {}) {
       if (platform === 'win32') {
         const { stdout } = await command(`${taskLookup(definition.name)}if($t){@{enabled=($t.State -ne 'Disabled');owned=($t.Description -eq ${quote(definition.tag)})}|ConvertTo-Json -Compress}`);
         const result = stdout.trim() ? JSON.parse(stdout) : { enabled: false, owned: true };
-        if (!result.owned) throw new Error('同名任务不属于此后端服务，拒绝修改。');
+        if (!result.owned) throw new Error('同名任务不属于此应用服务，拒绝修改。');
         return { ...record, enabled: result.enabled, platform, target: definition.name };
       }
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       const content = await readFile(target, 'utf8');
-      if (!content.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
+      if (!content.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此应用服务。');
       let enabled = false;
       try { const { stdout } = await run('systemctl', ['--user', 'is-enabled', `${definition.name}.service`], { timeout: 10000 }); enabled = stdout.trim() === 'enabled'; } catch { /* Disabled or user manager unavailable. */ }
       return { ...record, enabled, platform, target };
@@ -64,7 +64,7 @@ export function createJarAutostart(registry, dependencies = {}) {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
         const existing = await readFile(target, 'utf8');
-        if (!existing.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
+        if (!existing.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此应用服务。');
         await run('systemctl', ['--user', 'disable', `${definition.name}.service`], { timeout: 10000 });
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
       if (mode === 'boot') await run('loginctl', ['enable-linger'], { timeout: 20000, windowsHide: true });
@@ -88,7 +88,7 @@ export function createJarAutostart(registry, dependencies = {}) {
     } else {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
-        if (!(await readFile(target, 'utf8')).startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此后端服务。');
+        if (!(await readFile(target, 'utf8')).startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此应用服务。');
         await run('systemctl', ['--user', 'disable', `${definition.name}.service`], { timeout: 10000 }); await unlink(target);
         await run('systemctl', ['--user', 'daemon-reload'], { timeout: 10000 });
       } catch (error) { if (error.code !== 'ENOENT') throw error; }

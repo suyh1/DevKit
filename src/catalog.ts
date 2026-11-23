@@ -4,10 +4,10 @@ import type { ToolId } from './tools';
 // Full-page capabilities live beside the offline task catalog, rather than inside it.
 // Both the main navigation and README generator read this registry.
 export const workspaceModules = [
-  { id: 'logs', name: '日志中心', description: '按主机聚合后端服务日志、控制台输出及 Nginx 日志，支持四窗独立追踪、筛选、主机端脱敏、故障时段联查和限量导出。', category: '工作台', badge: '共享' },
-  { id: 'monitor', name: '监控中心', description: '定时 HTTP/TCP 检测，可关联项目、本机与远程后端服务或局域网主机，支持维护窗口、故障恢复记录、HTTPS 证书到期提醒与 Webhook 通知。', category: '工作台', badge: '共享' },
+  { id: 'logs', name: '日志中心', description: '按主机聚合应用服务日志、控制台输出及 Nginx 日志，支持四窗独立追踪、筛选、主机端脱敏、故障时段联查和限量导出。', category: '工作台', badge: '共享' },
+  { id: 'monitor', name: '监控中心', description: '定时 HTTP/TCP 检测，可关联项目、本机与远程应用服务或局域网主机，支持维护窗口、故障恢复记录、HTTPS 证书到期提醒与 Webhook 通知。', category: '工作台', badge: '共享' },
   { id: 'http', name: 'HTTP 调试', description: '可局域网共享的 API 项目、接口设计、文档与调试，支持快速请求、multipart 字段与文件上传、环境变量、接口集合回归、响应 Schema 校验及 OpenAPI/Swagger 导入导出。', category: '工作台', badge: '共享' },
-  { id: 'projects', name: '项目中心', description: '管理项目入口与环境档案，关联 API、后端服务、Nginx 和监控，查看项目运维总览。', category: '工作台', badge: '共享' },
+  { id: 'projects', name: '项目中心', description: '管理项目入口与环境档案，关联 API、应用服务、Nginx 和监控，查看项目运维总览。', category: '工作台', badge: '共享' },
   { id: 'knowledge', name: '团队知识库', description: '按目录、项目和标签组织团队知识，在独立 Markdown 写作页编辑、恢复草稿，批量引用文档与实例，搜索正文并分享章节链接。', category: '工作台', badge: '共享' },
   { id: 'project-todos', name: '待办清单', description: '像编辑文本文件一样管理待办，支持分组、标签、快捷键、归档、清单导入导出及局域网共享。', category: '工作台', badge: '共享' },
   { id: 'file-shares', name: '本机文件共享管理', description: '通过共享清单和详情查看状态、端口和文件范围，管理多项只读共享并在网页下载文件或文件夹 ZIP。', category: '工作台', badge: '共享' },
@@ -15,7 +15,7 @@ export const workspaceModules = [
   { id: 'mock', name: '接口模拟服务', description: '按 Schema 或模板生成局域网 HTTP 响应，按请求字段切换场景，查看命中原因并重放请求。项目基础地址支持共享数据集的增删改查。', category: '工作台', badge: '共享' },
   { id: 'whiteboard', name: '截图协作白板', description: '在共享截图或空白画布上同步绘制、圈选、连箭头和文字标注，可导出 PNG。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
-  { id: 'jar', name: '后端管理', description: '按主机管理 Java JAR、npm 项目和 Go 等可执行程序，支持启停、日志、控制台、健康检查、配置和系统自启。', category: '工作台', badge: '共享' },
+  { id: 'jar', name: '服务管理', description: '按主机管理 Java JAR、npm 项目、可执行程序和解释器脚本，关联项目中心入口，控制启停、日志、健康检查和系统自启。', category: '工作台', badge: '共享' },
   { id: 'lan-hosts', name: '局域网主机', description: '管理、发现和导入主机，支持 SSH 终端、SFTP、端口监控和网络唤醒。共享网页可按访客权限直连远程桌面。', category: '工作台', badge: '共享' },
 ] as const;
 

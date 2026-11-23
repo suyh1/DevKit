@@ -1,3 +1,4 @@
+import { configGroup } from './config-layout.mjs';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -37,7 +38,7 @@ function content(input) {
 }
 
 export async function createKnowledgeBase(directory) {
-  const file = path.join(directory, 'knowledge.json');
+  const file = path.join(await configGroup(directory, 'planning'), 'knowledge.json');
   let pages = [],
     folders = [];
   try {

@@ -30,7 +30,7 @@ export const workspaceModuleNav = {
   mock: { Icon: Workflow, hint: '多场景响应与调用记录' },
   whiteboard: { Icon: Presentation, hint: '截图与多人标注' },
   nginx: { Icon: Server, hint: '配置与实例管理' },
-  jar: { Icon: ServerCog, hint: '后端服务启停与控制台' },
+  jar: { Icon: ServerCog, hint: '应用服务启停与控制台' },
   monitor: { Icon: Activity, hint: '可用率与故障记录' },
   logs: { Icon: ScrollText, hint: '实时日志多窗对照' },
   'lan-hosts': { Icon: Terminal, hint: '连接档案与 SSH 终端' },

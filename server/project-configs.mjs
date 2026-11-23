@@ -13,6 +13,8 @@ import { randomUUID } from "node:crypto";
 import { acquireProjectLock } from "./project-lock.mjs";
 import { readProjectEnvelope, profileFilename } from "./project-store.mjs";
 
+import { configGroup, organizeConfigs } from './config-layout.mjs';
+
 const exists = async (file) => {
   try {
     await access(file);
@@ -22,7 +24,16 @@ const exists = async (file) => {
     throw error;
   }
 };
-const instructions = `DevKit project center configs\n\nprojects.json: profile index, revision and the latest 30 snapshots.\nprofile-<hex-encoded-id>.json: one independent profile, including projects and variables.\nprojects.v1.backup.json: original v1 data retained during automatic migration.\n.projects-pending.json: recoverable pending save; copy it with the entire folder.\nsharing.json: host sharing options and salted password hash (no plaintext password).\nmigration.json: optional migration history.\n\nClose DevKit / the Node host on BOTH computers before copying this entire folder.\nCopy configs beside the other installation's executable (or beside server/ in the standalone ZIP).\nKeep the destination folder writable by the user who launches DevKit.\nDo not merge projects.json by hand. Use the UI JSON import to merge projects/profiles.\n.lock and *.tmp are runtime files, never configuration. A clean shutdown removes the lock.\nJSON UI export excludes sharing passwords and snapshot history. Folder copy includes them.\n`;
+const instructions = `DevKit 配置目录
+
+projects/  项目索引、档案、快照、迁移记录与待恢复的保存
+sharing/   共享权限、访问口令哈希、审计记录、文件共享与快传链接
+planning/  待办清单与知识库
+jar/、nginx/、http/、monitor/、lan-hosts/、collaboration/  各栏目的数据
+
+复制前请关闭两台电脑上的 DevKit 或独立服务，备份目标 configs，再复制整个目录。
+目录含有共享凭据。仅迁移项目时可使用界面的 JSON 导出和合并导入。
+`;
 
 export async function prepareProjectConfigs(directory, legacyDirectories = []) {
   directory = path.resolve(directory);
@@ -30,10 +41,13 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
   try {
     await mkdir(directory, { recursive: true });
     release = await acquireProjectLock(directory);
+    await organizeConfigs(directory);
+    const projects = await configGroup(directory, 'projects');
+    const sharing = await configGroup(directory, 'sharing');
     let migratedFrom = "";
     if (
-      !(await exists(path.join(directory, "projects.json"))) &&
-      !(await exists(path.join(directory, ".projects-pending.json")))
+      !(await exists(path.join(projects, "projects.json"))) &&
+      !(await exists(path.join(projects, ".projects-pending.json")))
     ) {
       for (const legacy of legacyDirectories.map((item) =>
         path.resolve(item),
@@ -56,21 +70,21 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
               const name = profileFilename(profile.id);
               await copyFile(
                 path.join(legacy, name),
-                path.join(directory, name),
+                path.join(projects, name),
               );
             }
           }
           // Commit projects.json last; a partial migration is retried on next start.
           if (
             (await exists(path.join(legacy, "sharing.json"))) &&
-            !(await exists(path.join(directory, "sharing.json")))
+            !(await exists(path.join(sharing, "sharing.json")))
           ) {
             JSON.parse(
               await readFile(path.join(legacy, "sharing.json"), "utf8"),
             );
             await copyFile(
               path.join(legacy, "sharing.json"),
-              path.join(directory, "sharing.json"),
+              path.join(sharing, "sharing.json"),
               constants.COPYFILE_EXCL,
             );
           }
@@ -81,7 +95,7 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
           try {
             await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
             await writeFile(
-              path.join(directory, "migration.json"),
+              path.join(projects, "migration.json"),
               JSON.stringify(
                 { migratedFrom: legacy, migratedAt: new Date().toISOString() },
                 null,
@@ -89,7 +103,7 @@ export async function prepareProjectConfigs(directory, legacyDirectories = []) {
               ),
               { mode: 0o600 },
             );
-            await rename(temporary, path.join(directory, "projects.json"));
+            await rename(temporary, path.join(projects, "projects.json"));
           } finally {
             await unlink(temporary).catch((error) => {
               if (error.code !== "ENOENT") throw error;

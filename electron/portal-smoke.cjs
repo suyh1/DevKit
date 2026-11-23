@@ -156,6 +156,8 @@ app
         window.webContents.debugger.attach('1.3');
         await window.webContents.debugger.sendCommand('Page.enable');
         await window.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `
+          const cssSupports = CSS.supports.bind(CSS);
+          CSS.supports = (...args) => !String(args[0]).includes('base-select') && cssSupports(...args);
           delete HTMLElement.prototype.popover;
           delete HTMLElement.prototype.showPopover;
           delete HTMLElement.prototype.hidePopover;
@@ -380,6 +382,13 @@ app
       await button("接口设计", ".api-tabs button");
       await selector('.portal-appearance summary');
       await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
+      if (process.argv.includes('--legacy-popover')) {
+        await js(`{const field=document.querySelector('[aria-label="共享页面主题风格"]'); field.focus(); field.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));}`);
+        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
+        await js(`{const menu=document.activeElement;for(const key of ['End','Enter'])menu.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));}`);
+        await wait(`!document.querySelector('.select-menu') && document.querySelector('[aria-label="共享页面主题风格"]').selectedIndex === document.querySelector('[aria-label="共享页面主题风格"]').options.length - 1`);
+      }
+      await js('document.querySelector(\'[aria-label="共享页面主题"] button[aria-pressed=true]\').focus()');
       key("End");
       key("Return");
       await wait('document.documentElement.dataset.theme==="dark"');
@@ -646,8 +655,8 @@ app
       assert.ok(!await js('document.body.innerText.includes("unsaved-audit-secret") || [...document.querySelectorAll("textarea")].some(e=>e.value.includes("audit-secret"))'));
       assert.ok(!await js('[...document.querySelectorAll(".jar-instance button")].some(e=>e.textContent.trim()==="日志"||e.textContent.trim()==="控制台")'));
       await button('日志中心', '.jar-instance button');
-      await wait('location.hash.startsWith("#jar") && document.querySelector(".workspace-access-bubble")?.textContent.includes("后端日志权限")');
-      for (const [page, resource] of [['jar', '后端服务'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
+      await wait('location.hash.startsWith("#jar") && document.querySelector(".workspace-access-bubble")?.textContent.includes("服务日志权限")');
+      for (const [page, resource] of [['jar', '应用服务'], ['nginx', 'Nginx 实例'], ['logs', '日志来源']]) {
         await js(`location.hash=${JSON.stringify('#'+page+'/not-a-resource')}`);
         await wait(`[...document.querySelectorAll('[role=status]')].some(e=>e.textContent.includes(${JSON.stringify(resource+'已移除或当前访客无权访问')}))`);
       }

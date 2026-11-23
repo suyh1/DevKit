@@ -5,9 +5,11 @@ import { parseCsv } from './practical';
 import { timestampDate } from './time-conversion';
 import { ipv4 } from './extended';
 
+export type ServiceDraft = { kind: 'jar' | 'npm' | 'program' | 'script'; jar?: string; program?: string; script?: string; name?: string; jvm?: string; args?: string };
+
 export type Suggestion =
   | { kind: 'tool'; id: ToolId; name: string; reason: string; input?: string; options?: Options }
-  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; options?: never };
+  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; options?: never };
 export const DETECTION_LIMIT = 200_000;
 
 const toolNames = new Map(tools.map(t => [t.id, t.name]));
@@ -19,7 +21,7 @@ const intents: Partial<Record<ToolId, string[]>> = {
 
 type Rules = {
   tool: (id: ToolId, reason: string, options?: Options, input?: string) => void;
-  workspace: (id: WorkspaceModuleId, reason: string) => void;
+  workspace: (id: WorkspaceModuleId, reason: string, service?: ServiceDraft) => void;
   open: (id: ToolId, reason: string) => void;
 };
 
@@ -117,7 +119,9 @@ function fileRules(text: string, r: Rules) {
   if (/^(pem|der|crt|cer)$/.test(extension)) r.open('cert-inspect', '选择证书文件检查有效期和域名');
   if (/^(zip|jar)$/.test(extension)) r.open('zip-inventory', '选择归档文件查看清单');
   if (/^(jar|war|zip)$/.test(extension)) r.open('jar-inspect', '选择归档文件检查 Java 资源');
-  if (extension === 'jar') r.workspace('jar', '可在后端管理中配置 JAR 服务');
+  if (extension === 'jar') r.workspace('jar', '可在服务管理中配置 JAR 服务', { kind: 'jar', jar: text });
+  if (extension === 'exe') r.workspace('jar', '登记可执行程序', { kind: 'program', program: text });
+  if (['py', 'js', 'cjs', 'mjs'].includes(extension)) r.workspace('jar', '登记解释器脚本', { kind: 'script', script: text });
   if (/^(txt|csv|tsv|log|md|properties)$/.test(extension)) r.open('encoding-repair', '选择原文件检查字节和文本编码');
   r.open('file-signature', '选择原文件核对签名与扩展名');
 }
@@ -251,8 +255,19 @@ function serviceRules(text: string, first: string, { tool, workspace }: Rules) {
   if (/^Set-Cookie:/im.test(text)) tool('cookie-context', '检查 Cookie 发送条件');
   if (/^(?:curl\s|(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\S+)/i.test(text)) workspace('http', '识别到 HTTP 请求');
   if (/(?:^|[\s;{])(?:server\s*\{|upstream\s+[\w.-]+\s*\{|proxy_pass\s+\S+)/m.test(text)) workspace('nginx', '识别到 Nginx 配置指令');
-  if ((/^java\s/i.test(first) && /\s-jar\s/i.test(first)) || /^npm\s+(?:run\s+\S|start\b)/i.test(first))
-    workspace('jar', '识别到后端服务启动命令');
+  if (text === first) {
+    const args = first.match(/"[^"]*"|'[^']*'|[^\s"']+/g)?.map(token => token.replace(/^(["'])(.*)\1$/, '$2')) || [];
+    const [runtime, entry, ...rest] = args;
+    if (/^java$/i.test(runtime) && args.includes('-jar')) {
+      const index = args.indexOf('-jar');
+      if (args[index + 1]) workspace('jar', '登记 Java 服务', { kind: 'jar', jar: args[index + 1], jvm: args.slice(1, index).join('\n'), args: args.slice(index + 2).join('\n') });
+    } else if (runtime === 'npm' && (entry === 'start' || (entry === 'run' && rest[0]))) {
+      const extra = entry === 'start' ? rest : rest.slice(1);
+      workspace('jar', '登记 npm 服务', { kind: 'npm', script: entry === 'start' ? 'start' : rest[0], args: (extra[0] === '--' ? extra.slice(1) : extra).join('\n') });
+    } else if (/^(?:python(?:3(?:\.\d+)?)?|node)(?:\.exe)?$/i.test(runtime) && entry && /\.(?:py|[cm]?js)$/i.test(entry)) {
+      workspace('jar', '登记解释器脚本', { kind: 'script', script: entry, args: rest.join('\n') });
+    }
+  }
 }
 
 function documentRules(text: string, lines: string[], r: Rules) {
@@ -291,7 +306,7 @@ export function detectTools(input: string): Suggestion[] {
   const rules: Rules = {
     tool: (id, reason, options, source = input) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason, options, input: source }),
     open: (id, reason) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason }),
-    workspace: (id, reason) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason }),
+    workspace: (id, reason, service) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason, ...(service && { service }) }),
   };
   if (text.length <= 100) {
     const key = text.toLowerCase();
@@ -299,7 +314,7 @@ export function detectTools(input: string): Suggestion[] {
       if ([t.name, t.english, t.id, ...(intents[t.id] ?? [])].some(name => name.toLowerCase() === key))
         rules.open(t.id, '打开' + t.name);
     }
-    for (const w of workspaceModules) if (w.name === text || w.id === key) rules.workspace(w.id, '进入' + w.name);
+    for (const w of workspaceModules) if (w.name === text || w.id === key || (w.id === 'jar' && text === '后端管理')) rules.workspace(w.id, '进入' + w.name);
     if (matches.size) return [...matches.values()];
   }
   if (/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00a0]/.test(input)) rules.tool('invisible', '定位隐形字符与方向控制符');

@@ -40,10 +40,10 @@ module.exports = async (window, output) => {
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [jar] });
   try {
     window.setSize(1440, 1000);
-    await verifyHostEditor(window, output, click, wait);
     window.webContents.setBackgroundThrottling(false);
+    await verifyHostEditor(window, output, click, wait);
     await js('document.documentElement.dataset.theme="light"');
-    await openShared(window, '后端管理', wait);
+    await openShared(window, '服务管理', wait);
     await wait('!document.querySelector(".jar-center button.run-button").disabled');
     await checkServiceHeader();
     const project = path.join(folder, 'npm project');
@@ -80,6 +80,7 @@ module.exports = async (window, output) => {
     const chosenNode = require('node:child_process').execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', windowsHide: true }).trim();
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosenNode] });
     await click('手动选文件', '.jar-runtime-field');
+    await click('系统选择…', '.host-directory');
     await wait('document.querySelector(".jar-dialog input[placeholder*=PATH]").value === ' + JSON.stringify(chosenNode));
     assert.equal(await js("document.querySelector('.jar-dialog .jar-runtime-probe [role=status]')"), null);
     await click('检测 Node.js 和 npm', '.jar-dialog');
@@ -87,11 +88,34 @@ module.exports = async (window, output) => {
     await fill('公共环境变量', '');
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [project] });
     await click('选择目录', '.jar-dialog');
+    await click('系统选择…', '.host-directory');
     await wait('document.querySelector(".jar-dialog code")?.textContent === "npm run serve:test"');
     await click('保存服务', '.jar-dialog');
     await wait('!document.querySelector(".jar-dialog[open]") && !!document.querySelector(".jar-table")');
     const service = await js('window.devkitJar.request("get").then(r => r.data.instances.find(i => i.kind === "npm"))');
     assert.equal(service.nodePath, await fs.realpath(chosenNode));
+    await js(`(async () => {
+      const { data } = await window.devkitProjects.request('get');
+      data.profiles[0].projects.push({ id: 'service-ui', name: '服务关联测试', code: 'service-ui', url: 'http://localhost/', enabled: true, group: '', description: '', query: [] });
+      const result = await window.devkitProjects.request('save', { data, revision: data.revision });
+      if (result.error) throw Error(result.error);
+    })()`);
+    await click('关联项目', '.jar-instance');
+    await wait('document.querySelector(".service-projects")?.textContent.includes("服务关联测试")');
+    const association = 'Array.from(document.querySelectorAll(".service-projects li")).find(row=>row.textContent.includes("服务关联测试"))';
+    await js(association + '.querySelector(".secondary-button").click()');
+    await wait(association + '.textContent.includes("解除关联")');
+    assert.equal(await js("window.devkitProjects.request('get').then(r=>r.data.profiles[0].projects.find(p=>p.id==='service-ui').resources.jar)"), service.id);
+    await js(association + '.querySelector(".secondary-button").click()');
+    await wait(association + '.querySelector(".secondary-button").textContent === "关联项目"');
+    await click('新建关联项目', 'dialog[open]');
+    await wait('document.querySelector("dialog[open] h2")?.textContent.includes("项目定义")');
+    await js(`{ const field = [...document.querySelectorAll('dialog[open] label')].find(label => label.querySelector('span')?.textContent === '项目名称').querySelector('input');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '从服务新建的项目');
+      field.dispatchEvent(new Event('input', { bubbles: true })); }`);
+    await click('保存项目定义', 'dialog[open]');
+    await wait('!document.querySelector("dialog[open]") && !!document.querySelector(".jar-instance")');
+    assert.equal(await js("window.devkitProjects.request('get').then(r=>r.data.profiles.flatMap(p=>p.projects).find(p=>p.name==='从服务新建的项目')?.resources?.jar)"), service.id);
     await click('设置', '.jar-instance');
     await wait('document.querySelector(".jar-dialog[open] input[placeholder*=PATH]")?.value === ' + JSON.stringify(service.nodePath));
     await click('取消', '.jar-dialog');
@@ -127,7 +151,13 @@ module.exports = async (window, output) => {
       body.scrollTop = 0;
       return ok;
     })()`), true, 'JAR registration scrolls the settings independently of its header and save actions');
-    await click('选择文件'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
+    await click('选择文件');
+    await wait('!!document.querySelector(".host-directory-current")');
+    await js(`{const field=document.querySelector('.host-directory-path input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,${JSON.stringify(folder)});field.dispatchEvent(new Event('input',{bubbles:true}));}`);
+    await wait('!document.querySelector(".host-directory-actions .secondary-button").disabled');
+    await click('打开', '.host-directory-actions');
+    await wait('document.querySelector(".host-directory-list")?.textContent.includes("order service.jar")');
+    await click('order service.jar', '.host-directory-list'); await wait(`document.querySelector('.jar-dialog input[placeholder="选择已有 .jar 文件"]').value === ${JSON.stringify(jar)}`);
     await fill('显示名称', '订单服务 · 测试环境');
     await fill('JVM 参数（每行一个）', '-Xms64m\n-Xmx256m');
     await js(`{const section=[...document.querySelectorAll('.jar-setting-section')].find(el=>el.querySelector('summary').textContent.includes('HTTP'));section.open=true; section.querySelector('[aria-label="检测方式"] button[value=tcp]').click();}`);
@@ -162,7 +192,9 @@ module.exports = async (window, output) => {
     await fs.writeFile(path.join(output, 'jar-mobile-card.png'), (await window.webContents.capturePage()).toPNG());
     window.setMinimumSize(...cardMinimum); window.setSize(...cardSize);
     await wait('innerWidth > 920');
-    await click('配置文件');
+    await js('document.querySelector(".top-actions [aria-label=配置文件]").click()');
+    await wait('document.querySelector(".config-source select")?.options.length > 1');
+    await js('document.querySelector(".config-source select").selectedIndex = 1; document.querySelector(".config-source select").dispatchEvent(new Event("change",{bubbles:true}))');
     await wait("!!document.querySelector('.jar-configs option[value=\"application.yml\"]')");
     assert.equal(await js(`{
       const toolbar = document.querySelector('.jar-config-source .pc-field-action');
@@ -203,7 +235,7 @@ module.exports = async (window, output) => {
     assert.match(await fs.readFile(configFile, 'utf8'), /name: sample/);
     await click('查看上一版', '.jar-config-actions');
     await wait('!!document.querySelector(".jar-configs .change-preview")');
-    await js('document.querySelector(\'button[aria-label="关闭后端配置文件"]\').click()');
+    await js('document.querySelector(\'button[aria-label="关闭服务配置文件"]\').click()');
     await fs.writeFile(path.join(folder, item.logName), 'fixture log 中文\nready for inspection\n');
     await click('日志'); await wait('document.querySelector(".jar-log pre")?.textContent.includes("fixture log 中文")');
     await new Promise(resolve => setTimeout(resolve, 450));
@@ -238,7 +270,7 @@ module.exports = async (window, output) => {
     await js(`document.querySelector('.settings-page button[value="performance"]').click()`);
     await wait('document.documentElement.dataset.displayMode === "performance"');
     assert.equal(await js('JSON.parse(localStorage.getItem("devkit:preferences")).displayMode'), 'performance');
-    await openShared(window, '后端管理', wait);
+    await openShared(window, '服务管理', wait);
     await wait('document.querySelector(".jar-summary").textContent.includes("每 15 秒")');
     window.show();
     window.focus();
@@ -290,7 +322,7 @@ async function verifyHostEditor(window, output, click, wait) {
   async function capture(name) {
     await painted();
     await js(`Promise.allSettled(document.querySelector('.lan-host-dialog').getAnimations({subtree:true})
-      .filter(animation => animation.effect.getComputedTiming().endTime < Infinity).map(animation => animation.finished))`);
+      .filter(animation => animation.playState === 'running' && animation.effect.getComputedTiming().endTime < Infinity).map(animation => animation.finished))`);
     await painted();
     const rectangle = await js(`{ const rect = document.querySelector('.lan-host-dialog').getBoundingClientRect();
       ({ x: Math.floor(rect.x), y: Math.floor(rect.y), width: Math.ceil(rect.width), height: Math.ceil(rect.height) }); }`);
@@ -458,7 +490,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await when(window, '!!document.querySelector(".lan-scan-fields")');
     await js(window, `document.querySelector('[aria-label="关闭主机扫描"]').click()`);
     await when(window, '!document.querySelector(".lan-scan-fields")');
-    await go('后端管理');
+    await go('服务管理');
     await wait('!document.querySelector(".jar-center button.run-button")?.disabled');
     await click('添加服务');
     await js(window, '{const field=document.querySelector(".jar-dialog select");field.selectedIndex=1;field.dispatchEvent(new Event("change",{bubbles:true}));}');
@@ -497,7 +529,9 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await js(gatewayWindow, 'document.querySelector(".portal-login .run-button").click()');
     const group = 'Array.from(document.querySelectorAll(".jar-table tbody")).find(group => group.textContent.includes("远程测试主机"))';
     await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '已停止'`);
-    await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='配置文件').click()`);
+    await js(gatewayWindow, 'document.querySelector(".portal-account [aria-label=配置文件]").click()');
+    await when(gatewayWindow, 'document.querySelector(".config-source select")?.options.length > 1');
+    await js(gatewayWindow, `{const select=document.querySelector('.config-source select');const name=(${group}).querySelector('.jar-instance-title strong').textContent;select.value=[...select.options].find(o=>o.textContent.endsWith(' · '+name)).value;select.dispatchEvent(new Event('change',{bubbles:true}));}`);
     await when(gatewayWindow, "!!document.querySelector('.jar-configs option[value=\"remote.yml\"]')");
     await js(gatewayWindow, `{
       const field = document.querySelector('.jar-configs select');
@@ -505,7 +539,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
       field.dispatchEvent(new Event('change', { bubbles: true }));
     }`);
     await when(gatewayWindow, 'document.querySelector(".jar-configs .cm-content")?.textContent.includes("port: 9002")');
-    await js(gatewayWindow, 'document.querySelector(\'button[aria-label="关闭后端配置文件"]\').click()');
+    await js(gatewayWindow, 'document.querySelector(\'button[aria-label="关闭服务配置文件"]\').click()');
     await when(gatewayWindow, '!document.querySelector(".jar-config-dialog[open]")');
     await js(gatewayWindow, `Array.from((${group}).querySelectorAll('.jar-row-actions button')).find(b=>b.textContent.trim()==='启动').click()`);
     await when(gatewayWindow, `${group}?.querySelector('.jar-status')?.textContent === '运行中'`, 35_000);

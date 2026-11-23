@@ -15,7 +15,7 @@ module.exports = async function checkProjects(window, output, staging) {
     }
     console.error(
       await contents.executeJavaScript(
-        'JSON.stringify({errors:[...document.querySelectorAll(".pc-error")].map(item=>item.textContent),role:document.querySelector(".pc-role")?.textContent,cards:[...document.querySelectorAll(".pc-card h3")].map(item=>item.textContent),dialog:document.querySelector("dialog[open] h2")?.textContent,busy:document.querySelector(".portal-login .run-button")?.disabled})',
+        'JSON.stringify({focused:document.hasFocus(),active:document.activeElement?.outerHTML.slice(0,220),errors:[...document.querySelectorAll(".pc-error")].map(item=>item.textContent),role:document.querySelector(".pc-role")?.textContent,cards:[...document.querySelectorAll(".pc-card h3")].map(item=>item.textContent),dialog:document.querySelector("dialog[open] h2")?.textContent,busy:document.querySelector(".portal-login .run-button")?.disabled})',
       ),
     );
     await fs.writeFile(
@@ -27,7 +27,7 @@ module.exports = async function checkProjects(window, output, staging) {
     throw new Error(`Project UI condition not met: ${expression}`);
   };
   const click = async (text) => {
-    const expression = `[...document.querySelectorAll('.project-workspace button, dialog[open] button')].find(button => button.textContent.trim() === ${JSON.stringify(text)})`;
+    const expression = `[...document.querySelectorAll('.project-workspace button, .top-actions button, dialog[open] button')].find(button => button.textContent.trim() === ${JSON.stringify(text)})`;
     await wait(
       window.webContents,
       `!!${expression} && !${expression}.disabled`,
@@ -303,18 +303,20 @@ module.exports = async function checkProjects(window, output, staging) {
   );
   const storage = await ipc('storage');
   assert.equal(path.resolve(storage.directory), path.resolve(process.env.DEVKIT_DEV_ROOT, 'configs'));
-  assert.equal(JSON.parse(await fs.readFile(path.join(storage.directory, 'profile-' + Buffer.from(imported.profiles[1].id).toString('hex') + '.json'),'utf8')).projects[0].name, '团队管理台');
+  assert.equal(JSON.parse(await fs.readFile(path.join(storage.directory, 'projects', 'profile-' + Buffer.from(imported.profiles[1].id).toString('hex') + '.json'),'utf8')).projects[0].name, '团队管理台');
   await click('配置文件');
   await wait(window.webContents, 'document.querySelector("dialog[open] .pc-path code")?.textContent.endsWith("configs")');
   await click('知道了');
   // Closing a dirty editor must preserve the draft until explicitly discarded.
   await js(`document.querySelector('button[aria-label="编辑 团队管理台"]').click()`);
+  window.focus();
+  window.webContents.focus();
   await field('项目名称','尚未保存的名称');
   await js('[...document.querySelectorAll("dialog[open] input")].find(input=>input.value==="尚未保存的名称").focus()');
   await click('取消');
   await wait(window.webContents, '!!document.querySelector("dialog[open] .pc-discard")');
   await click('继续编辑');
-  assert.equal(await js('document.activeElement.value'), '尚未保存的名称');
+  await wait(window.webContents, 'document.activeElement.value === "尚未保存的名称"');
   assert.equal(await js('[...document.querySelectorAll("dialog[open] label")].find(label=>label.querySelector("span")?.textContent==="项目名称").querySelector("input").value'), '尚未保存的名称');
   await click('取消'); await click('放弃更改');
   assert.equal((await ipc('get')).profiles[1].projects[0].name,'团队管理台');
@@ -357,7 +359,7 @@ module.exports = async function checkProjects(window, output, staging) {
   await wait(window.webContents, '!document.querySelector("dialog[open]") && document.querySelector(".pc-environment h2")?.textContent === "测试环境 副本"');
   let copyState = await ipc('get');
   const copiedId = copyState.profiles.find(item => item.name === '测试环境 副本').id;
-  const copiedFile = path.join(storage.directory, 'profile-' + Buffer.from(copiedId).toString('hex') + '.json');
+  const copiedFile = path.join(storage.directory, 'projects', 'profile-' + Buffer.from(copiedId).toString('hex') + '.json');
   assert.equal(JSON.parse(await fs.readFile(copiedFile, 'utf8')).projects.length, 2);
   await js(`document.querySelector('button[aria-label="编辑 团队管理台"]').click()`);
   await field('项目名称', '副本独立入口'); await click('保存项目定义');

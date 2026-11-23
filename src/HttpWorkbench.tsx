@@ -1,7 +1,6 @@
 import { TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
-import { SharingButton } from './Sharing';
 import { canSendHttp, remoteAccess } from './workspace-remote';
 import { newProjectId } from './project-api';
 import { MotionReveal, MotionGroup, useMotionList, MotionButton, MotionPresence } from './Motion';
@@ -258,7 +257,7 @@ export default function HttpWorkbench({
   }
   const matchingEntries = entries.filter(entry => (entry.name + entry.config).toLowerCase().includes(search.toLowerCase()));
   return (
-    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} tabIndex={workspaceMode==='api' ? 0 : -1} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} tabIndex={workspaceMode==='quick' ? 0 : -1} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div><SharingButton /></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
+    <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} tabIndex={workspaceMode==='api' ? 0 : -1} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} tabIndex={workspaceMode==='quick' ? 0 : -1} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading workspace-banner">
         <div className="page-title">
           <h1>HTTP 调试</h1>
@@ -334,7 +333,7 @@ export default function HttpWorkbench({
               <Download size={14} />
               导出
             </button>
-            <button className="text-button" disabled={!!running} onClick={() => file.current?.click()}>
+            <button className="file-pick-button" disabled={!!running} onClick={() => file.current?.click()}>
               <Upload size={14} />
               导入
             </button>

@@ -1,3 +1,4 @@
+import './select-menu';
 import { createRoot } from 'react-dom/client';
 import { ArrowLeftRight } from 'lucide-react';
 import { ConfirmationProvider } from './Confirmation';
@@ -9,6 +10,8 @@ import './segmented-control.css';
 import './motion.css';
 import './adaptations.css';
 import './workbench-forms.css';
+import './local-file-picker.css';
+import './select.css';
 import '../shared/focus.css';
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');

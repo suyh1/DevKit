@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -71,8 +72,11 @@ export function Modal({
     draft !== undefined && JSON.stringify(draft) !== baseline.current;
   const requestClose = () => {
     if (!busy) {
-      if (dirty) setDiscard(true);
-      else close();
+      if (dirty) {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && ref.current?.contains(focused) && focused.matches("input, select, textarea, [contenteditable=true]")) lastField.current = focused;
+        setDiscard(true);
+      } else close();
     }
   };
   useEffect(() => {
@@ -88,11 +92,16 @@ export function Modal({
       if (before instanceof HTMLElement && before.isConnected && !document.querySelector('dialog[open]')) before.focus();
     };
   }, [active]);
-  useEffect(() => {
-    if (discard)
-      ref.current
-        ?.querySelector<HTMLButtonElement>(".pc-discard button")
-        ?.focus();
+  const returningToDraft = useRef(false);
+  useLayoutEffect(() => {
+    if (discard) {
+      returningToDraft.current = true;
+      ref.current?.querySelector<HTMLButtonElement>(".pc-discard button")?.focus();
+    } else if (returningToDraft.current) {
+      returningToDraft.current = false;
+      const target = lastField.current;
+      (target?.isConnected && !target.matches(":disabled") ? target : ref.current?.querySelector<HTMLButtonElement>("header button"))?.focus();
+    }
   }, [discard]);
   useEffect(() => {
     if (!dirty) return;
@@ -151,11 +160,7 @@ export function Modal({
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => {
-                setDiscard(false);
-                const target = lastField.current;
-                (target?.isConnected && !target.matches(":disabled") ? target : ref.current?.querySelector<HTMLButtonElement>("header button"))?.focus();
-              }}
+                  onClick={() => setDiscard(false)}
                 >
                   继续编辑
                 </button>

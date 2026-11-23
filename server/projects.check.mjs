@@ -7,6 +7,8 @@ import {
   writeFile,
   mkdir,
   cp,
+  readdir,
+  rename,
   access,
   rmdir,
 } from "node:fs/promises";
@@ -198,6 +200,12 @@ test("configs migration preserves snapshots/settings/source, is idempotent and f
       salt: "fixture-salt",
     });
     await store.close();
+    // Build the flat schema-v2 layout used by previous releases.
+    for (const group of ['projects', 'sharing']) {
+      for (const name of await readdir(path.join(legacy, group))) {
+        await rename(path.join(legacy, group, name), path.join(legacy, name));
+      }
+    }
     const original = await readFile(path.join(legacy, "projects.json"), "utf8");
     const info = await prepareProjectConfigs(destination, [legacy]);
     assert.equal(info.directory, destination);
@@ -216,7 +224,7 @@ test("configs migration preserves snapshots/settings/source, is idempotent and f
     await store.close();
     await prepareProjectConfigs(destination, [legacy]);
     assert.equal(
-      await readFile(path.join(destination, "projects.json"), "utf8"),
+      await readFile(path.join(destination, "projects", "projects.json"), "utf8"),
       original,
     );
     const copied = path.join(folder, "other-install/configs");
@@ -237,6 +245,32 @@ test("configs migration preserves snapshots/settings/source, is idempotent and f
     await assert.rejects(access(path.join(copied, ".lock")));
   }));
 
+test("flat configs are grouped under the root lock, preserving unknown files and refusing collisions", async () =>
+  temporary(async root => {
+    const files = [
+      ['sharing.json', 'sharing'], ['sharing-audit.jsonl.previous', 'sharing'],
+      ['transfer-links.json', 'sharing'], ['file-shares.json', 'sharing'],
+      ['todo-lists.json', 'planning'], ['knowledge.json', 'planning'],
+      ['.projects-pending.json', 'projects'], [profileFilename('sample'), 'projects'],
+    ];
+    for (const [name] of files) await writeFile(path.join(root, name), name);
+    await writeFile(path.join(root, 'notes.txt'), 'local');
+    await mkdir(path.join(root, 'sharing'));
+    const conflict = path.join(root, 'sharing', 'sharing.json');
+    await writeFile(conflict, 'newer');
+    await assert.rejects(prepareProjectConfigs(root), /新旧配置同名/);
+    assert.equal(await readFile(conflict, 'utf8'), 'newer');
+    for (const [name] of files) assert.equal(await readFile(path.join(root, name), 'utf8'), name);
+    await rm(conflict);
+    await prepareProjectConfigs(root);
+    await prepareProjectConfigs(root);
+    for (const [name, group] of files) {
+      assert.equal(await readFile(path.join(root, group, name), 'utf8'), name);
+      await assert.rejects(access(path.join(root, name)), { code: 'ENOENT' });
+    }
+    assert.equal(await readFile(path.join(root, 'notes.txt'), 'utf8'), 'local');
+  }));
+
 test("existing configs win over legacy data; broken legacy is preserved without creating empty projects", async () =>
   temporary(async (folder) => {
     const legacy = path.join(folder, "legacy"),
@@ -247,7 +281,7 @@ test("existing configs win over legacy data; broken legacy is preserved without 
       prepareProjectConfigs(destination, [legacy]),
       /配置目录/,
     );
-    await assert.rejects(access(path.join(destination, "projects.json")));
+    await assert.rejects(access(path.join(destination, "projects", "projects.json")));
     assert.equal(
       await readFile(path.join(legacy, "projects.json"), "utf8"),
       "{broken",
@@ -257,12 +291,12 @@ test("existing configs win over legacy data; broken legacy is preserved without 
     await prepareProjectConfigs(destination, [legacy]);
     assert.equal(
       JSON.parse(
-        await readFile(path.join(destination, "projects.json"), "utf8"),
+        await readFile(path.join(destination, "projects", "projects.json"), "utf8"),
       ).current.profiles.length,
       1,
     );
     await assert.rejects(
-      prepareProjectConfigs(path.join(destination, "projects.json", "configs")),
+      prepareProjectConfigs(path.join(destination, "projects", "projects.json", "configs")),
       /配置目录/,
     );
   }));
@@ -335,10 +369,10 @@ test("corrupt data is preserved and simultaneous host processes cannot share a d
     const store = await createProjectStore(folder);
     await assert.rejects(createProjectStore(folder), /正在/);
     await store.close();
-    await writeFile(path.join(folder, "projects.json"), "{corrupt", "utf8");
+    await writeFile(path.join(folder, 'projects', "projects.json"), "{corrupt", "utf8");
     await assert.rejects(createProjectStore(folder), /原文件已保留/);
     assert.equal(
-      await readFile(path.join(folder, "projects.json"), "utf8"),
+      await readFile(path.join(folder, 'projects', "projects.json"), "utf8"),
       "{corrupt",
     );
   }));
@@ -587,14 +621,14 @@ test("v1 migration expands overrides into independent files and preserves origin
       assert.equal(state.profiles[0].projects[0].url, project.url);
       assert.equal(state.profiles[1].projects[0].url, 'https://{{host}}/test');
       assert.equal(state.profiles[1].projects[0].enabled, false);
-      assert.equal(await readFile(path.join(folder, 'projects.v1.backup.json'), 'utf8'), bytes);
+      assert.equal(await readFile(path.join(folder, 'projects', 'projects.v1.backup.json'), 'utf8'), bytes);
       assert.deepEqual((await store.snapshot('old')).profiles, state.profiles);
       assert.deepEqual(importState(JSON.stringify({ format: 'devkit-project-center', version: 1, data: legacy })), state);
       state.profiles[0].projects[0].name = '仅开发改名';
       await store.save(state, 7);
       assert.equal((await store.get()).profiles[1].projects[0].name, project.name);
-      assert.equal(JSON.parse(await readFile(path.join(folder, profileFilename('test')), 'utf8')).projects[0].enabled, false);
-      assert.equal(JSON.parse(await readFile(path.join(folder, 'projects.json'), 'utf8')).current.projects, undefined);
+      assert.equal(JSON.parse(await readFile(path.join(folder, 'projects', profileFilename('test')), 'utf8')).projects[0].enabled, false);
+      assert.equal(JSON.parse(await readFile(path.join(folder, 'projects', 'projects.json'), 'utf8')).current.projects, undefined);
     } finally { await store.close(); }
     const reopened = await createProjectStore(folder);
     assert.equal((await reopened.get()).profiles[0].projects[0].name, '仅开发改名');
@@ -608,7 +642,7 @@ test("project changes, deletes, imports and profile deletes stay within their pr
     const store = await createProjectStore(folder);
     try {
       let saved = await store.save(state, 0);
-      const otherFile = path.join(folder, profileFilename('TEST'));
+      const otherFile = path.join(folder, 'projects', profileFilename('TEST'));
       const before = await readFile(otherFile, 'utf8');
       saved.profiles[0].projects[0].enabled = false;
       saved.profiles[0].projects.push({ ...project, id: 'new', code: 'new' });
@@ -637,18 +671,18 @@ test("pending multi-file saves recover before reads after a restart", async () =
     let store = await createProjectStore(folder);
     await store.save(fixture(), 0);
     await store.close();
-    const pending = await readProjectEnvelope(folder);
+    const pending = await readProjectEnvelope(path.join(folder, 'projects'));
     pending.current.revision++;
     pending.current.profiles[0].projects = [];
     pending.current.profiles.push({ ...initialState().profiles[0], id: 'new', name: '新增档案' });
-    await writeFile(path.join(folder, '.projects-pending.json'), JSON.stringify(pending));
+    await writeFile(path.join(folder, 'projects', '.projects-pending.json'), JSON.stringify(pending));
     // Simulate a crash after replacing one profile and before updating the index.
-    await writeFile(path.join(folder, profileFilename('default')), JSON.stringify(pending.current.profiles[0]));
+    await writeFile(path.join(folder, 'projects', profileFilename('default')), JSON.stringify(pending.current.profiles[0]));
     store = await createProjectStore(folder);
     try {
       assert.deepEqual(await store.get(), pending.current);
-      await assert.rejects(access(path.join(folder, '.projects-pending.json')));
-      assert.equal((await readProjectEnvelope(folder)).current.profiles.length, 2);
+      await assert.rejects(access(path.join(folder, 'projects', '.projects-pending.json')));
+      assert.equal((await readProjectEnvelope(path.join(folder, 'projects'))).current.profiles.length, 2);
     } finally { await store.close(); }
   }));
 
@@ -657,14 +691,14 @@ test("missing/corrupt profile files fail without resetting other profiles or the
     const store = await createProjectStore(folder);
     await store.save(fixture(), 0);
     await store.close();
-    const index = await readFile(path.join(folder, 'projects.json'), 'utf8');
-    const file = path.join(folder, profileFilename('default'));
+    const index = await readFile(path.join(folder, 'projects', 'projects.json'), 'utf8');
+    const file = path.join(folder, 'projects', profileFilename('default'));
     await writeFile(file, '{broken');
     await assert.rejects(createProjectStore(folder), /原文件已保留/);
     assert.equal(await readFile(file, 'utf8'), '{broken');
     await rm(file);
     await assert.rejects(createProjectStore(folder), /档案.*无法读取/);
-    assert.equal(await readFile(path.join(folder, 'projects.json'), 'utf8'), index);
+    assert.equal(await readFile(path.join(folder, 'projects', 'projects.json'), 'utf8'), index);
   }));
 
 test("probes cannot resolve a project from another profile", async () => {
@@ -677,17 +711,17 @@ test("probes cannot resolve a project from another profile", async () => {
 test("a failed file write retains the journal and recovers in-process before checking later revisions", async () =>
   temporary(async folder => {
     const store = await createProjectStore(folder);
-    const file = path.join(folder, profileFilename('default'));
+    const file = path.join(folder, 'projects', profileFilename('default'));
     try {
       await rm(file);
       await mkdir(file);
       await assert.rejects(store.save(fixture(), 0));
-      assert.equal(JSON.parse(await readFile(path.join(folder, '.projects-pending.json'), 'utf8')).current.revision, 1);
+      assert.equal(JSON.parse(await readFile(path.join(folder, 'projects', '.projects-pending.json'), 'utf8')).current.revision, 1);
       await rmdir(file);
       assert.equal((await store.get()).profiles[0].projects[0].code, 'web');
       assert.equal((await store.get()).revision, 1);
       await assert.rejects(store.save(initialState(), 0), error => error.status === 409);
-      await assert.rejects(access(path.join(folder, '.projects-pending.json')));
+      await assert.rejects(access(path.join(folder, 'projects', '.projects-pending.json')));
     } finally { await store.close(); }
   }));
 

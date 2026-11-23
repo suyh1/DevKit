@@ -41,10 +41,11 @@ function normalize(item) {
     if (!validScript(item.script)) throw new Error('请选择有效的 npm 脚本。');
     source = { kind, workDir: absolute(item.workDir, '项目目录'), script: item.script };
     if (item.nodePath) source.nodePath = absolute(item.nodePath, 'Node.js 路径');
-  } else if (kind === 'program') {
+  } else if (kind === 'program' || kind === 'script') {
     const program = absolute(item.program, '程序路径');
     if (process.platform === 'win32' && path.extname(program).toLowerCase() !== '.exe') throw new Error('请选择 Windows .exe 程序。');
-    source = { kind, program, workDir: absolute(item.workDir || path.dirname(program), '工作目录') };
+    const script = kind === 'script' ? absolute(item.script, '脚本路径') : undefined;
+    source = { kind, program, ...(script && { script }), workDir: absolute(item.workDir || path.dirname(script || program), '工作目录') };
   } else throw new Error('未知服务类型。');
   stem ??= 'devkit-' + id;
   const pidName = fileName(item.pidName, `${stem}.pid`, '.pid'), logName = fileName(item.logName, `${stem}.log`, '.log');
@@ -60,6 +61,7 @@ export function jarPaths(item) {
 }
 function validatePaths(instances) {
   const entries = new Set(instances.map(item => pathKey(serviceEntry(item))));
+  for (const item of instances) if (item.program) entries.add(pathKey(item.program));
   const jars = new Set(), files = new Set();
   for (const item of instances) {
     if (isJar(item)) {
@@ -299,6 +301,7 @@ export async function createJarManager(directory, dependencies = {}) {
       result.backendTypes = options.allowBackend !== false;
       result.backendChecks = result.backendTypes;
       result.supportsNodePath = result.backendTypes;
+      result.supportsScripts = result.backendTypes;
       result.runtimeDiscovery = true;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
@@ -348,7 +351,11 @@ export async function createJarManager(directory, dependencies = {}) {
       else {
         item.workDir = await realpath(item.workDir);
         if (!(await stat(item.workDir)).isDirectory()) throw new Error('工作目录无效。');
-        if (item.kind === 'program') item.program = await realpath(item.program);
+        if (item.program) {
+          item.program = await realpath(item.program);
+          if (!(await stat(item.program)).isFile()) throw new Error('程序路径必须是文件。');
+        }
+        if (item.kind === 'script') item.script = await realpath(item.script);
         if (item.kind === 'npm' && !(await projectScripts(item.workDir)).includes(item.script)) throw new Error('package.json 中找不到所选 npm 脚本。');
       }
       if (!(await stat(serviceEntry(item))).isFile()) throw new Error('服务入口不是普通文件。');
@@ -388,7 +395,7 @@ export async function createJarManager(directory, dependencies = {}) {
   }
   return {
     request(action, value, options) {
-      if (closed) return Promise.reject(new Error('后端管理器已关闭。'));
+      if (closed) return Promise.reject(new Error('服务管理器已关闭。'));
       if (action === 'list-runtimes' || action.startsWith('console-')) return request(action, value, options);
       const pending = queue.then(() => request(action, value, options)); queue = pending.catch(() => {}); return pending;
     },

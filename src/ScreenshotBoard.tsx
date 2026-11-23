@@ -106,7 +106,7 @@ export function ScreenshotBoard({ active, edit }: PageProps) {
                     placeholder="为这次讨论起个名字（可选）"
                   />
                 </label>
-                <button className="primary-button" disabled={op.busy} onClick={() => picker.current?.click()}>
+                <button className="file-pick-button" disabled={op.busy} onClick={() => picker.current?.click()}>
                   <ImagePlus size={17} />
                   从截图新建
                 </button>

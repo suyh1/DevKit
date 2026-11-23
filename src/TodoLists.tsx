@@ -7,7 +7,6 @@ import { readText, saveText } from './files';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
 import type { FileShareState, TodoDocument } from './planning-share-api';
 import { Modal, ModalCancel, ModalForm } from './project-components';
-import { SharingButton } from './Sharing';
 import type { TodoEditorHandle } from './TodoTextEditor';
 import TodoOutline, { needsTodoFollowUp } from './TodoOutline';
 import TodoSyntaxActions from './TodoSyntaxActions';
@@ -196,9 +195,9 @@ export default function TodoLists({ active, portal = false, canEdit = !portal, o
   const locked = busy || !canEdit;
   return <section className="td-workspace">
     <header className="td-heading workspace-banner"><h1>待办清单</h1><div className="td-actions">
-      {!portal && <SharingButton />}
+
       <button className="td-icon" type="button" aria-label="刷新清单" title="刷新清单" onClick={refresh} disabled={busy}><RefreshCw size={16} /></button>
-      {canEdit && <button className="td-secondary" type="button" disabled={!documents || busy} onClick={() => importInput.current?.click()}><Upload size={16} />导入清单</button>}
+      {canEdit && <button className="file-pick-button" type="button" disabled={!documents || busy} onClick={() => importInput.current?.click()}><Upload size={16} />导入清单</button>}
       {canEdit && <button className="td-primary" type="button" disabled={!documents || busy} onClick={() => void newList()}><Plus size={16} />新建清单</button>}
     </div></header>
     {canEdit && <input ref={importInput} type="file" hidden aria-label="选择清单文件" accept=".todo,.todos,.task,.tasks,.taskpaper,.txt,.md,text/plain" onChange={event => {

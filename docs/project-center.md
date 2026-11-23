@@ -1,6 +1,6 @@
 # 项目中心：项目入口、配置档案和局域网访问
 
-项目中心将入口管理、独立方案配置、导入导出和备份恢复放在同一个工作流中。项目中心、HTTP 调试、Nginx、后端服务及监控中心可独立开放共享；离线工具及其输入不会通过此服务提供，文件读写、检测及运行操作按服务分别授权。
+项目中心将入口管理、独立方案配置、导入导出和备份恢复放在同一个工作流中。项目中心、HTTP 调试、Nginx、应用服务及监控中心可独立开放共享；离线工具及其输入不会通过此服务提供，文件读写、检测及运行操作按服务分别授权。
 
 桌面项目中心与局域网页面共用九套主题风格：默认、极简扁平、自然有机、编辑杂志、新野兽派、柔和界面、macOS 毛玻璃、现代渐变、复古怀旧，每套均支持浅色、深色与跟随系统。原有灰白/石墨灰与蓝色配色保留为默认主题；启用及检测通过保留绿色，错误使用柔红色，弹窗与输入区同步适配。网页顶部可分别选择风格和明暗模式，偏好保存在访问者当前浏览器；桌面在设置的“外观与工作台”中选择。详见[界面设计说明](interface-design.md)。
 
@@ -50,7 +50,7 @@ flowchart LR
 
 1. 在 Windows、Linux amd64 或 Linux ARM64 主机安装本次 DevKit，打开左侧 **项目中心**。
 2. 添加项目定义与配置档案，先确认最终地址预览正确。供其他电脑访问的服务地址应填写实际内网 IP/域名，不能使用指向访问者自身的 `localhost`、`127.0.0.1`。
-3. 点击桌面顶部的 **局域网共享**（或项目中心的“共享设置”），选择“局域网（所有 IPv4 网卡）”，默认端口 `8765`。
+3. 点击桌面顶部的 **局域网共享**，选择“局域网（所有 IPv4 网卡）”，默认端口 `8765`。
 4. 设置单独的访问口令（至少 8 位）。在服务卡片中开放“项目中心”，按需分别授权“编辑项目与档案”和“检测项目入口”；其余服务可独立选择。勾选“下次启动 DevKit 时自动开启共享”可保存启动偏好。
 5. 点击“开启共享”，复制面板中主机真实网卡地址，例如 `http://192.168.1.50:8765/`。`0.0.0.0` 是监听设置，不是发给访客的访问地址。
 6. 其他电脑连接同一局域网，用现代浏览器打开地址并输入口令。客户端不需要安装 DevKit、Node、Python 或 JDK。
@@ -81,7 +81,7 @@ Linux/麒麟由管理员按其正在使用的防火墙配置允许实际内网�
 
 ## configs：配置位置、备份与整目录迁移
 
-从 v1.6.0 起，项目中心使用**安装目录下的 `configs` 文件夹**。在项目中心右上角点击“配置文件”，可查看真实路径、复制路径或打开文件夹。
+从 v1.6.0 起，项目中心使用**安装目录下的 `configs` 文件夹**。在桌面顶栏点击“配置文件”，可查看真实路径、复制路径或打开文件夹。
 
 | 启动方式 | 默认配置位置 |
 | --- | --- |
@@ -90,9 +90,11 @@ Linux/麒麟由管理员按其正在使用的防火墙配置允许实际内网�
 | 独立 Node ZIP | 解压根目录的 `configs`，与 `server` 同级 |
 | 源码 `npm run desktop` | 仓库根目录的 `configs` |
 
-目录包含 `projects.json`（档案索引、版本及最近 30 份快照）、每个档案一个 `profile-<编码 ID>.json`（档案名称、说明、项目列表和变量）、`sharing.json`（共享选项及加盐口令哈希）、迁移记录和目录说明。档案 ID 使用十六进制编码作为文件名，避免 Windows 大小写文件名冲突；索引只引用 ID，不重复存储当前项目。配置不放进 ASAR、安装包或资源目录内。导出 JSON 仅含项目和档案，不含共享口令或历史快照。
+项目子目录 `projects/` 包含 `projects.json`（档案索引、版本及最近 30 份快照）、每个档案一个 `profile-<编码 ID>.json`（档案名称、说明、项目列表和变量）和迁移记录。共享选项及加盐口令哈希保存在 `sharing/sharing.json`。档案 ID 使用十六进制编码作为文件名，避免 Windows 大小写文件名冲突；索引只引用 ID，不重复存储当前项目。配置不放进 ASAR、安装包或资源目录内。导出 JSON 仅含项目和档案，不含共享口令或历史快照。
 
-首次启动发现新位置没有 `projects.json` 时，会自动迁入旧版用户数据目录的 `project-center`；独立 Node 服务会检查原先的 `data/project-center`。原文件不删除，已有 `configs/projects.json` 始终优先。损坏的旧文件会报错并保留，不会静默创建空项目替换。
+升级时会把旧 `configs` 根目录中已识别的文件自动归入 `projects/`、`sharing/` 和 `planning/`。未识别的文件保留原位。若新旧目录都有同名配置，启动会报告目标路径并保留两个版本，核对后可重新启动。
+
+首次启动发现新位置没有 `projects.json` 时，会自动迁入旧版用户数据目录的 `project-center`；独立 Node 服务会检查原先的 `data/project-center`。原文件不删除，已有 `configs/projects/projects.json` 始终优先。损坏的旧文件会报错并保留，不会静默创建空项目替换。
 
 旧版 schema v1 数据首次打开时自动展开：把原全局项目和各档案覆盖组合成每个档案的独立项目，保留变量、解析地址与启停状态；旧快照和 v1 导入文件也使用相同转换。原始文件另存为 `projects.v1.backup.json`，不会覆盖已有迁移备份。旧版无法判断项目最初属于哪个档案，因此迁移会保留各档案原先能看到的项目，之后可在各档案中分别删除不需要的项目。
 
@@ -140,7 +142,7 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' \
 DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 ```
 
-首次至少显式开放一项服务。`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，`DEVKIT_SHARE_LAN_HOSTS=true` 开放已保存的主机清单。Nginx、HTTP、后端服务、监控和日志也可分别开放。服务开关、编辑和运行权限见 [共享工作台](workspace-sharing.md)。
+首次至少显式开放一项服务。`DEVKIT_SHARE_PROJECTS=true` 开放项目中心，`DEVKIT_SHARE_LAN_HOSTS=true` 开放已保存的主机清单。Nginx、HTTP、应用服务、监控和日志也可分别开放。服务开关、编辑和运行权限见 [共享工作台](workspace-sharing.md)。
 
 首次启动必须提供口令，后续可复用数据目录内已保存的口令哈希而省略密码环境变量。项目编辑使用 `DEVKIT_PROJECT_EDIT=true`，入口检测使用 `DEVKIT_PROJECT_PROBE=true`，两者独立。后续启动复用已保存设置，环境变量逐项覆盖。独立服务和桌面端使用相同数据目录时，只能启动其中一个；要迁移数据可通过项目中心导出/导入。
 
@@ -198,7 +200,7 @@ DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 | `@repeat(每周一)` | 用“完成”或 `Alt+D` 完成本期时生成下一期。支持 `每天`、`每周`、`每周一` 至 `每周日`、`每月`、`每月31日` 等。下一期的日期晚于当前到期日和完成日，月底不足指定日时取当月最后一天。周期规则移到下一期，下一期的验收条件重置。 |
 | `:: 分组默认 @验收 @owner(小周)` | 在分组下缩进声明默认标签，也接受 `:: 默认`。用“新任务”、Enter 续写或给普通文本加任务框时自动填入。嵌套分组可覆盖同名标签，正文里已有的标签优先。 |
 
-主机数据存放于 `configs/todo-lists.json`。首次打开会把原有项目各转为一份文本清单，保留任务、备注和原有发布状态。旧文件 `configs/project-todos.json` 留存完整数据，独立服务仍用 `DEVKIT_SHARE_PROJECT_TODOS=true` 开放、`DEVKIT_PROJECT_TODOS_EDIT=true` 授予编辑。
+主机数据存放于 `configs/planning/todo-lists.json`。首次打开会把原有项目各转为一份文本清单，保留任务、备注和原有发布状态。旧文件 `configs/planning/project-todos.json` 留存完整数据，独立服务仍用 `DEVKIT_SHARE_PROJECT_TODOS=true` 开放、`DEVKIT_PROJECT_TODOS_EDIT=true` 授予编辑。
 
 纯文本格式、快捷键和归档参考 Todo+，周期任务的历史保留和下一期 ID 处理参考 Obsidian Tasks。DevKit 复用自身的 CodeMirror 编辑器和共享存储。[Todo+](https://github.com/fabiospampinato/vscode-todo-plus) · [Obsidian Tasks 周期任务](https://github.com/obsidian-tasks-group/obsidian-tasks/blob/main/docs/Getting%20Started/Recurring%20Tasks.md)
 
@@ -214,4 +216,4 @@ DEVKIT_SHARE_PROJECTS=true DEVKIT_PROJECT_EDIT=false node server/start.mjs
 
 ## 运维总览
 
-编辑项目，展开「关联运维资源」，可分别绑定一个 API 项目、后端服务、Nginx 实例及监控项。标识随档案保存、备份和导入导出。点击项目卡片顶部的「运维总览」会读取当前授权资源的状态，也会列出以本项目为来源的监控。点击刷新可更新运行状态与最近故障，从实例卡片可直接打开对应日志。目标移除或共享权限变化时会显示不可用。
+编辑项目，展开「关联运维资源」，可分别绑定一个 API 项目、应用服务、Nginx 实例及监控项。标识随档案保存、备份和导入导出。点击项目卡片顶部的「运维总览」会读取当前授权资源的状态，也会列出以本项目为来源的监控。点击刷新可更新运行状态与最近故障，从实例卡片可直接打开对应日志。目标移除或共享权限变化时会显示不可用。

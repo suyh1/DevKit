@@ -1604,7 +1604,10 @@ body:has(.pc-login) {
 .pc-probe-progress progress { width:140px; max-width:100%; accent-color:var(--accent); }
 .pc-repair-variable { font-size:12px; justify-content:flex-start; text-align:left; margin:6px 0; }
 
-.pc-entry-actions { display: flex; justify-content: flex-end; margin-block: 10px; }
+.pc-environment { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+.pc-environment > div:first-child { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.pc-entry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.pc-entry-actions button { min-height: 36px; }
 .pc-entry-actions:empty { display: none; }
 .pc-selection:not(.pc-bulk) { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-block: 8px; color: var(--muted); font-size: 12px; }
 .pc-content :is(.pc-toolbar, .pc-selection)[hidden], .project-center :is(.pc-toolbar, .pc-selection)[hidden] { display: none; }

@@ -1,3 +1,4 @@
+import { prepareProjectConfigs } from './project-configs.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -207,6 +208,7 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
 test('knowledge upgrades historical categories to tags and persists empty folders with stable document IDs', async () => fixture(async root => {
   const original={id:'known-id',project:'示例',kind:'项目交接',title:'交接',body:'旧版',revision:1,actor:'桌面端',updated:'2026-01-01'};
   await writeFile(path.join(root,'knowledge.json'), JSON.stringify({version:1,pages:[{...original,revision:2,body:'新版',history:[original]}]}));
+  await prepareProjectConfigs(root);
   const library=await createKnowledgeBase(root);
   const [page]=await library.request('list');
   assert.deepEqual(page.tags,['项目交接']); assert.equal(page.folder,'');
@@ -234,6 +236,7 @@ test('both legacy formats become text lists with their publication and unmodifie
       }],
     }] });
     await writeFile(old, contents);
+    await prepareProjectConfigs(dir);
     const manager = await createTodoLists(dir);
     const [converted] = (await manager.request('get')).documents;
     assert.equal(converted.name, '旧项目');
@@ -245,7 +248,7 @@ test('both legacy formats become text lists with their publication and unmodifie
     assert.match(converted.body, /# 回归备注/);
     await manager.request('save', { id: converted.id, revision: 4, body: '新清单:\n  ☐ 持续编辑' });
     await manager.close();
-    assert.equal(await readFile(old, 'utf8'), contents);
+    assert.equal(await readFile(path.join(dir, 'planning', 'project-todos.json'), 'utf8'), contents);
     const reopened = await createTodoLists(dir);
     assert.equal((await reopened.request('get')).documents[0].body, '新清单:\n  ☐ 持续编辑');
     await reopened.close();

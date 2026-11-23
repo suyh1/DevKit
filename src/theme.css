@@ -18,6 +18,7 @@
 @import './adaptations.css';
 @import './workbench-forms.css';
 @import '../shared/text-controls.css';
+@import './local-file-picker.css';
 @import './select.css';
 @import '../shared/focus.css';
 @import './focus-controls.css';

@@ -1,3 +1,4 @@
+import { configGroup } from './config-layout.mjs';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -96,8 +97,8 @@ async function load(directory, filename) {
 }
 
 export async function createTodoLists(directory) {
-  const filename = path.join(directory, 'todo-lists.json');
-  let documents = await load(directory, filename);
+  const filename = path.join(await configGroup(directory, 'planning'), 'todo-lists.json');
+  let documents = await load(path.dirname(filename), filename);
   let queue = Promise.resolve();
   const view = portal => documents.filter(item => !portal || item.published);
   async function mutate(action, input, { portal, authorize }) {

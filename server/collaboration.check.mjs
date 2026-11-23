@@ -337,7 +337,7 @@ test('quick links isolate ports and clients while serving the desktop inbox with
   const [portA, portB, unused, occupied] = ports;
   await links.close();
   // Model a pre-upgrade installation. Saving another port must preserve its existing access mode.
-  await writeFile(path.join(directory, 'transfer-links.json'), JSON.stringify([{ port: portB, token: randomBytes(24).toString('hex') }]));
+  await writeFile(path.join(directory, 'sharing', 'transfer-links.json'), JSON.stringify([{ port: portB, token: randomBytes(24).toString('hex') }]));
   links = await createTransferLinks(directory, dist, store);
   for (const invalid of [[0], [65536], [1.5], [portA, portA]]) await assert.rejects(links.save(invalid), { status: 400 });
   const configured = await links.save({ ports: [portA, portB], shorten: [] });

@@ -341,7 +341,7 @@ export default function ApiWorkspace({
             新建API项目
           </button>
           <button
-            className="secondary-button"
+            className="file-pick-button"
             disabled={!canWriteWorkspace('http') || busy || sending}
             onClick={() => file.current?.click()}
           >
@@ -673,7 +673,7 @@ export default function ApiWorkspace({
                     新建API项目
                   </button>
                   <button
-                    className="secondary-button"
+                    className="file-pick-button"
                     onClick={() => file.current?.click()}
                   >
                     导入OpenAPI / Swagger / Postman

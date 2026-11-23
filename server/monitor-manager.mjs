@@ -146,13 +146,13 @@ export async function createMonitorManager(directory, { projects, jar, lan, auto
     }
     if (monitor.source.type === 'jar' && monitor.source.id.includes(':')) return { remoteJar: monitor.source.id };
     const state = await jar?.()?.request('get'), item = state?.instances.find(item => item.id === monitor.source.id);
-    if (!item) fail('关联的后端服务已删除或管理器不可用。');
-    if (!['http', 'tcp'].includes(item.health.type)) fail('请先为关联的后端服务配置 HTTP/TCP 健康检查。');
+    if (!item) fail('关联的应用服务已删除或管理器不可用。');
+    if (!['http', 'tcp'].includes(item.health.type)) fail('请先为关联的应用服务配置 HTTP/TCP 健康检查。');
     return { ...monitor, ...item.health, timeout: monitor.timeout };
   }
   function runRestriction(source, access) {
     if (source?.type === 'lan' && access.allowLan === false) return '运行此端口监控需要局域网主机访问权限。';
-    if (source?.type === 'jar' && source.id.includes(':') && access.allowRemoteJar === false) return '检测远程后端服务需要后端管理的运行权限。';
+    if (source?.type === 'jar' && source.id.includes(':') && access.allowRemoteJar === false) return '检测远程应用服务需要服务管理的运行权限。';
     return '';
   }
   function authorizeRun(source, access) {

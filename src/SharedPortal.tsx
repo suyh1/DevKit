@@ -1,3 +1,5 @@
+import ConfigStorage from './ConfigStorage';
+import LicenseDetails from './LicenseDetails';
 import { TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { clearPortalPickups } from './publisher-pickups';
@@ -128,6 +130,7 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
       <SegmentedControl label="共享页面主题" value={theme}
         options={[{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色主题' }, { value: 'dark', label: '深色主题' }]} onChange={setTheme} />
       </div>
+      <section aria-label="关于 DevKit"><strong>关于 DevKit</strong><LicenseDetails /></section>
       </div>
     </details>
   );
@@ -513,6 +516,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         <div className="portal-current"><strong>{session?.authenticated ? modules.find(item => item.id === page)?.name || '共享工作台' : 'DevKit 共享工作台'}</strong>{session?.authenticated && <small><span title={summary}>{summary}</span>{session.visitor && <span title={session.visitor}>{session.visitor}</span>}</small>}</div>
         <div className="portal-account">
           {session?.authenticated && <button data-search-capsule className="secondary-button" aria-label="搜索共享资源" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /></button>}
+          {session?.authenticated && services.jar.enabled && services.jar.edit && <ConfigStorage key={workspaceEpoch} portal />}
           <PortalTheme mode={mode} setMode={setMode} />
           {session?.authenticated && (
             <button

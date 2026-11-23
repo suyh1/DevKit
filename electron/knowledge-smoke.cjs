@@ -184,7 +184,7 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
       '\n恢复上一版订单制品并复核探活。\n\n## 网关配置示例\n\n```nginx\nlocation /orders/ { proxy_pass http://orders; }\n```\n\n本次发布验证使用以下资源：\n',
     );
     await click('.kb-writing-tools', '插入资源');
-    for (const kind of ['后端服务', 'Nginx 实例', '监控项']) await labelClick('.kb-filters', kind);
+    for (const kind of ['应用服务', 'Nginx 实例', '监控项']) await labelClick('.kb-filters', kind);
     await field('.kb-resource-dialog input[type=search]', '应用');
     await labelClick('.kb-choices', '应用 A');
     await labelClick('.kb-choices', '应用 B');
@@ -192,7 +192,7 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
     await labelClick('.kb-choices', '网关');
     await field('.kb-resource-dialog input[type=search]', '订单健康');
     await labelClick('.kb-choices', '订单健康检查');
-    await labelClick('.kb-filters', '后端服务');
+    await labelClick('.kb-filters', '应用服务');
     await until('document.querySelector(".kb-selected strong")?.textContent==="已选 4 项"');
     await snapshot('resources');
     await click('.kb-resource-dialog', '插入 4 项');

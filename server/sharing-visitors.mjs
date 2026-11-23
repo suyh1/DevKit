@@ -30,7 +30,7 @@ export function updateVisitors(input, previous = []) {
   });
 }
 export function createSharingAudit(directory) {
-  const file = path.join(directory, 'sharing-audit.jsonl');
+  const file = path.join(directory, 'sharing', 'sharing-audit.jsonl');
   let writes = Promise.resolve();
   return {
     flush: () => writes,

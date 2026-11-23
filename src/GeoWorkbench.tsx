@@ -74,7 +74,7 @@ export default function GeoWorkbench({ task, onEdit, onRun, onCancel, onNotice }
         </div><p className="preview-note">{o.algorithm === 'ellipsoid' ? 'WGS84 参考椭球 · Karney 算法。请使用 WGS84 圆心坐标。' : '球面半径 6,371,008.8 米；用于球面模型计算，与椭球结果可能不同。'} 半径 0～10,000 km。不自动转换高德/百度坐标。</p></>}
       </> : <><label className="geo-field"><span>包含度分秒坐标的文本</span><TextArea aria-label="包含度分秒坐标的文本" value={task.input} disabled={busy} rows={8} spellCheck={false} placeholder="点位：东经116度23分28.68秒，北纬39度54分27秒" onChange={e => onEdit({ input: e.target.value })} /></label><div className="geo-inline">
         {select('dedupe', '重复点', [['off', '保留原文顺序与重复点'], ['on', '按未舍入坐标去重']])}
-        <button className="secondary-button" disabled={busy} onClick={() => file.current?.click()}><Upload size={14} />导入文本</button>
+        <button className="file-pick-button" disabled={busy} onClick={() => file.current?.click()}><Upload size={14} />导入文本</button>
         <input hidden type="file" ref={file} aria-label="导入坐标文本" accept=".txt,.csv,.tsv,.log,.md" onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />
         <span className="preview-note">{task.input.length.toLocaleString()} / 300,000 字符 · 最多 5,000 对</span>
       </div></>}

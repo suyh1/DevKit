@@ -26,7 +26,7 @@ export default function LanHostImport({ close, onImport }: { close: () => void; 
         const input = event.currentTarget, selectedFile = input.files?.[0]; input.value = '';
         if (selectedFile) void run(async () => { if (selectedFile.size > 262144) throw new Error('文件最多 256 KiB。'); change((await readText(selectedFile)).text); });
       }} />
-      <button className="secondary-button" disabled={busy} onClick={() => file.current?.click()}>选择文件</button>
+      <button className="file-pick-button" disabled={busy} onClick={() => file.current?.click()}>选择文件</button>
     </div>
     <label className="lan-field lan-import-source"><span>连接内容</span><TextArea value={source} disabled={busy} maxLength={262144} rows={6} spellCheck={false} onChange={event => change(event.target.value)}
       placeholder={format === 'csv' ? 'name,address,user,port,group,tags\n测试机,192.168.1.20,dev,22,测试,linux|api' : 'Host test\n  HostName 192.168.1.20\n  User dev\n  Port 22'} /></label>

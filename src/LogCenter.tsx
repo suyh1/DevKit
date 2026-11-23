@@ -7,7 +7,6 @@ import { logsRequest, canExportLogs, canReadRawLogs, eachRemoteLogCatalog } from
 import type { LogCatalog, LogCursor, LogSource, LogRead } from './logs-api';
 import { copyText } from './motion-primitives';
 import { saveText } from './files';
-import { SharingButton } from './Sharing';
 import { usePerformanceMode } from './DisplayMode';
 import { CreateRelated, RelatedLink, useWorkspaceGuard, workspaceRestriction } from './related-workspaces';
 import { missingResourceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
@@ -23,7 +22,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const guard = useWorkspaceGuard();
   const creation = [
     { page: 'lan-hosts', label: '新建主机', reason: workspaceRestriction('lan-hosts', 'edit') },
-    { page: 'jar', label: '添加后端来源', reason: workspaceRestriction('jar', 'edit') || workspaceRestriction('logs', 'jar') },
+    { page: 'jar', label: '添加服务来源', reason: workspaceRestriction('jar', 'edit') || workspaceRestriction('logs', 'jar') },
     { page: 'nginx', label: '添加 Nginx 来源', reason: workspaceRestriction('nginx', 'edit') || workspaceRestriction('logs', 'nginx') },
   ] as const;
   const availableCreation = creation.filter(item => !item.reason);
@@ -114,11 +113,11 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const linkHost = linkTarget.includes(':') ? linkTarget.split(':')[0] : '';
   const linkStatus = linked && !linked.startsWith('host:') && sourceStatus[''] === 'ready' && !catalog.sources.some(item => item.id === linked || `instance:${item.instanceId}` === linked) ? sourceStatus[linkHost] || 'ready' : undefined;
   return <section className="log-center">
-    <header className="log-heading workspace-banner"><div><ScrollText size={27} /><div><h1>日志中心</h1></div></div><div className="log-actions"><SharingButton /><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
+    <header className="log-heading workspace-banner"><div><ScrollText size={27} /><div><h1>日志中心</h1></div></div><div className="log-actions"><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
     {error && <p className="pc-error" role="alert">{error}</p>}{message && <p className="pc-message" role="status">{message}</p>}
     {linkStatus === 'ready' && <p className="pc-notice" role="status">{missingResourceLink('日志来源')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的日志来源，请刷新来源重试。</p>}
-    {incident && <section className="devkit-panel"><h3>故障前后 5 分钟 · {new Date(incidentTime).toLocaleString()}</h3><small>当前服务日志文件末尾 4 MiB · 默认脱敏 · 无时区的时间按日志主机本地时间解释</small><pre>{incidentSource ? excerpt : loading ? '正在读取来源…' : '找不到有权读取的后端服务日志文件。'}</pre></section>}
+    {incident && <section className="devkit-panel"><h3>故障前后 5 分钟 · {new Date(incidentTime).toLocaleString()}</h3><small>当前服务日志文件末尾 4 MiB · 默认脱敏 · 无时区的时间按日志主机本地时间解释</small><pre>{incidentSource ? excerpt : loading ? '正在读取来源…' : '找不到有权读取的应用服务日志文件。'}</pre></section>}
     <div className="log-toolbar"><label className="log-query"><Search size={14} /><TextInput embedded aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input role="switch" className="liquid-toggle" type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input className="form-check" type="checkbox" checked={!rawAllowed} disabled={!canReadRawLogs()} onChange={event => setRaw(!event.target.checked)} />主机脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
     <div className="log-layout" style={{'--source-width':sourceWidth+'px'} as React.CSSProperties}>
       <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><TextInput aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
@@ -144,7 +143,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
           touchStart.current = null; setPullDistance(0);
         }}>{pullDistance > 10 && <small>{pullDistance >= 64 ? '松开刷新来源' : '下拉刷新来源'}</small>}{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <div key={item.id} className={`log-source-item${selected.includes(item.id) ? ' selected' : ''}`}>
           <label><input className="form-check" type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><strong>{item.name}</strong></label>
-          {item.mode === 'console' ? <small>标准输出 / 错误</small> : <PathSummary label={item.kind === 'jar' ? '后端' : 'Nginx'} path={item.path} />}
+          {item.mode === 'console' ? <small>标准输出 / 错误</small> : <PathSummary label={item.kind === 'jar' ? '服务' : 'Nginx'} path={item.path} />}
         </div>)}</section>)}{!matching.length && (hostLoad === 'pending' || loading && !hostLoad) ? <Skeleton kind="list" label="正在读取日志来源…" /> : !matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
@@ -211,6 +210,6 @@ function LogPane({ source, focused, tracking, refreshSeconds, query, regex, leve
     <div className="log-pane-tools"><label><input role="switch" className="liquid-toggle" type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} />自动滚动</label><div><button title="回到底部" aria-label={`回到底部 ${source.name}`} onClick={() => { setFollow(true); if (output.current) output.current.scrollTop = output.current.scrollHeight; }}><ArrowDown size={14} /></button><button title="清空本页显示" aria-label={`清空 ${source.name}`} onClick={clear}><Eraser size={14} /></button><button title="复制已筛选显示内容" aria-label={`复制 ${source.name}`} disabled={!!filterError} onClick={() => { void copyText(filtered).then(() => setNotice('已复制当前筛选内容。')).catch(error => setNotice(error.message)); }}><Copy size={14} /></button>{canExportLogs() && <button title="导出来源最近的有界内容（不应用筛选）" aria-label={`导出 ${source.name}`} onClick={exportLog}><Download size={14} /></button>}</div></div>
     {(stream?.error || filterError) && <p className="log-pane-error" role="alert">{stream?.error || filterError}{stream?.error && stream?.text && ' 当前保留上次内容，状态可能已过期。'}</p>}
     <pre ref={output} tabIndex={0} aria-label={`${source.name} 日志内容`}>{filterError ? '' : filtered || (stream ? '暂无匹配的日志行。' : '正在连接来源…')}</pre>
-    <footer><span>{notice || stream?.notice || '只读追踪 · 不修改原文件'}</span>{source.instanceId && <RelatedLink page={source.kind} id={source.instanceId}>{source.kind === 'jar' ? '查看后端服务' : '查看 Nginx 实例'}</RelatedLink>}{source.hostId && <RelatedLink page="lan-hosts" id={source.hostId}>查看主机档案</RelatedLink>}<ResourceLink page="logs" id={source.id} /><small>{stream?.checkedAt ? new Date(stream.checkedAt).toLocaleTimeString() : '等待读取'}</small></footer>
+    <footer><span>{notice || stream?.notice || '只读追踪 · 不修改原文件'}</span>{source.instanceId && <RelatedLink page={source.kind} id={source.instanceId}>{source.kind === 'jar' ? '查看应用服务' : '查看 Nginx 实例'}</RelatedLink>}{source.hostId && <RelatedLink page="lan-hosts" id={source.hostId}>查看主机档案</RelatedLink>}<ResourceLink page="logs" id={source.id} /><small>{stream?.checkedAt ? new Date(stream.checkedAt).toLocaleTimeString() : '等待读取'}</small></footer>
   </section>;
 }

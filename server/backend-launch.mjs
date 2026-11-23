@@ -11,7 +11,7 @@ import { matchesJar, pathKey } from './jar-process.mjs';
 
 export const isJar = item => !item.kind || item.kind === 'jar';
 export const serviceDirectory = item => isJar(item) ? path.dirname(item.jar) : item.workDir;
-export const serviceEntry = item => item.kind === 'npm' ? path.join(item.workDir, 'package.json') : item.kind === 'program' ? item.program : item.jar;
+export const serviceEntry = item => item.kind === 'npm' ? path.join(item.workDir, 'package.json') : item.kind === 'script' ? item.script : item.kind === 'program' ? item.program : item.jar;
 const windows = process.platform === 'win32';
 const execute = promisify(execFile);
 export const jobRunner = fileURLToPath(new URL('./backend-job.mjs', import.meta.url));
@@ -162,6 +162,11 @@ export async function launchSpec(item, detect) {
     const args = item.script === 'start' ? ['start'] : ['run', item.script];
     if (item.appArgs.length) args.push('--', ...item.appArgs);
     return viaNode ? { executable: node, args: [cli, ...args], env } : { executable: cli, args, env };
+  }
+  if (item.kind === 'script') {
+    await access(entry, constants.R_OK);
+    await access(item.program, windows ? constants.F_OK : constants.X_OK);
+    return { executable: item.program, args: [entry, ...item.appArgs] };
   }
   await access(entry, windows ? 0 : 1);
   return { executable: entry, args: item.appArgs };

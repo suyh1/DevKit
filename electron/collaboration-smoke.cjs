@@ -461,16 +461,25 @@ module.exports = async function collaborationSmoke(window, output) {
 
     await desktop('window.devkitProjects.request("stop")');
     await openWorkspace('局域网快传');
-    await desktop('document.querySelector(".transfer-link-settings summary").click()');
-    await wait(desktop, '!!document.querySelector(".transfer-link-settings input:not(:disabled)")');
+    const openQuickLinks = async () => {
+      await desktop('document.querySelector(".global-sharing-button").click()');
+      await wait(desktop, '!!document.querySelector("dialog[open] .transfer-link-settings summary")');
+      await desktop('document.querySelector(".transfer-link-settings summary").click()');
+      await wait(desktop, '!!document.querySelector(".transfer-link-settings input:not(:disabled)")');
+    };
+    const closeSharing = () => desktop('document.querySelector("dialog[open] button[aria-label=关闭共享设置]").click()');
+    await openQuickLinks();
     await fill(desktop, '.transfer-link-settings input', String(port));
     await click(desktop, '.transfer-link-settings ', '保存端口');
     await wait(desktop, '!!document.querySelector(".transfer-port-links code")');
     const quick = await desktop('document.querySelector(".transfer-port-links code").textContent');
     assert.equal(quick, new URL(quick).origin, 'Only the LAN address and listening port are needed');
+    window.focus();
+    window.webContents.focus();
     await click(desktop, '.transfer-port-links ', '复制链接');
     await wait(desktop, 'document.querySelector(".transfer-link-settings").innerText.includes("已复制快速链接")');
     assert.equal(await clipboard.readText(), quick);
+    await closeSharing();
     await browser.webContents.session.setProxy({ mode: 'direct' });
     await browser.loadURL(quick);
     const standalone = '.transfer-link-page .collab-page ';
@@ -487,9 +496,11 @@ module.exports = async function collaborationSmoke(window, output) {
     await web(sentFile + '.querySelector(".publisher-pickup button").click()');
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick-stored.bin');
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick.bin', true);
+    await openQuickLinks();
     await fill(desktop, '.transfer-link-settings input', '');
     await click(desktop, '.transfer-link-settings ', '保存端口');
     await wait(desktop, '!document.querySelector(".transfer-port-links code")');
+    await closeSharing();
   } finally {
     browser.destroy();
     await desktop('window.devkitProjects.request("stop")');

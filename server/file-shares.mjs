@@ -1,3 +1,4 @@
+import { configGroup } from './config-layout.mjs';
 import { listen, closeListener } from './http-listener.mjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
@@ -45,7 +46,7 @@ function directListener(share, active, protectedRoot) {
 }
 
 export async function createFileShares(directory) {
-  const filename = path.join(directory, 'file-shares.json');
+  const filename = path.join(await configGroup(directory, 'sharing'), 'file-shares.json');
   const protectedRoot = await realpath(directory);
   let state;
   try { state = JSON.parse(await readFile(filename, 'utf8')); }

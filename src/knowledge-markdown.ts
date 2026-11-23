@@ -13,7 +13,7 @@ export const resourceKinds = [
 export type ResourceKind = (typeof resourceKinds)[number];
 export const resourceNames: Record<ResourceKind, string> = {
   knowledge: '知识库文档',
-  jar: '后端服务',
+  jar: '应用服务',
   nginx: 'Nginx 实例',
   projects: '项目入口',
   'lan-hosts': '局域网主机',

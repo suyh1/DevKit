@@ -10,7 +10,6 @@ import { CreateRelated } from './related-workspaces';
 import { fileShareRequest, publishedShares } from './planning-share-api';
 import type { FileShare, FileShareState, PublishedShare } from './planning-share-api';
 import { copyText } from './motion-primitives';
-import { SharingButton } from './Sharing';
 import { missingResourceLink, useWorkspaceResource } from './workspace-links';
 import './planning-share.css';
 
@@ -151,7 +150,7 @@ export default function FileShares({ active }: { active: boolean }) {
   const draft = editor?.draft;
   return <section className="planning-workspace pl-files-workspace">
     <header className="pl-page-head workspace-banner"><h1>本机文件共享管理</h1>
-      <div className="pl-actions"><SharingButton />
+      <div className="pl-actions">
         <button className="pl-icon" type="button" title="刷新共享" aria-label="刷新共享" disabled={busy} onClick={refresh}><RefreshCw size={16} /></button>
         <button className="pl-button pl-primary" type="button" disabled={busy || !state} onClick={() => edit()}><Plus size={16} />新建共享</button>
       </div>

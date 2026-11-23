@@ -110,3 +110,8 @@ details.portal-access { display: block; margin-bottom: 10px; }
 .portal-context-row .portal-access { flex: 1 1 170px; margin: 0; align-self: center; }
 .portal-module-actions:empty { display: none; }
 .portal-module-actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12px; }
+
+@media(max-width:780px) {
+  .portal-account .config-storage-trigger span { display:none; }
+  .portal-account .config-storage-trigger { padding:7px; }
+}

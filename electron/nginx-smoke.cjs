@@ -287,7 +287,7 @@ module.exports = async function checkNginx(window, output) {
     await input('实例名称', '全新配置');
     const { dialog } = require('electron'); const originalPicker = dialog.showOpenDialog;
     dialog.showOpenDialog = async (_window, options) => { assert.deepEqual(options.properties, ['openDirectory']); return { canceled: false, filePaths: [createdDirectory] }; };
-    try { await click('选择目录', '.ng-modal[open]'); } finally { dialog.showOpenDialog = originalPicker; }
+    try { await click('选择目录', '.ng-modal[open]'); await click('系统选择…', '.host-directory'); } finally { dialog.showOpenDialog = originalPicker; }
     assert.deepEqual(await fs.readdir(createdDirectory), []);
     await input('主文件名', '../invalid.conf'); await click('创建文件并添加实例', '.ng-modal[open]');
     await wait('document.querySelector(".ng-modal[open] [role=alert]")?.textContent.includes("文件名")');

@@ -1,3 +1,27 @@
+/* Shared controls keep their metrics in workspace dialogs and portal chrome. */
+:where(:root) select:where(:not([multiple], [size])) {
+  min-block-size: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--text);
+  padding: 6px 10px;
+  font: 500 12px/1.45 var(--font-ui);
+}
+@supports not (appearance: base-select) {
+  @media (forced-colors: none) {
+    :where(:root) select:where(:not([multiple], [size])) {
+      appearance: none;
+      padding-inline-end: 28px;
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: right 13px center, right 9px center;
+      background-size: 4px 4px;
+      background-repeat: no-repeat;
+    }
+  }
+}
+.license-details summary { cursor: pointer; color: var(--accent); }
+.license-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 17rem; overflow: auto; font: 12px/1.6 var(--font-mono, monospace); }
 select option {
   color: var(--text);
   background-color: var(--surface);
@@ -72,3 +96,19 @@ select option {
     select option::checkmark { order: 1; margin-inline-start: auto; color: var(--accent); }
   }
 }
+
+.select-menu {
+  position: fixed; inset: auto; margin: 0; padding: 4px; overflow-y: auto;
+  box-sizing: border-box; overscroll-behavior: contain; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-hover);
+  font: 500 12px/1.45 var(--font-ui); text-align: start;
+}
+.select-menu [role=option] { display: flex; align-items: center; gap: .75em; min-height: 32px; padding: 6px 10px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.select-menu [data-active] { background: var(--soft); outline: 1px solid var(--line); }
+.select-menu [aria-selected=true] { background: var(--tint); color: var(--accent); }
+.select-menu [aria-selected=true]::after { content: '✓'; margin-inline-start: auto; }
+.select-menu [aria-disabled=true], .select-group-label { color: var(--muted); }
+.select-menu [aria-disabled=true] { opacity: .65; cursor: default; }
+.select-group-label { padding: 6px 10px 2px; font-weight: 600; }
+
+.select-menu.\:popover-open { display: block; }

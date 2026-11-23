@@ -12,6 +12,7 @@ import { WindowCloseSetting } from './DesktopClose';
 import { MotionButton } from './Motion';
 import { copyText } from './motion-primitives';
 import { isProjectDesktop, openProjectUrl } from './project-api';
+import LicenseDetails from './LicenseDetails';
 import packageInfo from '../package.json';
 
 export default function Settings({ preferences, onChange, favorites, onFavorites, onNotice }: { preferences: Preferences; onChange: (value: Preferences) => void; favorites: ToolId[]; onFavorites: (value: ToolId[]) => void; onNotice: (message: string, kind?: NoticeKind, undo?: () => void) => void }) {
@@ -76,12 +77,13 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
           options={[{ value: 'normal', label: '正常模式' }, { value: 'performance', label: '性能模式' }]} />
       </div>
     </section>
-    <section className="settings-section"><h2><ShieldCheck size={17} />数据与偏好</h2><p>主题、编辑器设置、共享栏目顺序和收藏会自动保存。任务需通过顶部“保存工作区”主动导出，恢复时作为新任务打开。密码、JWT 和 HMAC 默认从工作区文件中排除；颜色任务与图片不写入工作区文件。</p><div className="settings-buttons"><button className="secondary-button" onClick={() => void exportSettings()}><Download size={14} />导出设置与收藏</button><button className="secondary-button" onClick={() => file.current?.click()}><Upload size={14} />导入设置</button><button className="text-button" onClick={() => { const old = preferences; onChange(defaultPreferences); onNotice('偏好设置已恢复默认', 'success', () => onChange(old)); }}><RotateCcw size={14} />恢复默认偏好</button></div><input ref={file} hidden type="file" accept=".json" aria-label="导入设置文件" onChange={event => { void importSettings(event.target.files?.[0]); event.target.value = ''; }} /></section>
+    <section className="settings-section"><h2><ShieldCheck size={17} />数据与偏好</h2><p>主题、编辑器设置、共享栏目顺序和收藏会自动保存。任务需通过顶部“保存工作区”主动导出，恢复时作为新任务打开。密码、JWT 和 HMAC 默认从工作区文件中排除；颜色任务与图片不写入工作区文件。</p><div className="settings-buttons"><button className="secondary-button" onClick={() => void exportSettings()}><Download size={14} />导出设置与收藏</button><button className="file-pick-button" onClick={() => file.current?.click()}><Upload size={14} />导入设置</button><button className="text-button" onClick={() => { const old = preferences; onChange(defaultPreferences); onNotice('偏好设置已恢复默认', 'success', () => onChange(old)); }}><RotateCcw size={14} />恢复默认偏好</button></div><input ref={file} hidden type="file" accept=".json" aria-label="导入设置文件" onChange={event => { void importSettings(event.target.files?.[0]); event.target.value = ''; }} /></section>
     <section className="settings-section"><h2><Keyboard size={17} />键盘操作</h2><dl className="shortcut-list"><div><dt>全局搜索</dt><dd>Ctrl / Cmd + K</dd></div><div><dt>执行当前任务</dt><dd>Ctrl / Cmd + Enter</dd></div><div><dt>查找文本</dt><dd>编辑器内 Ctrl / Cmd + F</dd></div><div><dt>新建同类任务</dt><dd>点击工具标题旁的 ＋</dd></div><div><dt>任务标签导航</dt><dd>方向键 / Home / End，Delete 关闭</dd></div><div><dt>离开编辑区</dt><dd>Esc，然后 Tab</dd></div></dl></section>
     <section className="settings-section" aria-labelledby="devkit-about-heading">
       <h2 id="devkit-about-heading"><Info size={17} aria-hidden="true" />关于 DevKit</h2>
       <dl className="about-details">
         <div><dt>版本</dt><dd>{packageInfo.version}</dd></div>
+        <div><dt>开源许可</dt><dd><LicenseDetails /></dd></div>
         <div><dt>作者</dt><dd>{packageInfo.author.name}</dd></div>
         <div><dt>联系邮箱</dt><dd className="about-contact">
           <span>{packageInfo.author.email}</span>

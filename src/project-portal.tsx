@@ -1,3 +1,4 @@
+import './select-menu';
 import { createRoot } from 'react-dom/client';
 import { ConfirmationProvider } from './Confirmation';
 import SharedPortal from './SharedPortal';

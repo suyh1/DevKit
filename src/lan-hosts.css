@@ -291,3 +291,9 @@
 .lan-host-list .pc-actions[hidden] { display: none; }
 .lan-terminal-tabs small { font-family: var(--font-mono); color: var(--muted); }
 .lan-rdp-viewport > div:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+
+.host-directory-results .host-directory-list { background:var(--surface); margin-inline:-10px; padding:5px; border-radius:0 0 8px 8px; }
+.host-directory-results .host-directory-list button { display:flex; justify-content:flex-start; align-items:center; border-radius:6px; }
+.host-directory-list .path-next { margin-inline-start:auto; color:var(--muted); }
+.host-directory-list button:is(:hover,:focus-visible) { background:var(--tint); }
+.host-directory footer { display:flex; align-items:center; gap:8px; justify-content:flex-end; }

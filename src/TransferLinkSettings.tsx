@@ -33,34 +33,34 @@ export function TransferLinkSettings() {
     };
   }, [open]);
 
+  function savePorts() {
+    void op.run(async () => {
+      const values = ports.trim() ? ports.trim().split(/[，,、\s]+/u) : [];
+      if (values.some((value) => !/^\d+$/.test(value)))
+        throw new Error('请输入端口数字，多个端口用逗号分隔。');
+      const selected = values.map(Number);
+      const result = await collab<Link[]>('transfer', 'links-save', {
+        ports: selected, shorten: shorten.filter(port => selected.includes(port)),
+      });
+      setLinks(result);
+      setShorten([]);
+      setPorts(result.map((link) => link.port).join(', '));
+      return result.length ? '快速链接已生效' : '已关闭全部快速链接';
+    });
+  }
+
   return (
     <details className="transfer-link-settings" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>快速链接设置</summary>
       {open && (
         <div>
           <p>新端口只需告诉对方局域网 IP 和端口，例如 192.168.1.20:8780。能连到该端口的人可直接收发同一收件箱的内容，无需共享口令或访客账号。已设取件密码的内容仍需凭密码领取。</p>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void op.run(async () => {
-                const values = ports.trim() ? ports.trim().split(/[，,、\s]+/u) : [];
-                if (values.some((value) => !/^\d+$/.test(value)))
-                  throw new Error('请输入端口数字，多个端口用逗号分隔。');
-                const selected = values.map(Number);
-                const result = await collab<Link[]>('transfer', 'links-save', {
-                  ports: selected, shorten: shorten.filter(port => selected.includes(port)),
-                });
-                setLinks(result);
-                setShorten([]);
-                setPorts(result.map((link) => link.port).join(', '));
-                return result.length ? '快速链接已生效' : '已关闭全部快速链接';
-              });
-            }}
-          >
+          <div className="transfer-port-fields">
             <label>
               监听端口
               <TextInput
                 value={ports}
+                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); savePorts(); } }}
                 disabled={!links || op.busy}
                 onChange={(event) => setPorts(event.target.value)}
                 placeholder="例如 8780, 8781"
@@ -77,10 +77,10 @@ export function TransferLinkSettings() {
                 为旧端口 {link.port} 开启短地址（原长链接仍可用）
               </label>
             ))}
-            <button type="submit" disabled={!links || op.busy}>
+            <button type="button" className="secondary-button" onClick={savePorts} disabled={!links || op.busy}>
               保存端口
             </button>
-          </form>
+          </div>
           {links?.map((link) => (
             <div key={link.port} className="transfer-port-links">
               {link.error && (
@@ -93,7 +93,7 @@ export function TransferLinkSettings() {
                   <code>{address}</code>
                   <button
                     type="button"
-                    disabled={op.busy}
+                    className="text-button" disabled={op.busy}
                     onClick={() =>
                       void op.run(async () => {
                         await copyText(address);

@@ -103,7 +103,7 @@ async function openLanWindow(address, module) {
   isolated.setPermissionCheckHandler(() => false);
   isolated.setPermissionRequestHandler((_contents, _permission, reply) => reply(false));
   isolated.webRequest.onBeforeRequest((details, reply) => reply({ cancel: !sameHost(details.url) }));
-  const title = `DevKit · ${module === 'jar' ? '远程 后端管理' : '远程 Nginx 配置'} · ${url.host}`;
+  const title = `DevKit · ${module === 'jar' ? '远程 服务管理' : '远程 Nginx 配置'} · ${url.host}`;
   const remote = new BrowserWindow({
     width: 1240, height: 820, minWidth: 480, minHeight: 540, show: false, title, autoHideMenuBar: true,
     webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, webviewTag: false },
@@ -318,6 +318,11 @@ app.whenReady().then(async () => {
         return { data: result.canceled ? [] : result.filePaths };
       }
       if (!nginxManager) throw new Error(nginxError || 'Nginx 管理器尚未准备好。');
+      if (!lan && action === 'browse') {
+        if (value?.hostId) throw new Error('目标主机连接尚未准备好。');
+        const { managedRequest } = await import('./server/managed-workspace.mjs');
+        return { data: await managedRequest(nginxManager, 'nginx', action, value) };
+      }
       return { data: await (lan ? lan.request(nginxManager, 'nginx', action, value) : nginxManager.request(action, value)) };
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
@@ -422,19 +427,24 @@ app.whenReady().then(async () => {
     catch (error) { return { error: error.message }; }
   });
   ipcMain.handle('devkit:jar', async (event, action, value) => {
-    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的 后端管理请求。');
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的服务管理请求。');
     try {
       if (action === 'pick') {
-        if (!['jar', 'executable', 'directory'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
+        if (!['jar', 'executable', 'directory', 'script'].includes(value?.kind)) throw new Error('无效的文件选择类型。');
         const result = await dialog.showOpenDialog(window, {
-          title: value.kind === 'jar' ? '选择 JAR 文件' : value.kind === 'directory' ? '选择服务目录' : '选择程序', properties: [value.kind === 'directory' ? 'openDirectory' : 'openFile'],
+          title: value.kind === 'jar' ? '选择 JAR 文件' : value.kind === 'directory' ? '选择服务目录' : value.kind === 'script' ? '选择入口脚本' : '选择程序', properties: [value.kind === 'directory' ? 'openDirectory' : 'openFile'],
           ...(value.kind === 'jar' ? { filters: [{ name: 'Java 应用', extensions: ['jar'] }] } : {}),
         });
         return { data: result.canceled ? [] : result.filePaths };
       }
-      if (!jarManager) throw new Error(jarError || '后端管理器尚未准备好。');
+      if (!jarManager) throw new Error(jarError || '服务管理器尚未准备好。');
+      if (!lan && action === 'browse') {
+        if (value?.hostId) throw new Error('目标主机连接尚未准备好。');
+        const { managedRequest } = await import('./server/managed-workspace.mjs');
+        return { data: await managedRequest(jarManager, 'jar', action, value) };
+      }
       return { data: await (lan ? lan.request(jarManager, 'jar', action, value) : jarManager.request(action, value)) };
-    } catch (error) { return { error: error.message || '后端服务操作失败。' }; }
+    } catch (error) { return { error: error.message || '应用服务操作失败。' }; }
   });
   ipcMain.handle('devkit:monitor', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的监控请求。');

@@ -156,6 +156,10 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
     assert.ok(detected[1].ok, detected[1].text);
     const two = await add('npm', 'two', { script: 'serve:custom', nodePath: chosen });
     const executable = await add('program', 'exe', { program: process.execPath, appArgs: ['app.cjs'] });
+    const scriptId = await add('script', 'script', { program: process.execPath, script: path.join(cwd, 'app.cjs'), workDir: '' });
+    const script = (await manager.request('get')).instances.find(item => item.id === scriptId);
+    assert.equal(script.workDir, cwd);
+    assert.deepEqual((await launchSpec(script)).args, [path.join(cwd, 'app.cjs')]);
     const logCenter = createLogCenter({ jar: () => manager });
     const catalog = await logCenter.request('sources');
     assert.deepEqual(new Set(catalog.sources.map(source => source.instanceId)), new Set(ids));
@@ -170,6 +174,7 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
     await assert.rejects(managedRequest(manager, 'jar', 'command', { id: one, command: 'start' }, restricted), /权限/);
     for (const id of ids) assert.equal((await command(id, 'start')).status.state, 'running');
     assert.equal(await readFile(path.join(cwd, 'prestart'), 'utf8'), 'ok');
+    assert.equal(await (await fetch(await endpoint('script'))).text(), 'script');
     const first = await endpoint('one'), second = await endpoint('two'), third = await endpoint('exe');
     const selectedRuntime = () => readFile(path.join(cwd, 'two.node'), 'utf8').then(JSON.parse);
     const expected = { node: chosen, npmNode: chosen, version: expectedVersion };

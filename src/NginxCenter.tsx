@@ -2,7 +2,6 @@ import { TextArea, TextInput } from './TextControl';
 import { navigateTabList } from './tab-navigation';
 import PathSummary, { pathSuffix } from './PathSummary';
 import Skeleton from './Skeleton';
-import { SharingButton } from './Sharing';
 import { RelatedLink, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 import HostPathPicker, { HostSelect } from './HostPathPicker';
 import LegacySshImport from './LegacySshImport';
@@ -90,8 +89,8 @@ function InstanceForm({ active, instance, platform, groups, busy, error, submit,
     else if (kind === 'directory') { setDirectory(files[0]); }
     else patch({ [kind]: files[0] });
   }
-  function pick(kind: FileKind) {
-    if (hostId) { setPicker(kind); return; }
+  function pickSystem(kind: FileKind) {
+    setPicker(null);
     void task(async () => applyPaths(kind, await nginxRequest<string[]>('pick', { kind })));
   }
   const pickKind = picker === 'directory' || picker === 'prefix' ? 'directory' : 'file';
@@ -102,22 +101,22 @@ function InstanceForm({ active, instance, platform, groups, busy, error, submit,
       {error && <p className="ng-error" role="alert">{error}</p>}
       {!instance && <MotionGroup className="ng-setup-tabs" role="group" aria-label="配置来源"><button type="button" aria-pressed={setup === 'existing'} className="text-button"  onClick={() => setSetup('existing')}>使用已有文件</button><button type="button" aria-pressed={setup === 'create'} className="text-button"  onClick={() => setSetup('create')}>新建配置</button></MotionGroup>}
       <h3 className="ng-form-section">基本信息</h3><div className="ng-form-grid"><label>实例名称<TextInput required maxLength={100} aria-describedby={hintId('name')} value={draft.name} onChange={event => patch({ name: event.target.value })} />{hint('name')}</label><label>目标系统<select aria-describedby={hintId('platform')} value={draft.platform} onChange={event => patch({ platform: event.target.value as NginxInstance['platform'] })}><option value="win32">Windows</option><option value="linux">Linux</option><option value="any">跟随本机</option></select>{hint('platform')}</label></div><h3 className="ng-form-section">配置文件与运行目录</h3>
-      {setup === 'create' && <><label>配置目录<div className="ng-path-input"><TextInput required aria-describedby={hintId('directory')} spellCheck={false} value={directory} placeholder="填写存放新配置的已有目录" onChange={event => { setDirectory(event.target.value); }} /><button type="button" hidden={!canPick} className="text-button" onClick={() => pick('directory')}><FolderOpen size={15} />选择目录</button></div>{hint('directory')}</label>
+      {setup === 'create' && <><label>配置目录<div className="ng-path-input"><TextInput required aria-describedby={hintId('directory')} spellCheck={false} value={directory} placeholder="填写存放新配置的已有目录" onChange={event => { setDirectory(event.target.value); }} /><button type="button" hidden={!canPick} className="file-pick-button" onClick={() => setPicker('directory')}><FolderOpen size={15} />选择目录</button></div>{hint('directory')}</label>
         <div className="ng-form-grid"><label>主文件名<TextInput required aria-describedby={hintId('mainName')} maxLength={100} value={mainName} onChange={event => { setMainName(event.target.value); }} />{hint('mainName')}</label><label>附属文件名<TextInput required aria-describedby={hintId('commonName')} maxLength={100} value={commonName} onChange={event => { setCommonName(event.target.value); }} />{hint('commonName')}</label></div>
         <label>监听端口<input required aria-describedby={hintId('port')} type="number" min={1} max={65535} step={1} value={port} onChange={event => { setPort(event.target.value); }} />{hint('port')}</label>
         <div className="ng-create-preview"><strong>将创建并登记</strong><pre>{`${mainName}  → include ${commonName}\n${commonName}  → /api/ 公共代理规则\nhtml/index.html  → 默认首页\nlogs/  → 日志与 PID\ntemp/  → 请求与代理临时目录`}</pre></div></>}
-      {(setup === 'create' ? ['executable'] as const : ['main', 'prefix', 'executable'] as const).map(key => <label key={key}>{({ main: '主配置文件', prefix: '运行目录（-p prefix）', executable: 'nginx 程序路径（留空自动检测）' })[key]}<div className="ng-path-input"><TextInput required={key !== 'executable'} aria-describedby={hintId(key)} spellCheck={false} value={draft[key]} onChange={event => patch({ [key]: event.target.value })} placeholder={key === 'main' ? ((host?.platform ?? platform) === 'win32' ? 'D:\\workspace\\nginx\\nginx-win.conf' : '/etc/nginx/nginx.conf') : key === 'prefix' ? 'nginx 安装目录或自定义运行前缀' : '自动检测 PATH 与常见安装位置'} /><button type="button" hidden={!canPick} className="text-button" onClick={() => pick(key)}><FolderOpen size={15} />选择</button></div>{hint(key)}</label>)}
+      {(setup === 'create' ? ['executable'] as const : ['main', 'prefix', 'executable'] as const).map(key => <label key={key}>{({ main: '主配置文件', prefix: '运行目录（-p prefix）', executable: 'nginx 程序路径（留空自动检测）' })[key]}<div className="ng-path-input"><TextInput required={key !== 'executable'} aria-describedby={hintId(key)} spellCheck={false} value={draft[key]} onChange={event => patch({ [key]: event.target.value })} placeholder={key === 'main' ? ((host?.platform ?? platform) === 'win32' ? 'D:\\workspace\\nginx\\nginx-win.conf' : '/etc/nginx/nginx.conf') : key === 'prefix' ? 'nginx 安装目录或自定义运行前缀' : '自动检测 PATH 与常见安装位置'} /><button type="button" hidden={!canPick} className="file-pick-button" onClick={() => setPicker(key)}><FolderOpen size={15} />选择</button></div>{hint(key)}</label>)}
       <div className="ng-actions">{setup === 'existing' && <button type="button" className="text-button"  onClick={() => void task(() => scan())}><Search size={14} />解析附属文件</button>}<button type="button" className="text-button" disabled={!(host?.control ?? canOperateNginx())} onClick={() => void task(async () => {
         const found = await nginxRequest<NginxDetection>('detect', { ...draft, hostId }); setDetection(found.output);
         if (found.found) patch({ executable: found.executable, ...(setup === 'existing' ? { prefix: found.prefix } : {}) });
       })}><Search size={14} />{setup === 'create' ? '检测 nginx' : '检测 nginx 并填入运行目录'}</button></div>
       {detection && <MotionDetails className="ng-detection-panel"><summary>{detection.split(/\r?\n/)[0]}<small>查看详情</small></summary><pre className="ng-detection">{detection}</pre></MotionDetails>}
       {setup === 'existing' && <><label>附属文件（每行一个绝对路径）<TextArea rows={4} aria-describedby={hintId('files')} value={manualFiles} onChange={event => setManualFiles(event.target.value)} placeholder="可自动解析 include，也可手动添加未引用的配置文件" />{hint('files')}</label>
-      <button type="button" hidden={!canPick} className="text-button" onClick={() => pick('files')}><Plus size={14} />选择附属文件</button>
+      <button type="button" hidden={!canPick} className="file-pick-button" onClick={() => setPicker('files')}><Plus size={14} />选择附属文件</button>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}</>}
     </fieldset>
   </div><footer className="ng-form-footer"><span>保存到 {hostName}</span><MotionButton busy={busy} type="button" className="secondary-button"  disabled={busy} onClick={() => void closeForm()}>取消</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy} type="submit">{setup === 'create' ? '创建文件并添加实例' : '保存实例'}</MotionButton></footer></form>
-    {picker && <HostPathPicker name={host?.name || ''} kind={pickKind} request={directory => nginxRequest<RemoteDirectory>('browse', { hostId, directory, kind: pickKind })} close={() => setPicker(null)} select={filename => { setPicker(null); void task(() => applyPaths(picker, [filename])); }} />}
+    {picker && <HostPathPicker name={hostName} systemPicker={!hostId && window.devkitNginx ? () => pickSystem(picker) : undefined} kind={pickKind} request={directory => nginxRequest<RemoteDirectory>('browse', { hostId, directory, kind: pickKind })} close={() => setPicker(null)} select={filename => { setPicker(null); void task(() => applyPaths(picker, [filename])); }} />}
   </Modal>;
 }
 
@@ -382,7 +381,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   }
   if (!window.devkitNginx && !remoteAccess()) return <section className="ng-center"><header className="ng-heading workspace-banner"><Server /><div><h1>Nginx 配置</h1><p>可视化编辑配置文件，按主配置管理本机 Nginx 实例。</p></div></header><p className="ng-warning">请使用 DevKit Windows / Linux 桌面端打开此功能。</p></section>;
   return <section className="ng-center" aria-label="Nginx 配置工作区">
-    <header className="ng-heading workspace-banner"><span className="ng-heading-icon"><Server size={25} /></span><div><h1>Nginx 配置</h1></div><div className="ng-actions"><SharingButton /><MotionButton busy={busy} className="text-button"  disabled={busy} onClick={() => discardThen(() => void task(() => refresh()))}><RefreshCw size={15} />刷新</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy || !state || dirty || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><Plus size={16} />添加实例</MotionButton></div></header>
+    <header className="ng-heading workspace-banner"><span className="ng-heading-icon"><Server size={25} /></span><div><h1>Nginx 配置</h1></div><div className="ng-actions"><MotionButton busy={busy} className="text-button"  disabled={busy} onClick={() => discardThen(() => void task(() => refresh()))}><RefreshCw size={15} />刷新</MotionButton><MotionButton busy={busy} className="run-button"  disabled={busy || !state || dirty || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><Plus size={16} />添加实例</MotionButton></div></header>
     {error && <p className="ng-error ng-message" role="alert">{error}</p>}{notice && <p className="ng-notice ng-message" role="status">{notice}</p>}
     {busy && <p className="ng-busy" role="status">正在处理…</p>}
     <HostProgress groups={state?.groups} retry={id => void hosts.retry(id)} />

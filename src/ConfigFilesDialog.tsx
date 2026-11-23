@@ -119,7 +119,7 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
       </div>
     </footer>
   );
-  return <Modal footer={actions} title="配置文件" description={item.name} icon={<FileCode size={19} />} className="jar-config-dialog" close={close} closeLabel={jar ? '关闭后端配置文件' : '关闭 Nginx 配置文件'} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
+  return <Modal footer={actions} title="配置文件" description={item.name} icon={<FileCode size={19} />} className="jar-config-dialog" close={close} closeLabel={jar ? '关闭服务配置文件' : '关闭 Nginx 配置文件'} draft={dirty ? draft : undefined} busy={busy} wide feedback={notice}>
     <div className="jar-configs">
       <div className="jar-config-source">
         <div className="jar-config-directory">
@@ -141,7 +141,7 @@ export default function ConfigFilesDialog({ item, editable, close, request = jar
       {error && <p className="jar-error" role="alert">{error}</p>}
       {file && <>
         <div className="jar-config-editor" hidden={mode !== 'edit'}>
-          <CodeEditor key={file.name} label={`${jar ? '后端' : 'Nginx'} 配置 ${file.name}`} value={editorText(draft)} language={jar ? languages[file.name.split('.').pop()!.toLowerCase()] || 'text' : 'nginx'} readOnly={busy || !editable} onChange={value => setDraft(current => value === editorText(file.content) ? file.content : withOriginalFormat(value, current))} />
+          <CodeEditor key={file.name} label={`${jar ? '服务' : 'Nginx'} 配置 ${file.name}`} value={editorText(draft)} language={jar ? languages[file.name.split('.').pop()!.toLowerCase()] || 'text' : 'nginx'} readOnly={busy || !editable} onChange={value => setDraft(current => value === editorText(file.content) ? file.content : withOriginalFormat(value, current))} />
         </div>
         {mode === 'changes' && <ChangePreview before={file.content} after={draft} />}
         {mode === 'backup' && backup && <>

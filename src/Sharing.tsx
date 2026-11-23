@@ -1,3 +1,4 @@
+import { TransferLinkSettings } from './TransferLinkSettings';
 import { TextInput } from './TextControl';
 import {
   createContext,
@@ -91,7 +92,7 @@ export function SharingProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function SharingButton({ global = false }: { global?: boolean }) {
+export function SharingButton() {
   const context = useContext(SharingContext);
   if (!context || !isProjectDesktop()) return null;
   const { status, error, open } = context;
@@ -112,19 +113,17 @@ export function SharingButton({ global = false }: { global?: boolean }) {
   return (
     <button
       type="button"
-      className={
-        global ? "global-sharing-button" : "secondary-button sharing-shortcut"
-      }
+      className="global-sharing-button"
       data-sharing-state={state}
-      aria-label={global ? `局域网共享：${description}` : "共享设置"}
+      aria-label={`局域网共享：${description}`}
       aria-haspopup="dialog"
       title={`局域网共享 · ${description}${status?.running ? "\n" + status.addresses.join("\n") : ""}`}
       onClick={open}
     >
       <Radio size={15} />
-      <span>{global ? '局域网共享' : '共享设置'}</span>
-      {global && <small>{status?.running && !error ? '运行中' : error ? '状态未知' : !status ? '读取中' : '未开启'}</small>}
-      {global && <i aria-hidden="true" />}
+      <span>局域网共享</span>
+      <small>{status?.running && !error ? '运行中' : error ? '状态未知' : !status ? '读取中' : '未开启'}</small>
+      <i aria-hidden="true" />
     </button>
   );
 }
@@ -295,6 +294,7 @@ function SharingPanel({
             </>
           ) : (
             <>
+              {window.devkitCollab && <TransferLinkSettings />}
               <div className="pc-sharing-state">
                 <strong>{draft.running ? "共享正在运行" : "共享已停止"}</strong>
                 {draft.addresses.map((url) => (
@@ -377,7 +377,7 @@ function SharingPanel({
                 </div>
                 {draft.legacyAccess && (
                   <p className="pc-hint">
-                    已按旧设置转换各服务权限。各服务可独立关闭，尚未配置的后端管理和监控中心默认不开放，应用后保存为新设置。
+                    已按旧设置转换各服务权限。各服务可独立关闭，尚未配置的服务管理和监控中心默认不开放，应用后保存为新设置。
                   </p>
                 )}
                 <div className="sharing-services">
@@ -438,9 +438,9 @@ function SharingPanel({
                         ],
                       },
                       {
-                        id: 'jar', name: '后端管理', description: '主机服务、日志和共享控制台',
+                        id: 'jar', name: '服务管理', description: '主机服务、日志和共享控制台',
                         permissions: [
-                          { key: 'backend', label: '包含 npm 与可执行程序', detail: '允许查看这两类服务，并按已有编辑与运行授权操作' },
+                          { key: 'backend', label: '包含 npm、可执行程序与解释器脚本', detail: '允许查看这些服务，并按已有编辑与运行授权操作' },
                           { key: 'edit', label: '编辑服务与配置文件', detail: '允许维护实例、启动参数、环境档案以及工作目录配置文件和备份' },
                           { key: 'control', label: '运行管理与控制台输入', detail: '允许启停服务、控制台输入、系统自启和 Java 检测，有编辑权限时还可检测 Node.js 与 npm' },
                         ],
@@ -474,7 +474,7 @@ function SharingPanel({
                       {
                         id: 'logs', name: '日志中心', description: '已登记的文件日志、控制台输出与多窗对照',
                         permissions: [
-                          { key: 'jar', label: '读取后端日志与控制台输出', detail: '用于日志中心和后端页面，可读取文件日志及内存输出。控制台输入另需运行权限。' },
+                          { key: 'jar', label: '读取服务日志与控制台输出', detail: '用于日志中心和服务管理页面，可读取文件日志及内存输出。控制台输入另需运行权限。' },
                           { key: 'nginx', label: '读取 Nginx 日志', detail: '用于日志中心和 Nginx 页面，可读取实例配置中登记的文件日志。' },
                           { key: 'export', label: '导出日志', detail: '允许导出已授权来源的有界近期内容，不修改原文件' },
                           { key: 'raw', label: '允许读取原始日志', detail: '访客可在日志中心主动关闭主机脱敏，原始内容可能包含凭据' },
@@ -591,7 +591,7 @@ function SharingPanel({
                   {(draft.visitors || []).map((visitor, index) => {
                     const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
                     const existing = visitor.hasPassword === true;
-                    const labels: Record<string, string> = { backend: '包含 npm 与可执行程序', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '后端日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
+                    const labels: Record<string, string> = { backend: '包含 npm、可执行程序与解释器脚本', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '服务日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
                     const effective = visitorServices(draft.services, visitor.services);
                     const grants = workspaceModules.flatMap(item => {
                       const service = effective[item.id];

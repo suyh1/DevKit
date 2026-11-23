@@ -71,7 +71,7 @@ test('standalone service exposes opt-in workspaces without installed npm depende
       const response = await fetch(origin + route, { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(response.status, 200, await response.text());
     }
-    assert.ok((await readFile(path.join(directory, 'configs/sharing.json'), 'utf8')).includes('shareHttp'));
+    assert.ok((await readFile(path.join(directory, 'configs/sharing/sharing.json'), 'utf8')).includes('shareHttp'));
   } finally {
     if (child && child.exitCode === null) { const exited = new Promise(resolve => child.once('exit', resolve)); child.kill(); await exited; }
     assert.equal(path.dirname(directory), await realpath(tmpdir()));

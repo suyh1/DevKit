@@ -1,5 +1,4 @@
 import { TextInput } from './TextControl';
-import { SharingButton } from './Sharing';
 import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence, MotionDetails } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
 import ProjectComparison from './ProjectComparison';
@@ -20,7 +19,6 @@ import {
   X,
   ShieldCheck,
   Settings2,
-  FolderOpen,
   LayoutGrid,
   List,
   MoreHorizontal,
@@ -48,7 +46,6 @@ import type {
   Session,
   Snapshot,
   Health,
-  ProjectStorage,
 } from "./project-api";
 import {
   Modal,
@@ -128,8 +125,6 @@ export default function ProjectCenter({
   const [probeProgress, setProbeProgress] = useState<{
     profileId: string; total: number; done: number; success: number; failed: number; skipped: number;
   } | null>(null);
-  const [storage, setStorage] = useState<ProjectStorage | null>(null),
-    [storageOpen, setStorageOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]),
     [sort, setSort] = useState("manual");
   const [view, setView] = useState<'grid' | 'list'>(() =>
@@ -158,9 +153,7 @@ export default function ProjectCenter({
         ? "import"
         : history
           ? "history"
-          : storageOpen
-            ? "storage"
-            : confirmation
+          : confirmation
               ? confirmation.title
               : "";
   useEffect(() => {
@@ -168,6 +161,14 @@ export default function ProjectCenter({
       setError("");
       setMessage("");
     }
+  }, [openModalKey]);
+  useEffect(() => {
+    const update = (event: Event) => {
+      // An open draft keeps its original revision and the normal conflict check.
+      if (!openModalKey && !busyRef.current) setData((event as CustomEvent<ProjectState>).detail);
+    };
+    window.addEventListener('devkit:project-associations', update);
+    return () => window.removeEventListener('devkit:project-associations', update);
   }, [openModalKey]);
   const session = portalSession || loadedSession;
   const canProbe =
@@ -225,8 +226,6 @@ export default function ProjectCenter({
       throw new Error("共享会话已失效，请重新登录；当前内容和草稿已保留。");
     }
     setSession(auth);
-    if (auth.role === "owner")
-      setStorage(await projectRequest<ProjectStorage>("storage"));
     if (auth.authenticated) {
       setData(await projectRequest<ProjectState>("get"));
       setHealth({});
@@ -339,10 +338,11 @@ export default function ProjectCenter({
     } catch (error) { setMessage((error as Error).message); }
   }
 
-  function addProject() {
-    editEntry({ id: newProjectId(), name: '', code: `project-${Date.now().toString(36)}`, group: '', description: '', url: 'http://{{host}}:8080/', enabled: true, query: [] });
+  function newProject(serviceId?: string) {
+    editEntry({ id: newProjectId(), name: '', code: `project-${Date.now().toString(36)}`, group: '', description: '', url: 'http://{{host}}:8080/', enabled: true, query: [], ...(serviceId && { resources: { jar: serviceId } }) });
   }
-  const finishCreation = useRelatedCreation('projects', visible && !!profile && canEdit && !busy, addProject);
+  const addProject = () => newProject();
+  const finishCreation = useRelatedCreation('projects', visible && !!profile && canEdit && !busy, (from, id) => newProject(from === 'jar' ? id : undefined));
   function closeEntry() { setEntry(null); finishCreation(); }
   function editEntry(project: Project) {
     setError("");
@@ -446,22 +446,7 @@ export default function ProjectCenter({
       <section ref={stage} className="project-center">
         {errorBox}
         {error ? <p>项目中心暂不可用，请处理上面的配置目录问题后重新启动。其他工具仍可使用。</p> : <Skeleton kind="projects" />}
-        {storage && (
-          <div className="pc-path">
-            <code>{storage.directory}</code>
-            <button
-              className="secondary-button"
-              onClick={() =>
-                void action(async () => {
-                  await projectRequest("open-configs");
-                })
-              }
-            >
-              <FolderOpen size={15} />
-              打开 configs 目录
-            </button>
-          </div>
-        )}
+
       </section>
     );
   const groups = [...new Set(profile.projects.map((item) => item.group))]
@@ -472,7 +457,6 @@ export default function ProjectCenter({
     !!profileDraft ||
     !!imported ||
     !!history ||
-    storageOpen ||
     !!confirmation;
   const resolved = profile.projects.map((item) => resolveProject(item, profile));
   const missingVariables = [...new Set(resolved.flatMap(item => item.missingVariables))];
@@ -522,17 +506,8 @@ export default function ProjectCenter({
             <RefreshCw size={14} />
             刷新
           </MotionButton>
-          {owner && (
-            <MotionButton outcome={error ? "error" : ""} busy={busy}
-              className="secondary-button"
-              disabled={busy}
-              onClick={() => setStorageOpen(true)}
-            >
-              <FolderOpen size={14} />
-              配置文件
-            </MotionButton>
-          )}
-          {owner && <SharingButton />}
+
+
         </div>
       </header>
       {!modalOpen && errorBox}
@@ -547,12 +522,7 @@ export default function ProjectCenter({
           正在处理，请稍候…
         </p>
       )}
-      {storage?.migratedFrom && (
-        <p className="pc-notice">
-          旧版项目数据已迁入安装目录的
-          configs，原文件仍保留。可在“配置文件”查看保存位置。
-        </p>
-      )}
+
       <div className="pc-shell">
         <aside className="pc-profiles" tabIndex={0} aria-label="配置档案">
           <div className="pc-section-title">
@@ -671,12 +641,12 @@ export default function ProjectCenter({
             <span>
               {profile.projects.length} 个项目 · {profile.variables.length} 个变量
             </span>
-            {canProbe && !!profile.projects.length && <button className="secondary-button" disabled={busy}
+            <div className="pc-entry-actions">{canProbe && !!profile.projects.length && <button className="secondary-button" disabled={busy}
               title="检测当前档案全部已启用项目，包含筛选外项目，跳过停用项目"
               onClick={() => void action(() => probe(profile.projects))}>
               <ShieldCheck size={15} />全部探活
             </button>}
-            {canEdit && <div className="pc-entry-actions">
+            {canEdit && (
               <MotionButton outcome={error ? "error" : ""} busy={busy}
                 className="run-button"
                 disabled={busy}
@@ -685,7 +655,7 @@ export default function ProjectCenter({
                 <Plus size={15} />
                 添加项目
               </MotionButton>
-            </div>}
+            )}</div>
           </div>
           {probeProgress?.profileId === profile.id && <div className="pc-probe-progress" role="status">
             <span>{probing.length ? "主机探活中" : probeProgress.done === probeProgress.total ? "主机探活完成" : "主机探活中断"} · {probeProgress.done}/{probeProgress.total} · 正常 {probeProgress.success} · 异常 {probeProgress.failed} · 跳过停用 {probeProgress.skipped}</span>
@@ -1099,7 +1069,7 @@ export default function ProjectCenter({
             {canEdit && (
               <>
                 <MotionButton outcome={error ? "error" : ""} busy={busy}
-                  className="text-button"
+                  className="file-pick-button"
                   disabled={busy}
                   onClick={() => file.current?.click()}
                 >
@@ -1781,81 +1751,6 @@ export default function ProjectCenter({
             >
               确认删除
             </MotionButton>
-          </footer>
-        </Modal>
-      )}</MotionPresence>
-      <MotionPresence kind="dialog" present={!!(storageOpen && owner)}>{storageOpen && owner && (
-        <Modal
-          feedback={message}
-          title="配置文件与迁移"
-          close={() => setStorageOpen(false)}
-          busy={busy}
-        >
-          {errorBox}
-          <p>
-            项目中心使用安装目录下的 <strong>configs</strong>{" "}
-            文件夹。复制整个文件夹可以带走项目、档案、备份和共享设置。
-          </p>
-          <div className="pc-path">
-            <code>{storage?.directory}</code>
-            <div className="pc-actions">
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  void action(async () => {
-                    await projectRequest("open-configs");
-                  })
-                }
-              >
-                <FolderOpen size={15} />
-                打开 configs 目录
-              </button>
-              <MotionButton variant="copy"
-                className="secondary-button"
-                onClick={() => void copy(storage?.directory || "")}
-              >
-                <Copy size={14} />
-                复制路径
-              </MotionButton>
-            </div>
-          </div>
-          <dl className="pc-file-list">
-            <div>
-              <dt>projects.json</dt>
-              <dd>档案索引、版本及最近 30 份快照</dd>
-            </div>
-            <div>
-              <dt>profile-&lt;编码 ID&gt;.json</dt>
-              <dd>每个档案独立保存的项目、变量与说明</dd>
-            </div>
-            <div>
-              <dt>sharing.json</dt>
-              <dd>共享选项与访问口令哈希</dd>
-            </div>
-          </dl>
-          <h3 className="pc-form-section">整目录迁移</h3>
-          <ol className="pc-transfer-steps">
-            <li>关闭两台电脑上的 DevKit 或独立服务。</li>
-            <li>
-              先备份目标电脑的 configs，再将来源 configs
-              整个复制到目标安装目录的相同位置。
-            </li>
-            <li>
-              确认当前用户可写，重新启动 DevKit 即可使用。主机 IP
-              从新电脑重新获取。
-            </li>
-          </ol>
-          <p>
-            复制目录包含访问口令与快照；导出 JSON
-            仅包含项目和档案。需要保留两边内容时，使用 JSON 合并导入。
-          </p>
-          {storage?.migratedFrom && (
-            <p className="pc-hint">
-              本次启动迁入自：{storage.migratedFrom}。旧目录原件未删除。
-            </p>
-          )}
-          <footer>
-            <ModalCancel>知道了</ModalCancel>
           </footer>
         </Modal>
       )}</MotionPresence>

@@ -93,7 +93,7 @@
 @media (max-width: 480px) {
   .jar-config-source { padding: 11px; }
 }
-.jar-host-filter { display:grid; gap:4px; font-size:11px; color:var(--muted); }
+.jar-host-filter { display:flex; align-items:center; gap:8px; white-space:nowrap; font-size:12px; color:var(--muted); }
 .jar-host-filter select { min-height:32px; max-width:230px; color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:6px; }
 .jar-compact .jar-table-scroll { overflow:visible; background:transparent; border:0; }
 .jar-compact .jar-table, .jar-compact .jar-table tbody { display:block; min-width:0; }
@@ -120,3 +120,28 @@
 .jar-runtime-field li button { display: grid; gap: 3px; width: 100%; padding: 8px 11px; background: var(--surface); color: var(--text); text-align: start; overflow-wrap: anywhere; }
 .jar-runtime-field li button:is(:hover, :focus-visible, [aria-pressed=true]) { background: var(--soft); }
 .jar-runtime-field li span { font: 12px/1.5 var(--font-mono); color: var(--muted); }
+
+.jar-toolbar { justify-content: flex-start; flex-wrap: wrap; }
+.jar-toolbar .jar-search { flex: 1 1 12rem; min-width: 0; height: 36px; }
+.jar-toolbar .jar-host-filter select { min-height: 36px; }
+.jar-toolbar .jar-actions { margin-inline-start: auto; }
+@media (max-width:760px) {
+  .jar-toolbar { flex-direction: row; }
+  .jar-toolbar .jar-host-filter { max-width: 100%; }
+}
+
+.service-projects h3 { margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
+.service-projects ul { padding: 0; margin: 0; list-style: none; }
+.service-projects li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 8px; border-bottom: 1px solid var(--line); }
+.service-projects strong { flex: 1 1 10rem; overflow-wrap: anywhere; }
+
+.config-source label { display: grid; gap: 6px; }
+.config-source select { width: 100%; }
+.jar-dialog .jar-path-input { gap: 6px; padding: 4px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; }
+.jar-dialog .jar-path-input .text-control { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
+.jar-dialog .jar-path-input .file-pick-button { background: var(--tint); border-color: transparent; }
+.jar-dialog .jar-path-input:focus-within { border-color: var(--accent); }
+@media(max-width:760px) {
+  .jar-dialog .jar-path-input { flex-flow: row wrap; }
+  .jar-dialog .jar-path-input .text-control { flex-basis: min(13rem, 100%); }
+}

@@ -17,7 +17,6 @@ import { Versions } from './KnowledgeVersions';
 import { loadResources, type ResourceChoice } from './KnowledgeResourcePicker';
 import { bodyMatch, referenceText, refersTo, resourceNames } from './knowledge-markdown';
 import { openWorkspaceLink, ResourceLink, useWorkspaceResource } from './workspace-links';
-import { SharingButton } from './Sharing';
 import { useCardLight } from './tool-card-motion';
 import Skeleton from './Skeleton';
 import './knowledge.css';
@@ -209,7 +208,7 @@ export default function KnowledgeBase({
           <h1>团队知识库</h1>
         </div>
         <div>
-          {!portal && <SharingButton />}
+
           <button className="icon-button" aria-label="刷新文档" onClick={() => void refresh()}>
             <RefreshCw size={16} />
           </button>

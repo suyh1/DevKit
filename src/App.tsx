@@ -18,6 +18,7 @@ import GeoWorkbench from './GeoWorkbench';
 import { mergeGeoOutput } from './geography';
 import Overview, { type OverviewScreen } from './Overview';
 import Settings from './Settings';
+import ConfigStorage from './ConfigStorage';
 import ProjectCenter from './ProjectCenter';
 import KnowledgeBase from './KnowledgeBase';
 import TodoLists from './TodoLists';
@@ -32,6 +33,7 @@ import LogCenter from './LogCenter';
 import SharedWorkspaceNavigation from './SharedWorkspaceNavigation';
 import SharedWorkspaceOrder from './SharedWorkspaceOrder';
 import { workspaceModules } from './catalog';
+import type { ServiceDraft } from './detection';
 import type { WorkspaceModuleId } from './catalog';
 import CommandPalette from './CommandPalette';
 import { parseWorkspaceLink } from './workspace-links';
@@ -58,6 +60,7 @@ export default function App() {
   return <DisplayModeProvider mode={preferences.displayMode}><ConfirmationProvider><SharingProvider><Workbench preferences={preferences} setPreferences={setPreferences} /></SharingProvider></ConfirmationProvider></DisplayModeProvider>;
 }
 function Workbench({ preferences, setPreferences }: { preferences: Preferences; setPreferences: React.Dispatch<React.SetStateAction<Preferences>> }) {
+  const [serviceSeed, setServiceSeed] = useState<ServiceDraft>();
   const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
   const [activeId, setActiveId] = useState<string | null>(tasks[0]?.id ?? null);
@@ -263,7 +266,8 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <button data-search-capsule className="top-search secondary-button" aria-label="打开工具搜索" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /><span>搜索</span><kbd>Ctrl K</kbd></button>
         <button className="text-button" onClick={() => workspaceFile.current?.click()} aria-label="恢复工作区" title="恢复工作区"><FolderOpen size={16} /><span>恢复</span></button>
         <button className="text-button" disabled={!tasks.some(task => !isColorTool(task.toolId))} onClick={() => { setIncludeSensitive(false); setSaveOpen(true); }} aria-label="保存工作区" title="保存工作区"><Save size={16} /><span>保存工作区</span></button>
-        <SharingButton global />
+        <ConfigStorage />
+        <SharingButton />
       </div>
     </header>
       <MotionPresence kind="panel" present={tasks.length > 0}>{tasks.length > 0 && <div className="task-strip"><button className={`home-tab ${page !== 'task' ? 'selected' : ''}`} onClick={() => navigate('home')} title="工作台总览" aria-label="工作台总览"><LayoutGrid size={16} /></button><MotionGroup className="task-tabs" role="tablist" aria-label="已打开的任务" groupRef={tabs}>{tasks.map((task, index) => { const tool = tools.find(item => item.id === task.toolId)!, Icon = toolIcons[task.toolId], selected = page === 'task' && task.id === activeId; const sequence = tasks.slice(0, index + 1).filter(item => item.toolId === task.toolId).length; return <div className={`task-tab ${selected ? 'selected' : ''}`} key={task.id} data-motion-key={task.id}><button role="tab" id={`tab-${task.id}`} aria-controls={`task-${task.id}`} aria-selected={selected} tabIndex={selected || page !== 'task' && index === 0 ? 0 : -1} onClick={() => focusTask(task.id)} onKeyDown={event => { let next = index; if (event.key === 'ArrowRight') next = (index + 1) % tasks.length; else if (event.key === 'ArrowLeft') next = (index + tasks.length - 1) % tasks.length; else if (event.key === 'Home') next = 0; else if (event.key === 'End') next = tasks.length - 1; else if (event.key === 'Delete') { event.preventDefault(); closeTask(task.id); return; } else return; event.preventDefault(); focusTask(tasks[next].id); document.getElementById(`tab-${tasks[next].id}`)?.focus(); }}>{task.status === 'running' ? <LoaderCircle size={14} className="spin" /> : <Icon size={14} />}<span>{tool.name}{sequence > 1 ? ` ${sequence}` : ''}</span>{['stale', 'idle'].includes(task.status) && task.input && <i title="未更新的输入" />}</button><button className="tab-close" tabIndex={selected ? 0 : -1} aria-label={`关闭${tool.name}任务 ${sequence}`} onClick={() => closeTask(task.id)}><X size={12} /></button></div>; })}</MotionGroup><ActionPopover className="task-create" triggerClassName="icon-button" label="新建任务" trigger={<Plus size={16} />}><button onClick={() => chooseTask(false)}>打开工具</button><button onClick={() => chooseTask(true)}>新建独立任务</button></ActionPopover></div>}</MotionPresence>
@@ -276,11 +280,11 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         {(['transfer', 'mock', 'whiteboard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
-        <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} /></div>
+        <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} seed={serviceSeed} consumeSeed={() => setServiceSeed(undefined)} /></div>
         <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={match => {
-          if (match.kind === 'workspace') navigate(match.id);
+          if (match.kind === 'workspace') { setServiceSeed(match.service); navigate(match.id); }
           else openTool(match.id, true, match.input, match.options);
         }} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} homeVisit={homeVisit} onBrowse={() => navigate('home', false, 'library')} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>

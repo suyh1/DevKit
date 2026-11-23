@@ -134,7 +134,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     );
     await click("取消", "dialog[open] button");
     await wait('!document.querySelector("dialog[open]")');
-    await openShortcut(".project-center .sharing-shortcut");
+    assert.equal(await js("!!document.querySelector(" + JSON.stringify(".project-center .sharing-shortcut") + ")"), false);
+    await openShortcut(".global-sharing-button");
     window.show();
     window.focus();
     window.webContents.focus();
@@ -145,7 +146,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     assert.equal(await clipboard.readText(), address);
     await close();
     await navigate("Nginx 配置");
-    await openShortcut(".ng-center .sharing-shortcut");
+    assert.equal(await js("!!document.querySelector(" + JSON.stringify(".ng-center .sharing-shortcut") + ")"), false);
+    await openShortcut(".global-sharing-button");
     await click("停止共享");
     await wait(
       'document.querySelector(".global-sharing-button")?.dataset.sharingState==="stopped"',
@@ -153,7 +155,8 @@ module.exports = async function sharingSettingsSmoke(window, output) {
     await wait('!document.querySelector(".sharing-panel .pc-sharing-state > div > code")');
     await close();
     await navigate("HTTP 调试");
-    await openShortcut(".http-workspace-topline .sharing-shortcut");
+    assert.equal(await js("!!document.querySelector(" + JSON.stringify(".http-workspace-topline .sharing-shortcut") + ")"), false);
+    await openShortcut(".global-sharing-button");
     assert.equal(
       await js(
         'document.querySelector(".sharing-panel input[type=number]").value',

@@ -3,11 +3,10 @@ import { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { QrCode, ArrowLeftRight, Braces, ScanLine } from 'lucide-react';
 import { workspaceModules } from './catalog';
-import { SharingButton, useSharingStatus } from './Sharing';
+import { useSharingStatus } from './Sharing';
 import { copyText } from './motion-primitives';
 import { useWorkspaceResource, workspaceHash } from './workspace-links';
 import { type CollabModule, type PageProps } from './collab-api';
-import { TransferLinkSettings } from './TransferLinkSettings';
 import { QuickTransfer } from './QuickTransfer';
 import { MockService } from './MockService';
 import { ScreenshotBoard } from './ScreenshotBoard';
@@ -78,7 +77,6 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
         </div>
         {inviteButton}
       </header>}
-      {module === 'transfer' && window.devkitCollab && <TransferLinkSettings />}
       {invite && (
         <div className="collab-invite" id={module + '-invite'}>
           {addresses.length > 1 && (
@@ -119,10 +117,7 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
               </div>
             </>
           ) : (
-            <>
-              <span>在主机的局域网共享中开放此栏目，并选择局域网监听地址，即可邀请其他设备。</span>
-              <SharingButton global />
-            </>
+            <span>在桌面顶栏的“局域网共享”中开放此栏目，并选择局域网监听地址，即可邀请其他设备。</span>
           )}
         </div>
       )}

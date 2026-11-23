@@ -72,11 +72,19 @@ export function validateProjectEnvelope(input) {
   return { current, snapshots };
 }
 
-export async function createProjectStore(directory) {
-  await mkdir(directory, { recursive: true });
+import { configGroup, organizeConfigs } from './config-layout.mjs';
+
+export async function createProjectStore(root) {
+  await mkdir(root, { recursive: true });
+  const releaseLock = await acquireProjectLock(root);
+  let directory, sharing;
+  try {
+    await organizeConfigs(root);
+    directory = await configGroup(root, 'projects');
+    sharing = await configGroup(root, 'sharing');
+  } catch (error) { await releaseLock(); throw error; }
   const filename = path.join(directory, "projects.json");
   const journal = path.join(directory, ".projects-pending.json");
-  const releaseLock = await acquireProjectLock(directory);
   async function atomic(file, value) {
     const temporary = `${file}.${randomUUID()}.tmp`;
     try {
@@ -232,7 +240,7 @@ export async function createProjectStore(directory) {
     }
   }
   return {
-    directory,
+    directory: root,
     get: () =>
       transaction(async () => {
         return clone(envelope.current);
@@ -287,7 +295,7 @@ export async function createProjectStore(directory) {
     settings: async () => {
       try {
         return JSON.parse(
-          await readFile(path.join(directory, "sharing.json"), "utf8"),
+          await readFile(path.join(sharing, "sharing.json"), "utf8"),
         );
       } catch (error) {
         if (error.code === "ENOENT") return {};
@@ -295,7 +303,7 @@ export async function createProjectStore(directory) {
       }
     },
     saveSettings: (value) =>
-      transaction(() => atomic(path.join(directory, "sharing.json"), value)),
+      transaction(() => atomic(path.join(sharing, "sharing.json"), value)),
     close: async () => {
       await queue;
       await releaseLock();

@@ -48,6 +48,19 @@ describe('推荐顺序和打开方式', () => {
       expect(colors.every(s => s.kind === 'tool' && s.input === value)).toBe(true);
     },
   );
+  it('从脚本命令带入启动方式、含空格的脚本路径和逐行参数', () => {
+    expect(detectTools('python3 "/srv/my app/main.py" --port 9000')).toContainEqual(expect.objectContaining({
+      id: 'jar', service: { kind: 'script', script: '/srv/my app/main.py', args: '--port\n9000' },
+    }));
+    expect(detectTools('java -Xmx1g -jar app.jar --port 9000')).toContainEqual(expect.objectContaining({
+      id: 'jar', service: { kind: 'jar', jar: 'app.jar', jvm: '-Xmx1g', args: '--port\n9000' },
+    }));
+    expect(detectTools('npm run dev -- --host 0.0.0.0')).toContainEqual(expect.objectContaining({
+      id: 'jar', service: { kind: 'npm', script: 'dev', args: '--host\n0.0.0.0' },
+    }));
+    expect(detectTools('node --version').some(match => match.id === 'jar')).toBe(false);
+    expect(detectTools('后端管理')[0].id).toBe('jar');
+  });
   it('从 CSS 声明带入实际色值，并区分纯数字状态码', () => {
     expect(detectTools('--brand: #237abc;')[0]).toMatchObject({ id: 'color-convert', input: '#237abc' });
     expect(detectTools('404').map(s => s.id)).not.toContain('color-convert');

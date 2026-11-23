@@ -1,12 +1,14 @@
 .local-file-picker { min-width: 0; }
 .local-file-picker[data-expanded=false] { max-width: 100%; }
 .local-file-picker > .file-meta { max-width: min(100%, 36ch); padding: 4px 0 0; border: 0; background: transparent; }
-.local-file-picker .file-drop-target {
+.file-pick-button, input[type=file]::file-selector-button, .local-file-picker .file-drop-target {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   gap: 8px; min-height: 36px; padding: 6px 12px; min-width: 0;
   border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
   background: var(--surface); color: var(--text); font: 550 13px/1.5 var(--font-ui);
 }
+.file-pick-button svg { color: var(--accent); flex: none; }
+.file-pick-button:hover, input[type=file]::file-selector-button:hover { background: var(--tint); border-color: var(--accent); }
 .local-file-picker .file-picker-symbol { display: grid; place-items: center; color: var(--accent); }
 .local-file-picker[data-expanded=true] .file-drop-target {
   display: flex; flex-direction: column; width: 100%; min-height: 166px; padding: 20px 12px;
