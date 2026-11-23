@@ -103,5 +103,10 @@
 .ng-list-host { display: grid; gap: 5px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
 .ng-list-host select { min-width: 0; width: 100%; min-height: 34px; background: var(--surface); color: var(--text); }
 .ng-storage { grid-column: 1 / -1; min-width: 0; }
-.ng-instance-heading .path-summary { margin-top: 4px; }
-.ng-runtime { display: grid; gap: 3px; }
+.ng-runtime { margin-block: 0 8px; }
+.ng-runtime summary { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.ng-runtime summary strong, .ng-runtime svg { flex: none; }
+.ng-runtime summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ng-runtime[open] summary svg { transform: rotate(90deg); }
+.ng-runtime dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 6px 0 0; padding: 8px 12px; background: var(--soft); border-radius: 6px; }
+.ng-runtime dd { margin: 0; color: var(--text); font-family: monospace; user-select: text; }

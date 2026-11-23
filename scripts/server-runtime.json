@@ -1,4 +1,5 @@
 [
+  "@faker-js/faker",
   "ssh2",
   "asn1",
   "bcrypt-pbkdf",

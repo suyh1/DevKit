@@ -405,20 +405,23 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
             <header className="ng-instance-heading">
               <div>
                 <h2>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2>
-                <p className="ng-help">目标主机 <strong>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')}</strong></p>
-                <PathSummary label="主配置" path={current.main} others={state.instances.map(item => item.main)} />
               </div>
               <div className="ng-actions">
                 <MotionButton busy={busy} className="text-button" disabled={busy || dirty || !currentEdit} onClick={() => setInstanceForm(current)}><Settings2 size={15} />实例设置</MotionButton>
                 <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
               </div>
             </header>
-            <div className="ng-runtime">
-              {hostFor(current) && <span>{hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}</span>}
-              <PathSummary label="运行目录" path={current.prefix} others={state.instances.map(item => item.prefix)} />
-              {status?.detail && <span>{status.detail}</span>}
-              {status?.pidPath && <PathSummary label="PID 文件" path={status.pidPath} />}
-            </div>
+            <MotionDetails key={current.id} className="ng-runtime">
+              <summary><ChevronRight size={14} /><strong>实例路径</strong><span>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')} · {pathSuffix(current.main, state.instances.map(item => item.main))}</span></summary>
+              <dl>
+                {hostFor(current) && <><dt>目标主机</dt><dd>{hostFor(current)!.name} · {hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}</dd></>}
+                <dt>主配置</dt><dd>{current.main}</dd>
+                <dt>运行目录</dt><dd>{current.prefix}</dd>
+                <dt>Nginx 程序</dt><dd>{current.executable || '自动检测'}</dd>
+                {status?.pidPath && <><dt>PID 文件</dt><dd>{status.pidPath}</dd></>}
+                {status?.detail && <><dt>运行状态</dt><dd>{status.detail}</dd></>}
+              </dl>
+            </MotionDetails>
             <div className="ng-status-connection" role="status" data-stale={statusStale}>
               <span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span>
               <button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button>

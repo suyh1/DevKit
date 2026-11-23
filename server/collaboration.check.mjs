@@ -191,6 +191,8 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
       scenarios: [
         { name: 'fresh', status: 201, delay: 0, body: '{"ok":true}', format: 'json' },
         { name: 'busy', status: 503, delay: 20, queryKey: 'mode', queryValue: 'fail', body: 'retry', format: 'text' },
+        { name: 'orders', status: 200, delay: 0, queryKey: 'mode', queryValue: 'generate', body: '', format: 'generated',
+          template: '{"items":[{"id":"{{uuid}}","number":"{{index}}","value":"{{price}}"}],"ok":true}', count: 3 },
       ],
     };
     assert.equal((await post('mock/create', args, reader)).status, 403);
@@ -208,6 +210,20 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
     assert.equal(busy.status, 503);
     assert.equal(await busy.text(), 'retry');
     assert.equal((await ok('mock/read', { id: mock.id }, reader)).history.length, 3);
+    async function generatedOrders() {
+      const response = await fetch(url + '?mode=generate', { method: 'POST' });
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get('content-type'), /application\/json/);
+      const { items, ok } = await response.json();
+      assert.equal(ok, true);
+      assert.deepEqual(items.map(item => item.number), [1, 2, 3]);
+      assert.equal(typeof items[0].value, 'number');
+      return items[0].id;
+    }
+    assert.notEqual(await generatedOrders(), await generatedOrders());
+    for (const invalid of [{ count: 101 }, { template: '"{{missing}}"' }, { template: '[' }]) {
+      assert.equal((await post('mock/save', { ...updated, active: 0, scenarios: [{ ...args.scenarios[2], ...invalid }] }, second)).status, 400);
+    }
     await ok('mock/rotate', updated);
     assert.equal((await fetch(url, { method: 'POST' })).status, 404);
     const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg==';

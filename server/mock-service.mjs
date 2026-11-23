@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkRevision, fail, newRecord, requireRecord, shortText } from './collab-record.mjs';
+import { prepareMockResponse } from '../shared/mock-response.mjs';
 
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const param = /^(?::[A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})$/;
@@ -45,11 +46,15 @@ function definition(input) {
       !Number.isInteger(item.delay) ||
       item.delay < 0 ||
       item.delay > 10000 ||
-      !['json', 'text'].includes(item.format) ||
+      !['json', 'text', 'generated'].includes(item.format) ||
       typeof item.body !== 'string' ||
       item.body.length > 64000
     )
       fail(400, '响应状态、延迟或正文无效。');
+    if (item.format === 'generated') {
+      try { prepareMockResponse(item.template, item.count); }
+      catch (error) { fail(400, '场景“' + item.name + '”：' + error.message); }
+    }
     if (item.format === 'json' && ![204, 205, 304].includes(item.status)) {
       try {
         JSON.parse(item.body);
@@ -73,6 +78,7 @@ function definition(input) {
       status: item.status,
       delay: item.delay,
       format: item.format,
+      ...(item.format === 'generated' && { template: item.template, count: item.count }),
       body: item.body,
     };
   });
@@ -88,6 +94,7 @@ function definition(input) {
 }
 export function createMockService(current) {
   const history = new Map();
+  const generators = new WeakMap();
   let inflight = 0;
   async function request({ rows, commit, action, input }) {
     if (action === 'list')
@@ -145,6 +152,13 @@ export function createMockService(current) {
     try {
       if (scenario.delay) await delay(scenario.delay);
       if (res.destroyed) return;
+      let body;
+      if (![204, 205, 304].includes(scenario.status)) {
+        if (scenario.format === 'generated') {
+          if (!generators.has(scenario)) generators.set(scenario, prepareMockResponse(scenario.template, scenario.count));
+          body = JSON.stringify(await generators.get(scenario)());
+        } else body = scenario.body;
+      }
       if (!find()) fail(404, '模拟接口已关闭。');
       const log = {
         at: Date.now(),
@@ -155,9 +169,9 @@ export function createMockService(current) {
       };
       history.set(route.id, [log, ...(history.get(route.id) || [])].slice(0, 30));
       res.writeHead(scenario.status, {
-        'Content-Type': (scenario.format === 'json' ? 'application/json' : 'text/plain') + '; charset=utf-8',
+        'Content-Type': (scenario.format === 'text' ? 'text/plain' : 'application/json') + '; charset=utf-8',
       });
-      res.end([204, 205, 304].includes(scenario.status) ? undefined : scenario.body);
+      res.end(body);
     } finally {
       inflight--;
     }

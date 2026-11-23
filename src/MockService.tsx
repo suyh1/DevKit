@@ -1,5 +1,4 @@
 import { TextInput } from './TextControl';
-import SegmentedControl from './SegmentedControl';
 import type { ApiEndpoint } from '../shared/api-workspace.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { collab, useLive, useCollabList, useOperation, type PageProps } from './collab-api';
@@ -16,19 +15,17 @@ import {
   FileInput,
   CircleDot,
 } from 'lucide-react';
-import CodeEditor from './CodeEditor';
+import MockResponseEditor, { defaultGeneration, type ResponseBody } from './MockResponseEditor';
 import { copyText } from './motion-primitives';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import { useWorkspaceResource, openWorkspaceLink } from './workspace-links';
 import { apiLibrary } from './api-library';
 import { CreateRelated, useRelatedCreation, useWorkspaceGuard } from './related-workspaces';
 
-type Scenario = {
+type Scenario = ResponseBody & {
   name: string;
   status: number;
   delay: number;
-  format: string;
-  body: string;
   queryKey?: string;
   queryValue?: string;
 };
@@ -55,7 +52,7 @@ const sample = (): Route => ({
   cors: false,
   active: 0,
   scenarios: [
-    { name: '成功', status: 200, delay: 0, format: 'json', body: '{\n  "items": [{"id": 1}]\n}' },
+    { name: '成功', status: 200, delay: 0, ...defaultGeneration, body: '{\n  "items": [{"id": 1}]\n}' },
     { name: '空数据', status: 200, delay: 0, format: 'json', body: '{"items":[]}' },
     { name: '服务异常', status: 503, delay: 800, format: 'json', body: '{"error":"temporarily unavailable"}' },
   ],
@@ -339,26 +336,8 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                     ))}
                   </div>
                 </section>
+                <MockResponseEditor key={(row.id || 'draft') + ':' + index} scenario={scenario} disabled={!edit || op.busy} change={changeScenario} />
                 <fieldset disabled={!edit || op.busy}>
-                  <div className="mock-code-panel">
-                    <div>
-                      <strong>
-                        <Braces size={16} />
-                        响应正文
-                      </strong>
-                      <small>
-                        {scenario.format.toUpperCase()} · {scenario.body.split('\n').length} 行
-                      </small>
-                    </div>
-                    <CodeEditor
-                      label="响应正文"
-                      language={scenario.format === 'json' ? 'json' : 'text'}
-                      readOnly={!edit || op.busy}
-                      value={scenario.body}
-                      onChange={(body) => changeScenario({ body })}
-                      wrap
-                    />
-                  </div>
                   <div className="collab-fields">
                     <label>
                       场景名称
@@ -385,11 +364,6 @@ export function MockService({ active, edit, origin }: PageProps & { origin?: str
                       />
                     </label>
                     <div className="delay-stepper"><button type="button" aria-label="减少延迟" onClick={() => changeScenario({ delay: Math.max(0, scenario.delay - 50) })}>−</button><input aria-label="拖动调整延迟" type="range" min={0} max={10000} value={scenario.delay} onChange={e => changeScenario({ delay: Number(e.target.value) })} /><button type="button" aria-label="增加延迟" onClick={() => changeScenario({ delay: Math.min(10000, scenario.delay + 50) })}>＋</button></div>
-                    <div className="choice-field">
-                      <span>格式</span>
-                      <SegmentedControl label="响应格式" value={scenario.format}
-                        options={[{ value: 'json', label: 'JSON' }, { value: 'text', label: '纯文本' }]} onChange={format => changeScenario({ format })} />
-                    </div>
                   </div>
                   <details className="mock-match">
                     <summary>

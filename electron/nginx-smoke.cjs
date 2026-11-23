@@ -183,6 +183,12 @@ module.exports = async function checkNginx(window, output) {
     const state = await ipc('get'); instanceId = state.instances.find(item => item.main === main).id;
     assert.equal(await js('document.querySelector(\'button[aria-pressed=true]\')?.textContent === "字段配置" || !!document.querySelector(".ng-tree")'), true);
     assert.equal(await js('document.querySelectorAll(".ng-file-tabs button").length'), 3);
+    assert.equal(await js('document.querySelector(".ng-runtime").open'), false);
+    assert.equal(await js('document.querySelector(".ng-runtime summary").clientHeight < 32'), true);
+    await js('document.querySelector(".ng-runtime summary").click()');
+    await wait('document.querySelector(".ng-runtime").open');
+    assert.equal(await js('document.querySelector(".ng-runtime dl").innerText.includes(' + JSON.stringify(main) + ')'), true);
+    await js('document.querySelector(".ng-runtime summary").click()');
     const tabLabels = await js(`[...document.querySelectorAll('.ng-file-tabs [role=tab]')].filter(el=>el.title.endsWith('common_proxy.conf')).map(el=>el.textContent)`);
     assert.equal(new Set(tabLabels).size, 2);
     await wait('!document.querySelector("dialog[open]") && !!document.querySelector(".ng-file-tabs [aria-selected=true]:enabled")');

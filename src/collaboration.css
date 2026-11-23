@@ -633,6 +633,19 @@
   border-radius: 7px;
   overflow: hidden;
 }
+.mock-response-editor { display: grid; gap: 10px; min-width: 0; }
+.mock-response-bar, .mock-generation { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mock-response-bar { justify-content: space-between; }
+.mock-response-bar strong { display: inline-flex; align-items: center; gap: 7px; }
+.mock-generation label { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.mock-generation select { width: auto; }
+.mock-generation input { width: 5em; }
+.mock-preview > button { margin: 6px 10px; }
+.mock-preview > p, .mock-code-panel > p { padding: 8px 12px; }
+.mock-fields-help { color: var(--muted); font-size: 12px; }
+.mock-fields-help summary { cursor: pointer; }
+.mock-fields-help p { margin-block: 8px; }
+.mock-fields-help div { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .mock-code-panel > div:first-child {
   padding: 8px 12px;
   display: flex;
