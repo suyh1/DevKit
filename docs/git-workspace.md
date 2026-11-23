@@ -55,7 +55,7 @@ node server/git-register.mjs list
 
 ## 高频操作的界面设计
 
-分支总览展示本地位置与远端目标。提交区和差异预览在宽屏并排，窄屏按单列排列。推送先就地展开目标与提交清单；本地提交和远端传输各自显示结果。分块暂存借鉴 Lazygit 的差异块操作，提交前核对文件和目标分支的组织方式参考 GitHub Desktop。底层使用 [Git apply](https://git-scm.com/docs/git-apply) 和 [Git merge](https://git-scm.com/docs/git-merge)。
+页面标题沿用共享工作台的字号。分支总览、推送按钮和选中项随主题配色及明暗模式变化，差异行用新增色和删除色区分。分支总览展示本地位置与远端目标。提交区和差异预览在宽屏并排，窄屏按单列排列。推送先就地展开目标与提交清单；本地提交和远端传输各自显示结果。分块暂存借鉴 Lazygit 的差异块操作，提交前核对文件和目标分支的组织方式参考 GitHub Desktop。底层使用 [Git apply](https://git-scm.com/docs/git-apply) 和 [Git merge](https://git-scm.com/docs/git-merge)。
 
 ## 验证入口
 

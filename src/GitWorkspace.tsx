@@ -623,7 +623,7 @@ export default function GitWorkspace({
   if (!active) return null;
   return (
     <div ref={container} className="git-workspace">
-      <header className="git-heading">
+      <header className="git-heading workspace-banner">
         <div>
           <FolderGit2 size={24} />
           <h1>Git 仓库管理</h1>
@@ -668,7 +668,7 @@ export default function GitWorkspace({
         <Skeleton kind="projects" label="正在读取仓库列表" />
       ) : !repos.length ? (
         <div className="git-empty" data-resource-card>
-          <GitPullRequest size={56} strokeWidth={1.25} />
+          <GitPullRequest size={36} strokeWidth={1.25} />
           <h2>{portal ? '暂无已发布仓库' : '连接第一个 Git 仓库'}</h2>
           <p>
             {portal

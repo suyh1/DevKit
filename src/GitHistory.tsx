@@ -6,7 +6,7 @@ import Skeleton from './Skeleton';
 import FileMeta from './FileMeta';
 import { DiffText } from './GitReview';
 
-const colors = ['#399984', '#c46f4f', '#9674c9', '#518ac4', '#bc963f'];
+const colors = ['var(--accent)', 'var(--syntax-string)', 'var(--warning)', 'var(--syntax-keyword)', 'var(--success)'];
 const laneX = (n: number) => 9 + n * 12;
 
 export function graphRows(commits: Commit[]) {

@@ -45,13 +45,60 @@ module.exports = async function gitSmoke(window, installation, output) {
     await wait(execute, target);
     await execute(target + '.click()');
   };
+  // Read computed styles in the same renderer used by desktop and shared browsers.
+  async function checkAppearance(execute, contents, surface, shot) {
+    const original = await execute('({...document.documentElement.dataset})');
+    const backgrounds = new Set();
+    try {
+      for (const style of ['default', 'editorial']) {
+        for (const theme of ['light', 'dark']) {
+          const sample = await execute(`(async () => {
+            Object.assign(document.documentElement.dataset, {theme: ${JSON.stringify(theme)}, themeStyle: ${JSON.stringify(style)}});
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await Promise.allSettled(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished));
+            const page = document.querySelector('.git-workspace');
+            const panel = page.querySelector(${JSON.stringify(surface)});
+            const css = getComputedStyle(panel);
+            const probe = document.createElement('span');
+            panel.append(probe);
+            const color = token => {
+              probe.style.color = 'var(--' + token + ')';
+              return getComputedStyle(probe).color;
+            };
+            const sample = {
+              background: css.backgroundImage,
+              textMatches: css.color === color('text'),
+              accentMatches: getComputedStyle(page.querySelector('.git-heading svg')).color === color('accent'),
+              titleSize: parseFloat(getComputedStyle(page.querySelector('h1')).fontSize),
+              branchSize: parseFloat(getComputedStyle(panel.querySelector('h2')).fontSize),
+              bodySize: parseFloat(getComputedStyle(page).fontSize),
+            };
+            probe.remove();
+            return sample;
+          })()`);
+          assert.ok(sample.textMatches && sample.accentMatches, style + '/' + theme + ' palette');
+          assert.ok(sample.titleSize <= 22 && sample.branchSize <= 18 && sample.bodySize <= 13);
+          backgrounds.add(sample.background);
+          if (shot && style === 'default') {
+            await fs.writeFile(path.join(output, shot + '-' + theme + '.png'), (await contents.capturePage()).toPNG());
+          }
+        }
+      }
+      assert.equal(backgrounds.size, 4, 'Git panel follows both palette and brightness');
+    } finally {
+      await execute('void Object.assign(document.documentElement.dataset, ' + JSON.stringify(original) + ')');
+    }
+  }
   let browser;
   try {
     await require('./navigation-helpers.cjs')(window).openWorkspace('Git 仓库管理');
+    await wait(desktop, 'document.querySelector(".git-empty h2")');
+    await checkAppearance(desktop, window.webContents, '.git-empty');
     await chooseText(desktop, '选择工作目录');
     await wait(desktop, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
     const text = await desktop('document.querySelector(".git-hero h2").textContent');
     assert.equal(text, 'main');
+    await checkAppearance(desktop, window.webContents, '.git-hero', 'git-workspace');
     await fs.writeFile(path.join(output, 'git-desktop.png'), (await window.webContents.capturePage()).toPNG());
     await click(desktop, '.git-review-tools button[aria-label="暂存 README.md"]');
     await wait(desktop, '!!document.querySelector(".git-review-tools button[aria-label=\\"取消暂存 README.md\\"]")');
@@ -62,6 +109,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     await wait(desktop, 'document.querySelector(".git-hero-main p")?.textContent.includes("网页审阅样本")');
     await wait(desktop, 'document.querySelector(".git-push-preview ul")?.textContent.includes("网页审阅样本")');
     await desktop('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    await checkAppearance(desktop, window.webContents, '.git-hero', 'git-push');
     await fs.writeFile(path.join(output, 'git-push-preview.png'), (await window.webContents.capturePage()).toPNG());
     await click(desktop, '.git-push-preview .run-button');
     await wait(desktop, 'document.querySelector(".git-notice")?.textContent.includes("origin/main")');
@@ -109,6 +157,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     await click(web, '.git-workspace button[aria-label="提交历史"]');
     await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
     assert.equal(await web('document.querySelectorAll(".git-commit-row").length'), 2);
+    await checkAppearance(web, browser.webContents, '.git-hero', 'git-portal');
     assert.equal(await web('document.documentElement.scrollWidth <= window.innerWidth'), true);
     const [published] = await web(post('git/list', {}) + '.then(r=>r.json())');
     assert.equal(published.root, undefined);
