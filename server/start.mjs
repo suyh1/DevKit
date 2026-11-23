@@ -15,15 +15,16 @@ import { createLanWorkspaces } from './lan-workspaces.mjs';
 import { createCollabStore } from './collab-store.mjs';
 import { createFileShares } from './file-shares.mjs';
 import { createKnowledgeBase } from './knowledge-base.mjs';
+import { createGitWorkspace } from './git-workspace.mjs';
 import { createTodoLists } from './todo-lists.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
-let collab, transferLinks, nginx, library, jar, monitor, lan, fileShares, projectTodos, knowledge;
+let gitWorkspace, collab, transferLinks, nginx, library, jar, monitor, lan, fileShares, projectTodos, knowledge;
 const logs = createLogCenter({ nginx: () => nginx, jar: () => jar, lan: () => lan });
-const host = await createProjectHost(store, path.join(root, "dist"), { nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
+const host = await createProjectHost(store, path.join(root, "dist"), { git: () => gitWorkspace, nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
 try {
   lan = await createLanWorkspaces(directory);
   const saved = await store.settings();
@@ -48,6 +49,7 @@ try {
   jar = await createJarManager(directory);
   monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar, lan: () => lan });
   fileShares = await createFileShares(directory).catch(error => console.error(`文件共享配置：${error.message}`));
+  if (services.git.enabled) gitWorkspace = await createGitWorkspace(directory);
   if (services.knowledge.enabled) knowledge = await createKnowledgeBase(directory);
   if (services['project-todos'].enabled)
     projectTodos = await createTodoLists(directory).catch(error => console.error(`待办清单配置：${error.message}`));

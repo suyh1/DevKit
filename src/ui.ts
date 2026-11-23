@@ -1,6 +1,6 @@
 import { Braces, Binary, Link, Clock3, Fingerprint, KeyRound, Regex, Code2, FileCode2, Table2, FileKey2, CaseSensitive, Hash, Code, Pipette, Palette, Contrast, Blend, Paintbrush, SlidersHorizontal, FileJson2, FileSpreadsheet, Database, FileDiff, ScanLine, LockKeyhole, MapPin, Activity, ScrollText, ServerCog, Server, FolderOpen, Send, Terminal } from 'lucide-react';
 import { categories, type workspaceModules } from './catalog';
-import { QrCode, PanelsTopLeft, ListOrdered, BookOpen, ClipboardList, FolderUp, ArrowLeftRight, Workflow, Presentation } from 'lucide-react';
+import { GitBranch, QrCode, PanelsTopLeft, ListOrdered, BookOpen, ClipboardList, FolderUp, ArrowLeftRight, Workflow, Presentation } from 'lucide-react';
 
 import { CalendarDays, ChartNoAxesColumn, ChartGantt, FileArchive, Images, Scroll, GitCompareArrows, BookKey, Workflow as FlowIcon, Grid2X2, FileType2, MapPinned, Timer, ListTree, AppWindowMac, Cookie, CalendarRange, GitCommitHorizontal, Languages, Network } from 'lucide-react';
 import type {AnalysisId} from './analysis/catalog';
@@ -25,6 +25,7 @@ export const workspaceModuleNav = {
   projects: { Icon: FolderOpen, hint: '项目入口与环境档案' },
   knowledge: { Icon: BookOpen, hint: '部署手册、排查与交接' },
   'project-todos': { Icon: ClipboardList, hint: '纯文本任务与标签' },
+  git: { Icon: GitBranch, hint: '审阅改动、提交历史与分支' },
   'file-shares': { Icon: FolderUp, hint: '在浏览器下载本机文件' },
   transfer: { Icon: ArrowLeftRight, hint: '文件与文字互传' },
   mock: { Icon: Workflow, hint: '多场景响应与调用记录' },

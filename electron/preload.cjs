@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('devkitCollab', {
 contextBridge.exposeInMainWorld('devkitFileShares', {
   request: (action, payload) => ipcRenderer.invoke('devkit:file-shares', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitGit', {
+  request: (action, value) => ipcRenderer.invoke('devkit:git', action, value),
+});
 contextBridge.exposeInMainWorld('devkitKnowledge', {
   request: (action, payload) => ipcRenderer.invoke('devkit:knowledge', action, payload),
 });

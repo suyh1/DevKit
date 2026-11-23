@@ -197,7 +197,7 @@ HTTPS 入口显示证书到期时间，可在 Webhook 设置中启用剩余 30 �
 | 独立 Node 服务 | 解压根目录的 `configs/`，与 `server/` 同级 |
 | 源码桌面运行 | 仓库根目录的 `configs/` |
 
-桌面顶栏可打开“配置文件”和“局域网共享”。升级时会将旧目录中的已知文件自动分组，遇到同名冲突会提示核对并保留两份文件。项目与快照放在 `configs/projects/`，共享权限、审计和链接放在 `configs/sharing/`，知识库和待办放在 `configs/planning/`。每个档案对应一个 `profile-<编码 ID>.json`，独立保存项目与变量；`projects.json` 保存索引、版本与快照，共享设置及加盐口令哈希另存。旧数据自动展开为独立档案并保留原始备份；API 项目、环境和上次保存快照位于 `configs/http/api-workspace.json`，整目录复制时一起迁移；桌面 Nginx 实例注册表和原文件备份位于 `configs/nginx/`，实际配置文件仍在原路径。首次启动会在新位置无数据时迁入旧版项目配置并保留原件；已有新配置优先，升级和卸载保留配置目录。
+桌面顶栏可打开“配置文件”和“局域网共享”。升级时会将旧目录中的已知文件自动分组，遇到同名冲突会提示核对并保留两份文件。项目与快照放在 `configs/projects/`，共享权限、Git 仓库登记、审计和链接放在 `configs/sharing/`，知识库和待办放在 `configs/planning/`。每个档案对应一个 `profile-<编码 ID>.json`，独立保存项目与变量；`projects.json` 保存索引、版本与快照，共享设置及加盐口令哈希另存。旧数据自动展开为独立档案并保留原始备份；API 项目、环境和上次保存快照位于 `configs/http/api-workspace.json`，整目录复制时一起迁移；桌面 Nginx 实例注册表和原文件备份位于 `configs/nginx/`，实际配置文件仍在原路径。首次启动会在新位置无数据时迁入旧版项目配置并保留原件；已有新配置优先，升级和卸载保留配置目录。
 
 迁移时关闭来源与目标应用 / 服务，备份目标配置后，复制整个 `configs` 到新安装目录并确保普通用户有写入权限。只导出项目 JSON 不会包含共享口令和历史快照。两边数据需要合并时使用界面的导入预览。
 
@@ -224,6 +224,10 @@ DEVKIT_PROJECT_PASSWORD='替换为独立访问口令' DEVKIT_SHARE_PROJECTS=true
 ## 本机文件共享管理
 
 在共享清单中查看运行状态与端口，选中共享后管理范围、复制指定网卡的链接或打开下载页。下载页支持筛选文件名和下载文件夹 ZIP。勾选发布并在“局域网共享”中开放栏目，获准访客即可登录，在共享列表直接进入下载页。[配置与访问方式](docs/workspace-sharing.md#本机文件共享管理)
+
+## Git 仓库管理
+
+在共享栏目的「Git 仓库管理」选择本机工作目录，查看文件差异、暂存与提交、浏览提交拓扑，或管理分支、标签、贮藏和远端同步。逐仓库发布后，网页访客按授权查看、编辑或同步。运行仓库的主机需要安装 Git。详见[使用与设计说明](docs/git-workspace.md)。
 
 ## 待办清单
 
@@ -327,6 +331,7 @@ npm run test:docs
 npm test
 npm run test:desktop
 npm run test:projects
+npm run test:git
 npm run test:release
 npm run test:electron
 npm run build

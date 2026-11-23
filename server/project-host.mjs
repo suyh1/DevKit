@@ -296,6 +296,24 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
               return json(error.status || 500, { error: error.status ? error.message : '读取共享内容失败。' });
             }
           }
+          if (url.pathname.startsWith('/api/git/')) {
+            if (!services.git.enabled) return json(404, { error: '未开放 Git 仓库管理。' });
+            if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
+            const manager = managers.git?.();
+            if (!manager) return json(503, { error: 'Git 工作台暂不可用。' });
+            const action = url.pathname.slice('/api/git/'.length);
+            const payload = await body();
+            const writing = !['list', 'state', 'patch', 'show', 'stash-show'].includes(action);
+            let result;
+            try { result = await manager.request(action, payload, { ...services.git, portal: true, authorize: ensureCurrentSession }); }
+            catch (error) {
+              if (writing) audit.record(session.visitor, 'git.' + action.slice(0, 32), error.status === 403 || error.status === 404 ? 'denied' : 'failed');
+              throw error;
+            }
+            ensureCurrentSession();
+            if (writing) audit.record(session.visitor, 'git.' + action, 'ok');
+            return json(200, result);
+          }
           if (url.pathname.startsWith('/api/knowledge/')) {
             const access = services.knowledge;
             if (!access.enabled) return json(404, { error: '未开放团队知识库共享。' });

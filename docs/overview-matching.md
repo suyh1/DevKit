@@ -123,6 +123,7 @@
 
 | 工具或栏目 | 输入特征及用法 |
 | --- | --- |
+| Git 仓库管理（`git`） | `git status`、`git diff` 或补丁打开工作区；`git log`、`git show` 或完整提交记录打开历史；分支、标签和同步命令打开分支与同步。`git stash` 打开贮藏。命令只决定打开的视图。粘贴 `#git/<仓库 ID>` 结尾的共享链接，可选中已登记的对应仓库。 |
 | 日志中心（`logs`） | 带日志级别的记录、MyBatis、Java 线程或 GC 日志 |
 | 监控中心（`monitor`） | HTTP(S) 地址或 TCP 检测地址 |
 | HTTP 调试（`http`） | HTTP(S) 地址、cURL、HTTP 请求行、请求配置或 OpenAPI/Swagger |

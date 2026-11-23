@@ -21,6 +21,7 @@ import Settings from './Settings';
 import ConfigStorage from './ConfigStorage';
 import ProjectCenter from './ProjectCenter';
 import KnowledgeBase from './KnowledgeBase';
+import GitWorkspace from './GitWorkspace';
 import TodoLists from './TodoLists';
 import { CollaborationPage } from './CollaborationPage';
 import FileShares from './FileShares';
@@ -36,7 +37,7 @@ import { workspaceModules } from './catalog';
 import type { ServiceDraft } from './detection';
 import type { WorkspaceModuleId } from './catalog';
 import CommandPalette from './CommandPalette';
-import { parseWorkspaceLink } from './workspace-links';
+import { openWorkspaceLink, parseWorkspaceLink } from './workspace-links';
 import CategoryNavigation from './CategoryNavigation';
 import { toolIcons, categoryMeta } from './ui';
 import { createTask, defaultPreferences, editTask, importWorkspace, normalizeFavorites, MAX_TASKS, validatePreferences, snapshotTasks, workspaceSnapshot } from './workbench';
@@ -60,6 +61,7 @@ export default function App() {
   return <DisplayModeProvider mode={preferences.displayMode}><ConfirmationProvider><SharingProvider><Workbench preferences={preferences} setPreferences={setPreferences} /></SharingProvider></ConfirmationProvider></DisplayModeProvider>;
 }
 function Workbench({ preferences, setPreferences }: { preferences: Preferences; setPreferences: React.Dispatch<React.SetStateAction<Preferences>> }) {
+  const [gitSeed, setGitSeed] = useState<{ mode: import('./git-api').GitMode }>();
   const [serviceSeed, setServiceSeed] = useState<ServiceDraft>();
   const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
@@ -275,6 +277,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'logs'} hidden={page !== 'logs'} className="workspace"><LogCenter active={page === 'logs'} /></div>
         <div data-motion-page inert={page !== 'http'} hidden={page !== 'http'} className="workspace http-workspace"><HttpWorkbench active={page === 'http'} initial={httpInitial} onNotice={notice} onGenerate={config => openTool('http-code', true, config)} /></div>
         <div data-motion-page inert={page !== 'projects'} hidden={page !== 'projects'} className="workspace project-workspace"><ProjectCenter visible={page === 'projects'} /></div>
+        <div data-motion-page inert={page !== 'git'} hidden={page !== 'git'} className="workspace"><GitWorkspace active={page === 'git'} seed={gitSeed} /></div>
         <div data-motion-page inert={page !== 'knowledge'} hidden={page !== 'knowledge'} className="workspace"><KnowledgeBase active={page === 'knowledge'} /></div>
         <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><TodoLists active={page === 'project-todos'} onOpenTool={id => openTool(id)} /></div>
         {(['transfer', 'mock', 'whiteboard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
@@ -284,7 +287,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={match => {
-          if (match.kind === 'workspace') { setServiceSeed(match.service); navigate(match.id); }
+          if (match.kind === 'workspace') { setServiceSeed(match.service); if (match.gitMode) setGitSeed({ mode: match.gitMode }); if (match.resourceId) openWorkspaceLink(match.id, match.resourceId); else navigate(match.id); }
           else openTool(match.id, true, match.input, match.options);
         }} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} homeVisit={homeVisit} onBrowse={() => navigate('home', false, 'library')} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>

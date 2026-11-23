@@ -26,6 +26,7 @@ let jarManager, jarError = '';
 let lan, lanError = '';
 let collab, collabError = '', transferLinks, transferLinksError = '';
 let knowledge, knowledgeError = '';
+let gitWorkspace, gitError = '';
 let fileShares, fileSharesError = '', projectTodos, projectTodosError = '';
 let monitorManager, monitorError = '';
 let logCenter;
@@ -194,6 +195,8 @@ app.whenReady().then(async () => {
     projectStore = await createProjectStore(projectStorage.directory);
     try { lan = await (await import('./server/lan-workspaces.mjs')).createLanWorkspaces(projectStorage.directory); }
     catch (error) { lanError = error.message; }
+    try { gitWorkspace = await (await import('./server/git-workspace.mjs')).createGitWorkspace(projectStorage.directory); }
+    catch (error) { gitError = error.message; }
     try { fileShares = await (await import('./server/file-shares.mjs')).createFileShares(projectStorage.directory); }
     catch (error) { fileSharesError = error.message; }
     try { knowledge = await (await import('./server/knowledge-base.mjs')).createKnowledgeBase(projectStorage.directory); }
@@ -208,7 +211,7 @@ app.whenReady().then(async () => {
         transferLinks = await createTransferLinks(projectStorage.directory, path.join(__dirname, 'dist'), collab);
       } catch (error) { transferLinksError = error.message; }
     }
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { git: () => gitWorkspace, nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -351,6 +354,17 @@ app.whenReady().then(async () => {
         } finally { await file.close(); }
       }
       return { data: await collab.request(module, action, value, { owner: event.sender.id, actor: '主机' }) };
+    } catch (error) { return { error: error.message, status: error.status }; }
+  });
+  ipcMain.handle('devkit:git', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的仓库请求。');
+    try {
+      if (!gitWorkspace) throw new Error(gitError || projectError || 'Git 工作台尚未准备好。');
+      if (action === 'choose') {
+        const selection = await dialog.showOpenDialog(window, { title: '选择 Git 工作目录', properties: ['openDirectory'] });
+        return { data: selection.filePaths[0] || '' };
+      }
+      return { data: await gitWorkspace.request(action, value) };
     } catch (error) { return { error: error.message, status: error.status }; }
   });
   ipcMain.handle('devkit:file-shares', async (event, action, value) => {

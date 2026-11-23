@@ -219,6 +219,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     projects: { enabled: true, edit: true, probe: true },
     knowledge: { enabled: false, edit: false },
     'project-todos': { enabled: false, edit: false },
+    git: { enabled: false, edit: false, sync: false },
     'file-shares': { enabled: false },
     transfer: { enabled: false, edit: false },
     mock: { enabled: false, edit: false },

@@ -1,0 +1,134 @@
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const net = require('node:net');
+const { BrowserWindow, dialog } = require('electron');
+
+module.exports = async function gitSmoke(window, installation, output) {
+  const repo = path.join(installation, 'Atlas');
+  await fs.mkdir(repo);
+  const git = (...args) => execFileSync('git', args, { cwd: repo, windowsHide: true, stdio: 'pipe' });
+  git('init', '-b', 'main');
+  git('config', 'user.name', 'DevKit Test');
+  git('config', 'user.email', 'test@example.invalid');
+  git('config', 'commit.gpgsign', 'false');
+  await fs.writeFile(path.join(repo, 'README.md'), '# Atlas\n');
+  git('add', 'README.md');
+  git('commit', '-m', '创建项目说明');
+  await fs.writeFile(path.join(repo, 'README.md'), '# Atlas\nReviewed change\n');
+  const originalPicker = dialog.showOpenDialog;
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [repo] });
+  const desktop = (code) => window.webContents.executeJavaScript(code, true);
+  const wait = async (execute, expression) => {
+    for (let attempt = 0; attempt < 160; attempt++) {
+      if (await execute('Boolean(' + expression + ')')) return;
+      await new Promise((resolve) => setTimeout(resolve, 75));
+    }
+    throw new Error(
+      'Git UI condition failed: ' + expression + '\n' + (await execute('document.body.innerText')).slice(-1500),
+    );
+  };
+  const click = async (execute, selector) => {
+    const element = 'document.querySelector(' + JSON.stringify(selector) + ')';
+    await wait(execute, element + ' && !' + element + '.disabled');
+    await execute(element + '.click()');
+  };
+  const chooseText = async (execute, label) => {
+    const target =
+      '[...document.querySelectorAll(".git-workspace button")].find(b => b.textContent.trim() === ' +
+      JSON.stringify(label) +
+      ')';
+    await wait(execute, target);
+    await execute(target + '.click()');
+  };
+  let browser;
+  try {
+    await require('./navigation-helpers.cjs')(window).openWorkspace('Git 仓库管理');
+    await chooseText(desktop, '选择工作目录');
+    await wait(desktop, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
+    const text = await desktop('document.querySelector(".git-hero h2").textContent');
+    assert.equal(text, 'main');
+    await fs.writeFile(path.join(output, 'git-desktop.png'), (await window.webContents.capturePage()).toPNG());
+    await click(desktop, '.git-file-row button[aria-label="暂存 README.md"]');
+    await wait(desktop, '!!document.querySelector(".git-file-row button[aria-label=\\"取消暂存 README.md\\"]")');
+    await desktop(
+      '(()=>{const field=document.querySelector("#git-message"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,"网页审阅样本"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
+    );
+    await click(desktop, '.git-compose .run-button');
+    await wait(desktop, 'document.querySelector(".git-hero-main p")?.textContent.includes("网页审阅样本")');
+    await chooseText(desktop, '发布到网页');
+    await click(desktop, '.confirm-dialog[open] .confirm-discard');
+    await wait(desktop, 'document.querySelector(".git-repo-bar")?.textContent.includes("撤下共享")');
+
+    const socket = net.createServer();
+    await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
+    const port = socket.address().port;
+    await new Promise((resolve) => socket.close(resolve));
+    const { emptySharingServices } = await import('../shared/sharing.mjs');
+    const services = emptySharingServices();
+    services.git.enabled = true;
+    const start = await desktop(
+      'window.devkitProjects.request("start",' +
+        JSON.stringify({ host: '127.0.0.1', port, password: 'git-smoke-only', services }) +
+        ')',
+    );
+    assert.equal(start.error, undefined);
+    browser = new BrowserWindow({
+      show: false,
+      width: 405,
+      height: 830,
+      webPreferences: { sandbox: true, offscreen: true, backgroundThrottling: false, partition: 'git-' + Date.now() },
+    });
+    const web = (code) => browser.webContents.executeJavaScript(code, true);
+    const address = 'http://127.0.0.1:' + port + '/#git';
+    await browser.loadURL(address);
+    const post = (action, payload) =>
+      'fetch(' +
+      JSON.stringify('/api/' + action) +
+      ',{method:"POST",headers:{"Content-Type":"application/json"},body:' +
+      JSON.stringify(JSON.stringify(payload)) +
+      '})';
+    assert.equal(await web(post('git/list', {}) + '.then(r=>r.status)'), 401);
+    await wait(web, 'document.querySelector(".portal-login input[type=password]")');
+    await web(
+      '(()=>{const field=document.querySelector(".portal-login input[type=password]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(field,"git-smoke-only"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
+    );
+    await click(web, '.portal-login button[type=submit]');
+    await wait(web, 'document.querySelector(".git-hero h2")?.textContent === "main"');
+    assert.equal(await web('!!document.querySelector(".git-compose")'), false);
+    await click(web, '.git-workspace button[aria-label="提交历史"]');
+    await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
+    assert.equal(await web('document.querySelectorAll(".git-commit-row").length'), 2);
+    assert.equal(await web('document.documentElement.scrollWidth <= window.innerWidth'), true);
+    const [published] = await web(post('git/list', {}) + '.then(r=>r.json())');
+    assert.equal(published.root, undefined);
+    assert.equal(await web(post('git/stage', { id: published.id, path: 'README.md' }) + '.then(r=>r.status)'), 403);
+    await web('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    await fs.writeFile(path.join(output, 'git-portal-mobile.png'), (await browser.webContents.capturePage()).toPNG());
+    // Restart with editor access and use a fresh session to exercise the HTTP write path.
+    await desktop('window.devkitProjects.request("stop")');
+    services.git.edit = true;
+    const restart = await desktop('window.devkitProjects.request("start",' + JSON.stringify({ host: '127.0.0.1', port, services }) + ')');
+    assert.equal(restart.error, undefined);
+    await browser.loadURL('about:blank');
+    await fs.writeFile(path.join(repo, 'review.txt'), 'Browser editor\n');
+    await browser.loadURL(address);
+    await wait(web, 'document.querySelector(".portal-login input[type=password]")');
+    await web('(()=>{const field=document.querySelector(".portal-login input[type=password]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(field,"git-smoke-only"); field.dispatchEvent(new Event("input",{bubbles:true}));})()');
+    await click(web, '.portal-login button[type=submit]');
+    await click(web, '.git-file-row button[aria-label="暂存 review.txt"]');
+    await wait(web, 'document.querySelector(".git-file-row button[aria-label=\\"取消暂存 review.txt\\"]")');
+    assert.equal(git('diff', '--cached', '--name-only').toString().trim(), 'review.txt');
+    await click(web, '.git-workspace button[aria-label="贮藏"]');
+    await chooseText(web, '贮藏当前改动');
+    await click(web, '.confirm-dialog[open] .confirm-discard');
+    await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Browser editor")');
+    assert.equal(git('status', '--porcelain').toString().trim(), '');
+    console.log('Git desktop workflow, mobile review, visitor permissions, web staging and stash passed.');
+  } finally {
+    dialog.showOpenDialog = originalPicker;
+    browser?.destroy();
+    await desktop('window.devkitProjects.request("stop")');
+  }
+};

@@ -52,7 +52,7 @@ function StoragePanel({ portal, close }: { portal: boolean; close: () => void })
     </div></div>
     <dl className="pc-file-list">
       <div><dt>projects/</dt><dd>档案、项目、变量与最近 30 份快照</dd></div>
-      <div><dt>sharing/</dt><dd>共享权限、访问口令哈希、审计、文件共享和快传链接</dd></div>
+      <div><dt>sharing/</dt><dd>共享权限、访问口令哈希、审计、Git 仓库登记、文件共享和快传链接</dd></div>
       <div><dt>planning/</dt><dd>知识库和待办清单</dd></div>
     </dl>
     <p>升级时自动整理旧版散落的配置文件。迁移到其他电脑时，请先关闭两端的 DevKit 或独立服务，备份目标目录，再复制整个 configs。目录包含访问凭据。</p>

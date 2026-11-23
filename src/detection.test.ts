@@ -18,7 +18,7 @@ const examples: Partial<Record<ToolId, string>> = {
 };
 const workspaces: Record<WorkspaceModuleId, string> = {
   logs: '[WARN] cache unavailable', http: 'GET /hello HTTP/1.1', monitor: 'tcp://localhost:8080',
-  projects: '{"format":"devkit-project-center"}', knowledge: '# 交接记录', 'project-todos': '- [ ] 核对订单',
+  git: 'git status', projects: '{"format":"devkit-project-center"}', knowledge: '# 交接记录', 'project-todos': '- [ ] 核对订单',
   'file-shares': 'D:\\资料\\年度报告', transfer: 'report.xlsx', mock: '{"type":"object","properties":{}}',
   whiteboard: '设计稿.png', nginx: 'server { listen 80; }', jar: 'java -jar app.jar', 'lan-hosts': 'ssh dev@server',
 };
@@ -48,6 +48,15 @@ describe('推荐顺序和打开方式', () => {
       expect(colors.every(s => s.kind === 'tool' && s.input === value)).toBe(true);
     },
   );
+  it('按 Git 输入打开正确视图，并保留本机工具匹配', () => {
+    for (const [source, gitMode] of [['git status', 'changes'], ['diff --git a/a b/a', 'changes'], ['git log --graph', 'history'], ['git switch demo', 'refs'], ['git stash list', 'stash']])
+      expect(detectTools(source)).toContainEqual(expect.objectContaining({ id: 'git', gitMode }));
+    expect(detectTools('feat: 完成搜索').map(s => s.id)).toContain('changelog');
+    expect(detectTools('*.log').map(s => s.id)).not.toContain('git');
+    const id = 'ffb7a698-c851-4294-94f4-5651e4b33fe9';
+    expect(detectTools('https://kit.example/#git/' + id)[0]).toMatchObject({ id: 'git', resourceId: id });
+    expect(detectTools('digital art').map(s => s.id)).not.toContain('git');
+  });
   it('从脚本命令带入启动方式、含空格的脚本路径和逐行参数', () => {
     expect(detectTools('python3 "/srv/my app/main.py" --port 9000')).toContainEqual(expect.objectContaining({
       id: 'jar', service: { kind: 'script', script: '/srv/my app/main.py', args: '--port\n9000' },

@@ -404,6 +404,11 @@ function SharingPanel({
                         id: 'file-shares', name: '本机文件共享管理', description: '浏览主机已发布的共享，下载文件与文件夹 ZIP',
                         permissions: [],
                       },
+                      { id: 'git', name: 'Git 仓库管理', description: '审阅已发布仓库的工作区、代码差异和历史',
+                        permissions: [
+                          { key: 'edit', label: '编辑仓库', detail: '暂存、提交、创建和切换分支、打标签、保存与应用贮藏。' },
+                          { key: 'sync', label: '同步远端', detail: '使用主机凭据获取、快进拉取和推送至已配置的上游。' },
+                        ] },
                       { id: 'transfer', name: '局域网快传', description: '文件与文字互传',
                         permissions: [{ key: 'edit', label: '发送与移除', detail: '可向共享收件箱发送内容，也可从所有设备的收件箱移除条目。' }] },
                       { id: 'mock', name: '接口模拟服务', description: '多场景响应与调用记录',
@@ -542,6 +547,7 @@ function SharingPanel({
                                 : service.id === 'mock' ? '模拟接口、调用地址和近期记录'
                                 : service.id === 'whiteboard' ? '白板、截图和全部标注'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
+                                : service.id === 'git' ? '已发布仓库的代码差异、分支、标签与提交历史'
                                 : service.id === 'knowledge' ? '全部团队文档及历史版本' : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
                             。
                           </p>
@@ -591,7 +597,7 @@ function SharingPanel({
                   {(draft.visitors || []).map((visitor, index) => {
                     const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
                     const existing = visitor.hasPassword === true;
-                    const labels: Record<string, string> = { backend: '包含 npm、可执行程序与解释器脚本', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '服务日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
+                    const labels: Record<string, string> = { sync: '同步远端', backend: '包含 npm、可执行程序与解释器脚本', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '服务日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
                     const effective = visitorServices(draft.services, visitor.services);
                     const grants = workspaceModules.flatMap(item => {
                       const service = effective[item.id];

@@ -9,7 +9,7 @@ export type ServiceDraft = { kind: 'jar' | 'npm' | 'program' | 'script'; jar?: s
 
 export type Suggestion =
   | { kind: 'tool'; id: ToolId; name: string; reason: string; input?: string; options?: Options }
-  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; options?: never };
+  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; resourceId?: string; gitMode?: import('./git-api').GitMode; options?: never };
 export const DETECTION_LIMIT = 200_000;
 
 const toolNames = new Map(tools.map(t => [t.id, t.name]));
@@ -21,7 +21,7 @@ const intents: Partial<Record<ToolId, string[]>> = {
 
 type Rules = {
   tool: (id: ToolId, reason: string, options?: Options, input?: string) => void;
-  workspace: (id: WorkspaceModuleId, reason: string, service?: ServiceDraft) => void;
+  workspace: (id: WorkspaceModuleId, reason: string, service?: ServiceDraft, resourceId?: string) => void;
   open: (id: ToolId, reason: string) => void;
 };
 
@@ -144,7 +144,10 @@ function webAddressRules(text: string, { tool, workspace }: Rules) {
       const url = new URL(text);
       const [page] = url.hash.slice(1).split('/', 1);
       const linked = workspaceModules.find(w => w.id === page);
-      if (linked) workspace(linked.id, '链接指向' + linked.name);
+      if (linked) {
+        const gitId = /^#git\/([a-f\d-]{36})$/i.exec(url.hash)?.[1];
+        workspace(linked.id, '链接指向' + linked.name, undefined, gitId);
+      }
       tool('url-inspect', '拆解地址与查询参数');
       tool('qr-code', '为链接生成二维码');
       tool('url', '对完整地址进行百分号编码');
@@ -306,7 +309,7 @@ export function detectTools(input: string): Suggestion[] {
   const rules: Rules = {
     tool: (id, reason, options, source = input) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason, options, input: source }),
     open: (id, reason) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason }),
-    workspace: (id, reason, service) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason, ...(service && { service }) }),
+    workspace: (id, reason, service, resourceId) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason, ...(service && { service }), ...(resourceId && { resourceId }) }),
   };
   if (text.length <= 100) {
     const key = text.toLowerCase();
@@ -325,6 +328,13 @@ export function detectTools(input: string): Suggestion[] {
       jsonRules(data, text, rules);
       return [...matches.values()];
     }
+  }
+  const gitCommand = /^git\s+(status|diff|add|commit|log|show|branch|switch|tag|fetch|pull|push|stash)(?:\s|$)/i.exec(text);
+  if (gitCommand || /^(?:diff --git |On branch [^\n]+\r?\n|commit [a-f\d]{40}(?:\s|$))/i.test(text)) {
+    const command = gitCommand?.[1].toLowerCase();
+    const gitMode = command === 'stash' ? 'stash' : ['log', 'show'].includes(command || '') || /^commit /i.test(text) ? 'history'
+      : ['branch', 'switch', 'tag', 'fetch', 'pull', 'push'].includes(command || '') ? 'refs' : 'changes';
+    add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode });
   }
   if (webAddressRules(text, rules)) return [...matches.values()];
   const lines = text.split(/\r?\n/);

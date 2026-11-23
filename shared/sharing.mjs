@@ -1,5 +1,6 @@
 const fields = {
   projects: ["edit", "probe"],
+  git: ['edit', 'sync'],
   knowledge: ['edit'],
   'project-todos': ['edit'],
   'file-shares': [],

@@ -90,7 +90,7 @@ Linux/麒麟由管理员按其正在使用的防火墙配置允许实际内网�
 | 独立 Node ZIP | 解压根目录的 `configs`，与 `server` 同级 |
 | 源码 `npm run desktop` | 仓库根目录的 `configs` |
 
-项目子目录 `projects/` 包含 `projects.json`（档案索引、版本及最近 30 份快照）、每个档案一个 `profile-<编码 ID>.json`（档案名称、说明、项目列表和变量）和迁移记录。共享选项及加盐口令哈希保存在 `sharing/sharing.json`。档案 ID 使用十六进制编码作为文件名，避免 Windows 大小写文件名冲突；索引只引用 ID，不重复存储当前项目。配置不放进 ASAR、安装包或资源目录内。导出 JSON 仅含项目和档案，不含共享口令或历史快照。
+项目子目录 `projects/` 包含 `projects.json`（档案索引、版本及最近 30 份快照）、每个档案一个 `profile-<编码 ID>.json`（档案名称、说明、项目列表和变量）和迁移记录。Git 仓库登记位于 `sharing/git-repositories.json`，记录工作树路径和发布状态。共享选项及加盐口令哈希保存在 `sharing/sharing.json`。档案 ID 使用十六进制编码作为文件名，避免 Windows 大小写文件名冲突；索引只引用 ID，不重复存储当前项目。配置不放进 ASAR、安装包或资源目录内。导出 JSON 仅含项目和档案，不含共享口令或历史快照。
 
 升级时会把旧 `configs` 根目录中已识别的文件自动归入 `projects/`、`sharing/` 和 `planning/`。未识别的文件保留原位。若新旧目录都有同名配置，启动会报告目标路径并保留两个版本，核对后可重新启动。
 
