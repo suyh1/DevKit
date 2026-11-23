@@ -1,4 +1,4 @@
-// Only a whole JSON string can be a placeholder. Object keys and other literals stay as written.
+import { requestValue, validField } from './mock-request.mjs';
 const fields = {
   uuid: faker => faker.string.uuid(),
   index: (_faker, index) => index + 1,
@@ -31,21 +31,35 @@ export function prepareMockResponse(body, count) {
     if (Array.isArray(value)) {
       if ((depth === 0 || (depth === 1 && !Array.isArray(template))) && value.length === 1) {
         const item = compile(value[0], depth + 1, copies * count);
-        return faker => Array.from({ length: count }, (_, i) => item(faker, i));
+        return (faker, _, context) => Array.from({ length: count }, (_, i) => item(faker, i, context));
       }
       const children = value.map(child => compile(child, depth + 1, copies));
-      return faker => children.map((child, i) => child(faker, i));
+      return (faker, _, context) => children.map((child, i) => child(faker, i, context));
     }
     if (value !== null && typeof value === 'object') {
       const entries = Object.entries(value).map(([key, child]) => {
         budget(copies, JSON.stringify(key).length + 2);
         return [key, compile(child, depth + 1, copies)];
       });
-      return (faker, i) => Object.fromEntries(entries.map(([key, child]) => [key, child(faker, i)]));
+      return (faker, i, context) => Object.fromEntries(entries.map(([key, child]) => [key, child(faker, i, context)]));
     }
     const token = typeof value === 'string' && /^\{\{([^{}]*)\}\}$/.exec(value);
     if (token) {
       const name = token[1].trim();
+      if (name.startsWith('request.')) {
+        const [, source, ...parts] = name.split('.');
+        const key = parts.join('.');
+        if (!validField(source, key)) throw new Error('请求字段无效：' + name);
+        return (_faker, _i, context) => {
+          let value = requestValue(context, source, key);
+          if (source === 'query' && Array.isArray(value)) value = value[0];
+          if (value === undefined || value === null) return null;
+          if (typeof value === 'object') throw new Error('请引用具体的标量字段：' + name);
+          context.remaining -= typeof value === 'string' ? value.length : 16;
+          if (context.remaining < 0) throw new Error('请求字段展开后的响应过大。');
+          return value;
+        };
+      }
       if (!Object.hasOwn(fields, name)) throw new Error('未知生成字段：' + name);
       budget(copies, 100);
       return fields[name];
@@ -55,8 +69,8 @@ export function prepareMockResponse(body, count) {
     return () => value;
   }
   const render = compile(template, 0, 1);
-  return async () => {
+  return async (request = {}) => {
     const { faker } = await import('@faker-js/faker/locale/zh_CN');
-    return render(faker, 0);
+    return render(faker, 0, { ...request, remaining: 512000 - characters });
   };
 }

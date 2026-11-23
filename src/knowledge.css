@@ -470,3 +470,6 @@
     max-width: 100%;
   }
 }
+
+.kb-filters summary { cursor:pointer; color:var(--muted); padding-block:4px; font-size:12px; }
+.kb-filters[open] summary { margin-bottom:6px; }

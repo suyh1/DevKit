@@ -14,6 +14,8 @@ module.exports = async function geographySmoke(window, output) {
   assert.match(await js(`document.querySelector('${pane} .geo-output').textContent`), /116°23′28.68″E/);
   assert.equal(await copy('复制全部坐标'), '116.391300,39.907500');
   assert.equal(await copy('复制经度十进制度'), '116.391300');
+  await js("document.querySelector('.task-pane:not([hidden]) .geo-output .geo-format > summary').click()");
+  await wait("!!document.querySelector('.task-pane:not([hidden]) .geo-output .geo-format[open]')");
   await set('复制格式', 'dms');
   assert.equal(await copy('复制纬度度分秒'), '39°54′27.00″N');
   assert.equal(await copy('复制纬度十进制度'), '39.907500', 'single-value copy is tied to its visible format');

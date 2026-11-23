@@ -329,7 +329,7 @@ export default function ApiWorkspace({
       <div className="api-topline workspace-banner">
         <div>
           <h1>HTTP 调试</h1>
-          <p>{remoteAccess() ? "接口定义与环境保存在共享主机，本次调试值仅留在当前页面。" : "设计接口、维护文档与调试，共用一份本地项目定义。"}</p>
+          {remoteAccess() && <small>接口定义保存在共享主机</small>}
         </div>
         <div className="api-actions">
           <button
@@ -366,7 +366,6 @@ export default function ApiWorkspace({
           </button>
         </div>
       </div>
-      {project && <ApiRegression key={project.id} project={project} environment={environment} sending={sending || busy} onBusy={onSending} />}
       {error && (
         <div className="api-error" role="alert">
           <strong>操作未完成</strong>
@@ -1002,6 +1001,7 @@ export default function ApiWorkspace({
           )}
         </Modal>
       )}
+      {project && <ApiRegression key={project.id} project={project} environment={environment} sending={sending || busy} onBusy={onSending} />}
     </section>
   );
 }

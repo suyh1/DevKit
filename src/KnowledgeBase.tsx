@@ -326,6 +326,7 @@ export default function KnowledgeBase({
                 </button>
               </form>
             )}
+            <details className="kb-filters"><summary>项目与标签{(project || tag) && ' · '+[project,tag].filter(Boolean).join(' / ')}</summary>
             <div className="kb-fields">
               <select aria-label="筛选项目" value={project} onChange={(e) => setProject(e.target.value)}>
                 <option value="">全部项目</option>
@@ -340,6 +341,7 @@ export default function KnowledgeBase({
                 ))}
               </select>
             </div>
+            </details>
             {drafts.length > 0 && (
               <details className="kb-drafts" open>
                 <summary>本机草稿 · {drafts.length}</summary>

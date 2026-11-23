@@ -1062,3 +1062,28 @@
   gap: 8px 16px;
 }
 .transfer-port-links code { overflow-wrap: anywhere; user-select: all; }
+
+.mock-library-tools { margin-block: 8px; font-size: 13px; }
+.mock-library-tools > button { width: 100%; margin-top: 6px; }
+.mock-library-tools summary, .mock-advanced summary, .mock-call summary { cursor: pointer; }
+.mock-editor { gap: 10px; padding-block: 12px; }
+.mock-heading { flex-wrap: wrap; gap: 6px 10px; }
+.mock-heading .mock-save { margin-inline-start: auto; }
+.mock-advanced { border-block: 1px solid var(--panel-edge); padding-block: 8px; }
+.mock-advanced summary small { margin-inline-start: 6px; }
+.mock-advanced fieldset { margin-top: 8px; }
+.mock-rule-row { display: grid; grid-template-columns: minmax(70px, .8fr) repeat(2, minmax(70px, 1fr)) auto; align-items: end; gap: 6px; padding-block: 6px; }
+.mock-call { border-bottom: 1px solid var(--panel-edge); padding: 8px 0; min-width: 0; }
+.mock-call summary { display: flex; align-items: baseline; gap: 8px; }
+.mock-call summary::before { content: '▸'; }
+.mock-call[open] summary::before { content: '▾'; }
+.mock-call summary span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mock-call pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14em; overflow: auto; }
+.mock-call[open] p { margin-block: 8px; }
+.mock-fields-help .mock-generation { display:flex; margin-block:8px; }
+.mock-fields-help .mock-generation input { width:10em; }
+.mock-fields-help textarea { font-family:var(--font-mono); }
+@container collaboration (max-width: 760px) {
+  .mock-rule-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .mock-response-bar .segmented-control { max-width:100%; }
+}

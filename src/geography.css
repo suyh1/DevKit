@@ -10,7 +10,8 @@
 .geo-inline .geo-field { flex:1 1 130px; max-width:300px; }
 .geo-inline .geo-field:has(.segmented-control) { flex-basis:max-content; max-width:100%; }
 .geo-inline .segmented-control { flex-wrap:wrap; }
-.geo-settings { border-top:1px solid var(--line); padding-top:18px; }
+.geo-format summary { cursor:pointer; color:var(--muted); font-size:13px; }
+.geo-format[open] .geo-inline { margin-top:10px; }
 .geo-paste-pair { display:flex; align-items:flex-end; gap:12px; }
 .geo-paste-pair>.geo-field { flex:1; }
 .geo-panel .geo-run-row { padding:14px 0 0; border-top:1px solid var(--line); background:transparent; gap:14px; height:auto; flex-wrap:wrap; }

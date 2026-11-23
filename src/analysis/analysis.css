@@ -275,7 +275,8 @@ details.analysis-file[open] > :not(summary) { margin-block-start: 12px; }
 .file-panel-title > svg, .favicon-package h3 > svg { color: var(--accent); flex: none; }
 .file-panel-title h2 { margin: 0; color: var(--text); font: 650 17px/1.4 var(--font-ui); }
 .file-panel-title small { margin-inline-start: auto; font-size: 12px; color: var(--muted); }
-.file-description { margin: -6px 0 0; color: var(--muted); text-wrap: pretty; }
+.file-guide summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.file-description { margin: 6px 0 0; color: var(--muted); text-wrap: pretty; }
 .file-sources, .file-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; }
 .file-source { min-width: 0; display: grid; align-content: start; gap: 8px; }
 .file-options:empty, .file-output-panel > .analysis-actions:empty { display: none; }

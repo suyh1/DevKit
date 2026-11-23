@@ -263,6 +263,7 @@ module.exports = async function designSmoke(window, output) {
   assert.equal(await js(`(() => { const section = document.querySelector('${about}'); return section.scrollWidth <= section.clientWidth; })()`), true);
   await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
   console.log('About DevKit passed: package metadata, real clipboard, desktop browser handler and narrow layout.');
+  await js('document.querySelector(".setting-theme-library summary").click()');
   for (const style of ['default', 'minimal', 'organic', 'editorial', 'brutalist', 'soft', 'glass', 'gradient', 'retro']) {
     await js(`document.querySelector('input[name="theme-style"][value="${style}"]').click()`);
     for (const mode of ['light', 'dark']) {

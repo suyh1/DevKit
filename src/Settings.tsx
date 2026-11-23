@@ -33,17 +33,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
     } catch (error) { onNotice(`导入失败：${String(error)}`, 'error'); }
   }
   return <div className="settings-page"><div className="settings-heading"><h1>偏好设置</h1><p>偏好设置保存在本机，任务内容默认只留在内存中。</p></div>
-    <section className="settings-section"><h2><Monitor size={17} />外观</h2><fieldset className="theme-picker">
-      <legend>主题风格</legend>
-      <p>每套风格都支持浅色、深色与跟随系统。</p>
-      <div className="theme-options">{themeStyles.map(style => (
-        <label key={style.id} className="theme-option">
-          <input type="radio" name="theme-style" value={style.id} checked={preferences.themeStyle === style.id} onChange={() => update({ themeStyle: style.id })} />
-          <span className="theme-swatches" aria-hidden="true">{style.colors.map(color => <i key={color} style={{ background: color }} />)}</span>
-          <strong>{style.name}</strong><small>{style.description}</small>
-        </label>
-      ))}</div>
-    </fieldset>
+    <section className="settings-section"><h2><Monitor size={17} />外观</h2>
       <div className="setting-row">
         <span><strong>明暗模式</strong><small>跟随系统时会自动响应系统主题变化</small></span>
         <SegmentedControl label="明暗模式" value={preferences.theme} onChange={(theme) => update({ theme })}
@@ -54,7 +44,17 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
         <SegmentedControl label="界面密度" value={preferences.density} onChange={(density) => update({ density })}
           options={[{ value: 'comfortable', label: '舒适' }, { value: 'compact', label: '紧凑' }]} />
       </div>
-      <label className="setting-row"><span><strong>启动页面</strong><small>直接进入指定工具；不自动保存输入内容</small></span><select value={preferences.startup} onChange={event => update({ startup: event.target.value as Preferences['startup'] })}><option value="home">工作台总览</option>{tools.map(tool => <option key={tool.id} value={tool.id}>{tool.name}</option>)}</select></label></section>
+      <label className="setting-row"><span><strong>启动页面</strong><small>直接进入指定工具；不自动保存输入内容</small></span><select value={preferences.startup} onChange={event => update({ startup: event.target.value as Preferences['startup'] })}><option value="home">工作台总览</option>{tools.map(tool => <option key={tool.id} value={tool.id}>{tool.name}</option>)}</select></label><details className="setting-theme-library"><summary>主题风格 · {themeStyles.find(style => style.id === preferences.themeStyle)?.name}</summary><fieldset className="theme-picker">
+      <legend>主题风格</legend>
+      <p>每套风格都支持浅色、深色与跟随系统。</p>
+      <div className="theme-options">{themeStyles.map(style => (
+        <label key={style.id} className="theme-option">
+          <input type="radio" name="theme-style" value={style.id} checked={preferences.themeStyle === style.id} onChange={() => update({ themeStyle: style.id })} />
+          <span className="theme-swatches" aria-hidden="true">{style.colors.map(color => <i key={color} style={{ background: color }} />)}</span>
+          <strong>{style.name}</strong><small>{style.description}</small>
+        </label>
+      ))}</div>
+    </fieldset></details></section>
     <section className="settings-section"><h2>编辑器</h2><label className="setting-row"><span><strong>代码字号</strong><small>应用到所有任务和颜色代码区域</small></span><span className="font-slider"><code style={{ fontSize: preferences.fontSize }}>Aa 01</code><input aria-label="代码字号" list="font-size-ticks" type="range" min={12} max={18} value={preferences.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /><datalist id="font-size-ticks">{[12,13,14,15,16,17,18].map(size => <option key={size} value={size} />)}</datalist><output>{preferences.fontSize} px</output></span></label>
       <div className="setting-row">
         <span><strong>默认缩进</strong><small>Tab 缩进即时生效；格式化默认值用于新任务</small></span>

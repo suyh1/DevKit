@@ -505,7 +505,7 @@ export default function ProjectCenter({
           <FolderKanban size={27} />
           <div>
             <h1>项目中心</h1>
-            <p>每个档案独立管理项目与变量，按需对比不同方案。</p>
+
           </div>
         </div>
         <div className="pc-actions"><MotionButton outcome={error ? "error" : ""} busy={busy} className="secondary-button" disabled={busy || data.profiles.length < 2} onClick={() => setComparisonOpen(true)}>对比方案</MotionButton>

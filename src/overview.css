@@ -54,12 +54,12 @@
 .home-launch-content {
   width: min(100%, 620px);
   margin: auto;
-  padding-block: clamp(20px, 6vh, 54px);
+  padding-block: clamp(12px, 3vh, 30px);
 }
-.home-heading { margin-bottom: clamp(21px, 4.5vh, 36px); text-align: center; }
+.home-heading { margin-bottom: clamp(12px, 2vh, 20px); text-align: center; }
 .home-heading h1 {
   margin: 0;
-  font-size: clamp(32px, 4.2cqi, 55px);
+  font-size: clamp(26px, 3.4cqi, 40px);
   font-weight: 700;
   letter-spacing: -.055em;
   line-height: 1.18;

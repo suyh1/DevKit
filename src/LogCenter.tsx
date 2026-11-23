@@ -114,7 +114,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const linkHost = linkTarget.includes(':') ? linkTarget.split(':')[0] : '';
   const linkStatus = linked && !linked.startsWith('host:') && sourceStatus[''] === 'ready' && !catalog.sources.some(item => item.id === linked || `instance:${item.instanceId}` === linked) ? sourceStatus[linkHost] || 'ready' : undefined;
   return <section className="log-center">
-    <header className="log-heading workspace-banner"><div><ScrollText size={27} /><div><h1>日志中心</h1><p>在同一视图中追踪应用与网关日志。</p></div></div><div className="log-actions"><SharingButton /><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
+    <header className="log-heading workspace-banner"><div><ScrollText size={27} /><div><h1>日志中心</h1></div></div><div className="log-actions"><SharingButton /><button className="secondary-button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={14} />刷新来源</button><button className="secondary-button" onClick={() => setPaused(!paused)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? '继续追踪' : '暂停接收'}</button></div></header>
     {error && <p className="pc-error" role="alert">{error}</p>}{message && <p className="pc-message" role="status">{message}</p>}
     {linkStatus === 'ready' && <p className="pc-notice" role="status">{missingResourceLink('日志来源')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的日志来源，请刷新来源重试。</p>}

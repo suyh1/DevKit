@@ -217,9 +217,6 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
             <FileInput size={18} />
             <h2>{isKit ? '制作图标包' : '文件输入'}</h2>
           </div>
-          <p className="file-description">
-            {byAnalysis.get(id)?.description ?? '选择二维码图片，或聚焦此区域后粘贴截图。'}
-          </p>
           <div className="file-sources">
             {field()}
             {hasSecond && field(true)}
@@ -349,6 +346,11 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
               </button>
             )}
           </div>
+          <MotionDetails className="file-guide"><summary>文件格式与使用说明</summary>
+          <p className="file-description">
+            {byAnalysis.get(id)?.description ?? '选择二维码图片，或聚焦此区域后粘贴截图。'}
+          </p>
+          </MotionDetails>
         </section>
         <section className="file-output-panel">
           {isKit ? (

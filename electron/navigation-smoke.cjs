@@ -119,13 +119,14 @@ module.exports = async function navigationSmoke(window, output) {
   window.webContents.sendInputEvent({ type:'mouseUp', x:point.x, y:point.y, button:'left', clickCount:1 });
   await wait('!document.querySelector(".category-panel")');
   await open('data');
+  const selectedTitle = await js('document.activeElement.closest(".category-tool").title');
   await key('Enter');
-  await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === "JSON 格式化"');
+  await wait('document.querySelector(".task-pane:not([hidden]) h1")?.textContent === ' + JSON.stringify(selectedTitle));
   await wait('!document.querySelector(".category-panel")');
   assert.equal(await js('document.querySelector(".category-trigger.current-category").dataset.category'), 'data');
   await open('data');
   assert.equal(await js('document.activeElement.getAttribute("aria-current")'), 'page');
-  assert.equal(await js('document.querySelector(\'.category-tool[data-tool-id="json"] .category-task-count\').textContent'), '1');
+  assert.equal(await js('document.querySelector(\'.category-tool[aria-current="page"] .category-task-count\').textContent'), '1');
   await key('K', ['control']);
   await wait('!!document.querySelector(".command-dialog[open]") && !document.querySelector(".category-panel")');
   assert.ok(await js('[...document.querySelectorAll(".command-result")].every(option => option.tabIndex === -1)'));

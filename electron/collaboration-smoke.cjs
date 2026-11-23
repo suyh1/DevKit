@@ -12,6 +12,7 @@ module.exports = async function collaborationSmoke(window, output) {
   const { emptySharingServices } = await import('../shared/sharing.mjs');
   const services = emptySharingServices();
   for (const id of ['mock', 'transfer', 'whiteboard']) services[id] = { enabled: true, edit: true };
+  services.http = { enabled:true, edit:true, send:true };
   const socket = net.createServer();
   await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
   const port = socket.address().port;
@@ -245,6 +246,52 @@ module.exports = async function collaborationSmoke(window, output) {
     await fill(web, current + '[aria-label="查找接口"]', 'missing-endpoint');
     await wait(web, 'document.body.innerText.includes("没有匹配的接口")');
     await fill(web, current + '[aria-label="查找接口"]', '');
+    const { newApiEndpoint } = await import('../shared/api-workspace.mjs');
+    const library = async (action,input) => {
+      const result = await desktop('window.devkitHttp.request('+JSON.stringify(action)+','+JSON.stringify(input || {})+')');
+      assert.equal(result.error,undefined);
+      return result.data.state;
+    };
+    const original = await library('get-library');
+    const endpoint = {...newApiEndpoint('order_fixture'),name:'订单详情',path:'/orders/:id'};
+    endpoint.responses[0].schema = JSON.stringify({$ref:'#/$defs/order',$defs:{order:{type:'object',properties:{id:{$ref:'#/$defs/id'},status:{enum:['new','paid']}}},id:{type:'integer',minimum:1}}});
+    const fixture = {id:'mock_contract_fixture',name:'商城回归',description:'',version:'1',baseUrl:'http://localhost',groups:[],environments:[],endpoints:[endpoint]};
+    const seeded = await library('save-library',{revision:original.revision,data:{...original,projects:[...original.projects,fixture]}});
+    try {
+      await web('document.querySelector(".mock-library-tools summary").click()');
+      await click(web,current,'从 HTTP 工作台导入');
+      await click(web,current,'商城回归 / 订单详情');
+      await wait(web,'document.querySelector(".mock-response-bar button[value=schema]").getAttribute("aria-pressed")==="true"');
+      await web('document.querySelector(".mock-fields-help summary").click()');
+      await fill(web,current+'.mock-fields-help input','id');
+      await click(web,current,'填入响应字段');
+      await click(web,current,'预览响应');
+      await wait(web,'document.querySelector(".mock-preview .cm-content")?.textContent.includes("42")');
+      await web('document.querySelectorAll(".mock-publish input")[1].click()');
+      await click(web,current,'保存接口');
+      await wait(web,'!!document.querySelector(".mock-calls .collab-url")');
+      const target = (await web('document.querySelector(".mock-calls .collab-url").textContent')).replace(/\/1$/, '/42')+'?page=2';
+      assert.equal((await (await fetch(target)).json()).id,42);
+      await wait(web,'document.querySelector(".mock-call summary")?.textContent.includes("page=2")');
+      await web('document.querySelector(".mock-call summary").click()');
+      await click(web,current,'带入 HTTP 调试');
+      await wait(web,'[...document.querySelectorAll(".http-workbench:not([hidden]) input")].some(e=>e.value.includes("/42?page=2"))');
+      await web('location.hash="mock"');
+      await wait(web,'!!document.querySelector(".portal-page:not([hidden]) .mock-heading")');
+      if (await web('!document.querySelector(".mock-library-tools").open')) await web('document.querySelector(".mock-library-tools summary").click()');
+      await click(web,current,'新建项目数据集');
+      await fill(web,current+'input[list="mock-project-names"]','商城回归');
+      await fill(web,current+'.mock-route .collab-fields label:nth-child(3) input','/products');
+      await web('document.querySelectorAll(".mock-publish input")[1].click()');
+      await click(web,current,'保存接口');
+      await wait(web,'document.querySelector(".mock-calls .collab-url")?.textContent.endsWith("/products")');
+      const base = await web('document.querySelector(".mock-calls details .collab-url").textContent');
+      assert.equal((await (await fetch(base+'/products')).json()).length,5);
+      assert.equal((await (await fetch(base+'/orders/42')).json()).id,42);
+      await click(web,current,'响应配置');
+    } finally {
+      await library('save-library',{revision:seeded.revision,data:{...original,revision:seeded.revision}});
+    }
     await web('location.hash="whiteboard"');
     await fill(web, current + '[aria-label="新画板名称"]', '同步标注');
     await web(`(async () => {
@@ -373,6 +420,11 @@ module.exports = async function collaborationSmoke(window, output) {
     await web('location.hash="mock"');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden]) .mock-code-panel")');
     assert.ok(await web('document.documentElement.scrollWidth <= innerWidth'));
+    assert.equal(await web('document.querySelectorAll(".portal-context-row .portal-module-actions button").length'), 1);
+    await click(web, '.portal-module-actions ', '邀请设备');
+    await wait(web, '!!document.querySelector(".portal-page:not([hidden]) #mock-invite")');
+    await click(web, '.portal-module-actions ', '邀请设备');
+    await wait(web, '!document.querySelector("#mock-invite")');
     await capture('collab-mock-mobile');
     const directoryToggle = current + '.mock-directory-toggle';
     await web('document.querySelector(' + JSON.stringify(directoryToggle) + ').click()');

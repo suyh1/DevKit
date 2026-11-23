@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { QrCode, ArrowLeftRight, Braces, ScanLine } from 'lucide-react';
@@ -13,7 +14,10 @@ import { ScreenshotBoard } from './ScreenshotBoard';
 import { CreateRelated } from './related-workspaces';
 import './collaboration.css';
 
-export function CollaborationPage({ module, active, edit }: PageProps & { module: CollabModule }) {
+export function CollaborationPage({ module, active, edit, portalActions }: PageProps & {
+  module: CollabModule;
+  portalActions?: HTMLElement | null;
+}) {
   const status = useSharingStatus(),
     resource = useWorkspaceResource(module);
   const [invite, setInvite] = useState(false),
@@ -37,15 +41,33 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
     return code.createDataURL(4);
   }, [href, invite]);
   const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine }[module];
+  const title = workspaceModules.find((item) => item.id === module)?.name;
+  const inviteButton = (
+    <button
+      className="secondary-button"
+      aria-expanded={invite}
+      aria-controls={invite ? module + '-invite' : undefined}
+      onClick={() => {
+        setInvite(!invite);
+        setCopyStatus('');
+      }}
+    >
+      <QrCode size={16} />
+      邀请设备
+    </button>
+  );
   return (
     <section className="collab-page" data-module={module}>
-      <header className="collab-header workspace-banner">
+      {portalActions !== undefined ? <>
+        <h1 className="sr-only">{title}</h1>
+        {active && portalActions && createPortal(inviteButton, portalActions)}
+      </> : <header className="collab-header workspace-banner">
         <div className="collab-identity">
           <span className="collab-emblem">
             <PageIcon size={25} />
           </span>
           <div>
-            <h1>{workspaceModules.find((item) => item.id === module)?.name}</h1>
+            <h1>{title}</h1>
             {window.devkitCollab && (
               <span className="collab-host" data-online={!!origin && !localOnly}>
                 {origin ? (localOnly ? '本机共享' : '局域网共享') : '本机工作区'}
@@ -54,21 +76,11 @@ export function CollaborationPage({ module, active, edit }: PageProps & { module
             )}
           </div>
         </div>
-        <button
-          className="secondary-button"
-          aria-expanded={invite}
-          onClick={() => {
-            setInvite(!invite);
-            setCopyStatus('');
-          }}
-        >
-          <QrCode size={16} />
-          邀请设备
-        </button>
-      </header>
+        {inviteButton}
+      </header>}
       {module === 'transfer' && window.devkitCollab && <TransferLinkSettings />}
       {invite && (
-        <div className="collab-invite">
+        <div className="collab-invite" id={module + '-invite'}>
           {addresses.length > 1 && (
             <label>
               共享主机地址

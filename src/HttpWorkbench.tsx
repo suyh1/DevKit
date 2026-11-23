@@ -142,11 +142,11 @@ export default function HttpWorkbench({
     const prepare = (event: Event) => {
       if (!canSendHttp()) return;
       if (apiBusy) { onNotice('请先完成当前接口操作。'); return; }
-      const { name, method, url } = (event as CustomEvent<{ name: string; method: string; url: string }>).detail;
+      const { name, method, url, headers = {}, body } = (event as CustomEvent<{ name: string; method: string; url: string; headers?: Record<string,string>; body?: string }>).detail;
       void allowReplace().then(allowed => {
         if (allowed) {
           setWorkspaceMode('quick');
-          reset(JSON.stringify({ method, url, headers: {} }, null, 2), name);
+          reset(JSON.stringify({ method, url, headers, body }, null, 2), name);
         }
       });
     };
@@ -262,7 +262,6 @@ export default function HttpWorkbench({
       <div className="page-heading workspace-banner">
         <div className="page-title">
           <h1>HTTP 调试</h1>
-          <p className="workflow-intro">快速请求 · 集合保存在{remoteAccess() ? '当前浏览器' : '本机'}</p>
         </div>
         <button
           className="secondary-button"

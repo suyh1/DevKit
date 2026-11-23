@@ -4,7 +4,7 @@ import path from 'node:path';
 import { atomicFile } from './atomic-file.mjs';
 import { createTransferService, openTransferFile } from './quick-transfer.mjs';
 import { boardRequest } from './screenshot-board.mjs';
-import { createMockService } from './mock-service.mjs';
+import { createMockService, mutateDataset } from './mock-service.mjs';
 
 import { fail } from './collab-record.mjs';
 
@@ -30,7 +30,7 @@ export async function createCollabStore(directory) {
   }
   const transferState = modules.get('transfer');
   const transfer = await createTransferService(folder, transferState.rows, () => { transferState.version = randomUUID(); });
-  const mock = createMockService(() => modules.get('mock').rows);
+  const mock = createMockService(() => modules.get('mock').rows, (input, authorize) => request('mock', mutateDataset, input, { authorize }));
   const handlers = { transfer: transfer.request, whiteboard: boardRequest, mock: mock.request };
   function request(name, action, input = {}, access = {}) {
     const state = modules.get(name);

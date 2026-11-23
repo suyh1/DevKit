@@ -237,6 +237,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   });
   const orderedModules = order.map(id => modules.find(module => module.id === id)!);
   const [orderTrigger, setOrderTrigger] = useState<HTMLButtonElement | null>(null);
+  const [collaborationActions, setCollaborationActions] = useState<HTMLDivElement | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     const desktop = matchMedia('(min-width:781px)'), resize = () => { if (desktop.matches) setDrawerOpen(false); };
@@ -546,7 +547,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
           </section>
         ) : (
           <WorkspaceFeedback>
-            {active?.enabled && <details className="portal-access">
+            {active?.enabled && <div className="portal-context-row"><details className="portal-access">
               <summary>主机与权限 <span>{location.host}</span></summary>
               <p>{summary}。{{
                 projects: '从当前浏览器打开入口，检测由共享主机发起。',
@@ -563,7 +564,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 nginx: '配置和运行操作作用于选中的实例主机。',
                 http: '由共享主机发送请求；快速请求集合保存在当前浏览器。',
               }[page]}</p>
-            </details>}
+            </details><div className="portal-module-actions" ref={setCollaborationActions} /></div>}
             {notice && (
               <div className="portal-notice" role="status">
                 <span>{notice}</span>
@@ -594,7 +595,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             )}
             {services.knowledge?.enabled && <div className="portal-page" hidden={page !== 'knowledge'} inert={page !== 'knowledge'}><KnowledgeBase active={page === 'knowledge'} portal visitor={session?.visitor || ''} canEdit={services.knowledge.edit} /></div>}
             {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><TodoLists portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
-            {(['transfer', 'mock', 'whiteboard'] as const).map(id => services[id].enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} /></div>)}
+            {(['transfer', 'mock', 'whiteboard'] as const).map(id => services[id].enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} portalActions={collaborationActions} /></div>)}
             {services['file-shares'].enabled && <div className="portal-page" hidden={page !== 'file-shares'} inert={page !== 'file-shares'}><PublishedFileShares active={page === 'file-shares'} /></div>}
             {services.nginx.enabled && (
               <div

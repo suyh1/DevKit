@@ -295,7 +295,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
   const visibleHosts = grouped.flatMap(([, entries]) => entries);
   const currentHost = visibleHosts.find(host => host.id === focusedHost) ?? visibleHosts[0];
   return <section className="lan-center">
-    <header className="lan-heading workspace-banner"><div><h1>局域网主机</h1><p>{allowed('terminal') ? '管理远程连接、验证主机指纹，并在 SSH 终端中维护服务器。' : '查看共享主机保存的远程连接与端口状态。'}</p></div>{available && <div className="lan-heading-actions">
+    <header className="lan-heading workspace-banner"><div><h1>局域网主机</h1></div>{available && <div className="lan-heading-actions">
       {portal && <button className="secondary-button" disabled={busy} onClick={() => void task(() => load())}>刷新</button>}
       {allowed('discover') && <button className="secondary-button" disabled={busy} onClick={() => setDiscovering(true)}><Radar size={15} />发现主机</button>}
       {allowed('edit') && <><button className="secondary-button" disabled={busy} onClick={() => setImporting(true)}><Upload size={15} />导入主机</button>

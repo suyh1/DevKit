@@ -209,7 +209,7 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
     const busy = await fetch(url, { method: 'POST' });
     assert.equal(busy.status, 503);
     assert.equal(await busy.text(), 'retry');
-    assert.equal((await ok('mock/read', { id: mock.id }, reader)).history.length, 3);
+    assert.equal((await ok('mock/read', { id: mock.id }, reader)).history.filter(call => call.status !== 405).length, 3);
     async function generatedOrders() {
       const response = await fetch(url + '?mode=generate', { method: 'POST' });
       assert.equal(response.status, 200);
@@ -224,6 +224,55 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
     for (const invalid of [{ count: 101 }, { template: '"{{missing}}"' }, { template: '[' }]) {
       assert.equal((await post('mock/save', { ...updated, active: 0, scenarios: [{ ...args.scenarios[2], ...invalid }] }, second)).status, 400);
     }
+    const project = '商城';
+    const schema = {$defs:{recordId:{type:'integer',minimum:1}},type:'object', properties:{
+      id:{$ref:'#/$defs/recordId','x-devkit-request':'request.path.id'}, status:{enum:['new','paid']},
+      dates:{type:'array',items:{type:'string',format:'date'},minItems:2,maxItems:2}
+    }};
+    const selected = await ok('mock/create', {...args, project, scenarios:[
+      {...args.scenarios[0], format:'schema', schema:JSON.stringify(schema)},
+      {...args.scenarios[0], name:'empty', rules:[{source:'query',key:'mode',value:'empty'}], body:'[]'},
+      {...args.scenarios[0], name:'echo', format:'generated', rules:[
+        {source:'header',key:'X-Mode',value:'test'}, {source:'body',key:'order.qty',value:'0'}
+      ], template:'{"id":"{{request.path.id}}","qty":"{{request.body.order.qty}}","page":"{{request.query.page}}"}',count:1}
+    ]});
+    const base = origin + '/mock/' + selected.projectKey;
+    const endpoint = base + '/orders/42';
+    const generated = await (await fetch(endpoint,{method:'POST'})).json();
+    assert.equal(generated.id,42);
+    assert.ok(['new','paid'].includes(generated.status));
+    assert.equal(generated.dates.length,2);
+    assert.deepEqual(await (await fetch(endpoint+'?mode=empty',{method:'POST'})).json(),[]);
+    const defaultLog = (await ok('mock/read',selected)).history[1];
+    assert.match(defaultLog.reason,/mode 未提供/);
+    assert.ok(defaultLog.elapsed >= 0);
+    const call = await fetch(endpoint+'?page=3&token=private',{method:'POST',headers:{'Content-Type':'application/json','X-Mode':'test',Authorization:'private'},body:'{"order":{"qty":0},"password":"private"}'});
+    assert.deepEqual(await call.json(),{id:'42',qty:0,page:'3'});
+    const [echo] = (await ok('mock/read',selected)).history;
+    assert.equal(echo.path,'/orders/42?page=3');
+    assert.equal(echo.headers['x-mode'],'test');
+    assert.equal(echo.body,'{"order":{"qty":0}}');
+    assert.ok(echo.omitted && echo.replayable);
+    assert.ok(!JSON.stringify(echo).includes('private'));
+
+    const dataset = await ok('mock/create',{...args, method:'GET',project,path:'/products',
+      dataset:{template:'[{"id":"{{index}}","name":"{{product}}"}]',count:2,writable:true}});
+    assert.equal(dataset.projectKey,selected.projectKey);
+    const products = base+'/products';
+    const seeds = await (await fetch(products)).json();
+    assert.equal(seeds.length,2);
+    assert.deepEqual(await (await fetch(products+'/2')).json(),seeds[1]);
+    const write = (path,method,data) => fetch(products+path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const writes = await Promise.all([write('','POST',{id:3}),write('','POST',{id:4})]);
+    assert.deepEqual(writes.map(res=>res.status),[201,201]);
+    assert.equal((await write('','POST',{id:3})).status,409);
+    assert.equal((await write('/2','PATCH',{price:0})).status,200);
+    assert.equal((await (await fetch(products+'/2')).json()).price,0);
+    assert.equal((await write('/4','PUT',{stock:8})).status,200);
+    assert.equal((await fetch(products+'/3',{method:'DELETE'})).status,204);
+    assert.equal((await fetch(products+'/3')).status,404);
+    assert.equal((await post('mock/reset',dataset,reader)).status,403);
+    assert.equal((await post('mock/create',{...args,project,path:'/products/:id'},first)).status,409);
     await ok('mock/rotate', updated);
     assert.equal((await fetch(url, { method: 'POST' })).status, 404);
     const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg==';
@@ -252,6 +301,9 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
       (await ok('transfer/list', {}, reader)).every((item) => item.locked),
       true,
     );
+    assert.deepEqual(await (await fetch(products+'/4')).json(),{id:4,stock:8});
+    await ok('mock/reset',dataset);
+    assert.deepEqual(await (await fetch(products)).json(),seeds);
     assert.equal((await ok('mock/read', { id: mock.id })).active, 1);
   } finally {
     await host?.stop();

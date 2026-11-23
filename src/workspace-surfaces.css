@@ -3,23 +3,23 @@
   --workspace-rule: color-mix(in srgb, var(--accent) 22%, var(--line));
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px 16px;
-  padding: 20px 24px;
+  gap: 6px 12px;
+  padding: 9px 14px;
   border: 1px solid var(--line);
   border-inline-start: 3px solid var(--workspace-rule);
   border-radius: 14px;
   background: var(--surface);
   box-shadow: 0 2px 4px #00000005;
 }
-.workspace-banner h1 { margin-block: 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
+.workspace-banner h1 { margin-block: 0; font-size: 21px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
 .workspace-banner p { margin-block: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .workspace-banner :is(.eyebrow, .jar-eyebrow) { margin-block-end: 4px; color: var(--muted); font-size: 11px; letter-spacing: 0; }
 .workspace-banner :is(.pc-brand > svg, .monitor-brand > svg, .log-heading > div > svg, .ng-heading-icon) {
   box-sizing: border-box;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  padding: 10px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 5px;
   border: 1px solid var(--workspace-rule);
   border-radius: 10px;
   background: var(--tint);
@@ -31,8 +31,8 @@
 .workspace-banner .pc-role { font-variant-numeric: tabular-nums; }
 .workspace-banner.page-heading { flex-wrap: nowrap; }
 .workspace-banner.page-heading h1 { overflow-wrap: anywhere; }
-.workspace-banner .page-icon { width: 44px; height: 44px; border-radius: 10px; }
-.workspace-portal .workspace-banner { padding: 12px 16px; }
+.workspace-banner .page-icon { width: 32px; height: 32px; border-radius: 10px; }
+.workspace-portal .workspace-banner { padding: 8px 12px; }
 
 /* Text tools use matching editor frames while their tool-specific layouts stay independent. */
 .task-pane :is(.editor-card, .color-panel, .toolbar) { border-radius: 12px; }
@@ -106,7 +106,7 @@
 :root[data-theme=dark] .workspace-banner { box-shadow: none; }
 
 @media (max-width: 760px) {
-  .workspace-banner { padding: 16px; }
+  .workspace-banner { padding: 8px 10px; }
   .workspace-banner h1 { font-size: 22px; }
   .workspace-banner p { font-size: 12px; }
   .task-pane .editor-footer { font-size: 10px; }
@@ -125,8 +125,8 @@
 :is(.task-pane, .workspace, .workspace-portal) :is(.workspace-banner, .editor-card, .geo-panel, .color-panel, .log-sources, .log-pane, .monitor-card, .td-documents, .td-sheet, .collab-inbox, .collab-compose, .collab-detail, .board-library, .board-stage) {
   border-radius: var(--work-panel-radius);
 }
-:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) { padding: 16px clamp(14px, 2vw, 24px); background: var(--surface); border: 1px solid var(--line); border-inline-start: 3px solid var(--workspace-rule); }
-:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) h1 { font-size: clamp(20px, 2.4vw, 28px); font-weight: 600; }
+:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) { padding: 8px clamp(10px, 1.5vw, 18px); background: var(--surface); border: 1px solid var(--line); border-inline-start: 3px solid var(--workspace-rule); }
+:is(.collab-page,.td-workspace,.planning-workspace) .workspace-banner:is(.collab-header,.td-heading,.pl-page-head) h1 { font-size: clamp(18px, 2vw, 22px); font-weight: 600; }
 .skeleton-list { min-height: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--work-panel-radius); }
 .skeleton-list .skeleton-lines { gap: 10px; }
 .skeleton-list .skeleton-lines span { margin: 0; max-width: 100%; height: 9px; }
@@ -152,3 +152,9 @@
 .task-pane .match-source mark { background: var(--tint); color: var(--text); box-shadow: inset 0 -2px var(--accent); }
 .task-pane .geo-point { background: var(--soft); }
 .task-pane .color-panel .color-live { color: var(--success); background: var(--success-tint); }
+
+.setting-theme-library { margin-block: 8px; }
+.setting-theme-library summary { cursor: pointer; padding-block: 6px; font-size: 13px; }
+.workspace .workspace-banner.page-heading { margin-bottom: 10px !important; }
+.workspace-banner .collab-emblem { width: 32px; height: 32px; }
+.workspace-banner.collab-header { margin-block-end: 10px; }

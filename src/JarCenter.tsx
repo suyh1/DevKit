@@ -276,7 +276,7 @@ export default function JarCenter({ active }: { active: boolean }) {
   const consoleItem = state?.instances.find(item => item.id === consoleId);
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
     <header className="jar-heading workspace-banner">
-      <div><span className="jar-eyebrow"><ServerCog size={17} />服务进程</span><h1>后端管理</h1><p>按主机管理 JAR、npm 项目与可执行程序，随时查看进程、资源、日志与控制台。</p></div>
+      <div><h1>后端管理</h1></div>
       <button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加服务</button>
     </header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用后端管理。</p>}

@@ -138,7 +138,6 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
   </section>;
   return <div className={`text-workbench workflow-${workflow}`} data-tool={active}>
     {active === 'hash' && <FileChecksums />}
-    <p className="workflow-intro">{experience.hint}</p>
     {!generated && !compact && <div className="toolbar">{options}{run}</div>}
     {largeReports.has(active) && <MotionDetails className="workbench-disclosure"><summary>直接分析大文件（单文件最多 128 MiB）</summary><FileWorkbench id={active} preset={task.options}/></MotionDetails>}
     {analysis && <TableFields id={active} input={task.input} options={task.options} onChange={(key,value)=>onEdit({options:{...task.options,[key]:value}})}/>}
@@ -177,6 +176,6 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     {active==='regex'&&<RegexCases options={task.options}/>}
     <UpgradePanel id={active} current={task.input}/>{active==='base64'&&<Base64Files/>}
     <ToolRecipes input={task.input} />
-    <MotionDetails className="tool-help"><summary>使用提示与边界</summary><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></MotionDetails>
+    <MotionDetails className="tool-help"><summary>使用提示与边界</summary><p>{experience.hint}</p><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></MotionDetails>
   </div>;
 }

@@ -125,7 +125,7 @@ export default function MonitorCenter({ active = true, focus }: { active?: boole
   const restrictedSource = draft?.source && data?.monitors.find(item => item.id === draft.id && JSON.stringify(item.source) === JSON.stringify(draft.source))?.runRestriction;
   const frozen = !!draft?.enabled && (!operate || !!restrictedSource);
   return <section className="monitor-center">
-    <header className="monitor-heading workspace-banner"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1><p>持续检测服务，把故障与恢复留在时间线上。</p></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{(edit || sourceFilter) && !!related?.length && <button className="run-button" onClick={addMonitor}><Plus size={15} />添加监控</button>}</div></header>
+    <header className="monitor-heading workspace-banner"><div className="monitor-brand"><Activity size={28} /><div><h1>监控中心</h1></div></div><div className="monitor-actions"><SharingButton /><button className="secondary-button" disabled={busy} onClick={() => void refresh()}><RefreshCw size={15} />刷新</button>{(edit || sourceFilter) && !!related?.length && <button className="run-button" onClick={addMonitor}><Plus size={15} />添加监控</button>}</div></header>
     <div className="monitor-note"><ShieldCheck size={15} /><span>检测从主机发起，切换页面后继续。退出主机应用或独立服务后停止。状态每 {statusSeconds} 秒刷新。</span></div>
     {error && !draft && !remove && <p className="pc-error" role="alert">{error}</p>}
     {sourceFilter && <div className="monitor-note"><span>正在查看此来源的关联监控</span><RelatedLink page="monitor">查看全部监控</RelatedLink></div>}
