@@ -260,6 +260,12 @@ module.exports = async function designSmoke(window, output) {
   const about = 'section[aria-labelledby="devkit-about-heading"]';
   assert.equal(await js('document.getElementById("devkit-about-heading").textContent'), '关于 DevKit');
   assert.deepEqual(await js(`['版本','作者'].map(label => [...document.querySelectorAll('${about} dt')].find(term => term.textContent === label)?.nextElementSibling?.textContent)`), [version, author.name]);
+  assert.equal(await js(`document.querySelector('${about} .license-details summary').textContent`), '非商业许可');
+  await js(`document.querySelector('${about} .license-details summary').click()`);
+  await wait(`document.querySelector('${about} .license-details [popover]').matches(':popover-open')`);
+  assert.ok(await js(`document.querySelector('${about} .license-details pre').textContent.includes('# PolyForm Noncommercial License 1.0.0')`));
+  await js(`document.querySelector('${about} .floating-details-close').click()`);
+  await wait(`!document.querySelector('${about} .license-details').open`);
   assert.equal(await js('document.querySelector(".about-contact span").textContent'), author.email);
   assert.equal(await js('document.querySelector(".about-repository").href'), homepage);
   const previousClipboard = await clipboard.readText();

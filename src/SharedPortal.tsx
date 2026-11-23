@@ -132,7 +132,7 @@ function PortalTheme({ mode, setMode }: { mode: DisplayMode; setMode: (value: Di
       <SegmentedControl label="共享页面主题" value={theme}
         options={[{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色主题' }, { value: 'dark', label: '深色主题' }]} onChange={setTheme} />
       </div>
-      <section aria-label="关于 DevKit"><strong>关于 DevKit</strong><LicenseDetails /></section>
+      <section className="portal-about" aria-label="关于 DevKit"><span>关于 DevKit</span><LicenseDetails /></section>
       </div>
     </details>
   );

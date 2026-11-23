@@ -406,6 +406,20 @@ app
       );
       await button("接口设计", ".api-tabs button");
       await selector('.portal-appearance summary');
+      {
+        const about = ".portal-appearance .portal-about";
+        const sizes = await js(`[
+          document.querySelector('.portal-appearance .choice-field > span'),
+          document.querySelector('${about} > span'),
+          document.querySelector('${about} summary')
+        ].map(element => getComputedStyle(element).fontSize)`);
+        assert.deepEqual(sizes, [sizes[0], sizes[0], sizes[0]], 'About uses the same text size as the theme controls');
+        await selector(about + ' summary');
+        await wait(`document.querySelector('${about} [popover]')?.matches(':popover-open')`);
+        assert.ok(await js(`document.querySelector('${about} pre').textContent.includes('# PolyForm Noncommercial License 1.0.0')`));
+        key('Escape');
+        await wait(`!document.querySelector('${about} [popover]').matches(':popover-open') && document.querySelector('.portal-appearance').open`);
+      }
       await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
       if (process.argv.includes('--legacy-popover')) {
         await js(`{const field=document.querySelector('[aria-label="共享页面主题风格"]'); field.focus(); field.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));}`);

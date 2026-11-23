@@ -84,7 +84,7 @@ export default function Settings({ preferences, onChange, favorites, onFavorites
       <h2 id="devkit-about-heading"><Info size={17} aria-hidden="true" />关于 DevKit</h2>
       <dl className="about-details">
         <div><dt>版本</dt><dd>{packageInfo.version}</dd></div>
-        <div><dt>开源许可</dt><dd><LicenseDetails /></dd></div>
+        <div><dt>软件许可</dt><dd><LicenseDetails /></dd></div>
         <div><dt>作者</dt><dd>{packageInfo.author.name}</dd></div>
         <div><dt>联系邮箱</dt><dd className="about-contact">
           <span>{packageInfo.author.email}</span>
