@@ -1,10 +1,10 @@
 .workspace-portal { width:100%; max-width:1680px; height:100dvh; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); column-gap:22px; min-width:0; background:var(--bg); }
-.workspace-portal.portal-authenticated { grid-template-columns:176px minmax(0,1fr); }
+.workspace-portal.portal-authenticated { grid-template-columns:clamp(184px,16vw,220px) minmax(0,1fr); }
 .portal-bar { grid-column:1 / -1; }
 .portal-content { min-width:0; }
-.portal-sidebar { grid-row:2; grid-column:1; display:grid; grid-template-rows:auto minmax(0,1fr) auto; padding:22px 14px 16px 0; border-right:1px solid var(--line); min-height:0; }
-.portal-sidebar>.portal-navigation { min-height:0; overflow-y:auto; overscroll-behavior-y:contain; padding:3px; margin-inline:-3px; }
-.portal-sidebar>p { color:var(--muted); line-height:1.8; font-size:10px; padding:16px 8px 0; margin:16px 0 0; border-top:1px solid var(--line); }
+.portal-sidebar { grid-row:2; grid-column:1; display:grid; grid-template-rows:auto minmax(0,1fr) auto; padding:clamp(10px,2vh,18px) 8px 12px 0; border-right:1px solid var(--line); min-height:0; min-width:0; }
+.portal-sidebar>.portal-navigation { min-height:0; overflow-y:auto; overscroll-behavior-y:contain; scrollbar-gutter:stable; padding:3px 8px 3px 3px; margin-left:-3px; }
+.portal-sidebar>p { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 8px; color:var(--muted); line-height:1.5; font-size:10px; padding:10px 8px 0; margin:10px 0 0; border-top:1px solid var(--line); }
 .portal-nav-caption { display:block; color:var(--subtle); font-size:10px; padding:0 10px 12px; }
 .portal-navigation { display:flex; flex-direction:column; gap:5px; }
 .portal-navigation>button { flex:none; display:flex; align-items:center; gap:10px; text-align:left; padding:12px 10px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--muted); font-size:12px; width:100%; min-height:44px; }
@@ -96,7 +96,7 @@
   .portal-appearance > summary span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 }
 
-.portal-sidebar > p > strong { display: block; margin-top: 5px; font-size: 12px; overflow-wrap: anywhere; }
+.portal-sidebar > p > strong { min-width:0; font-size:12px; overflow-wrap:anywhere; }
 details.portal-access { display: block; margin-bottom: 10px; }
 .portal-access > summary { cursor: pointer; width: fit-content; max-width: 100%; overflow-wrap: anywhere; }
 .portal-access > summary > span { margin-inline-start: 6px; font-family: var(--font-mono); }

@@ -197,8 +197,11 @@ app
           document.scrollingElement.scrollTop
         ]`);
         await wait(`${list}.scrollHeight === ${list}.clientHeight`);
+        const rowWidth = () => js(`${list}.firstElementChild.getBoundingClientRect().width`);
+        const fullHeightWidth = await rowWidth();
         window.setContentSize(width, 280);
         await wait(`${list}.clientHeight > 0 && ${list}.scrollHeight > ${list}.clientHeight`);
+        assert.equal(await rowWidth(), fullHeightWidth, 'A scrollbar must not narrow the module buttons');
         const before = await fixedPositions();
         assert.ok(before[0] >= 0 && before[1] <= await js('innerHeight'));
         const center = await js(`(() => { const r = ${list}.getBoundingClientRect(); return { x: r.left + r.width/2, y: r.top + r.height/2 }; })()`);
@@ -208,8 +211,13 @@ app
         await wheel(-18000, center.x, center.y);
         await wait(`${list}.scrollTop === 0`);
         assert.deepEqual(await fixedPositions(), before);
+        window.setContentSize(800, height);
+        await wait(`innerWidth > 780 && innerWidth < 840 && ${list}.clientWidth > 0`);
+        assert.ok(await rowWidth() < fullHeightWidth, 'The navigation gives space back to the page on a narrow desktop');
+        assert.ok(await js(`${list}.scrollWidth === ${list}.clientWidth && document.documentElement.scrollWidth <= innerWidth`));
         window.setContentSize(width, height);
-        await wait(`${list}.scrollHeight === ${list}.clientHeight`);
+        await wait(`${list}.firstElementChild.getBoundingClientRect().width === ${fullHeightWidth} && ${list}.scrollHeight === ${list}.clientHeight`);
+        console.log('Portal navigation button width with and without a scrollbar:', fullHeightWidth);
       }
       await button('排序', '.portal-sidebar button');
       await wait('document.querySelectorAll(".shared-order-list li").length === 3');
