@@ -11,7 +11,7 @@ input.text-control, textarea.text-control {
   caret-color: var(--accent);
 }
 input.text-control { min-height: 36px; }
-textarea.text-control { display: block; width: 100%; resize: vertical; line-height: 1.6; }
+textarea.text-control { display: block; width: 100%; line-height: 1.6; }
 .text-control::placeholder { color: var(--subtle); opacity: 1; }
 .text-control[data-hover]:enabled:not(:focus):not([readonly]) { border-color: var(--muted); }
 .text-control:focus {
@@ -26,4 +26,19 @@ textarea.text-control { display: block; width: 100%; resize: vertical; line-heig
 @media (forced-colors: active) {
   .text-control:is(input, textarea) { border-color: ButtonText; }
   .text-control:is(input, textarea):focus { outline: 2px solid Highlight; }
+}
+
+/* Grow multi-line fields with their contents, leaving long documents scrollable. */
+textarea:is(.text-control, .text-control-embedded) {
+  --textarea-limit: min(20rem, 45dvh);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-height: var(--textarea-limit);
+  field-sizing: content;
+  overflow-y: auto;
+  resize: none;
+}
+:where(textarea.text-control, textarea.text-control-embedded) {
+  min-height: min(calc(2lh + 14px), var(--textarea-limit));
 }

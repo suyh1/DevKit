@@ -21,8 +21,7 @@
 }
 .analysis-file textarea {
   width: 100%;
-  resize: vertical;
-  min-height: 3.25rem;
+  min-height:min(3.25rem, var(--textarea-limit));
 }
 .analysis-file fieldset {
   min-width: 0;

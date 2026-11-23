@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { FolderDown, ShieldCheck } from 'lucide-react';
+import { FolderDown, ShieldCheck, Users } from 'lucide-react';
 import { gitRequest, type Repository, type RepoLevel, type RepoPolicy } from './git-api';
+import { Modal, ModalCancel, ModalForm } from './project-components';
 import { projectRequest, type Sharing } from './project-api';
 const labels: Record<RepoLevel, string> = {
   none: '不可访问',
@@ -10,22 +11,25 @@ const labels: Record<RepoLevel, string> = {
   sync: '查看与远端同步',
   collaborate: '读写与同步',
 };
-function Levels({ value, onChange, label }: { value: RepoLevel; onChange: (v: RepoLevel) => void; label: string }) {
+export function RepoGrants({ repo, onSaved }: { repo: Repository; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as RepoLevel)}>
-      {Object.entries(labels).map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
+    <>
+      <button type="button" className="text-button" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <ShieldCheck size={15} />
+        仓库访问权限
+      </button>
+      {open && <GrantsDialog repo={repo} close={() => setOpen(false)} onSaved={onSaved} />}
+    </>
   );
 }
-export function RepoGrants({ repo, onSaved }: { repo: Repository; onSaved: () => void }) {
-  const [policy, setPolicy] = useState<RepoPolicy>(repo.policy || { default: 'history', visitors: [] }),
-    [visitors, setVisitors] = useState<string[]>([]),
-    [busy, setBusy] = useState(false),
-    [notice, report] = useState('');
+
+function GrantsDialog({ repo, close, onSaved }: { repo: Repository; close: () => void; onSaved: () => void }) {
+  const [policy, setPolicy] = useState<RepoPolicy>(repo.policy ?? { default: 'history', visitors: [] });
+  const [visitors, setVisitors] = useState<string[]>();
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [saveError, setSaveError] = useState('');
   useEffect(() => {
     let live = true;
     projectRequest<Sharing>('sharing').then(
@@ -33,75 +37,106 @@ export function RepoGrants({ repo, onSaved }: { repo: Repository; onSaved: () =>
         if (live) setVisitors((s.visitors || []).map((v) => v.name));
       },
       (e) => {
-        if (live) report(e.message);
+        if (live) setLoadError(e.message);
       },
     );
     return () => {
       live = false;
     };
   }, []);
-  const names = [...new Set([...visitors, ...policy.visitors.map((v) => v.name)])];
+  const names = [...new Set([...(visitors ?? []), ...policy.visitors.map((v) => v.name)])];
+  const options = Object.entries(labels).map(([value, label]) => (
+    <option key={value} value={value}>
+      {label}
+    </option>
+  ));
   return (
-    <details className="git-host-panel">
-      <summary>
-        <ShieldCheck size={15} />
-        仓库访问权限
-      </summary>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
+    <Modal
+      title="仓库访问权限"
+      description={repo.name}
+      icon={<ShieldCheck size={20} />}
+      closeLabel="关闭仓库访问权限"
+      className="git-grants-dialog"
+      close={close}
+      draft={policy}
+      busy={busy}
+    >
+      <ModalForm
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (busy) return;
           setBusy(true);
+          setSaveError('');
           try {
             await gitRequest(false, 'policy', { id: repo.id, policy });
             onSaved();
-            report('仓库授权已保存');
-          } catch (e) {
-            report((e as Error).message);
-          } finally {
+            close();
+          } catch (error) {
+            setSaveError((error as Error).message);
             setBusy(false);
           }
         }}
+        footer={
+          <footer className="pc-form-footer">
+            <ModalCancel />
+            <button className="run-button" type="submit" disabled={busy}>
+              {busy ? '正在保存…' : '保存仓库权限'}
+            </button>
+          </footer>
+        }
       >
-        <p>栏目权限和仓库权限同时生效。单独指定访客时，可把默认权限设为「不可访问」。</p>
-        <label>
-          通用口令及未单独配置的访客
-          <Levels value={policy.default} onChange={(v) => setPolicy({ ...policy, default: v })} label="默认仓库权限" />
-        </label>
-        {names.map((name) => {
-          const grant = policy.visitors.find((v) => v.name === name);
-          return (
+        <div className="git-grants-default">
+          <label htmlFor="git-default-grant">默认权限</label>
+          <p>使用通用口令或未单独授权的访客按此设置访问。</p>
+          <select
+            id="git-default-grant"
+            aria-label="默认仓库权限"
+            value={policy.default}
+            onChange={(e) => setPolicy({ ...policy, default: e.target.value as RepoLevel })}
+          >
+            {options}
+          </select>
+        </div>
+        <section className="git-visitor-grants" aria-label="访客例外">
+          <h3>
+            <Users size={16} />
+            访客例外
+          </h3>
+          {names.map((name) => (
             <label key={name}>
-              {name}
+              <span>{name}</span>
               <select
                 aria-label={name + '的仓库权限'}
-                value={grant?.level || ''}
-                onChange={(e) =>
+                value={policy.visitors.find((v) => v.name === name)?.level ?? ''}
+                onChange={(e) => {
+                  const level = e.target.value as RepoLevel | '';
                   setPolicy({
                     ...policy,
-                    visitors: [
-                      ...policy.visitors.filter((v) => v.name !== name),
-                      ...(e.target.value ? [{ name, level: e.target.value as RepoLevel }] : []),
-                    ],
-                  })
-                }
+                    visitors: [...policy.visitors.filter((v) => v.name !== name), ...(level ? [{ name, level }] : [])],
+                  });
+                }}
               >
                 <option value="">继承默认权限</option>
-                {Object.entries(labels).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
+                {options}
               </select>
             </label>
-          );
-        })}
-        {!names.length && <small>在局域网共享设置中添加命名访客后，可在这里逐人授权。</small>}
-        <button className="secondary-button" disabled={busy}>
-          保存仓库权限
-        </button>
-        {notice && <small role="status">{notice}</small>}
-      </form>
-    </details>
+          ))}
+          {loadError ? (
+            <p role="alert">{loadError}</p>
+          ) : (
+            !names.length && (
+              <p>{visitors ? '在局域网共享设置中添加命名访客后，可在这里逐人授权。' : '正在读取访客…'}</p>
+            )
+          )}
+        </section>
+        <p className="git-grants-note">实际访问范围同时受共享栏目的编辑和同步权限限制。</p>
+        {saveError && (
+          <p className="git-error" role="alert">
+            {saveError}
+          </p>
+        )}
+      </ModalForm>
+    </Modal>
   );
 }
 export function CloneRepo({ onAdded, initialSource }: { initialSource?: string; onAdded: (repo: Repository) => void }) {

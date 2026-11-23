@@ -5,7 +5,7 @@
 .visual-layout .visual-title { display:flex; align-items:center; gap:8px; font:600 16px/1.5 var(--font-ui); margin:0; }
 .visual-title svg { color:var(--accent); }
 .visual-controls > label { display:grid; gap:6px; color:var(--muted); font-size:12px; }
-.visual-controls textarea { min-height:7rem; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:10px; font:14px/1.6 var(--font-ui); color:var(--text); background:var(--surface); }
+.visual-controls textarea { min-height:min(7rem, var(--textarea-limit)); border:1px solid var(--line); border-radius:8px; padding:10px; font:14px/1.6 var(--font-ui); color:var(--text); background:var(--surface); }
 .visual-controls .options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:14px 12px; }
 .visual-controls .option { display:grid; grid-column:1/-1; gap:5px; justify-items:stretch; min-width:0; }
 .visual-controls .option:has(.number-stepper) { grid-column:auto; }

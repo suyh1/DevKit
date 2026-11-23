@@ -132,7 +132,7 @@
 .lan-field input::placeholder { color: var(--muted); opacity: .8; }
 .lan-field.lan-import-source { grid-template-rows: auto auto; }
 .lan-import-source textarea {
-  width: 100%; min-width: 0; min-height: calc(6lh + 18px); resize: vertical;
+  width: 100%; min-width: 0; min-height:min(calc(6lh + 18px), var(--textarea-limit));
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
   background: var(--soft); color: var(--text); font: 13px/1.5 var(--font-mono);
 }

@@ -4,7 +4,7 @@
 .geo-panel { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:22px; min-width:0; display:flex; flex-direction:column; gap:18px; }
 .geo-field { display:flex; flex-direction:column; min-width:0; gap:8px; color:var(--muted); font-size:12px; }
 .geo-field input,.geo-field select,.geo-field textarea { width:100%; min-width:0; border:1px solid var(--line); border-radius:8px; background:var(--soft); color:var(--text); padding:10px 12px; font:inherit; line-height:1.6; }
-.geo-field textarea { resize:vertical; font-family:var(--font-mono); min-height:160px; }
+.geo-field textarea { font-family:var(--font-mono); min-height:min(160px, var(--textarea-limit)); }
 .geo-input-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .geo-inline { display:flex; align-items:center; gap:12px; flex-wrap:wrap; min-width:0; }
 .geo-inline .geo-field { flex:1 1 130px; max-width:300px; }

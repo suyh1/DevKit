@@ -87,7 +87,7 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
   align-items:start; gap:10px; width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px;
 }
 .regression-cases label { display:grid; min-width:0; gap:4px; }
-.regression-cases textarea { width:100%; min-height:5rem; resize:vertical; }
+.regression-cases textarea { width:100%; min-height:min(5rem, var(--textarea-limit)); }
 .regression-cases fieldset button { justify-self:end; align-self:end; }
 .api-regression .regression-step {
   display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));
@@ -99,7 +99,7 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 .regression-actions .run-button { margin-inline-start:0; }
 .editable-notes { display:grid; justify-items:start; gap:10px; }
 .editable-notes label { display:grid; width:100%; gap:6px; font-weight:600; }
-.editable-notes textarea { padding:10px; resize:vertical; font:13px/1.65 var(--font-mono); border:1px solid var(--line); background:var(--soft); color:var(--text); border-radius:8px; }
+.editable-notes textarea { padding:10px; font:13px/1.65 var(--font-mono); border:1px solid var(--line); background:var(--soft); color:var(--text); border-radius:8px; }
 .svg-comparison { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:12px; }
 .svg-comparison figure { display:grid; grid-template-rows:1fr auto; min-width:0; margin:0; overflow:hidden; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
 .svg-comparison img { display:block; width:100%; height:clamp(130px,22vh,230px); padding:12px; object-fit:contain; }

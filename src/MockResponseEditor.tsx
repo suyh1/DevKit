@@ -1,3 +1,4 @@
+import { TextArea } from './TextControl';
 import { useEffect, useId, useState } from 'react';
 import { Braces, RefreshCw } from 'lucide-react';
 import { mockFieldNames, prepareMockResponse } from '../shared/mock-response.mjs';
@@ -304,7 +305,7 @@ export default function MockResponseEditor({
           {fieldError && <p role="alert">{fieldError}</p>}
           <label>
             预览请求（JSON）
-            <textarea rows={4} value={context} onChange={(e) => setRequestDraft(e.target.value)} />
+            <TextArea rows={4} value={context} onChange={(e) => setRequestDraft(e.target.value)} />
           </label>
         </details>
       )}

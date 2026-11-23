@@ -1,3 +1,4 @@
+import { TextArea } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import {
   Archive,
@@ -146,7 +147,7 @@ function Changes({
           )}
           <label htmlFor="git-message">提交说明</label>
           <div className="git-commit-controls">
-            <textarea
+            <TextArea
               id="git-message"
               placeholder="概括这次提交的改动…"
               value={message}
@@ -723,7 +724,7 @@ export default function GitWorkspace({
                 {repo.published && <ResourceLink page="git" id={repo.id} compact />}
                 {!portal && (
                   <>
-                    {repo && !portal && <RepoGrants key={repo.id} repo={repo} onSaved={refresh} />}
+                    {repo && !portal && <RepoGrants key={repo.id} repo={repo} onSaved={() => { refresh(); report('仓库授权已保存'); }} />}
                     <button className="text-button" disabled={busy} onClick={() => void manage('publish')}>
                       <Globe2 size={14} />
                       {repo.published ? '撤下共享' : '发布到网页'}

@@ -145,7 +145,6 @@
   width: auto;
 }
 .collab-page textarea {
-  resize: vertical;
   line-height: 1.65;
 }
 .collab-page [role='status'] {
@@ -327,7 +326,7 @@
   font-weight: 400;
 }
 .collab-compose textarea {
-  min-height: 80px;
+  min-height:min(80px, var(--textarea-limit));
 }
 .transfer-options {
   display: grid;

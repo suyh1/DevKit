@@ -185,7 +185,7 @@
   font-size: 13px;
   font-weight: 400;
 }
-.planning-form :is(textarea) { resize: vertical; }
+
 .planning-form .pl-mono { font-family: var(--pl-mono) !important; }
 .planning-check { display: flex; align-items: start; gap: 8px; line-height: 1.5; }
 .planning-check input { margin-top: 2px; accent-color: var(--accent); }

@@ -1,3 +1,4 @@
+import { TextArea } from './TextControl';
 import { useState } from 'react';
 import { Check, GitMerge, Layers, Minus, Plus } from 'lucide-react';
 import { useGitRead, type Change, type GitMutation } from './git-api';
@@ -180,7 +181,7 @@ function ConflictEditor({ data, file, busy, edit, mutate }: Props & { data: Conf
       {edit && data.merged !== null && (
         <label>
           编辑合并结果
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
+          <TextArea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
           <button className="run-button" disabled={busy} onClick={() => void resolve('manual')}>
             <Check size={15} />
             保存并标记已解决

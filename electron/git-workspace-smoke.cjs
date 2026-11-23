@@ -89,6 +89,28 @@ module.exports = async function gitSmoke(window, installation, output) {
       await execute('void Object.assign(document.documentElement.dataset, ' + JSON.stringify(original) + ')');
     }
   }
+  async function checkTextarea(execute) {
+    const sizes = await execute(`(async () => {
+      const field = document.querySelector('#git-message');
+      const measure = async value => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, value);
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        return field.clientHeight;
+      };
+      const initial = await measure('');
+      const medium = await measure('line\\n'.repeat(5));
+      const full = await measure('long line\\n'.repeat(150));
+      field.scrollTop = field.scrollHeight;
+      const scrolls = field.scrollTop > 0;
+      const capped = full === await measure('long line\\n'.repeat(250));
+      const reset = await measure('');
+      return { initial, medium, full, capped, scrolls, reset, resize: getComputedStyle(field).resize };
+    })()`);
+    assert.equal(sizes.resize, 'none');
+    assert.ok(sizes.medium > sizes.initial && sizes.full > sizes.medium && sizes.capped && sizes.scrolls, JSON.stringify(sizes));
+    assert.equal(sizes.initial, sizes.reset);
+  }
   let browser;
   try {
     await require('./navigation-helpers.cjs')(window).openWorkspace('Git 仓库管理');
@@ -98,6 +120,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     await wait(desktop, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
     const text = await desktop('document.querySelector(".git-hero h2").textContent');
     assert.equal(text, 'main');
+    await checkTextarea(desktop);
     await checkAppearance(desktop, window.webContents, '.git-hero', 'git-workspace');
     await fs.writeFile(path.join(output, 'git-desktop.png'), (await window.webContents.capturePage()).toPNG());
     await click(desktop, '.git-review-tools button[aria-label="暂存 README.md"]');
@@ -168,7 +191,21 @@ module.exports = async function gitSmoke(window, installation, output) {
     await fs.writeFile(path.join(output, 'git-portal-mobile.png'), (await browser.webContents.capturePage()).toPNG());
     // Restart with editor access and use a fresh session to exercise the HTTP write path.
     await desktop('window.devkitProjects.request("stop")');
-    await click(desktop, '.git-host-panel summary:has(svg.lucide-shield-check)');
+    const grants = '.git-repo-bar button[aria-haspopup="dialog"]';
+    await desktop('document.querySelector(' + JSON.stringify(grants) + ').focus()');
+    await click(desktop, grants);
+    await wait(desktop, 'document.querySelector(".git-grants-dialog:modal")');
+    await wait(desktop, 'document.querySelector(".git-grants-dialog")?.innerText.includes("在局域网共享设置中")');
+    await desktop('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    await desktop('Promise.allSettled(document.querySelector(".git-grants-dialog").getAnimations({subtree:true}).map(animation => animation.finished)).then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
+    await fs.writeFile(path.join(output, 'git-repository-permissions.png'), (await window.webContents.capturePage()).toPNG());
+    await desktop('document.querySelector("#git-default-grant").value="none"; document.querySelector("#git-default-grant").dispatchEvent(new Event("change",{bubbles:true}))');
+    await click(desktop, '.git-grants-dialog [aria-label="关闭仓库访问权限"]');
+    await chooseText(desktop, '放弃更改');
+    await wait(desktop, '!document.querySelector(".git-grants-dialog")');
+    assert.equal(await desktop('document.activeElement.matches(' + JSON.stringify(grants) + ')'), true);
+    await click(desktop, grants);
+    await wait(desktop, 'document.querySelector("#git-default-grant")?.value === "history"');
     await desktop(
       '(()=>{const field=document.querySelector("select[aria-label=默认仓库权限]");field.value="collaborate";field.dispatchEvent(new Event("change",{bubbles:true}));})()',
     );
@@ -183,10 +220,20 @@ module.exports = async function gitSmoke(window, installation, output) {
     await fs.writeFile(path.join(repo, 'review.txt'), 'Browser editor\n');
     await browser.loadURL(address);
     await wait(web, 'document.querySelector(".portal-login input[type=password]")');
+    // Exercise browsers that do not implement native content sizing on the portal.
+    await web(`(() => {
+      const supports = CSS.supports.bind(CSS);
+      CSS.supports = (...args) => args[0] === 'field-sizing' ? false : supports(...args);
+      const style = document.createElement('style');
+      style.textContent = 'textarea { field-sizing: fixed !important }';
+      document.head.append(style);
+    })()`);
     await web(
       '(()=>{const field=document.querySelector(".portal-login input[type=password]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(field,"git-smoke-only"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
     );
     await click(web, '.portal-login button[type=submit]');
+    await wait(web, 'document.querySelector("#git-message")');
+    await checkTextarea(web);
     await click(web, '.git-review-tools button[aria-label="暂存 review.txt"]');
     await wait(web, 'document.querySelector(".git-review-tools button[aria-label=\\"取消暂存 review.txt\\"]")');
     assert.equal(git('diff', '--cached', '--name-only').toString().trim(), 'review.txt');

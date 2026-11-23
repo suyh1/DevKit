@@ -12,6 +12,7 @@ import './adaptations.css';
 import './workbench-forms.css';
 import './local-file-picker.css';
 import './select.css';
+import '../shared/text-controls.css';
 import '../shared/focus.css';
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');

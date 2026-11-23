@@ -57,7 +57,7 @@
 .compact-run .run-actions { flex-wrap:wrap; }
 .focused-input>label { display:flex; flex-direction:column; gap:10px; font-size:11px; color:var(--muted); min-width:0; }
 .focused-input>label>input,.focused-input textarea,.digest-compare input { width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--line); background:var(--soft); color:var(--text); border-radius:7px; padding:13px 14px; font:15px/1.7 Consolas,'Microsoft YaHei',monospace; }
-.focused-input textarea { resize:vertical; min-height:90px; max-height:380px; }
+.focused-input textarea { min-height:min(90px, var(--textarea-limit)); max-height:min(380px, var(--textarea-limit)); }
 .focused-input>.secondary-button { align-self:flex-start; }
 .input-presets { display:flex; flex-wrap:wrap; gap:8px; }
 .input-presets .secondary-button { font-size:11px; padding:7px 10px; }

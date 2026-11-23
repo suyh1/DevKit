@@ -75,7 +75,7 @@
 .smart-open-input textarea {
   display: block;
   width: 100%;
-  min-height: 78px;
+  min-height:min(78px, var(--textarea-limit));
   padding: 18px 20px 8px;
   border: 0;
   border-radius: 14px 14px 0 0;
