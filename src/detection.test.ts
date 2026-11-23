@@ -53,6 +53,8 @@ describe('推荐顺序和打开方式', () => {
       expect(detectTools(source)).toContainEqual(expect.objectContaining({ id: 'git', gitMode }));
     expect(detectTools('feat: 完成搜索').map(s => s.id)).toContain('changelog');
     expect(detectTools('*.log').map(s => s.id)).not.toContain('git');
+    for(const [command,seed] of [['git push',{mode:'changes',push:true}],['git merge feature/demo',{mode:'refs',branch:'feature/demo'}],['git clone https://git.example/team/demo.git',{mode:'changes',clone:'https://git.example/team/demo.git'}],['git log -- "src/file name.ts"',{mode:'history',path:'src/file name.ts'}]] as const)
+      expect(detectTools(command)[0]).toMatchObject({id:'git',gitSeed:seed});
     const id = 'ffb7a698-c851-4294-94f4-5651e4b33fe9';
     expect(detectTools('https://kit.example/#git/' + id)[0]).toMatchObject({ id: 'git', resourceId: id });
     expect(detectTools('digital art').map(s => s.id)).not.toContain('git');

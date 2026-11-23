@@ -462,12 +462,11 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
   const summary = !active?.enabled
     ? "没有可访问的服务"
     : [
-        ('edit' in active && active.edit)
+        page === 'git' ? '按仓库授权' : ('edit' in active && active.edit)
           ? "可编辑"
-          : { git: '仓库只读', knowledge: '文档只读', projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', transfer: '可复制和下载', mock: '可查看接口', whiteboard: '可查看和导出', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
+          : { knowledge: '文档只读', projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', transfer: '可复制和下载', mock: '可查看接口', whiteboard: '可查看和导出', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
               page
             ],
-        page === 'git' && services.git.sync ? '可同步远端' : '',
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
         page === 'jar' && services.jar.control ? (services.logs.enabled && services.logs.jar ? '可管理运行与控制台输入' : '可管理运行') : '',
         page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',

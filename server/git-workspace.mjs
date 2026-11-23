@@ -1,15 +1,27 @@
-import { execFile } from 'node:child_process';
+import { git, patches, fail } from './git-command.mjs';
+import { reviewFile, applyReview, conflictView, resolveConflict } from './git-review.mjs';
+import {
+  history,
+  visibleCommit,
+  compareCommits,
+  mergeStatus,
+  startMerge,
+  pushPlan,
+  cloneRepository,
+} from './git-operations.mjs';
 import { createHash, randomUUID } from 'node:crypto';
-import { access, lstat, readFile, realpath } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
+
 import { atomicFile } from './atomic-file.mjs';
 import { configGroup } from './config-layout.mjs';
 
-const execute = promisify(execFile);
-const patches = ['--no-ext-diff', '--no-textconv', '--no-color', '--submodule=short'];
 const syncActions = new Set(['fetch', 'pull', 'push']);
 const editActions = new Set([
+  'merge',
+  'merge-abort',
+  'merge-continue',
+  'resolve',
   'stage',
   'unstage',
   'commit',
@@ -19,71 +31,43 @@ const editActions = new Set([
   'stash-save',
   'stash-apply',
 ]);
-const reads = new Set(['list', 'state', 'patch', 'show', 'stash-show']);
-const fail = (status, message) => {
-  throw Object.assign(new Error(message), { status });
-};
-
-// Resolve the executable outside the repository, including on Windows where cwd is searched first.
-let executable;
-async function gitExecutable() {
-  if (executable) return executable;
-  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
-    if (!path.isAbsolute(dir)) continue;
-    const candidate = path.join(dir, process.platform === 'win32' ? 'git.exe' : 'git');
-    try {
-      await access(candidate, 1);
-      executable = candidate;
-      return candidate;
-    } catch {
-      /* Try the next PATH entry. */
-    }
+export const gitReads = new Set([
+  'list',
+  'state',
+  'patch',
+  'review',
+  'show',
+  'stash-show',
+  'conflict',
+  'history',
+  'compare',
+  'push-plan',
+]);
+const publicReads = new Set(['state', 'history', 'compare', 'show']);
+const levels = ['none', 'history', 'worktree', 'edit', 'sync', 'collaborate'];
+const legacyPolicy = { default: 'collaborate', visitors: [] };
+function policyFor(v) {
+  if (!v || !levels.includes(v.default) || !Array.isArray(v.visitors) || v.visitors.length > 30)
+    fail(400, '仓库访问策略无效。');
+  const seen = new Set();
+  for (const { name, level } of v.visitors) {
+    if (typeof name !== 'string' || !name || name.length > 48 || seen.has(name) || !levels.includes(level))
+      fail(400, '访客名称或授权无效。');
+    seen.add(name);
   }
-  fail(503, '主机找不到 Git，请安装 Git 并重启服务。');
+  return { default: v.default, visitors: v.visitors.map(({ name, level }) => ({ name, level })) };
 }
-
-async function git(cwd, args, { preview = false, difference = false, network = false } = {}) {
-  const binary = await gitExecutable();
-  const env = { ...process.env };
-  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_LITERAL_PATHSPECS']) delete env[key];
-  const literal = ['add', 'diff', 'rm', 'restore'].includes(args[0]) ? ['--literal-pathspecs'] : [];
-  try {
-    const { stdout } = await execute(
-      binary,
-      ['--no-pager', ...literal, '-c', 'color.ui=false', '-c', 'core.quotepath=false', ...args],
-      {
-        cwd,
-        windowsHide: true,
-        timeout: network ? 60000 : 20000,
-        maxBuffer: preview ? 384 * 1024 : 8 * 1024 * 1024,
-        env: {
-          ...env,
-          LC_ALL: 'C',
-          GIT_TERMINAL_PROMPT: '0',
-          GCM_INTERACTIVE: 'Never',
-          GIT_OPTIONAL_LOCKS: '0',
-        },
-      },
-    );
-    return stdout;
-  } catch (error) {
-    if (difference && error.code === 1) return error.stdout;
-    if (preview && error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER')
-      return error.stdout + '\n… 差异较大，仅显示前段。';
-    if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') fail(413, '此仓库的状态或引用列表超出读取上限。');
-    if (error.code === 'ENOENT') fail(503, '请确认主机已安装 Git，且仓库目录仍然存在。');
-    if (error.killed) fail(408, 'Git 操作超时，请刷新仓库并检查主机状态。');
-    const detail = String(error.stderr || '')
-      .trim()
-      .replace(/(?:https?|ssh):\/\/\S+/gi, '[远端地址]')
-      .slice(0, 1200);
-    throw Object.assign(new Error(detail || 'Git 操作失败，请检查仓库状态和主机配置。'), {
-      status: 400,
-      gitFailure: true,
-    });
-  }
+function accessFor(repo, actor) {
+  if (!actor.portal) return { visible: true, worktree: true, edit: true, sync: true };
+  const p = repo.policy ?? legacyPolicy,
+    level = p.visitors.find((v) => v.name === actor.visitor)?.level ?? p.default;
+  return {
+    visible: repo.published && level !== 'none',
+    worktree: !['none', 'history'].includes(level),
+    edit: actor.edit && ['edit', 'collaborate'].includes(level),
+    sync: actor.sync && ['sync', 'collaborate'].includes(level),
+  };
 }
-
 async function rootOf(directory) {
   if (typeof directory !== 'string' || !path.isAbsolute(directory)) fail(400, '请选择主机上的 Git 工作目录。');
   const root = (await git(directory, ['rev-parse', '--show-toplevel'])).replace(/\r?\n$/, '');
@@ -121,45 +105,26 @@ async function status(root) {
   }
   const [ahead, behind] = (headers['branch.ab'] || '+0 -0').split(' ').map((n) => Math.abs(Number(n)));
   const head = headers['branch.oid'] === '(initial)' ? '' : headers['branch.oid'];
+  const mergeHead = await mergeStatus(root);
   return {
+    mergeHead,
     branch: headers['branch.head'],
     upstream: headers['branch.upstream'] || '',
     ahead,
     behind,
     head,
     files,
-    revision: createHash('sha256').update(raw).digest('hex'),
+    revision: createHash('sha256')
+      .update(raw + '\0' + mergeHead)
+      .digest('hex'),
   };
-}
-
-async function history(root, head) {
-  const raw = await git(root, [
-    'log',
-    '--topo-order',
-    '--no-show-signature',
-    '--branches',
-    '--remotes',
-    '--tags',
-    ...(head ? [head] : []),
-    '-201',
-    '--format=%H%x00%P%x00%an%x00%aI%x00%s%x00%D',
-    '-z',
-    '--',
-  ]);
-  const fields = raw.split('\0'),
-    commits = [];
-  for (let i = 0; i + 5 < fields.length; i += 6) {
-    const [id, parents, author, date, subject, refs] = fields.slice(i, i + 6);
-    commits.push({ id, parents: parents.split(' ').filter(Boolean), author, date, subject, refs });
-  }
-  return { commits: commits.slice(0, 200), more: commits.length > 200 };
 }
 
 async function refs(root) {
   const output = await git(root, [
     'for-each-ref',
     '--sort=refname',
-    '--format=%(refname)%00%(objectname:short)%00%(upstream:short)',
+    '--format=%(refname)%00%(objectname)%00%(upstream:short)',
     'refs/heads',
     'refs/remotes',
     'refs/tags',
@@ -186,7 +151,7 @@ async function stashes(root) {
   return result;
 }
 
-async function perform(root, action, value, current, authorize) {
+async function perform(root, action, value, current, authorize, worktree) {
   const run = (args, options) => {
     authorize();
     return git(root, args, options);
@@ -196,18 +161,26 @@ async function perform(root, action, value, current, authorize) {
       history(root, current.head),
       refs(root),
       git(root, ['remote']),
-      stashes(root),
+      worktree ? stashes(root) : [],
     ]);
-    return { ...current, ...log, references, stashes: saved, remotes: remotes.trim().split('\n').filter(Boolean) };
+    return {
+      ...current,
+      ...log,
+      worktree,
+      references,
+      stashes: saved,
+      remotes: remotes.trim().split('\n').filter(Boolean),
+    };
   }
+  if (action === 'history') return history(root, current.head, value);
+  if (action === 'compare') return compareCommits(root, current.head, value);
   if (action === 'show') {
-    if (!(await history(root, current.head)).commits.some((item) => item.id === value.commit))
-      fail(404, '该提交不在当前历史窗口中。');
+    await visibleCommit(root, current.head, value.commit);
     return run(['show', '--format=fuller', '--first-parent', '--stat', '--patch', ...patches, value.commit, '--'], {
       preview: true,
     });
   }
-  if (!reads.has(action) && value.revision !== current.revision) fail(409, '仓库已变化，请刷新后重新核对。');
+  if (!gitReads.has(action) && value.revision !== current.revision) fail(409, '仓库已变化，请刷新后重新核对。');
   if (action === 'stash-save') {
     if (!current.head || !current.files.length || current.files.some((f) => f.conflict))
       fail(409, '贮藏需要已有提交和无冲突的本地改动。');
@@ -222,27 +195,22 @@ async function perform(root, action, value, current, authorize) {
     if (current.files.length) fail(409, '请先提交或贮藏当前改动，再应用贮藏。');
     return run(['stash', 'apply', '--index', entry.id]);
   }
-  if (['patch', 'stage', 'unstage'].includes(action)) {
-    const file = current.files.find((item) => item.path === value.path);
+  if (['patch', 'review', 'stage', 'unstage', 'conflict', 'resolve'].includes(action)) {
+    const file = current.files.find((f) => f.path === value.path);
     if (!file) fail(409, '文件状态已变化，请刷新。');
-    if (action === 'patch') {
-      if (file.work === '?' && !value.staged) {
-        const target = path.resolve(root, file.path);
-        const relative = path.relative(root, await realpath(path.dirname(target)));
-        if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative))
-          fail(409, '文件位置已变化。');
-        const info = await lstat(target);
-        if (!info.isFile() && !info.isSymbolicLink()) return '嵌套仓库或特殊文件，仅显示状态。';
-        return run(['diff', ...patches, '--no-index', '--', '/dev/null', file.path], {
-          preview: true,
-          difference: true,
-        });
-      }
-      return run(['diff', ...patches, ...(value.staged ? ['--cached'] : []), '--', file.path], { preview: true });
+    if (action === 'conflict') return conflictView(root, file);
+    if (action === 'resolve') return resolveConflict(root, file, value, authorize);
+    if (action === 'patch' || action === 'review') {
+      const review = await reviewFile(root, file, !!value.staged);
+      return action === 'patch' ? review.text : review;
     }
-    if (action === 'stage') return run(['add', '--', file.path]);
-    if (file.conflict) fail(409, '请在主机解决文件冲突。');
-    return run(current.head ? ['restore', '--staged', '--', file.path] : ['rm', '--cached', '--', file.path]);
+    return applyReview(root, file, action === 'unstage', value, authorize);
+  }
+  if (action === 'merge') return startMerge(root, current, value, authorize);
+  if (action === 'merge-abort' || action === 'merge-continue') {
+    if (!current.mergeHead) fail(409, '当前没有进行中的合并。');
+    if (action === 'merge-continue' && current.files.some((f) => f.conflict)) fail(409, '请先解决所有冲突。');
+    return run(action === 'merge-abort' ? ['merge', '--abort'] : ['commit', '--no-edit']);
   }
   if (action === 'commit') {
     if (typeof value.message !== 'string' || !value.message.trim() || value.message.length > 8000)
@@ -268,6 +236,24 @@ async function perform(root, action, value, current, authorize) {
     !(await git(root, ['remote'])).split('\n').includes(remote)
   )
     fail(400, '请选择已配置的远端。');
+  if (action === 'push' || action === 'push-plan') {
+    const plan = await pushPlan(root, current, remote);
+    if (action === 'push-plan') return plan;
+    if (plan.token !== value.token) fail(409, '推送来源或目标已变化，请重新核对。');
+    if (current.mergeHead || plan.incoming) fail(409, '请先完成合并或整合远端提交。');
+    await run(['push', '--no-follow-tags', '--', remote, current.head + ':refs/heads/' + plan.target], {
+      network: true,
+    });
+    if (plan.first) {
+      try {
+        await run(['branch', '--set-upstream-to=' + remote + '/' + plan.target, '--', current.branch]);
+      } catch (error) {
+        if (!error.gitFailure) throw error;
+        return { notice: '提交已推送；本机未能设置上游，请检查远端跟踪配置。' };
+      }
+    }
+    return { notice: '已将 ' + current.head.slice(0, 8) + ' 推送至 ' + remote + '/' + plan.target };
+  }
   if (action === 'fetch') return run(['fetch', '--no-recurse-submodules', '--', remote], { network: true });
   if (!current.upstream || current.branch === '(detached)') fail(409, '请先在主机为当前分支设置上游。');
   const tracking = (
@@ -280,8 +266,6 @@ async function perform(root, action, value, current, authorize) {
     .split('\n')[0]
     .split('\0');
   if (remote !== tracking[0] || !tracking[1]?.startsWith('refs/heads/')) fail(409, '请选择当前上游所在的远端。');
-  if (action === 'push')
-    return run(['push', '--no-follow-tags', '--', remote, 'HEAD:' + tracking[1]], { network: true });
   if (current.files.length) fail(409, '快进拉取需要干净的工作区。');
   return run(
     [
@@ -312,7 +296,8 @@ export async function createGitWorkspace(directory) {
     repositories.some(
       (r) =>
         !r ||
-        typeof r.root !== 'string' || !path.isAbsolute(r.root) ||
+        typeof r.root !== 'string' ||
+        !path.isAbsolute(r.root) ||
         typeof r.id !== 'string' ||
         typeof r.name !== 'string' ||
         typeof r.published !== 'boolean',
@@ -321,59 +306,114 @@ export async function createGitWorkspace(directory) {
     throw new Error('Git 仓库登记文件无效。');
   let busy = false;
   const writing = new Set();
-  const list = (portal) =>
-    repositories.filter((r) => !portal || r.published).map(({ id, name, published, root }) => (portal ? { id, name, published } : { id, name, published, root }));
+  for (const repo of repositories) if (repo.policy) policyFor(repo.policy);
+  const list = (actor) =>
+    repositories
+      .filter((r) => accessFor(r, actor).visible)
+      .map((r) =>
+        actor.portal
+          ? { id: r.id, name: r.name, published: r.published, access: accessFor(r, actor) }
+          : { ...r, policy: r.policy ?? legacyPolicy },
+      );
   return {
-    async request(action, value = {}, { portal = false, edit = !portal, sync = !portal, authorize = () => {} } = {}) {
+    async request(
+      action,
+      value = {},
+      { portal = false, edit = !portal, sync = !portal, visitor = '', authorize = () => {} } = {},
+    ) {
+      const actor = { portal, edit, sync, visitor };
       authorize();
       if (!value || typeof value !== 'object' || Array.isArray(value)) fail(400, '请求参数无效。');
-      if (action === 'list') return list(portal);
-      if (['register', 'publish', 'remove'].includes(action)) {
+      if (action === 'list') return list(actor);
+      if (['register', 'clone', 'policy', 'publish', 'remove'].includes(action)) {
         if (portal) fail(403, '请在主机管理仓库登记。');
         if (busy || writing.size) fail(409, '仓库操作正在进行，请稍后再试。');
         busy = true;
         try {
           let next;
-          if (action === 'register') {
-            const root = await rootOf(value.root);
+          if (action === 'register' || action === 'clone') {
+            const root = await rootOf(
+              action === 'clone' ? await cloneRepository(value.parent, value.source) : value.root,
+            );
             if (repositories.some((r) => path.relative(r.root, root) === '')) fail(409, '该仓库已登记。');
-            next = [...repositories, { id: randomUUID(), root, name: path.basename(root), published: false }];
+            next = [
+              ...repositories,
+              {
+                id: randomUUID(),
+                root,
+                name: path.basename(root),
+                published: false,
+                policy: { default: 'history', visitors: [] },
+              },
+            ];
           } else {
             if (!repositories.some((r) => r.id === value.id)) fail(404, '仓库未登记。');
             if (action === 'publish' && typeof value.published !== 'boolean') fail(400, '发布状态无效。');
             next =
               action === 'remove'
                 ? repositories.filter((r) => r.id !== value.id)
-                : repositories.map((r) => (r.id === value.id ? { ...r, published: value.published } : r));
+                : repositories.map((r) =>
+                    r.id !== value.id
+                      ? r
+                      : action === 'policy'
+                        ? { ...r, policy: policyFor(value.policy) }
+                        : { ...r, published: value.published },
+                  );
           }
           await atomicFile(filename, JSON.stringify(next, null, 2));
           repositories = next;
-          return list(false);
+          return list(actor);
         } finally {
           busy = false;
         }
       }
-      const repo = repositories.find((r) => r.id === value.id && (!portal || r.published));
+      const repo = repositories.find((r) => r.id === value.id && accessFor(r, actor).visible);
       if (!repo) fail(404, '找不到可访问的仓库。');
-      const mutation = !reads.has(action);
+      const rights = accessFor(repo, actor);
+      if (!rights.worktree && !publicReads.has(action)) fail(403, '此仓库仅授权查看提交历史。');
+      const mutation = !gitReads.has(action);
       if (mutation) {
         if (!editActions.has(action) && !syncActions.has(action)) fail(404, 'Git 操作不存在。');
-        if (syncActions.has(action) ? !sync : !edit) fail(403, '未获此 Git 操作权限。');
+        if (syncActions.has(action) ? !rights.sync : !rights.edit) fail(403, '未获此 Git 操作权限。');
         if (busy || writing.has(repo.id)) fail(409, '另一个仓库操作正在进行，请稍后刷新。');
         writing.add(repo.id);
       }
       const verify = () => {
         authorize();
-        if (portal && !repositories.some((r) => r.id === repo.id && r.published)) fail(404, '仓库已撤下。');
+        if (
+          portal &&
+          !repositories.some(
+            (r) =>
+              r.id === repo.id &&
+              accessFor(r, actor).visible &&
+              JSON.stringify(accessFor(r, actor)) === JSON.stringify(rights),
+          )
+        )
+          fail(404, '仓库已撤下。');
       };
       try {
         if (path.relative(repo.root, await rootOf(repo.root)) !== '') fail(409, '仓库位置已改变，请重新登记。');
-        const current = await status(repo.root);
-        const result = await perform(repo.root, action, value, current, verify);
+        const current = rights.worktree
+          ? await status(repo.root)
+          : {
+              branch:
+                (await git(repo.root, ['symbolic-ref', '-q', '--short', 'HEAD'], { allowOne: true }))?.trim() ||
+                '(detached)',
+              head: (await git(repo.root, ['rev-parse', '-q', '--verify', 'HEAD'], { allowOne: true }))?.trim() || '',
+              revision: '',
+              files: [],
+              mergeHead: '',
+              upstream: '',
+              ahead: 0,
+              behind: 0,
+            };
+        const result = await perform(repo.root, action, value, current, verify, rights.worktree);
         verify();
-        return mutation ? { ok: true } : result;
+        return mutation ? { ok: true, ...(result?.notice ? { notice: result.notice } : {}) } : result;
       } catch (error) {
         if (portal && !error.status) fail(409, '仓库文件已变化或读取失败，请刷新后重试。');
+        if (error.gitFailure && /non-fast-forward|fetch first|rejected.*behind/i.test(error.message))
+          fail(409, '远端分支已推进，请获取更新、比较并整合后重试。');
         if (portal && error.gitFailure) fail(400, 'Git 拒绝了操作，请由主机检查身份、凭据、分支和文件状态。');
         throw error;
       } finally {

@@ -9,7 +9,7 @@ export type ServiceDraft = { kind: 'jar' | 'npm' | 'program' | 'script'; jar?: s
 
 export type Suggestion =
   | { kind: 'tool'; id: ToolId; name: string; reason: string; input?: string; options?: Options }
-  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; resourceId?: string; gitMode?: import('./git-api').GitMode; options?: never };
+  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; resourceId?: string; gitMode?: import('./git-api').GitMode;gitSeed?:import('./git-api').GitSeed; options?: never };
 export const DETECTION_LIMIT = 200_000;
 
 const toolNames = new Map(tools.map(t => [t.id, t.name]));
@@ -329,12 +329,19 @@ export function detectTools(input: string): Suggestion[] {
       return [...matches.values()];
     }
   }
-  const gitCommand = /^git\s+(status|diff|add|commit|log|show|branch|switch|tag|fetch|pull|push|stash)(?:\s|$)/i.exec(text);
+  const gitCommand = /^git\s+(status|diff|add|commit|log|show|branch|switch|tag|fetch|pull|push|stash|clone|merge)(?:\s|$)/i.exec(text);
   if (gitCommand || /^(?:diff --git |On branch [^\n]+\r?\n|commit [a-f\d]{40}(?:\s|$))/i.test(text)) {
     const command = gitCommand?.[1].toLowerCase();
     const gitMode = command === 'stash' ? 'stash' : ['log', 'show'].includes(command || '') || /^commit /i.test(text) ? 'history'
-      : ['branch', 'switch', 'tag', 'fetch', 'pull', 'push'].includes(command || '') ? 'refs' : 'changes';
-    add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode });
+      : ['branch', 'switch', 'tag', 'fetch', 'pull', 'merge'].includes(command || '') ? 'refs' : 'changes';
+    const argument=text.replace(/^git\s+\S+\s*/i,'').trim();
+    const unquote=(s:string)=>s.replace(/^(["'])(.*)\1$/,'$2');
+    const path=command==='log'?/(?:^|\s)--\s+(.+)$/.exec(argument)?.[1]:undefined;
+    const gitSeed={mode:gitMode as import('./git-api').GitMode,
+      ...(command==='clone'&&{clone:argument.startsWith('-')?'':unquote(argument)}),
+      ...(command==='push'&&{push:true}),...(command==='merge'&&argument&&!argument.startsWith('-')&&{branch:argument}),
+      ...(path&&{path:unquote(path)})};
+    add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode,gitSeed });
   }
   if (webAddressRules(text, rules)) return [...matches.values()];
   const lines = text.split(/\r?\n/);

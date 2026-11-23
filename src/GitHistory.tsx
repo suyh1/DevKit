@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { GitCommitHorizontal, Search } from 'lucide-react';
 import type { Commit, GitState } from './git-api';
 import { useGitRead } from './git-api';
 import Skeleton from './Skeleton';
 import FileMeta from './FileMeta';
+import { DiffText } from './GitReview';
 
 const colors = ['#399984', '#c46f4f', '#9674c9', '#518ac4', '#bc963f'];
 const laneX = (n: number) => 9 + n * 12;
@@ -73,7 +74,6 @@ export function PatchView({
   stash?: string;
   generation: number;
 }) {
-  const [limit, setLimit] = useState(400);
   const { data, error } = useGitRead<string>(
     portal,
     stash ? 'stash-show' : commit ? 'show' : 'patch',
@@ -81,7 +81,7 @@ export function PatchView({
     !!(path || commit || stash),
     generation,
   );
-  const lines = useMemo(() => data?.trimEnd().split('\n') || [], [data]);
+
   return (
     <article className="git-inspector">
       <header>
@@ -100,98 +100,180 @@ export function PatchView({
       ) : !data ? (
         <p className="git-quiet">没有可显示的文本差异。</p>
       ) : (
-        <>
-          <pre className="git-diff" tabIndex={0} aria-label="代码差异">
-            {lines.slice(0, limit).map((line, i) => {
-              const tone = line.startsWith('@@')
-                ? 'hunk'
-                : /^(diff --git|index |--- |\+\+\+ )/.test(line)
-                  ? 'meta'
-                  : line.startsWith('+')
-                    ? 'added'
-                    : line.startsWith('-')
-                      ? 'removed'
-                      : '';
-              return (
-                <span className={tone} key={i}>
-                  {line || ' '}
-                  {'\n'}
-                </span>
-              );
-            })}
-          </pre>
-          {lines.length > limit && (
-            <button className="text-button" onClick={() => setLimit(limit + 400)}>
-              继续显示差异（余 {lines.length - limit} 行）
-            </button>
-          )}
-        </>
+        <DiffText text={data} />
       )}
     </article>
   );
 }
 
+export function CommitComparison({
+  portal,
+  id,
+  base,
+  target,
+  generation,
+}: {
+  portal: boolean;
+  id: string;
+  base: string;
+  target: string;
+  generation: number;
+}) {
+  const { data, error } = useGitRead<string>(portal, 'compare', { id, base, target }, !!base && !!target, generation);
+  return (
+    <article className="git-inspector">
+      <header>
+        <GitCommitHorizontal size={16} />
+        <strong>版本差异</strong>
+        <code>
+          {base.slice(0, 8)} → {target.slice(0, 8)}
+        </code>
+      </header>
+      {error ? (
+        <p role="alert">{error}</p>
+      ) : data === undefined ? (
+        <Skeleton kind="editor" label="正在比较版本" />
+      ) : (
+        <DiffText text={data || '两个版本的文件内容相同。'} />
+      )}
+    </article>
+  );
+}
 export function GitHistory({
   state,
   portal,
   id,
   generation,
+  initialPath = '',
 }: {
+  initialPath?: string;
   state: GitState;
   portal: boolean;
   id: string;
   generation: number;
 }) {
   const [query, setQuery] = useState(''),
-    [selected, setSelected] = useState('');
-  const rows = useMemo(() => graphRows(state.commits), [state.commits]);
-  const visible = state.commits
-    .map((c, i) => ({ c, i }))
-    .filter(({ c }) =>
-      [c.subject, c.author, c.id, c.refs].some((v) => v.toLowerCase().includes(query.trim().toLowerCase())),
-    );
-  const current = visible.find(({ c }) => c.id === selected)?.c ?? visible[0]?.c;
+    [path, setPath] = useState(initialPath),
+    [field, setField] = useState('message');
+  const [filter, setFilter] = useState({ query: '', path: initialPath, field: 'message' }),
+    [cursor, setCursor] = useState({ offset: 0, snapshot: '' }),
+    [selected, select] = useState(''),
+    [base, setBase] = useState('');
+  const offset = cursor.offset;
+  const filtered = !!filter.query || !!filter.path || offset > 0;
+  const { data, error } = useGitRead<Pick<GitState, 'commits' | 'more' | 'snapshot'>>(
+    portal,
+    'history',
+    { id, ...filter, offset, snapshot: cursor.snapshot },
+    filtered,
+    generation,
+  );
+  const page = filtered ? data : state;
+  const visible = page?.commits || [],
+    rows = graphRows(visible);
+  const current = visible.find((c) => c.id === selected) || visible[0];
   return (
     <div className="git-split devkit-bento">
       <section className="git-panel">
         <header>
           <h3>提交历史</h3>
-          <small>
-            {state.more ? '最近 ' : ''}
-            {state.commits.length} 条
-          </small>
+          <small>第 {1 + offset / 200} 页</small>
         </header>
-        <label className="git-search">
-          <Search size={15} />
+        <form
+          className="git-history-filter"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setFilter({ field, query: query.trim(), path: path.trim() });
+            setCursor({ offset: 0, snapshot: '' });
+            select('');
+          }}
+        >
+          <select aria-label="搜索字段" value={field} onChange={(e) => setField(e.target.value)}>
+            {Object.entries({ message: '提交消息', author: '作者', ref: '分支或标签', hash: '提交哈希' }).map(
+              ([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ),
+            )}
+          </select>
           <input
             aria-label="搜索提交"
-            placeholder="消息、作者或哈希"
+            placeholder="检索全部历史"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-        </label>
+          <input
+            aria-label="文件历史路径"
+            placeholder="文件路径（可选）"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+          />
+          <button className="secondary-button">
+            <Search size={14} />
+            检索
+          </button>
+        </form>
+        {error ? (
+          <p role="alert">
+            {error}{' '}
+            <button className="text-button" onClick={() => setCursor({ offset: 0, snapshot: '' })}>
+              回到第一页
+            </button>
+          </p>
+        ) : !page ? (
+          <Skeleton kind="list" label="正在检索提交" />
+        ) : null}
         <div className="git-rows">
-          {visible.map(({ c, i }) => (
+          {visible.map((c, i) => (
             <button
               key={c.id}
               className="git-commit-row"
               aria-pressed={c.id === current?.id}
-              onClick={() => setSelected(c.id)}
+              onClick={() => select(c.id)}
             >
-              {!query.trim() && <Lane row={rows[i]} />}
+              {!filter.query && !filter.path && <Lane row={rows[i]} />}
               <span>
                 <strong title={c.subject}>{c.subject || '无标题提交'}</strong>
                 <small>
-                  <code>{c.id.slice(0, 7)}</code> · {c.author} · {c.date.slice(0, 10)}{' '}
-                  {c.refs && <em title={c.refs}>{c.refs}</em>}
+                  <code>{c.id.slice(0, 7)}</code> · {c.author} · {c.date.slice(0, 10)} {c.refs && <em>{c.refs}</em>}
                 </small>
               </span>
             </button>
           ))}
-          {!visible.length && <p className="git-quiet">{query ? '没有匹配的提交。' : '仓库还没有提交。'}</p>}
+          {page && !visible.length && <p className="git-quiet">没有匹配的提交。</p>}
+        </div>
+        <div className="git-review-tools">
+          <button
+            className="text-button"
+            disabled={!offset}
+            onClick={() => setCursor({ offset: Math.max(0, offset - 200), snapshot: page?.snapshot || state.snapshot })}
+          >
+            上一页
+          </button>
+          <button
+            className="text-button"
+            disabled={!page?.more}
+            onClick={() => setCursor({ offset: offset + 200, snapshot: page!.snapshot })}
+          >
+            下一页
+          </button>
+          {base ? (
+            <button className="text-button" onClick={() => setBase('')}>
+              清除起点 {base.slice(0, 7)}
+            </button>
+          ) : (
+            <button className="text-button" disabled={!current} onClick={() => setBase(current!.id)}>
+              设为比较起点
+            </button>
+          )}
         </div>
       </section>
-      <PatchView key={current?.id} portal={portal} id={id} commit={current?.id} generation={generation} />
+      {base && current && base !== current.id ? (
+        <CommitComparison portal={portal} id={id} base={base} target={current.id} generation={generation} />
+      ) : (
+        <PatchView key={current?.id} portal={portal} id={id} commit={current?.id} generation={generation} />
+      )}
     </div>
   );
 }

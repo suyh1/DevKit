@@ -11,6 +11,7 @@ import { Readable } from 'node:stream';
 import { probeProjects } from "./project-probe.mjs";
 import { createSharedWorkspaces } from './shared-workspaces.mjs';
 import { sharingServices, sharingAliases, hasLegacySharing, visitorServices } from '../shared/sharing.mjs';
+import { gitReads } from './git-workspace.mjs';
 import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } from './sharing-visitors.mjs';
 import { webTransferLimit } from './lan-sftp.mjs';
 
@@ -303,9 +304,9 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (!manager) return json(503, { error: 'Git 工作台暂不可用。' });
             const action = url.pathname.slice('/api/git/'.length);
             const payload = await body();
-            const writing = !['list', 'state', 'patch', 'show', 'stash-show'].includes(action);
+            const writing = !gitReads.has(action);
             let result;
-            try { result = await manager.request(action, payload, { ...services.git, portal: true, authorize: ensureCurrentSession }); }
+            try { result = await manager.request(action, payload, { ...services.git, portal: true, visitor:session.visitor || '', authorize: ensureCurrentSession }); }
             catch (error) {
               if (writing) audit.record(session.visitor, 'git.' + action.slice(0, 32), error.status === 403 || error.status === 404 ? 'denied' : 'failed');
               throw error;

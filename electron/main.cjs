@@ -360,8 +360,8 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的仓库请求。');
     try {
       if (!gitWorkspace) throw new Error(gitError || projectError || 'Git 工作台尚未准备好。');
-      if (action === 'choose') {
-        const selection = await dialog.showOpenDialog(window, { title: '选择 Git 工作目录', properties: ['openDirectory'] });
+      if (action === 'choose' || action === 'choose-parent') {
+        const selection = await dialog.showOpenDialog(window, { title: action === 'choose-parent' ? '选择克隆目标父目录' : '选择 Git 工作目录', properties: ['openDirectory'] });
         return { data: selection.filePaths[0] || '' };
       }
       return { data: await gitWorkspace.request(action, value) };

@@ -29,13 +29,21 @@ test('published repositories, partial staging, graph, branches, tags and local u
     editor = { ...viewer, edit: true },
     sync = { ...viewer, sync: true };
   const call = (action, args = {}, access) => manager.request(action, { id, ...args }, access);
-  const change = async (action, args = {}, access = editor) =>
-    call(action, { revision: (await call('state')).revision, ...args }, access);
+  const change = async (action, args = {}, access = editor) => {
+    let token;
+    if (['stage', 'unstage'].includes(action))
+      token = (await call('review', { path: args.path, staged: action === 'unstage' })).token;
+    if (action === 'push') token = (await call('push-plan', args)).token;
+    return call(action, { revision: (await call('state')).revision, token, ...args }, access);
+  };
   assert.deepEqual(await call('list', {}, viewer), []);
   await assert.rejects(call('state', {}, viewer), { status: 404 });
   await assert.rejects(call('publish', { published: true }, editor), { status: 403 });
   await call('publish', { published: true });
   assert.equal((await call('list', {}, viewer))[0].root, undefined);
+  assert.equal((await call('state', {}, viewer)).worktree, false);
+  await assert.rejects(call('review', { path: 'example' }, viewer), { status: 403 });
+  await call('policy', { policy: { default: 'collaborate', visitors: [] } });
   const empty = await call('state', {}, viewer);
   assert.equal(empty.branch, 'main');
   assert.deepEqual(empty.commits, []);
@@ -112,9 +120,12 @@ test('published repositories, partial staging, graph, branches, tags and local u
   await assert.rejects(call('state', {}, editor), { status: 404 });
   await call('remove');
   assert.equal(git(repo, 'branch', '--show-current'), 'main');
-  const registry = (...args) => execFileSync(process.execPath, [fileURLToPath(new URL('./git-register.mjs', import.meta.url)), ...args], {
-    encoding: 'utf8', windowsHide: true, env: { ...process.env, DEVKIT_PROJECT_DATA: folder },
-  });
+  const registry = (...args) =>
+    execFileSync(process.execPath, [fileURLToPath(new URL('./git-register.mjs', import.meta.url)), ...args], {
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, DEVKIT_PROJECT_DATA: folder },
+    });
   assert.match(registry('publish', repo), /已发布/);
   assert.match(registry('list'), /已发布/);
   assert.match(registry('unpublish', repo), /仅主机/);
