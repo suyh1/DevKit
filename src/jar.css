@@ -147,3 +147,14 @@
   .jar-dialog .jar-path-input { flex-flow: row wrap; }
   .jar-dialog .jar-path-input .text-control { flex-basis: min(13rem, 100%); }
 }
+.jar-center .jar-table-scroll { max-block-size: 68dvh; overflow: auto; scroll-padding-block: 8px; }
+.jar-output-dialog .jar-log { margin: 0; padding: 0; min-width: 0; border: 0; }
+.jar-output-dialog .jar-log-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.jar-output-dialog .jar-help { overflow-wrap: anywhere; }
+.jar-output-dialog .jar-log pre { min-height: 4rem; max-height: 52dvh; overscroll-behavior: contain; }
+.jar-output-dialog .jar-console pre { max-height: min(32dvh, 360px); }
+@media (max-width: 600px) {
+  .jar-output-dialog .jar-console-input { display: grid; grid-template-columns: 1fr auto; }
+  .jar-output-dialog .jar-console-input input { grid-column: 1 / -1; }
+  .jar-output-dialog .jar-console pre { max-height: 23dvh; }
+}

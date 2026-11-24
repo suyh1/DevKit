@@ -297,3 +297,8 @@
 .host-directory-list .path-next { margin-inline-start:auto; color:var(--muted); }
 .host-directory-list button:is(:hover,:focus-visible) { background:var(--tint); }
 .host-directory footer { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+.lan-connections .lan-host-list { max-height: 62dvh; overflow: auto; padding-inline: 2px; }
+.host-progress { max-height: 24dvh; overflow: auto; }
+@media (max-width: 760px) {
+  .lan-connections .lan-host-list { max-height: 36dvh; }
+}

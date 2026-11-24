@@ -4,6 +4,7 @@ import { parseColor } from './colors';
 import { parseCsv } from './practical';
 import { timestampDate } from './time-conversion';
 import { ipv4 } from './extended';
+import { parseWorkspaceLink } from './workspace-link-format';
 
 export type ServiceDraft = { kind: 'jar' | 'npm' | 'program' | 'script'; jar?: string; program?: string; script?: string; name?: string; jvm?: string; args?: string };
 
@@ -142,12 +143,9 @@ function webAddressRules(text: string, { tool, workspace }: Rules) {
   if (/^https?:\/\/\S+$/i.test(text)) {
     try {
       const url = new URL(text);
-      const [page] = url.hash.slice(1).split('/', 1);
-      const linked = workspaceModules.find(w => w.id === page);
-      if (linked) {
-        const gitId = /^#git\/([a-f\d-]{36})$/i.exec(url.hash)?.[1];
-        workspace(linked.id, '链接指向' + linked.name, undefined, gitId);
-      }
+      const resource = parseWorkspaceLink(url.hash);
+      const linked = resource && workspaceModules.find(w => w.id === resource.page);
+      if (linked) workspace(linked.id, '链接指向' + linked.name, undefined, resource.id);
       tool('url-inspect', '拆解地址与查询参数');
       tool('qr-code', '为链接生成二维码');
       tool('url', '对完整地址进行百分号编码');

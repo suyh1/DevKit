@@ -18,7 +18,11 @@ async function wait(window, expression) {
   throw new Error('JAR portal condition failed: ' + expression + '\n' + await window.webContents.executeJavaScript('document.body.innerText'));
 }
 const js = (window, source) => window.webContents.executeJavaScript(source, true);
-const click = (window, label) => js(window, `[...document.querySelectorAll('.jar-center button')].find(button=>button.textContent.trim()===${JSON.stringify(label)})?.click()`);
+async function click(window, label) {
+  const button = `[...document.querySelectorAll('.jar-center button:enabled')].find(button=>button.textContent.trim()===${JSON.stringify(label)})`;
+  await wait(window, 'Boolean(' + button + ')');
+  await js(window, button + '.click()');
+}
 app.whenReady().then(async () => {
   let failed = false;
   try {
@@ -62,10 +66,12 @@ app.whenReady().then(async () => {
     await fs.writeFile(path.join(output, 'readonly-console.png'), (await viewer.webContents.capturePage()).toPNG()); viewer.destroy();
     services.jar.control = true; await host.start(settings);
     const first = await portal(), second = await portal();
+    await js(first, "document.querySelector('[aria-label=关闭控制台]').click()");
     await js(first, "document.querySelector('.jar-instance details').open = true");
     await click(first, '检测 Java');
     await wait(first, 'document.querySelector(".jar-instance .jar-runtime-probe [role=status]")?.textContent.includes("java")');
     await js(first, "document.querySelector('.jar-instance details').open = false");
+    await click(first, '控制台');
     await click(first, '取得输入控制权'); await wait(first, '!document.querySelector(".jar-console-input input").disabled');
     await wait(second, 'document.querySelector(".jar-console-control")?.textContent.includes("输入控制者")');
     assert.equal(await js(second, 'document.querySelector(".jar-console-input input").disabled'), true);

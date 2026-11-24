@@ -47,11 +47,16 @@ export function KnowledgeReader({
               <div key={h.key} style={{ paddingInlineStart: Math.max(0, h.level - 2) * 10 }}>
                 <button
                   className="text-button"
-                  onClick={() => {
+                  onClick={event => {
+                    const directory = event.currentTarget.closest('details');
+                    if (directory) directory.open = false;
                     openWorkspaceLink('knowledge', page.id + '~' + h.key);
-                    root.current
-                      ?.querySelector('[data-kb-heading="' + h.key + '"]')
-                      ?.scrollIntoView({ block: 'center' });
+                    const heading = root.current?.querySelector<HTMLElement>('[data-kb-heading="' + h.key + '"]');
+                    if (heading) {
+                      heading.tabIndex = -1;
+                      heading.focus({ preventScroll: true });
+                      heading.scrollIntoView({ block: 'center' });
+                    }
                   }}
                 >
                   {h.title}

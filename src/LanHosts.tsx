@@ -212,6 +212,17 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
     if (active && linked && linkedExists) { setQuery(''); setFocusedHost(linked); }
   }, [active, linked, linkedExists]);
   useEffect(() => { if (active && linked && focusedHost === linked) linkedRow.current?.scrollIntoView({ block: 'nearest' }); }, [active, linked, focusedHost, query]);
+  const connections = useRef<HTMLElement>(null), terminalArea = useRef<HTMLElement>(null);
+  function focusSession() {
+    requestAnimationFrame(() => terminalArea.current?.querySelector<HTMLButtonElement>('[role=tab][aria-selected=true]')?.focus());
+  }
+  function focusHost(id: string) {
+    requestAnimationFrame(() => {
+      const target = connections.current?.querySelector<HTMLElement>(`[data-host-id="${CSS.escape(id)}"] summary`)
+        ?? connections.current?.querySelector<HTMLInputElement>('.lan-search input');
+      target?.focus();
+    });
+  }
   const [tabs, setTabs] = useState<Tab[]>([]), [selected, setSelected] = useState<number>();
   const requestVersion = useRef(0), working = useRef(false);
   const confirm = useConfirmation();
@@ -291,6 +302,8 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
     const remaining = tabs.filter(tab => tab.id !== id);
     setTabs(remaining);
     if (selected === id) setSelected(remaining.at(-1)?.id);
+    if (remaining.length) focusSession();
+    else if (tabs[0]) focusHost(tabs[0].host.id);
   }
   const grouped = groupLanHosts(hosts, query, endpoint);
   return <section className="lan-center">
@@ -301,7 +314,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
       <button className="run-button" disabled={busy || !loaded} onClick={() => { setError(''); setSeed(undefined); setEditing('new'); }}><Plus size={16} />添加主机</button></>}
     </div>}</header>
     {!available ? <p className="lan-note">局域网主机暂不可用。</p> : <div className={`lan-layout${allowed('terminal') ? '' : ' lan-layout-list'}`}>
-      <aside className="lan-connections" aria-label="保存的主机连接">
+      <aside ref={connections} className="lan-connections" aria-label="保存的主机连接">
         <label className="lan-search"><Search size={16} /><TextInput embedded aria-label="搜索主机" placeholder="搜索名称、地址或标签" value={query} onChange={event => setQuery(event.target.value)} /></label>
         {linked && loaded && !linkedExists && <p className="pc-notice" role="status">{missingResourceLink('主机')}</p>}
         {!hosts.length && <p className="lan-note">{loaded || error ? '暂无已保存的连接。' : '正在读取主机清单…'}</p>}
@@ -311,7 +324,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
           {entries.map(host => {
             const status = statuses.find(item => item.hostId === host.id);
             const link = portal && host.mode === 'share' ? workbenchLink(host.address) : undefined;
-            return <li key={host.id} ref={host.id === linked ? linkedRow : undefined}>
+            return <li key={host.id} data-host-id={host.id} ref={host.id === linked ? linkedRow : undefined}>
           <header><div className="host-preview"><FloatingDetails open={focusedHost === host.id} onToggle={event => {
               if (event.currentTarget.open) setFocusedHost(host.id);
               else setFocusedHost(current => current === host.id ? '' : current);
@@ -320,7 +333,7 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
           </summary>          <div className="pc-actions" id={`lan-actions-${host.id}`} onClick={event => {
               if ((event.target as Element).closest('button, a')) setFocusedHost('');
             }}>
-            {host.mode === 'ssh' ? allowed('terminal') && <button className="secondary-button" disabled={busy || !host.fingerprint && !(allowed('edit') && allowed('diagnose'))} title={!host.fingerprint ? '首次连接需核对 SSH 指纹' : undefined} onClick={() => void task(async () => { if (host.fingerprint || await verify(host)) { const id = nextTab++; setTabs(items => [...items, { id, host }]); setSelected(id); } })}><Terminal size={14} />打开终端</button> : portal ? link && <a className="text-button" href={link} target="_blank" rel="noreferrer"><ExternalLink size={14} />打开工作台</a> : <button className="secondary-button" disabled={busy} onClick={() => void task(async () => { const result = await window.devkitDesktop?.openLanHost?.(host.address, host.modules.nginx && !host.modules.jar ? 'nginx' : 'jar'); if (!result || result.error) throw new Error(result?.error || '远程工作台不可用。'); })}><ExternalLink size={14} />打开工作台</button>}
+            {host.mode === 'ssh' ? allowed('terminal') && <button className="secondary-button" disabled={busy || !host.fingerprint && !(allowed('edit') && allowed('diagnose'))} title={!host.fingerprint ? '首次连接需核对 SSH 指纹' : undefined} onClick={() => void task(async () => { if (host.fingerprint || await verify(host)) { const id = nextTab++; setTabs(items => [...items, { id, host }]); setSelected(id); focusSession(); } })}><Terminal size={14} />打开终端</button> : portal ? link && <a className="text-button" href={link} target="_blank" rel="noreferrer"><ExternalLink size={14} />打开工作台</a> : <button className="secondary-button" disabled={busy} onClick={() => void task(async () => { const result = await window.devkitDesktop?.openLanHost?.(host.address, host.modules.nginx && !host.modules.jar ? 'nginx' : 'jar'); if (!result || result.error) throw new Error(result?.error || '远程工作台不可用。'); })}><ExternalLink size={14} />打开工作台</button>}
             {(['jar', 'nginx'] as const).filter(module => host.modules[module] || portal && !allowed('edit')).map(module =>
               <button type="button" className="text-button" key={module} disabled={busy} onClick={() => viewInstances(module, host)}>{module === 'jar' ? '查看应用服务' : '查看 Nginx 实例'}</button>)}
             {allowed('diagnose') && <button className="text-button" disabled={busy} onClick={() => void task(() => diagnose(host))}>测试连接</button>}
@@ -361,7 +374,8 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
 
         </li>; })}</Fragment>)}</ul>
       </aside>
-      {allowed('terminal') && <section className="lan-terminal-area" aria-label="SSH 终端">
+      {allowed('terminal') && <section ref={terminalArea} className="lan-terminal-area" aria-label="SSH 终端">
+        {!!tabs.length && <button className="text-button" onClick={() => { const tab = tabs.find(item => item.id === selected); if (tab) focusHost(tab.host.id); }}>返回主机列表</button>}
         {!!tabs.length ? <div role="tablist" onKeyDown={navigateTabList} aria-label="SSH 会话" className="lan-terminal-tabs">{tabs.map(tab => <div key={tab.id} className={selected === tab.id ? 'selected' : ''}><button type="button" role="tab" aria-selected={selected === tab.id} tabIndex={selected === tab.id ? 0 : -1} aria-controls={`lan-tab-${tab.id}`} onClick={() => setSelected(tab.id)}><Terminal size={14} />{tab.host.name}<small>{endpoint(tab.host)}</small></button><button type="button" className="icon-button" aria-label={`关闭 ${tab.host.name} 的终端`} onClick={() => closeTab(tab.id)}><X size={14} /></button></div>)}</div> : <div className="lan-terminal-empty"><Terminal size={32} /><h2>SSH 终端</h2><p>选择一台 SSH 主机，再点“打开终端”。</p></div>}
         <Suspense fallback={<Skeleton kind="editor" label="正在加载终端…" />}>{tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}><SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={allowed('files')} portal={portal} /></div>)}</Suspense>
       </section>}

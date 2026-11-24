@@ -22,19 +22,12 @@ import type { FileShareState } from './planning-share-api';
 import { gitRequest, type Repository } from './git-api';
 import { knowledgeRequest, type KnowledgePage } from './knowledge-api';
 import { parseTodo } from '../shared/todo-text.mjs';
+import { parseWorkspaceLink, type WorkspaceLink } from './workspace-link-format';
 
 export type WorkspacePage = typeof workspaceModules[number]['id'];
-export type WorkspaceLink = { page: WorkspacePage; id?: string };
+export { parseWorkspaceLink, type WorkspaceLink } from './workspace-link-format';
 export type WorkspaceResult = WorkspaceLink & { label: string; detail: string; host?: string };
 export const workspaceHash = (page: WorkspacePage, id?: string) => `#${page}${id ? '/' + encodeURIComponent(id) : ''}`;
-export function parseWorkspaceLink(hash: string): WorkspaceLink | undefined {
-  const [name, ...parts] = hash.slice(1).split('/');
-  const resource = parts.join('/');
-  const page = workspaceModules.find(item => item.id === name)?.id;
-  if (!page || !resource) return page ? { page } : undefined;
-  try { return { page, id: decodeURIComponent(resource).slice(0, 240) }; }
-  catch { return { page, id: resource.slice(0, 240) }; }
-}
 export const missingResourceLink = (name: string) => `链接中的${name}已移除或当前访客无权访问。`;
 export function inventoryLinkStatus(id: string, instances: { id: string }[], groups: HostGroup[] = []) {
   const host = id.includes(':') ? groups.find(group => group.id === id.split(':')[0]) : undefined;

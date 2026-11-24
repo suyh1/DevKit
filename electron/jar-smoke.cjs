@@ -72,7 +72,9 @@ module.exports = async (window, output) => {
     throw new Error(`JAR UI condition failed: ${expression}\n${await js('document.querySelector(".jar-center")?.innerText')}`);
   }
   const click = async (text, root = '.jar-center, .jar-dialog[open]') => {
-    await js(`[...document.querySelectorAll(${JSON.stringify(root)})].flatMap(el => [...el.querySelectorAll('button')]).find(b => b.textContent.trim() === ${JSON.stringify(text)})?.click()`);
+    const target = `[...document.querySelectorAll(${JSON.stringify(root)})].flatMap(el => [...el.querySelectorAll('button')]).find(b => !b.disabled && b.textContent.trim() === ${JSON.stringify(text)})`;
+    await wait('!!' + target);
+    await js(target + '.click()');
   };
   const fill = async (label, value) => {
     await js(`{const input=[...document.querySelectorAll('.jar-dialog label')].find(el=>el.firstChild?.textContent===${JSON.stringify(label)})?.querySelector('input,textarea'); if(!input)throw Error('missing field'); Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true}));}`);
@@ -337,6 +339,7 @@ module.exports = async (window, output) => {
     await click('日志'); await wait('document.querySelector(".jar-log pre")?.textContent.includes("fixture log 中文")');
     await new Promise(resolve => setTimeout(resolve, 450));
     await fs.writeFile(path.join(output, 'jar-list-light.png'), (await window.webContents.capturePage()).toPNG());
+    await js('document.querySelector(\'[aria-label="关闭日志"]\').click()');
     await click('设置'); await wait('!!document.querySelector(".jar-dialog[open]")');
     await new Promise(resolve => setTimeout(resolve, 250));
     await fs.writeFile(path.join(output, 'jar-runtime-settings.png'), (await window.webContents.capturePage()).toPNG());
@@ -394,8 +397,9 @@ module.exports = async (window, output) => {
         await js('document.querySelector(\'button[aria-label="关闭控制台"]\').click()');
         assert.equal(await js('document.querySelector(".jar-status").textContent'), '运行中');
         await click('控制台'); await wait('document.querySelector(".jar-console pre")?.textContent.includes("ECHO:console 中文")');
-        await click('停止'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止服务', '.confirm-dialog[open]');
+        await click('停止应用', '.jar-console'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止服务', '.confirm-dialog[open]');
         await wait('document.querySelector(".jar-status")?.textContent === "已停止"');
+        await js('document.querySelector(\'[aria-label="关闭控制台"]\').click()');
         const request = async (action, payload) => {
           const response = await js(`window.devkitJar.request(${JSON.stringify(action)},${JSON.stringify({ id: live.id, ...payload })})`);
           assert.equal(response.error, undefined); return response.data;

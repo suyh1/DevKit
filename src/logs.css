@@ -40,3 +40,7 @@
   .log-switcher button { min-height: 44px; }
   .log-pane button { min-width: 44px; min-height: 44px; }
 }
+.log-streams { grid-template-rows: auto minmax(0,1fr); }
+.log-stream-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
+.log-stream-nav .log-switcher { min-width: 0; margin: 0; }
+.log-sources > header { flex-wrap: wrap; gap: 4px; }

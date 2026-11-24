@@ -2,7 +2,7 @@ import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import type { ServiceDraft } from './detection';
 import Skeleton from './Skeleton';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ServerCog, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, Upload, X, Search } from 'lucide-react';
 import { MotionButton } from './Motion';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
@@ -13,6 +13,8 @@ import ServiceProjects from './ServiceProjects';
 import JarReplaceDialog from './JarReplaceDialog';
 import JarStartupDialog from './JarStartupDialog';
 import JarConsole from './JarConsole';
+import ResultPager from './ResultPager';
+import { Modal } from './project-components';
 import HostPathPicker, { HostSelect } from './HostPathPicker';
 import LegacySshImport from './LegacySshImport';
 import { groupInstances, targetGroup, hostAccessLabel, hostRole } from './lan-api';
@@ -187,6 +189,49 @@ function JarForm({ active, instance, seed, state, close, saved }: { seed?: Servi
   </dialog>;
 }
 
+const servicesPerPage = 20;
+
+function JarFileLog({ service, active, auto, interval }: { service: JarInstance; active: boolean; auto: boolean; interval: number }) {
+  const [log, setLog] = useState<JarLog | null>(null);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const output = useRef<HTMLPreElement>(null);
+  const followEnd = useRef(true);
+  useLayoutEffect(() => {
+    if (output.current && followEnd.current) output.current.scrollTop = output.current.scrollHeight;
+  }, [log]);
+  useEffect(() => {
+    if (!active) return;
+    let disposed = false, reading = false;
+    async function load() {
+      if (reading || document.hidden) return;
+      reading = true;
+      try {
+        const result = await jarRequest<JarLog>('log-tail', { id: service.id });
+        if (!disposed) { setLog(result); setError(''); }
+      } catch (failure) { if (!disposed) setError((failure as Error).message); }
+      finally { reading = false; }
+    }
+    void load();
+    const timer = auto ? setInterval(() => void load(), interval * 1000) : undefined;
+    return () => { disposed = true; clearInterval(timer); };
+  }, [service.id, active, auto, interval, refresh]);
+  return <section className="jar-log">
+    <div className="jar-log-tools"><small>{service.logMode === 'silent' ? '静默模式，查看已有日志文件。' : `最近 128 KB · ${auto ? '每 ' + interval + ' 秒刷新' : '手动刷新'}`}{log?.truncated && ' · 前部已截断'}</small>
+      <div className="jar-actions"><button type="button" className="text-button" onClick={() => {
+        followEnd.current = true;
+        if (output.current) output.current.scrollTop = output.current.scrollHeight;
+      }}>回到底部</button><button type="button" className="text-button" onClick={() => setRefresh(value => value + 1)}><RefreshCw size={14} />刷新日志</button></div>
+    </div>
+    {log?.path && <p className="jar-help">{log.path}</p>}
+    {error && <p className="jar-error" role="alert">{error}</p>}
+    <pre ref={output} tabIndex={0} data-modal-focus aria-label="服务日志内容" onScroll={event => {
+      const el = event.currentTarget;
+      followEnd.current = el.scrollHeight - el.clientHeight - el.scrollTop < 3;
+    }}>{log ? log.text || '暂无日志。' : error ? '' : '正在读取日志…'}</pre>
+  </section>;
+}
+
 export default function JarCenter({ active, seed, consumeSeed }: { active: boolean; seed?: ServiceDraft; consumeSeed?: () => void }) {
   const performanceMode = usePerformanceMode();
   const statusSeconds = performanceMode ? 15 : 5;
@@ -201,8 +246,11 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
   const [projectService, setProjectService] = useState<JarInstance | null>(null);
   const [replacement, setReplacement] = useState<JarInstance | null>(null);
   const [startup, setStartup] = useState<JarInstance | null>(null);
-  const [consoleId, setConsoleId] = useState('');
-  const [auto, setAuto] = useState(true), [logId, setLogId] = useState(''), [log, setLog] = useState<JarLog | null>(null), [logError, setLogError] = useState('');
+  const [viewerId, setViewerId] = useState('');
+  const viewerTrigger = useRef<HTMLButtonElement | null>(null);
+  const [auto, setAuto] = useState(true);
+  const [requestedPage, setPage] = useState(0);
+  const rows = useRef<HTMLDivElement>(null);
   const polling = useRef(false), operating = useRef(false), confirm = useConfirmation();
   const operationVersion = useRef(0);
   const desktop = !!window.devkitJar, available = desktop || !!remoteAccess(), write = canWriteWorkspace('jar'), control = canOperateJar();
@@ -230,11 +278,9 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
   const resource = useWorkspaceResource('jar');
   const hostLink = resource?.startsWith('host:') ? resource.slice(5) : undefined;
   const linked = hostLink ? undefined : resource;
-  useEffect(() => { if (active && hostLink) { setListHost(hostLink); setQuery(''); } }, [active, hostLink]);
+  useEffect(() => { if (active && hostLink) { setListHost(hostLink); setQuery(''); setPage(0); } }, [active, hostLink]);
   const linkStatus = linked && state ? inventoryLinkStatus(linked, state.instances, state.groups) : undefined;
   const linkedRow = useRef<HTMLTableRowElement>(null);
-  useEffect(() => { if (active && linkStatus === 'found') { setQuery(''); setListHost(null); } }, [active, linked, linkStatus]);
-  useEffect(() => { if (active && linkStatus === 'found' && !query) linkedRow.current?.scrollIntoView({ block: 'center' }); }, [active, linked, linkStatus, query]);
   const hosts = useHostInventory('jar', jarRequest, state, setState, setStatuses);
   async function refresh() { await hosts.inventory(); await hosts.poll(); }
   const supported = (item: JarInstance) => !item.kind || item.kind === 'jar' || (item.hostId ? targetGroup(state?.groups, item.hostId)?.backendTypes : state?.backendTypes);
@@ -259,18 +305,6 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
     const timer = setInterval(() => void poll(), statusSeconds * 1000);
     return () => { disposed = true; clearInterval(timer); };
   }, [active, auto, available, statusSeconds]);
-  useEffect(() => {
-    if (!logId || !active || !available || !readLogs) return;
-    let disposed = false, reading = false;
-    async function load() {
-      if (reading || document.hidden) return; reading = true;
-      try { const result = await jarRequest<JarLog>('log-tail', { id: logId }); if (!disposed) { setLog(result); setLogError(''); } }
-      catch (failure) { if (!disposed) setLogError((failure as Error).message); }
-      finally { reading = false; }
-    }
-    void load(); const timer = auto ? setInterval(() => void load(), logSeconds * 1000) : undefined;
-    return () => { disposed = true; clearInterval(timer); };
-  }, [logId, active, auto, available, readLogs, logSeconds]);
   async function command(item: JarInstance, command: JarCommand) {
     if (command !== 'start' && !await confirm({ title: `${command === 'restart' ? '重启' : command === 'force-stop' ? '强制终止' : '停止'} ${item.name}？`, slide: command === 'force-stop', detail: command === 'force-stop' ? `目标主机 ${targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')}。将强制结束进程，未完成的请求或数据可能无法保存。` : (targetGroup(state?.groups, item.hostId)?.platform ?? state?.platform) === 'win32' ? 'Windows 将终止服务进程，可能中断进行中的请求。重启会在确认进程退出后启动。' : `先发送 TERM，最多等待 ${item.stopTimeout} 秒。超时保留进程，之后可单独强制终止。`, confirm: command === 'restart' ? '重启服务' : command === 'force-stop' ? '强制终止' : '停止服务' })) return;
     await task(async () => {
@@ -278,7 +312,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
         const result = await jarRequest<{ output: string; status: JarStatus }>('command', { id: item.id, command });
         setStatuses(current => [...current.filter(status => status.id !== item.id), result.status]);
         setNotice(result.output);
-        if (readLogs && item.logMode === 'console' && ['start', 'restart'].includes(command)) setConsoleId(item.id);
+        if (readLogs && item.logMode === 'console' && ['start', 'restart'].includes(command)) openViewer(item.id);
       } catch (failure) {
         await refresh().catch(() => {});
         throw failure;
@@ -289,16 +323,48 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
   const selectedListHost = listHost === hostLink || hostOptions.some(group => group.id === listHost) ? listHost : null;
   const filtered = state?.instances.filter(item => (selectedListHost === null || (item.hostId || '') === selectedListHost)
     && `${item.name} ${serviceLocation(item)} ${targetGroup(state.groups, item.hostId)?.name || ''}`.toLowerCase().includes(query.toLowerCase())) || [];
-  const consoleItem = state?.instances.find(item => item.id === consoleId);
+  const grouped = groupInstances(filtered, state?.groups).flatMap(group => group.items);
+  const pages = Math.max(1, Math.ceil(grouped.length / servicesPerPage));
+  const page = Math.min(requestedPage, pages - 1);
+  const pageGroups = groupInstances(grouped.slice(page * servicesPerPage, (page + 1) * servicesPerPage), state?.groups);
+  const viewer = state?.instances.find(item => item.id === viewerId);
+  const statusById = new Map(statuses.map(status => [status.id, status]));
+  const handledLink = useRef('');
+  useLayoutEffect(() => {
+    if (!active || !linked) { handledLink.current = ''; return; }
+    if (linkStatus !== 'found' || !state || handledLink.current === linked) return;
+    const index = groupInstances(state.instances, state.groups).flatMap(group => group.items).findIndex(item => item.id === linked);
+    const targetPage = Math.floor(index / servicesPerPage);
+    if (query || listHost !== null || page !== targetPage) {
+      setQuery(''); setListHost(null); setPage(targetPage);
+      return;
+    }
+    if (linkedRow.current) {
+      const target = linkedRow.current.querySelector('[data-service-output]') ?? linkedRow.current;
+      target.scrollIntoView({ block: 'center', inline: 'nearest' });
+      handledLink.current = linked;
+    }
+  }, [active, linked, linkStatus, state, query, listHost, page]);
+  function openViewer(id: string) {
+    viewerTrigger.current = workspace.current?.querySelector<HTMLButtonElement>(`[data-service-output="${CSS.escape(id)}"]`) ?? null;
+    setViewerId(id);
+  }
+  function closeViewer() {
+    setViewerId('');
+    requestAnimationFrame(() => {
+      const target = viewerTrigger.current;
+      (target?.isConnected ? target : workspace.current?.querySelector<HTMLInputElement>('.jar-search input'))?.focus({ preventScroll: true });
+    });
+  }
   return <section ref={workspace} className={`jar-center${narrow ? ' jar-compact' : ''}`}>
     <header className="jar-heading workspace-banner">
       <div><h1>服务管理</h1></div>
       <button className="run-button" disabled={busy || !state || !write} onClick={() => setForm('new')}><Plus size={15} />添加服务</button>
     </header>
     {!available && <p className="jar-warning">请在桌面端或已授权的共享网页使用服务管理。</p>}
-    <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-host-filter">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
+    <div className="jar-toolbar">{hostOptions.length > 1 && <label className="jar-host-filter">实例主机<select value={selectedListHost ?? "all"} onChange={event => { setListHost(event.target.value === "all" ? null : event.target.value); setPage(0); }}>
       <option value="all">全部主机</option>{hostOptions.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
-    </select></label>}<label className="jar-search"><Search size={16} /><TextInput embedded aria-label="搜索服务" placeholder="搜索名称或路径" value={query} onChange={event => setQuery(event.target.value)} /></label><div className="jar-actions"><label className="jar-auto"><input role="switch" className="liquid-toggle" type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(async () => { await refresh(); if (readLogs && logId) setLog(await jarRequest<JarLog>('log-tail', { id: logId })); })}><RefreshCw size={15} />刷新</MotionButton></div></div>
+    </select></label>}<label className="jar-search"><Search size={16} /><TextInput embedded aria-label="搜索服务" placeholder="搜索名称或路径" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} /></label><div className="jar-actions"><label className="jar-auto"><input role="switch" className="liquid-toggle" type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} />自动刷新</label><MotionButton busy={busy} className="text-button" disabled={busy || !available} onClick={() => void task(refresh)}><RefreshCw size={15} />刷新</MotionButton></div></div>
     {error && <p className="jar-error" role="alert">{error}</p>}{notice && <p className="jar-notice" role="status">{notice}</p>}
     {monitorError && <p className="jar-warning" role="alert">状态刷新失败，以下显示上次结果：{monitorError}</p>}
     <HostProgress groups={state?.groups} retry={id => void hosts.retry(id)} />
@@ -310,9 +376,10 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
     {!state && available && !error && <Skeleton kind="list" label="正在读取服务列表…" />}
     {state && !state.instances.length && <div className="jar-empty"><ServerCog size={35} /><h2>添加第一个应用服务</h2><p>选择主机和启动方式，登记服务后即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />登记服务</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的服务。</p>}
-    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="应用服务"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{groupInstances(filtered, state?.groups).filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
+    <ResultPager label="服务列表分页" page={page} pages={pages} onPage={next => { setPage(next); if (rows.current) rows.current.scrollTop = 0; }} />
+    {!!filtered.length && <div className="jar-table-scroll" ref={rows}><table className="jar-table" aria-label="应用服务"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{pageGroups.filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
       const write = canEdit(item), control = canControl(item);
-      const status = statuses.find(status => status.id === item.id), running = status?.state === 'running', stopped = status && ['stopped', 'exited'].includes(status.state), supervised = status?.supervision?.active;
+      const status = statusById.get(item.id), running = status?.state === 'running', stopped = status && ['stopped', 'exited'].includes(status.state), supervised = status?.supervision?.active;
       const hostName = targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机');
       const extraActions = <>
           {(!remoteAccess() || remoteAccess()?.services?.projects.enabled) && <button className="text-button" onClick={() => setProjectService(item)}>关联项目</button>}
@@ -320,7 +387,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
           <button className="text-button" disabled={busy} onClick={() => setStartup(item)}><Play size={14} />系统自启</button>
-          <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: `目标主机 ${hostName}。只移除列表记录，保留服务文件、日志与运行文件。移除前需关闭系统自启。`, confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
+          <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: `目标主机 ${hostName}。只移除列表记录，保留服务文件、日志与运行文件。移除前需关闭系统自启。`, confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (viewerId === item.id) setViewerId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
       </>;
       return <tr key={item.id} ref={linked === item.id ? linkedRow : undefined} data-linked={linked === item.id || undefined} className="jar-instance">
         <td><div className="jar-instance-title"><strong>{item.name}</strong><span className={`jar-status ${status?.state || ''}`}>{status ? labels[status.state] : '待检测'}</span></div><small className="jar-target">目标主机 {hostName}</small><span title={serviceLocation(item)}>{item.kind === 'npm' ? 'npm · ' + item.script : item.kind === 'script' ? '解释器脚本' : item.kind === 'program' ? '可执行程序' : 'Java JAR'} · {basename(serviceLocation(item))}</span><small className="jar-full-path">{serviceLocation(item)}</small><small>{bytes(status?.size)} · {item.logMode === 'file' ? '文件日志' : item.logMode === 'console' ? '控制台模式' : '静默模式'}{status?.fileMissing ? ' · 服务入口缺失' : ''}</small><small>环境：{item.profiles.find(profile => profile.id === item.profile)?.name || '公共变量'}</small></td>
@@ -336,7 +403,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           <button className="text-button" disabled={busy || !control || !stopped || status.fileMissing} onClick={() => void command(item, 'start')}><Play size={14} />启动</button>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {item.kind !== 'npm' && (item.hostId ? group.fileReplacement : state?.fileReplacement) && <button className="text-button" disabled={busy || !write || !control} onClick={() => setReplacement(item)}><Upload size={14} />替换服务文件</button>}
-          {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
+          {readLogs && <button className="text-button" disabled={busy} data-service-output={item.id} aria-haspopup="dialog" onClick={() => openViewer(item.id)}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
         </div><FloatingDetails className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? (item.nodePath ? 'npm · ' + item.nodePath : 'npm · 按 PATH 选择 Node.js') : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>
           {!write && control && (!item.kind || item.kind === 'jar') && <JavaProbe key={item.executable} hostId={item.hostId || ''} executable={item.executable} disabled={busy} />}
@@ -348,8 +415,15 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
         </FloatingDetails></td>
       </tr>;
     })}</tbody>)}</table></div>}
-    {readLogs && logId && <section className="jar-log"><header><div><h2>{state?.instances.find(item => item.id === logId)?.name} · 日志</h2><p>{log?.path}</p></div><button className="icon-button" aria-label="关闭日志" onClick={() => setLogId('')}><X size={17} /></button></header><p className="jar-help">{state?.instances.find(item => item.id === logId)?.logMode === 'silent' ? '静默模式不会写入标准输出；已有文件可能是历史日志。' : `显示最近 128 KB，自动刷新开启时每 ${logSeconds} 秒重新读取。`} {log?.truncated ? '前部内容已截断。' : ''}</p>{logError && <p className="jar-error" role="alert">{logError}</p>}<pre tabIndex={0} aria-label="服务日志内容">{log ? log.text || '暂无日志。' : '正在读取日志…'}</pre></section>}
-    {readLogs && consoleItem && <JarConsole key={consoleId} id={consoleId} name={consoleItem.name} control={canControl(consoleItem)} active={active} close={() => setConsoleId('')} stop={() => void command(consoleItem, 'stop')} />}
+    {readLogs && viewer && <Modal key={viewer.id} active={active} wide className="jar-output-dialog"
+      title={viewer.name + (viewer.logMode === 'console' ? ' · 控制台' : ' · 日志')}
+      description={targetGroup(state?.groups, viewer.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')}
+      closeLabel={viewer.logMode === 'console' ? '关闭控制台' : '关闭日志'} close={closeViewer}>
+      {viewer.logMode === 'console' ? <>
+        {error && <p className="jar-error" role="alert">{error}</p>}
+        <JarConsole id={viewer.id} name={viewer.name} control={canControl(viewer)} active={active} stop={() => void command(viewer, 'stop')} />
+      </> : <JarFileLog service={viewer} active={active} auto={auto} interval={logSeconds} />}
+    </Modal>}
     <p className="jar-help jar-footer">路径、进程和文件均属于各应用登记的主机。关闭控制台或网页后，服务会继续运行。只读访客无法查看环境变量值和启动参数。</p>
     {form && state && <JarForm active={active} seed={formSeed} instance={form === 'new' ? undefined : form} state={state} close={closeForm} saved={() => { closeForm(); void task(refresh); }} />}
     {projectService && <ServiceProjects service={projectService} close={() => setProjectService(null)} />}

@@ -162,6 +162,14 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
   }, [active]);
   const [state, setState] = useState<NginxState | null>(null), [statuses, setStatuses] = useState<NginxStatus[]>([]);
   const hosts = useHostInventory('nginx', nginxRequest, state, setState, setStatuses);
+  const detailTitle = useRef<HTMLHeadingElement>(null);
+  const directory = useRef<HTMLElement>(null);
+  function focusConfiguration() {
+    requestAnimationFrame(() => {
+      detailTitle.current?.focus({ preventScroll: true });
+      detailTitle.current?.scrollIntoView({ block: 'nearest' });
+    });
+  }
   const [selected, setSelected] = useState(''), [documents, setDocuments] = useState<NginxDocument[]>([]), [drafts, setDrafts] = useState<Record<string, string>>({});
   const [file, setFile] = useState(''), [warnings, setWarnings] = useState<string[]>([]), [mode, setMode] = useState<'fields' | 'source'>('fields');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [query, setQuery] = useState('');
@@ -206,7 +214,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
     if (!active || !linked) { linkedHandled.current = ''; return; }
     if (busy || linkStatus !== 'found' || linkedHandled.current === linked) return;
     linkedHandled.current = linked;
-    if (selected !== linked) discardThen(() => void task(() => load(linked)));
+    selectConfiguration(linked);
   }, [active, linked, linkStatus, busy, selected]);
   const parsed = useMemo(() => { try { return { nodes: parseNginx(content), error: '' }; } catch (failure) { return { nodes: [], error: (failure as Error).message }; } }, [content]);
   async function task(action: () => Promise<unknown>) {
@@ -225,6 +233,10 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
       if (generation === statusGeneration.current) setStatusError('无法确认主机运行状态，请检查连接或重新登录后重试。');
       throw failure;
     } finally { if (generation === statusGeneration.current) setStatusChecking(false); }
+  }
+  function selectConfiguration(id: string) {
+    if (id === selected) focusConfiguration();
+    else discardThen(() => void task(async () => { await load(id); focusConfiguration(); }));
   }
   async function load(id: string) {
     setLogsOpen(false); setReview(null);
@@ -391,23 +403,24 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
     {linkStatus === 'missing' && <p className="pc-notice" role="status">{missingResourceLink(' Nginx 实例')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的 Nginx 实例，请重试连接目标主机。</p>}
     {window.devkitNginx && state && <LegacySshImport module="nginx" groups={state.groups} disabled={busy || dirty} refresh={() => void task(() => refresh())} />}
-    {!state ? busy ? <Skeleton kind="list" label="正在读取实例…" /> : <div className="ng-empty-loading" role="status">请刷新以读取实例列表。</div> : !state.instances.length ? <div className="ng-empty"><span className="ng-empty-icon"><Server size={28} /></span><h2>尚未添加 Nginx 实例</h2><p>每个实例使用一份主配置，可关联多份附属文件。<br />Windows 和 Linux 均支持相同的多文件配置。</p><div className="ng-empty-actions"><MotionButton busy={busy} className="run-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('create')}><Plus size={16} />新建配置</MotionButton><MotionButton busy={busy} className="secondary-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><FolderOpen size={16} />导入已有文件</MotionButton></div><small>{remoteAccess() ? "填写共享主机目录以生成配置，或登记主机已有配置。" : "可选择目录生成一套配置，或将已有配置加入工作区。"}</small></div> : <div className="ng-layout"><aside className="ng-instances" aria-label="Nginx 实例列表">
+    {!state ? busy ? <Skeleton kind="list" label="正在读取实例…" /> : <div className="ng-empty-loading" role="status">请刷新以读取实例列表。</div> : !state.instances.length ? <div className="ng-empty"><span className="ng-empty-icon"><Server size={28} /></span><h2>尚未添加 Nginx 实例</h2><p>每个实例使用一份主配置，可关联多份附属文件。<br />Windows 和 Linux 均支持相同的多文件配置。</p><div className="ng-empty-actions"><MotionButton busy={busy} className="run-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('create')}><Plus size={16} />新建配置</MotionButton><MotionButton busy={busy} className="secondary-button"  disabled={busy || !canWriteWorkspace('nginx')} onClick={() => setInstanceForm('new')}><FolderOpen size={16} />导入已有文件</MotionButton></div><small>{remoteAccess() ? "填写共享主机目录以生成配置，或登记主机已有配置。" : "可选择目录生成一套配置，或将已有配置加入工作区。"}</small></div> : <div className="ng-layout"><aside ref={directory} className="ng-instances" aria-label="Nginx 实例列表">
       {hostGroups.length > 1 && <label className="ng-list-host">实例主机<select value={selectedListHost ?? "all"} onChange={event => setListHost(event.target.value === "all" ? null : event.target.value)}>
         <option value="all">全部主机</option>{hostGroups.map(host => <option key={host.id} value={host.id}>{hostRole(host)}</option>)}
       </select></label>}
-      {hostGroups.filter(group => selectedListHost === null ? group.items.length : group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{group.name}</RelatedLink> : group.name}</h3>{!group.items.length && <p>此主机暂无可查看的实例。</p>}{group.items.map(instance => {
+      <div className="ng-instance-groups">{hostGroups.filter(group => selectedListHost === null ? group.items.length : group.id === selectedListHost).map(group => <section className="ng-host-group" key={group.id}><h3>{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{group.name}</RelatedLink> : group.name}</h3>{!group.items.length && <p>此主机暂无可查看的实例。</p>}{group.items.map(instance => {
       const itemStatus = statusStale ? undefined : statuses.find(item => item.id === instance.id);
-      return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => { if (selected !== instance.id) discardThen(() => void task(() => load(instance.id))); }}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code title={instance.main}>{pathSuffix(instance.main, group.items.map(item => item.main))}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
-    })}</section>)}<div className="ng-storage"><PathSummary label={remoteAccess() ? '共享主机登记与备份' : '本机登记与备份'} path={state.directory} /></div></aside>
+      return <div className={`ng-instance ${selected === instance.id ? 'selected' : ''}`} data-instance-id={instance.id} key={instance.id}><MotionButton busy={busy} type="button" className="ng-instance-select" aria-pressed={selected === instance.id} disabled={busy || !!hostFor(instance)?.error} onClick={() => selectConfiguration(instance.id)}><span><strong>{instance.name}</strong><small className={`ng-status ${itemStatus?.state || 'unknown'}`}>{statusStale ? '待重新确认' : itemStatus ? statusNames[itemStatus.state] : '待检测'}</small></span><code title={instance.main}>{pathSuffix(instance.main, group.items.map(item => item.main))}</code></MotionButton><div className="ng-instance-footer"><small>{instance.platform === 'any' ? '跟随主机' : instance.platform === 'win32' ? 'Windows' : 'Linux'} · {instance.files.length + 1} 个文件</small><MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !canEdit(instance)} aria-label={`删除实例：${instance.name}`} onClick={() => deleteInstance(instance)}><Trash2 size={13} />删除</MotionButton></div></div>;
+    })}</section>)}</div><div className="ng-storage"><PathSummary label={remoteAccess() ? '共享主机登记与备份' : '本机登记与备份'} path={state.directory} /></div></aside>
     {current && (selectedListHost === null || selectedListHost === (current.hostId || '')) && <div className="ng-detail">
       <NginxControlDock active={active} scrollRoot={scrollRoot}>{stuck => <>
         <div className="ng-dock-details" inert={stuck}>
           <div>
             <header className="ng-instance-heading">
               <div>
-                <h2>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2>
+                <h2 ref={detailTitle} tabIndex={-1}>{current.name}<span className={`ng-status ${status?.state || 'unknown'}`}>{statusStale ? '待重新确认' : status ? statusNames[status.state] : '待检测'}{status?.pid ? ` · PID ${status.pid}` : ''}</span></h2>
               </div>
               <div className="ng-actions">
+                <button className="text-button" onClick={() => directory.current?.querySelector<HTMLButtonElement>('.ng-instance-select[aria-pressed=true]')?.focus()}>返回实例列表</button>
                 <MotionButton busy={busy} className="text-button" disabled={busy || dirty || !currentEdit} onClick={() => setInstanceForm(current)}><Settings2 size={15} />实例设置</MotionButton>
                 <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
               </div>

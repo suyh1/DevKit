@@ -2,7 +2,7 @@ import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import PathSummary from './PathSummary';
 import Skeleton from './Skeleton';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ScrollText, RefreshCw, Search, Pause, Play, Download, Copy, X, Eraser, ArrowDown } from 'lucide-react';
 import { logsRequest, canExportLogs, canReadRawLogs, eachRemoteLogCatalog } from './logs-api';
 import type { LogCatalog, LogCursor, LogSource, LogRead } from './logs-api';
@@ -34,6 +34,11 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
   const [sourceStatus, setSourceStatus] = useState<Record<string, 'pending' | 'ready' | 'failed'>>({});
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [regex, setRegex] = useState(false), [level, setLevel] = useState('all'), [raw, setRaw] = useState(false), [paused, setPaused] = useState(false), [loading, setLoading] = useState(false);
   const [hostFilter, setHostFilter] = useState(''), [focusedSource, setFocusedSource] = useState('');
+  const streams = useRef<HTMLDivElement>(null), sourceList = useRef<HTMLElement>(null);
+  const pendingOutput = useRef('');
+  function showOutput() {
+    streams.current?.querySelector<HTMLElement>('.log-pane[data-focused=true] pre')?.focus();
+  }
   const rawAllowed = raw && canReadRawLogs();
   const resource = useWorkspaceResource('logs');
   const incident = /^incident:(\d{1,13}):(.+)$/.exec(resource || '');
@@ -90,8 +95,16 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     if (!matched.length) return;
     handledLink.current = linked;
     setSearch(''); setHostFilter(''); setSelected(matched.map(item => item.id)); setFocusedSource(matched[0].id); setPaused(false);
-  }, [linked, active, catalog.sources]);
+    pendingOutput.current = incidentTime ? '' : matched[0].id;
+  }, [linked, active, catalog.sources, incidentTime]);
+  useLayoutEffect(() => {
+    if (active && pendingOutput.current && selected.includes(pendingOutput.current) && focusedSource === pendingOutput.current) {
+      pendingOutput.current = '';
+      showOutput();
+    }
+  }, [active, selected, focusedSource]);
   function toggle(id: string) {
+    if (!selected.includes(id) && selected.length < 4) setFocusedSource(id);
     setSelected(values => values.includes(id) ? values.filter(value => value !== id) : values.length < 4 ? [...values, id] : values);
   }
   const paneId = selected.includes(focusedSource) ? focusedSource : selected[0];
@@ -121,7 +134,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
     {incident && <section className="devkit-panel"><h3>故障前后 5 分钟 · {new Date(incidentTime).toLocaleString()}</h3><small>当前服务日志文件末尾 4 MiB · 默认脱敏 · 无时区的时间按日志主机本地时间解释</small><pre>{incidentSource ? excerpt : loading ? '正在读取来源…' : '找不到有权读取的应用服务日志文件。'}</pre></section>}
     <div className="log-toolbar"><label className="log-query"><Search size={14} /><TextInput embedded aria-label="筛选日志内容" placeholder="筛选当前已载入的日志行…" maxLength={200} value={query} onChange={event => setQuery(event.target.value)} /></label><label><input role="switch" className="liquid-toggle" type="checkbox" checked={regex} onChange={event => setRegex(event.target.checked)} />正则</label><select aria-label="日志级别" value={level} onChange={event => setLevel(event.target.value)}><option value="all">全部级别</option><option value="error">ERROR / FATAL</option><option value="warn">WARN</option><option value="info">INFO</option><option value="debug">DEBUG</option></select><label><input className="form-check" type="checkbox" checked={!rawAllowed} disabled={!canReadRawLogs()} onChange={event => setRaw(!event.target.checked)} />主机脱敏</label><span className="log-live"><i data-paused={paused} />{paused ? '已暂停接收' : `每 ${refreshSeconds} 秒增量读取`}</span></div>
     <div className="log-layout" style={{'--source-width':sourceWidth+'px'} as React.CSSProperties}>
-      <aside className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small></header><TextInput aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
+      <aside ref={sourceList} className="log-sources" aria-label="日志来源"><header><strong>日志来源</strong><small>{selected.length} / 4 已选择</small>{!!selected.length && <button className="text-button log-show-output" onClick={showOutput}>查看所选日志</button>}</header><TextInput aria-label="搜索日志来源" placeholder="搜索来源或文件路径" value={search} onChange={event => setSearch(event.target.value)} />
         <select aria-label="按主机筛选日志来源" value={hostFilter} onChange={event => setHostFilter(event.target.value)}><option value="">全部主机</option><option value="local">{localName}</option>{catalog.hosts?.map(host => <option key={host.id} value={host.id}>{host.name}</option>)}{missingHost && <option value={hostFilter}>{loading ? '正在读取目标主机…' : '目标主机不可用'}</option>}</select>
         {hostFilter && hostFilter !== 'local' && <RelatedLink page="lan-hosts" id={hostFilter}>查看主机档案</RelatedLink>}
         {!!availableCreation.length && <div className="log-actions">{availableCreation.map(({ page, label }) =>
@@ -143,7 +156,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
           if (touchStart.current && !paused && !loading && e.currentTarget.scrollTop <= 0 && e.changedTouches[0].clientY - touchStart.current.y >= 64) void refresh();
           touchStart.current = null; setPullDistance(0);
         }}>{pullDistance > 10 && <small>{pullDistance >= 64 ? '松开刷新来源' : '下拉刷新来源'}</small>}{groups.map(id => <section key={id}><h3>{id ? `目标主机 · ${matching.find(item => item.hostId === id)?.hostName}` : localName}</h3>{matching.filter(item => (item.hostId || '') === id).map(item => <div key={item.id} className={`log-source-item${selected.includes(item.id) ? ' selected' : ''}`}>
-          <label><input className="form-check" type="checkbox" checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><strong>{item.name}</strong></label>
+          <label><input className="form-check" type="checkbox" data-source-id={item.id} checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><strong>{item.name}</strong></label>
           {item.mode === 'console' ? <small>标准输出 / 错误</small> : <PathSummary label={item.kind === 'jar' ? '服务' : 'Nginx'} path={item.path} />}
         </div>)}</section>)}{!matching.length && (hostLoad === 'pending' || loading && !hostLoad) ? <Skeleton kind="list" label="正在读取日志来源…" /> : !matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
         {!!catalog.warnings.length && <FloatingDetails className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</FloatingDetails>}
@@ -152,12 +165,17 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
         onDoubleClick={() => setSourceWidth(220)} onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); resize(sourceWidth + (e.key === 'ArrowRight' ? 10 : -10)); } else if (e.key === 'Home') setSourceWidth(220); }}
         onPointerDown={e => { if (e.button === 0) e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) resize(e.clientX - e.currentTarget.parentElement!.getBoundingClientRect().left); }} />
-      {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>在“日志来源”中勾选最多 4 项。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className="log-streams">
+      {!selected.length ? <div className="log-empty"><ScrollText size={36} /><h2>选择日志，开始对照</h2><p>在“日志来源”中勾选最多 4 项。读取、筛选和清空显示均不修改原日志。</p><small>文件首屏最多 128 KiB；导出读取最近 1 MiB。控制台输出来自现有内存缓冲。</small></div> : <div className="log-streams" ref={streams}>
+        <div className="log-stream-nav"><button className="text-button" onClick={() => {
+          const target = sourceList.current?.querySelector<HTMLInputElement>(`[data-source-id="${CSS.escape(paneId)}"]`)
+            ?? sourceList.current?.querySelector<HTMLInputElement>('[aria-label="搜索日志来源"]');
+          target?.focus();
+        }}>返回日志来源</button>
         {panes.length > 1 && <div className="log-switcher" role="group" aria-label="切换日志流">
           {panes.map(source => <button key={source.id} type="button" aria-pressed={paneId === source.id}
             title={source.hostName ? `${source.hostName} / ${source.name}` : source.name}
             onClick={() => setFocusedSource(source.id)}>{source.name}</button>)}
-        </div>}
+        </div>}</div>
         <div className={`log-panels log-panels-${panes.length}`}>{panes.map(source =>
           <LogPane key={`${source.id}:${rawAllowed}`} source={source} focused={source.id === paneId} tracking={active && !paused}
             refreshSeconds={refreshSeconds} query={query} regex={regex} level={level} redact={!rawAllowed}

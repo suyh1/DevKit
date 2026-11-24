@@ -102,8 +102,11 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
       );
       await click('.kb-writing-bar', '知识库');
       await until('!!document.querySelector(".kb-drafts")');
+      const reloaded = new Promise(resolve => wc.once('did-finish-load', resolve));
       wc.reload();
+      await reloaded;
       await until('!!document.querySelector(".kb-drafts")');
+      await run('document.querySelector(".kb-drafts summary").click()');
       await click('.kb-drafts', title + ' · 继续写作');
       await until('!!document.querySelector(' + q(source) + ')');
       assert.equal(await run('document.querySelector(".kb-title-input").value'), title);
@@ -242,7 +245,7 @@ module.exports = async function knowledgeSmoke(desktop, portal, wait, output) {
     await run('document.querySelector(".kb-toc").open=true');
     await click('.kb-toc', '服务术语');
     await until(
-      'location.hash.includes("~h") && document.querySelector(".kb-location")?.textContent==="服务术语"',
+      'location.hash.includes("~h") && !document.querySelector(".kb-toc[open]") && document.activeElement.matches(".kb-location") && document.activeElement.textContent==="服务术语"',
     );
     await require('./focus-smoke.cjs')(wc, wait, output, narrow);
     console.log(

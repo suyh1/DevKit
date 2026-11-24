@@ -72,6 +72,12 @@ describe('推荐顺序和打开方式', () => {
     expect(detectTools('https://kit.example/#git/' + id)[0]).toMatchObject({ id: 'git', resourceId: id });
     expect(detectTools('digital art').map(s => s.id)).not.toContain('git');
   });
+  it('共享资源链接保留目标主机、实例与已选日志来源', () => {
+    const host = '49147d8b-2d49-4f1f-b60e-abdbb6c00492', service = '75d77e09-cbd2-468b-a2ea-5df6eb80bf57';
+    for (const [id, resourceId] of [['jar', service], ['nginx', host + ':' + service], ['lan-hosts', host], ['logs', 'instance:' + service], ['knowledge', 'doc1~h2']]) {
+      expect(detectTools('https://kit.example/#' + id + '/' + encodeURIComponent(resourceId))[0]).toMatchObject({ id, resourceId });
+    }
+  });
   it('替换操作打开服务列表，JAR 路径保留登记、归档检查与传输入口', () => {
     for (const command of ['替换服务文件', '替换 JAR', '恢复服务备份', '恢复 JAR 备份']) {
       expect(detectTools(command)[0]).toMatchObject({ id: 'jar', kind: 'workspace' });

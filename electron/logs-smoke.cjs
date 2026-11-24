@@ -27,7 +27,8 @@ module.exports = async (window, output) => {
     assert.equal(await js(`document.querySelector('.shared-sidebar-trigger').getAttribute('aria-expanded')`), 'false', 'Shared sidebar starts collapsed');
     await js(`document.querySelector('.shared-sidebar-trigger').click()`);
     await wait(window.webContents, `!!document.querySelector('#shared-sidebar-panel:popover-open')`);
-    assert.equal(await js(`document.querySelectorAll('#shared-sidebar-panel nav button').length`), 13);
+    const sidebarModules = await js(`[...document.querySelectorAll('#shared-sidebar-panel nav button')].map(button => button.title).sort()`);
+    assert.ok(sidebarModules.includes('Git 仓库管理') && sidebarModules.includes('服务管理'));
     assert.equal(await js(`!!document.querySelector('#shared-sidebar-panel [title="局域网主机"]')`), true);
     await js(`document.querySelector('#shared-sidebar-panel [title="日志中心"]').click()`);
     await wait(window.webContents, `!document.querySelector('#shared-sidebar-panel:popover-open')`);
@@ -37,8 +38,9 @@ module.exports = async (window, output) => {
       window.setContentSize(width, 900); await delay(150);
       await js(`document.querySelector('.shared-nav-trigger').click()`);
       await wait(window.webContents, `document.querySelector('.shared-nav-panel')?.matches(':popover-open')`);
-      const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {count:p.querySelectorAll('.shared-nav-item').length,fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
-      assert.equal(geometry.count, 13); assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
+      const geometry = await js(`(()=>{const p=document.querySelector('.shared-nav-panel'),r=p.getBoundingClientRect();return {fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,hit:p.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}})()`);
+      assert.deepEqual(await js(`[...document.querySelectorAll('.shared-nav-item strong')].map(label => label.textContent).sort()`), sidebarModules);
+      assert.equal(geometry.fits && geometry.hit, true, 'Shared submenu fits and receives input at ' + width);
       window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'ArrowDown' }); window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'ArrowDown' });
       assert.equal(await js(`document.activeElement.getAttribute('role')==='menuitem'`), true);
       if (width === 1440) { window.show(); window.focus(); await delay(200); await fs.writeFile(path.join(output, 'shared-secondary-navigation.png'), (await window.webContents.capturePage()).toPNG()); }
