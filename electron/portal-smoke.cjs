@@ -453,6 +453,9 @@ app
         const [originalWidth, originalHeight] = window.getContentSize();
         window.setContentSize(390, 844);
         await wait(`innerWidth < 400 && document.querySelector('${about} .about-details').scrollWidth <= document.querySelector('${about} .about-details').clientWidth`);
+        window.focus();
+        window.webContents.focus();
+        await wait('document.hasFocus()');
         await selector(about + ' .about-contact button');
         await wait(`document.querySelector('${about} [role=status]')?.textContent === '联系邮箱已复制'`);
         assert.equal(await clipboard.readText(), author.email);
