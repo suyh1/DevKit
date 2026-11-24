@@ -1,11 +1,10 @@
 import { TextArea } from './TextControl';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Archive,
   ArrowDown,
   ArrowUp,
   ChevronRight,
-  CircleDot,
   Files,
   FolderGit2,
   GitBranch,
@@ -14,7 +13,6 @@ import {
   GitPullRequest,
   Globe2,
   History,
-  Layers,
   Plus,
   RefreshCw,
   Tag,
@@ -25,6 +23,7 @@ import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { ResourceLink, useWorkspaceResource } from './workspace-links';
 import { useCardLight } from './tool-card-motion';
+import GitFileGroup from './GitFileGroup';
 import GitStashes from './GitStashes';
 import { createPortal } from 'react-dom';
 import ActionPopover from './ActionPopover';
@@ -37,7 +36,7 @@ import { GitHistory } from './GitHistory';
 import {
   gitRequest,
   useGitRead,
-  type Change,
+  type GitSeed,
   type GitMode,
   type GitMutation,
   type GitState,
@@ -51,7 +50,6 @@ const views = [
   { value: 'refs', label: '分支与同步', Icon: GitFork },
   { value: 'stash', label: '贮藏', Icon: Archive },
 ] as const;
-const stateNames: Record<string, string> = { M: '修改', A: '新增', D: '删除', T: '类型变化', U: '冲突', '?': '未跟踪' };
 const branchName = (state: GitState) => (state.branch === '(detached)' ? '分离 HEAD' : state.branch);
 
 function Changes({
@@ -65,6 +63,8 @@ function Changes({
   message,
   setMessage,
   onPreviewPush,
+  seed,
+  delivery,
 }: {
   state: GitState;
   portal: boolean;
@@ -74,25 +74,46 @@ function Changes({
   mutate: GitMutation;
   generation: number;
   onPreviewPush?: () => void;
+  seed?: GitSeed;
+  delivery: ReactNode;
   message: string;
   setMessage: (value: string) => void;
 }) {
-  const [selection, select] = useState(''),
-    [query, setQuery] = useState('');
-  const sections = [
-    { staged: false, name: '未暂存', files: state.files.filter((f) => f.work !== '.' || f.conflict) },
-    { staged: true, name: '已暂存', files: state.files.filter((f) => f.index !== '.' && !f.conflict) },
-  ];
-  const items = sections.flatMap((s) =>
-    s.files
-      .filter((f) => f.path.toLowerCase().includes(query.toLowerCase()))
-      .map((file) => ({ file, staged: s.staged, key: s.name + ':' + file.path })),
-  );
-  const current = items.find((i) => i.key === selection) || items[0];
-  const stagedCount = sections[1].files.length;
-  function itemLabel(file: Change, staged: boolean) {
-    return file.conflict ? '冲突' : stateNames[staged ? file.index : file.work] || '改动';
-  }
+  const [selection, select] = useState({ path: seed?.path ?? '', staged: !!seed?.staged });
+  const [query, setQuery] = useState('');
+  // Keep the reviewed bytes bound to the view that displayed them, including partially staged files.
+  const reviewed = useRef(new Map<string, string>());
+  const rememberReview = useCallback((path: string, staged: boolean, token: string) => {
+    reviewed.current.set((staged ? 'index:' : 'work:') + path, token);
+  }, []);
+  const groups = [false, true].map((staged) => {
+    const all = state.files.filter((file) =>
+      staged ? file.index !== '.' && !file.conflict : file.work !== '.' || file.conflict,
+    );
+    return { staged, all, visible: all.filter((file) => file.path.toLowerCase().includes(query.toLowerCase())) };
+  });
+  const items = groups.flatMap((group) => group.visible.map((file) => ({ file, staged: group.staged })));
+  const current =
+    items.find((i) => i.staged === selection.staged && i.file.path === selection.path) ??
+    items.find((i) => i.staged === selection.staged) ??
+    items[0];
+  const stagedCount = groups[1].all.length;
+  const applyFiles = async (paths: string[], staged: boolean) => {
+    const applied = await mutate(
+      staged ? 'unstage' : 'stage',
+      {
+        files: paths.map((path) => ({ path, token: reviewed.current.get((staged ? 'index:' : 'work:') + path) })),
+      },
+      (staged ? '已取消暂存 ' : '已暂存 ') + paths.length + ' 个文件',
+    );
+    if (applied) {
+      for (const path of paths) {
+        reviewed.current.delete('index:' + path);
+        reviewed.current.delete('work:' + path);
+      }
+    }
+    return applied;
+  };
   const canCommit =
     !busy && !!message.trim() && stagedCount > 0 && !state.mergeHead && !state.files.some((f) => f.conflict);
   const commit = async (preview = false) => {
@@ -105,7 +126,58 @@ function Changes({
     ? { id, portal, file: current.file, staged: current.staged, generation, edit, busy, mutate }
     : null;
   return (
-    <div className="git-working-layout">
+    <div className="git-working-layout devkit-bento">
+      <section className="git-panel git-files-panel">
+        <header>
+          <h3>
+            文件变更 <small>{state.files.length}</small>
+          </h3>
+          {state.files.length > 0 && (
+            <input
+              className="git-filter"
+              placeholder="筛选文件路径"
+              aria-label="筛选文件路径"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          )}
+        </header>
+        <div className="git-rows">
+          {groups.map(({ staged, visible }) => (
+            <GitFileGroup
+              key={JSON.stringify([staged, query])}
+              files={visible}
+              staged={staged}
+              activePath={current?.staged === staged ? current.file.path : undefined}
+              edit={edit}
+              busy={busy}
+              onSelect={(path) => select({ path, staged })}
+              onApply={(paths) => applyFiles(paths, staged)}
+            />
+          ))}
+          {!items.length && (
+            <p className="git-quiet">{state.files.length ? '没有匹配的文件。' : '工作区干净，所有改动均已提交。'}</p>
+          )}
+        </div>
+      </section>
+      {reviewProps ? (
+        current?.file.conflict ? (
+          <ConflictReview key={current.file.path} {...reviewProps} />
+        ) : (
+          <FileReview
+            key={JSON.stringify([current?.file.path, current?.staged])}
+            {...reviewProps}
+            onReviewed={rememberReview}
+          />
+        )
+      ) : (
+        <article className="git-inspector">
+          <header>
+            <h3>差异预览</h3>
+          </header>
+          <p className="git-quiet">选择变更文件后可审阅差异。</p>
+        </article>
+      )}
       {edit && !state.mergeHead && (
         <form
           className="git-compose git-commit-desk"
@@ -126,19 +198,19 @@ function Changes({
               label="查看已暂存文件"
               trigger={'已暂存 ' + stagedCount + ' 个文件'}
             >
-              {sections[1].files.map((file) => (
+              {groups[1].all.map((file) => (
                 <button
                   type="button"
                   key={file.path}
                   onClick={() => {
                     setQuery('');
-                    select('已暂存:' + file.path);
+                    select({ staged: true, path: file.path });
                   }}
                 >
                   {file.path}
                 </button>
               ))}
-              {!stagedCount && <small>从下方差异预览中暂存文件或差异块。</small>}
+              {!stagedCount && <small>在文件列表中选择要暂存的改动。</small>}
             </ActionPopover>
           </div>
           <label htmlFor="git-message">提交说明</label>
@@ -173,59 +245,7 @@ function Changes({
           )}
         </form>
       )}
-      <div className="git-split devkit-bento">
-        <section className="git-panel">
-          <header>
-            <h3>文件变更</h3>
-            <small>{state.files.length} 个文件</small>
-          </header>
-          {state.files.length > 0 && (
-            <input
-              className="git-filter"
-              placeholder="筛选文件路径"
-              aria-label="筛选文件路径"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          )}
-          <div className="git-rows">
-            {sections.map((s) => (
-              <section key={s.name} className="git-file-group">
-                <h4>
-                  {s.staged ? <Layers size={13} /> : <CircleDot size={13} />} {s.name} <small>{s.files.length}</small>
-                </h4>
-                {items
-                  .filter((i) => i.staged === s.staged)
-                  .map(({ file, key }) => (
-                    <div key={key} className="git-file-row" data-selected={current?.key === key}>
-                      <button aria-pressed={current?.key === key} onClick={() => select(key)} title={file.path}>
-                        <em data-code={s.staged ? file.index : file.work}>{itemLabel(file, s.staged)}</em>
-                        <span>{file.path}</span>
-                      </button>
-                    </div>
-                  ))}
-              </section>
-            ))}
-            {!items.length && (
-              <p className="git-quiet">{state.files.length ? '没有匹配的文件。' : '工作区干净，所有改动均已提交。'}</p>
-            )}
-          </div>
-        </section>
-        {reviewProps ? (
-          current?.file.conflict ? (
-            <ConflictReview key={current.key} {...reviewProps} />
-          ) : (
-            <FileReview key={current?.key} {...reviewProps} />
-          )
-        ) : (
-          <article className="git-inspector">
-            <header>
-              <h3>差异预览</h3>
-            </header>
-            <p className="git-quiet">选择变更文件后可审阅差异。</p>
-          </article>
-        )}
-      </div>
+      {delivery}
     </div>
   );
 }
@@ -392,7 +412,7 @@ function References({
 
 function RepositoryView({
   repo,
-  onChanges,
+  onModeChange,
   seed,
   portal,
   edit,
@@ -405,7 +425,7 @@ function RepositoryView({
   report,
 }: {
   repo: Repository;
-  onChanges: () => void;
+  onModeChange: (mode: GitMode) => void;
   seed?: import('./git-api').GitSeed;
   portal: boolean;
   edit: boolean;
@@ -417,7 +437,7 @@ function RepositoryView({
   setBusy: (v: boolean) => void;
   report: (message: string, error?: boolean) => void;
 }) {
-  const [pushRequest, setPushRequest] = useState(0);
+  const [pushOpen, setPushOpen] = useState(!!seed?.push);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const { data: state, error, loading } = useGitRead<GitState>(portal, 'state', { id: repo.id }, true, generation);
   const mutate: GitMutation = async (action, payload, notice) => {
@@ -450,10 +470,22 @@ function RepositoryView({
     );
   const message = drafts[state.branch] || '';
   const setMessage = (value: string) => setDrafts((prev) => ({ ...prev, [state.branch]: value }));
+  const delivery = sync && state.worktree && (
+    <GitDelivery
+      open={pushOpen}
+      setOpen={setPushOpen}
+      state={state}
+      id={repo.id}
+      portal={portal}
+      busy={busy || loading}
+      generation={generation}
+      mutate={mutate}
+    />
+  );
   const latest = state.commits.find((c) => c.id === state.head);
   return (
     <>
-      <div className="git-branch-strip">
+      <div className="git-view-bar">
         <section className="git-hero">
           <div className="git-hero-main">
             <span>
@@ -479,28 +511,38 @@ function RepositoryView({
             </div>
           </div>
         </section>
-        {sync && state.worktree && (
-          <GitDelivery
-            initialOpen={!!seed?.push}
-            request={pushRequest}
-            state={state}
-            id={repo.id}
-            portal={portal}
-            busy={busy || loading}
-            generation={generation}
-            mutate={mutate}
-          />
-        )}
+        <SegmentedControl
+          label="Git 仓库视图"
+          value={mode}
+          onChange={onModeChange}
+          options={views
+            .filter((v) => state.worktree || v.value === 'history')
+            .map((v) => ({
+              ...v,
+              content: (
+                <>
+                  <v.Icon size={15} />
+                  {v.label}
+                </>
+              ),
+            }))}
+        />
       </div>
       {state.mergeHead && (
-        <MergeProgress onChanges={onChanges} state={state} mutate={mutate} edit={edit} busy={busy || loading} />
+        <MergeProgress
+          onChanges={() => onModeChange('changes')}
+          state={state}
+          mutate={mutate}
+          edit={edit}
+          busy={busy || loading}
+        />
       )}
       {mode === 'changes' && state.worktree ? (
         <Changes
+          seed={seed?.mode === 'changes' ? seed : undefined}
+          delivery={delivery}
           onPreviewPush={
-            sync && state.remotes.length && state.branch !== '(detached)'
-              ? () => setPushRequest((n) => n + 1)
-              : undefined
+            sync && state.remotes.length && state.branch !== '(detached)' ? () => setPushOpen(true) : undefined
           }
           message={message}
           setMessage={setMessage}
@@ -513,7 +555,13 @@ function RepositoryView({
           generation={generation}
         />
       ) : mode === 'history' || !state.worktree ? (
-        <GitHistory initialPath={seed?.path} state={state} id={repo.id} portal={portal} generation={generation} />
+        <GitHistory
+          initialPath={seed?.mode === 'history' ? seed.path : undefined}
+          state={state}
+          id={repo.id}
+          portal={portal}
+          generation={generation}
+        />
       ) : mode === 'stash' ? (
         <GitStashes
           state={state}
@@ -537,6 +585,7 @@ function RepositoryView({
             mutate={mutate}
           />
           <References state={state} edit={edit} sync={sync} busy={busy || loading} mutate={mutate} />
+          {delivery}
         </>
       )}
     </>
@@ -743,39 +792,21 @@ export default function GitWorkspace({
             )}
           </div>
           {repo ? (
-            <>
-              <SegmentedControl
-                label="Git 仓库视图"
-                value={activeMode}
-                onChange={setMode}
-                options={views
-                  .filter((v) => !historyOnly || v.value === 'history')
-                  .map((v) => ({
-                    ...v,
-                    content: (
-                      <>
-                        <v.Icon size={15} />
-                        {v.label}
-                      </>
-                    ),
-                  }))}
-              />
-              <RepositoryView
-                key={repo.id + JSON.stringify(seed ?? {})}
-                repo={repo}
-                seed={seed}
-                onChanges={() => setMode('changes')}
-                portal={portal}
-                edit={edit && (repo.access?.edit ?? true)}
-                sync={sync && (repo.access?.sync ?? true)}
-                mode={activeMode}
-                generation={generation}
-                refresh={refresh}
-                busy={busy}
-                setBusy={setBusy}
-                report={report}
-              />
-            </>
+            <RepositoryView
+              key={repo.id + JSON.stringify(seed ?? {})}
+              repo={repo}
+              seed={seed}
+              onModeChange={setMode}
+              portal={portal}
+              edit={edit && (repo.access?.edit ?? true)}
+              sync={sync && (repo.access?.sync ?? true)}
+              mode={activeMode}
+              generation={generation}
+              refresh={refresh}
+              busy={busy}
+              setBusy={setBusy}
+              report={report}
+            />
           ) : (
             <p role="status">该仓库已移除或撤下，请选择可访问的仓库。</p>
           )}

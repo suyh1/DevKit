@@ -1,5 +1,5 @@
 import { git, patches, fail } from './git-command.mjs';
-import { reviewFile, applyReview, conflictView, resolveConflict } from './git-review.mjs';
+import { reviewFile, applyReview, applyFiles, conflictView, resolveConflict } from './git-review.mjs';
 import {
   history,
   visibleCommit,
@@ -124,7 +124,7 @@ async function refs(root) {
   const output = await git(root, [
     'for-each-ref',
     '--sort=refname',
-    '--format=%(refname)%00%(objectname)%00%(upstream:short)',
+    '--format=%(refname)%00%(objectname)%00%(upstream:short)%00%(*objectname)',
     'refs/heads',
     'refs/remotes',
     'refs/tags',
@@ -134,9 +134,9 @@ async function refs(root) {
     .split('\n')
     .filter(Boolean)
     .map((line) => {
-      const [ref, hash, upstream] = line.split('\0');
+      const [ref, hash, upstream, peeled] = line.split('\0');
       const [, kind, ...parts] = ref.split('/');
-      return { kind, name: parts.join('/'), hash, upstream };
+      return { kind, name: parts.join('/'), hash, upstream, ...(peeled && { peeled }) };
     });
 }
 
@@ -196,6 +196,8 @@ async function perform(root, action, value, current, authorize, worktree) {
     return run(['stash', 'apply', '--index', entry.id]);
   }
   if (['patch', 'review', 'stage', 'unstage', 'conflict', 'resolve'].includes(action)) {
+    if ((action === 'stage' || action === 'unstage') && value.files !== undefined)
+      return applyFiles(root, current.files, action === 'unstage', value.files, authorize);
     const file = current.files.find((f) => f.path === value.path);
     if (!file) fail(409, '文件状态已变化，请刷新。');
     if (action === 'conflict') return conflictView(root, file);

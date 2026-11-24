@@ -329,18 +329,32 @@ export function detectTools(input: string): Suggestion[] {
       return [...matches.values()];
     }
   }
-  const gitCommand = /^git\s+(status|diff|add|commit|log|show|branch|switch|tag|fetch|pull|push|stash|clone|merge)(?:\s|$)/i.exec(text);
+  const gitCommand = /^git\s+(status|diff|add|restore|commit|log|show|branch|switch|tag|fetch|pull|push|stash|clone|merge)(?:\s|$)/i.exec(text);
   if (gitCommand || /^(?:diff --git |On branch [^\n]+\r?\n|commit [a-f\d]{40}(?:\s|$))/i.test(text)) {
     const command = gitCommand?.[1].toLowerCase();
     const gitMode = command === 'stash' ? 'stash' : ['log', 'show'].includes(command || '') || /^commit /i.test(text) ? 'history'
       : ['branch', 'switch', 'tag', 'fetch', 'pull', 'merge'].includes(command || '') ? 'refs' : 'changes';
     const argument=text.replace(/^git\s+\S+\s*/i,'').trim();
     const unquote=(s:string)=>s.replace(/^(["'])(.*)\1$/,'$2');
-    const path=command==='log'?/(?:^|\s)--\s+(.+)$/.exec(argument)?.[1]:undefined;
-    const gitSeed={mode:gitMode as import('./git-api').GitMode,
-      ...(command==='clone'&&{clone:argument.startsWith('-')?'':unquote(argument)}),
-      ...(command==='push'&&{push:true}),...(command==='merge'&&argument&&!argument.startsWith('-')&&{branch:argument}),
-      ...(path&&{path:unquote(path)})};
+    const historyPath = command === 'log' ? /(?:^|\s)--\s+(.+)$/.exec(argument)?.[1] : undefined;
+    const fileCommand = command === 'add' || command === 'diff' || command === 'restore';
+    // Match a single literal path. Options or multiple pathspecs still open the appropriate group.
+    const stageFlag = command === 'restore' ? /^(?:--staged|-S)(?:\s+|$)/ : /^(?:--staged|--cached)(?:\s+|$)/;
+    const staged = (command === 'restore' || command === 'diff') && stageFlag.test(argument);
+    const operand = staged ? argument.replace(stageFlag, '') : argument;
+    const afterSeparator = /^--\s+/.test(operand);
+    const single = operand.replace(/^--\s+/, '');
+    const file = fileCommand && (afterSeparator || (command !== 'diff' && !single.startsWith('-'))) && /^(?:"[^"\n]+"|'[^'\n]+'|[^\s"']+)$/.test(single)
+      && single !== '.' && !/[*?]/.test(single) ? unquote(single) : undefined;
+    const gitSeed = {
+      mode: gitMode as import('./git-api').GitMode,
+      ...(command === 'clone' && { clone: argument.startsWith('-') ? '' : unquote(argument) }),
+      ...(command === 'push' && { push: true }),
+      ...(command === 'merge' && argument && !argument.startsWith('-') && { branch: argument }),
+      ...(historyPath && { path: unquote(historyPath) }),
+      ...((staged || command === 'commit') && { staged: true }),
+      ...(file && { path: file }),
+    };
     add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode,gitSeed });
   }
   if (webAddressRules(text, rules)) return [...matches.values()];

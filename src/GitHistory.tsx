@@ -1,59 +1,74 @@
-import { useState } from 'react';
-import { GitCommitHorizontal, Search } from 'lucide-react';
-import type { Commit, GitState } from './git-api';
+import { useMemo, useState } from 'react';
+import { GitBranch, GitCommitHorizontal, GitFork, GitMerge, Radio, Search, Tag } from 'lucide-react';
+import { graphStart, layoutGraph, type GraphCursor } from './git-graph';
+import type { GitState, Reference } from './git-api';
 import { useGitRead } from './git-api';
 import Skeleton from './Skeleton';
 import FileMeta from './FileMeta';
 import { DiffText } from './GitReview';
 
 const colors = ['var(--accent)', 'var(--syntax-string)', 'var(--warning)', 'var(--syntax-keyword)', 'var(--success)'];
-const laneX = (n: number) => 9 + n * 12;
+const laneX = (column: number) => 12 + column * 16;
+const ink = (color: number) => colors[color % colors.length];
 
-export function graphRows(commits: Commit[]) {
-  let lanes: string[] = [];
-  return commits.map((commit) => {
-    const incoming = lanes.length;
-    if (!lanes.includes(commit.id)) lanes.push(commit.id);
-    const lane = lanes.indexOf(commit.id);
-    const next = [...lanes];
-    next.splice(lane, 1);
-    const unseen = commit.parents.filter((id) => !next.includes(id));
-    next.splice(lane, 0, ...unseen);
-    const edges = lanes.flatMap((id, col) =>
-      (id === commit.id ? commit.parents : [id]).map((target) => ({ from: col, to: next.indexOf(target) })),
-    );
-    const row = { lane, columns: incoming, width: Math.max(lanes.length, next.length), edges };
-    lanes = next;
-    return row;
-  });
-}
-
-function Lane({ row }: { row: ReturnType<typeof graphRows>[number] }) {
+function Lane({
+  row,
+  width,
+  merge,
+  head,
+}: {
+  row: ReturnType<typeof layoutGraph>['rows'][number];
+  width: number;
+  merge: boolean;
+  head: boolean;
+}) {
+  const x = laneX(row.column),
+    color = ink(row.color);
   return (
-    <svg aria-hidden="true" className="git-lane" width={laneX(row.width) + 2} height="56">
-      {Array.from({ length: row.columns }, (_, i) => (
-        <path key={i} d={'M' + laneX(i) + ' 0v28'} stroke={colors[i % colors.length]} />
+    <svg aria-hidden="true" className="git-lane" width={laneX(width)} height="56">
+      {row.incoming.map((lane, i) => (
+        <path key={lane.target} d={`M${laneX(i)} 0v28`} stroke={ink(lane.color)} />
       ))}
-      {row.edges.map((edge) => (
+      {row.edges.map(({ from, to, color }) => (
         <path
-          key={edge.from + ':' + edge.to}
+          key={from + ':' + to}
           fill="none"
-          d={
-            'M' +
-            laneX(edge.from) +
-            ' 28C' +
-            laneX(edge.from) +
-            ' 43 ' +
-            laneX(edge.to) +
-            ' 42 ' +
-            laneX(edge.to) +
-            ' 56'
-          }
-          stroke={colors[edge.to % colors.length]}
+          d={`M${laneX(from)} 28 C${laneX(from)} 42 ${laneX(to)} 42 ${laneX(to)} 56`}
+          stroke={ink(color)}
         />
       ))}
-      <circle cx={laneX(row.lane)} cy="28" r="4.2" fill="var(--surface)" stroke={colors[row.lane % colors.length]} />
+      {head && <circle cx={x} cy="28" r="8" fill="var(--surface)" stroke={color} />}
+      <circle cx={x} cy="28" r={merge ? 5 : 4} fill={merge ? 'var(--surface)' : color} stroke={color} />
+      {merge && <circle cx={x} cy="28" r="2" fill={color} />}
     </svg>
+  );
+}
+
+function RefLabels({ refs, head }: { refs?: Reference[]; head: boolean }) {
+  return (
+    <>
+      {head && (
+        <em className="git-ref-label" data-kind="head">
+          HEAD
+        </em>
+      )}
+      {refs?.map((ref) => {
+        const Icon = ref.kind === 'tags' ? Tag : ref.kind === 'heads' ? GitBranch : Radio;
+        const type = ref.kind === 'tags' ? '标签' : ref.kind === 'heads' ? '本地分支' : '远端分支';
+        return (
+          <em
+            className="git-ref-label"
+            data-kind={ref.kind}
+            key={ref.kind + '/' + ref.name}
+            title={type + ' · ' + ref.name}
+            aria-label={type + ' ' + ref.name}
+          >
+            <Icon size={11} />
+            {ref.name}
+          </em>
+        );
+      })}
+    </>
   );
 }
 
@@ -159,6 +174,7 @@ export function GitHistory({
     [cursor, setCursor] = useState({ offset: 0, snapshot: '' }),
     [selected, select] = useState(''),
     [base, setBase] = useState('');
+  const [pageStarts, setPageStarts] = useState<GraphCursor[]>([graphStart]);
   const offset = cursor.offset;
   const filtered = !!filter.query || !!filter.path || offset > 0;
   const { data, error } = useGitRead<Pick<GitState, 'commits' | 'more' | 'snapshot'>>(
@@ -169,20 +185,37 @@ export function GitHistory({
     generation,
   );
   const page = filtered ? data : state;
-  const visible = page?.commits || [],
-    rows = graphRows(visible);
-  const current = visible.find((c) => c.id === selected) || visible[0];
+  const visible = page?.commits;
+  const showGraph = !filter.query && !filter.path;
+  const graph = useMemo(
+    () => layoutGraph(showGraph ? (visible ?? []) : [], pageStarts[offset / 200]),
+    [showGraph, visible, pageStarts, offset],
+  );
+  const refsByCommit = useMemo(() => {
+    const grouped = new Map<string, Reference[]>();
+    for (const ref of state.references) {
+      const hash = ref.peeled || ref.hash;
+      const group = grouped.get(hash) ?? [];
+      group.push(ref);
+      grouped.set(hash, group);
+    }
+    return grouped;
+  }, [state.references]);
+  const current = visible?.find((c) => c.id === selected) || visible?.[0];
   return (
-    <div className="git-split devkit-bento">
+    <div className="git-split git-history-layout devkit-bento">
       <section className="git-panel">
         <header>
-          <h3>提交历史</h3>
+          <h3>
+            <GitFork size={16} /> {showGraph ? '提交图' : '历史检索结果'}
+          </h3>
           <small>第 {1 + offset / 200} 页</small>
         </header>
         <form
           className="git-history-filter"
           onSubmit={(e) => {
             e.preventDefault();
+            setPageStarts([graphStart]);
             setFilter({ field, query: query.trim(), path: path.trim() });
             setCursor({ offset: 0, snapshot: '' });
             select('');
@@ -224,24 +257,31 @@ export function GitHistory({
         ) : !page ? (
           <Skeleton kind="list" label="正在检索提交" />
         ) : null}
-        <div className="git-rows">
-          {visible.map((c, i) => (
+        <div className="git-rows git-graph-scroll" key={JSON.stringify([offset, filter])}>
+          {visible?.map((c, i) => (
             <button
               key={c.id}
               className="git-commit-row"
+              style={showGraph ? { minWidth: laneX(graph.width) + 180 } : undefined}
               aria-pressed={c.id === current?.id}
               onClick={() => select(c.id)}
             >
-              {!filter.query && !filter.path && <Lane row={rows[i]} />}
+              {showGraph && (
+                <Lane row={graph.rows[i]} width={graph.width} merge={c.parents.length > 1} head={c.id === state.head} />
+              )}
               <span>
-                <strong title={c.subject}>{c.subject || '无标题提交'}</strong>
+                <span className="git-commit-subject">
+                  {c.parents.length > 1 && <GitMerge size={13} aria-label="合并提交" />}
+                  <strong title={c.subject}>{c.subject || '无标题提交'}</strong>
+                </span>
                 <small>
-                  <code>{c.id.slice(0, 7)}</code> · {c.author} · {c.date.slice(0, 10)} {c.refs && <em>{c.refs}</em>}
+                  <RefLabels refs={refsByCommit.get(c.id)} head={c.id === state.head} />
+                  <code>{c.id.slice(0, 7)}</code> · {c.author} · {c.date.slice(0, 10)}
                 </small>
               </span>
             </button>
           ))}
-          {page && !visible.length && <p className="git-quiet">没有匹配的提交。</p>}
+          {page && !visible?.length && <p className="git-quiet">没有匹配的提交。</p>}
         </div>
         <div className="git-review-tools">
           <button
@@ -254,7 +294,10 @@ export function GitHistory({
           <button
             className="text-button"
             disabled={!page?.more}
-            onClick={() => setCursor({ offset: offset + 200, snapshot: page!.snapshot })}
+            onClick={() => {
+              setPageStarts([...pageStarts.slice(0, offset / 200 + 1), graph.next]);
+              setCursor({ offset: offset + 200, snapshot: page!.snapshot });
+            }}
           >
             下一页
           </button>
@@ -269,11 +312,27 @@ export function GitHistory({
           )}
         </div>
       </section>
-      {base && current && base !== current.id ? (
-        <CommitComparison portal={portal} id={id} base={base} target={current.id} generation={generation} />
-      ) : (
-        <PatchView key={current?.id} portal={portal} id={id} commit={current?.id} generation={generation} />
-      )}
+      <div className="git-history-detail">
+        {current && (
+          <header className="git-selected-commit">
+            <small>
+              {current.parents.length > 1 ? '合并提交' : '提交'} · <code>{current.id.slice(0, 12)}</code>
+            </small>
+            <h4>{current.subject || '无标题提交'}</h4>
+            <span>
+              {current.author} · {current.date.slice(0, 10)}
+            </span>
+            <div>
+              <RefLabels refs={refsByCommit.get(current.id)} head={current.id === state.head} />
+            </div>
+          </header>
+        )}
+        {base && current && base !== current.id ? (
+          <CommitComparison portal={portal} id={id} base={base} target={current.id} generation={generation} />
+        ) : (
+          <PatchView key={current?.id} portal={portal} id={id} commit={current?.id} generation={generation} />
+        )}
+      </div>
     </div>
   );
 }

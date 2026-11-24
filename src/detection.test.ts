@@ -51,6 +51,19 @@ describe('推荐顺序和打开方式', () => {
   it('按 Git 输入打开正确视图，并保留本机工具匹配', () => {
     for (const [source, gitMode] of [['git status', 'changes'], ['diff --git a/a b/a', 'changes'], ['git log --graph', 'history'], ['git switch demo', 'refs'], ['git stash list', 'stash']])
       expect(detectTools(source)).toContainEqual(expect.objectContaining({ id: 'git', gitMode }));
+    for (const [input, seed] of [
+      ['git add -- "src/file name.ts"', { mode: 'changes', path: 'src/file name.ts' }],
+      ['git restore --staged src/unit.ts', { mode: 'changes', staged: true, path: 'src/unit.ts' }],
+      ['git diff --cached -- src/unit.ts', { mode: 'changes', staged: true, path: 'src/unit.ts' }],
+      ['git add a.ts b.ts', { mode: 'changes' }],
+      ['git diff -S needle', { mode: 'changes' }],
+      ['git commit', { mode: 'changes', staged: true }],
+      ['git log --graph --decorate --all', { mode: 'history' }],
+    ] as const) {
+      const match = detectTools(input)[0];
+      expect(match.id).toBe('git');
+      expect(match.kind === 'workspace' && match.gitSeed).toEqual(seed);
+    }
     expect(detectTools('feat: 完成搜索').map(s => s.id)).toContain('changelog');
     expect(detectTools('*.log').map(s => s.id)).not.toContain('git');
     for(const [command,seed] of [['git push',{mode:'changes',push:true}],['git merge feature/demo',{mode:'refs',branch:'feature/demo'}],['git clone https://git.example/team/demo.git',{mode:'changes',clone:'https://git.example/team/demo.git'}],['git log -- "src/file name.ts"',{mode:'history',path:'src/file name.ts'}]] as const)

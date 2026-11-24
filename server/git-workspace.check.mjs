@@ -31,7 +31,7 @@ test('published repositories, partial staging, graph, branches, tags and local u
   const call = (action, args = {}, access) => manager.request(action, { id, ...args }, access);
   const change = async (action, args = {}, access = editor) => {
     let token;
-    if (['stage', 'unstage'].includes(action))
+    if (['stage', 'unstage'].includes(action) && !args.files)
       token = (await call('review', { path: args.path, staged: action === 'unstage' })).token;
     if (action === 'push') token = (await call('push-plan', args)).token;
     return call(action, { revision: (await call('state')).revision, token, ...args }, access);
@@ -53,6 +53,16 @@ test('published repositories, partial staging, graph, branches, tags and local u
   assert.match(await call('patch', payload, viewer), /\+first line/);
   await assert.rejects(change('stage', payload, viewer), { status: 403 });
   await assert.rejects(call('stage', { ...payload, revision: empty.revision }, editor), { status: 409 });
+  const second = { path: 'also selected.txt' };
+  await writeFile(path.join(repo, second.path), 'another file\n');
+  const files = [payload, second];
+  await assert.rejects(change('stage', { files }, viewer), { status: 403 });
+  await assert.rejects(change('stage', { files: [payload, { ...second, token: 'outdated' }] }), { status: 409 });
+  assert.equal(git(repo, 'diff', '--cached', '--name-only'), '');
+  await change('stage', { files });
+  assert.equal((await call('state')).files.filter(f => f.index === 'A').length, 2);
+  await change('unstage', { files });
+  assert.equal(git(repo, 'diff', '--cached', '--name-only'), '');
   await change('stage', payload);
   await change('unstage', payload);
   await change('stage', payload);
@@ -62,6 +72,7 @@ test('published repositories, partial staging, graph, branches, tags and local u
   await change('commit', { message: 'Initial snapshot' });
   const first = await call('state');
   assert.equal(first.commits[0].subject, 'Initial snapshot');
+  assert.deepEqual(first.files.find(f => f.path === second.path), { ...second, index: '.', work: '?' });
   assert.match(await call('show', { commit: first.head }), /\+first line/);
   await assert.rejects(call('show', { commit: 'HEAD' }), { status: 404 });
   await change('create-branch', { name: 'feature/demo' });
@@ -78,6 +89,8 @@ test('published repositories, partial staging, graph, branches, tags and local u
   await change('stage', { path: 'new.txt' });
   await change('stage', payload);
   await change('commit', { message: 'Main change' });
+  await change('stage', { files: [second] });
+  await change('commit', { message: 'Finish remaining file' });
   await change('switch', { name: 'feature/demo' });
   await writeFile(path.join(repo, 'feature.txt'), 'feature\n');
   await change('stage', { path: 'feature.txt' });
@@ -85,7 +98,9 @@ test('published repositories, partial staging, graph, branches, tags and local u
   await change('switch', { name: 'main' });
   git(repo, 'merge', '--no-ff', '-m', 'Join', 'feature/demo');
   await change('tag', { name: 'demo-1' });
+  git(repo, 'tag', '-a', 'demo-release', '-m', 'Annotated release');
   const merged = await call('state');
+  assert.equal(merged.references.find(r => r.name === 'demo-release').peeled, merged.head);
   assert.equal(merged.commits.find((c) => c.id === merged.head).parents.length, 2);
   assert.ok(merged.references.some((r) => r.kind === 'tags' && r.name === 'demo-1'));
   git(folder, 'init', '--bare', '-b', 'main', bare);

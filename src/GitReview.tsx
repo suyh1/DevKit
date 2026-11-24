@@ -1,5 +1,5 @@
 import { TextArea } from './TextControl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, GitMerge, Layers, Minus, Plus } from 'lucide-react';
 import { useGitRead, type Change, type GitMutation } from './git-api';
 import Skeleton from './Skeleton';
@@ -69,7 +69,19 @@ type Props = {
   mutate: GitMutation;
 };
 type Review = { text: string; token: string; hunks: { index: number; header: string }[]; truncated: boolean };
-export function FileReview({ portal, id, file, staged, generation, edit, busy, mutate }: Props) {
+export function FileReview({
+  portal,
+  id,
+  file,
+  staged,
+  generation,
+  edit,
+  busy,
+  mutate,
+  onReviewed,
+}: Props & {
+  onReviewed: (path: string, staged: boolean, token: string) => void;
+}) {
   const { data, error, loading } = useGitRead<Review>(
     portal,
     'review',
@@ -78,6 +90,9 @@ export function FileReview({ portal, id, file, staged, generation, edit, busy, m
     generation,
   );
   const label = staged ? '取消暂存' : '暂存';
+  useEffect(() => {
+    if (data && !loading) onReviewed(file.path, staged, data.token);
+  }, [data, loading, file.path, staged, onReviewed]);
   const apply = (hunk?: number) =>
     void mutate(
       staged ? 'unstage' : 'stage',

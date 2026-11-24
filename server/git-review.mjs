@@ -91,6 +91,34 @@ export async function applyReview(root, file, staged, value, authorize) {
   return git(root, ['apply', '--cached', '--whitespace=nowarn', ...(staged ? ['--reverse'] : []), '-'], { input });
 }
 
+export async function applyFiles(root, changes, staged, selection, authorize) {
+  if (!Array.isArray(selection) || !selection.length || selection.length > changes.length)
+    fail(409, '所选文件已变化，请刷新后重选。');
+  const candidates = new Map(
+    changes
+      .filter((file) => !file.conflict && (staged ? file.index : file.work) !== '.')
+      .map((file) => [file.path, file]),
+  );
+  const patches = [];
+  let size = 0;
+  for (const item of selection) {
+    const file = candidates.get(item?.path);
+    if (!file) fail(409, '所选文件已变化，请刷新后重选。');
+    candidates.delete(file.path);
+    const raw = await patchBytes(root, file, staged);
+    if (!raw.length || (item.token !== undefined && item.token !== digest(raw)))
+      fail(409, '文件内容已改变，请核对刷新后的差异，再次操作。');
+    size += raw.length;
+    if (size > 48 * 1024 * 1024) fail(413, '所选补丁超过 48 MiB，请分批操作。');
+    patches.push(raw);
+  }
+  // A single apply holds Git's index lock and leaves the index intact on a rejected patch.
+  authorize();
+  return git(root, ['apply', '--cached', '--whitespace=nowarn', ...(staged ? ['--reverse'] : []), '-'], {
+    input: Buffer.concat(patches, size),
+  });
+}
+
 export async function conflictView(root, file) {
   if (!file.conflict) fail(409, '冲突状态已经改变。');
   const stages = await git(root, ['ls-files', '--unmerged', '-z', '--', file.path]);

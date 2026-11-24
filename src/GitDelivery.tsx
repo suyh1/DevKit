@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal } from './project-components';
 import { ArrowRight, ArrowUpFromLine, GitBranch, GitCommitHorizontal } from 'lucide-react';
 import { useGitRead, type GitState, type GitMutation } from './git-api';
@@ -19,11 +19,11 @@ export default function GitDelivery({
   busy,
   generation,
   mutate,
-  initialOpen = false,
-  request,
+  open,
+  setOpen,
 }: {
-  request: number;
-  initialOpen?: boolean;
+  open: boolean;
+  setOpen: (open: boolean) => void;
   state: GitState;
   id: string;
   portal: boolean;
@@ -31,13 +31,7 @@ export default function GitDelivery({
   generation: number;
   mutate: GitMutation;
 }) {
-  const [open, setOpen] = useState(initialOpen),
-    [choice, setChoice] = useState('');
-  useEffect(() => {
-    if (request) {
-      setOpen(true);
-    }
-  }, [request]);
+  const [choice, setChoice] = useState('');
   const upstream = state.remotes
     .filter((r) => state.upstream.startsWith(r + '/'))
     .sort((a, b) => b.length - a.length)[0];
