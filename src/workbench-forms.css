@@ -82,7 +82,8 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 .analysis-file > label:has(> .form-check) { display:flex; align-items:center; gap:8px; }
 .field-choices label:has(:checked) { background:var(--tint); border-color:var(--accent); }
 .regression-cases { display:grid; gap:10px; min-width:0; justify-items:start; }
-.regression-cases > fieldset {
+.case-rows { justify-self: stretch; min-width: 0; }
+.case-rows > fieldset {
   display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));
   align-items:start; gap:10px; width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px;
 }
@@ -95,6 +96,7 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 }
 .regression-step > label:first-child { grid-column:1/-1; }
 .regression-step :is(input,select) { width:100%; min-width:0; }
+.regression-steps { display: grid; gap: 8px; max-block-size: min(48dvh, 460px); overflow: auto; }
 .regression-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .regression-actions .run-button { margin-inline-start:0; }
 .editable-notes { display:grid; justify-items:start; gap:10px; }

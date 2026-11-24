@@ -227,6 +227,35 @@ module.exports = async function apiSmoke(window, output) {
     await wait('document.querySelectorAll(".api-regression ol li").length >= 2');
     assert.equal(requests.at(-1).headers.authorization, 'Bearer true');
     await click("保存回归步骤", ".api-regression");
+    const regressionSize = window.getSize(), regressionMinimum = window.getMinimumSize();
+    window.setMinimumSize(360, 600);
+    async function checkStepLayout(count) {
+      for (const width of [390, 1340]) {
+        window.setContentSize(width, 844);
+        await wait(width < 400 ? 'innerWidth < 420' : 'innerWidth > 1200');
+        assert.ok(await js(`(() => {
+          const list = document.querySelector('.regression-steps');
+          const button = document.querySelector('.regression-actions .run-button');
+          const rect = button.getBoundingClientRect();
+          return list.children.length === ${count} && (${count} < 50 || list.scrollHeight > list.clientHeight)
+            && rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= list.getBoundingClientRect().top + 1;
+        })()`), `Run is reachable before ${count} steps at ${width}px`);
+      }
+    }
+    await checkStepLayout(2);
+    // Exercise the supported limit without issuing more requests.
+    await js(`(async () => {
+      const panel = document.querySelector('.api-regression');
+      const add = [...panel.querySelectorAll('button')].find(button => button.textContent === '追加接口');
+      for (let i = panel.querySelectorAll('.regression-step').length; i < 50; i++) {
+        add.click();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+    })()`);
+    await wait('document.querySelectorAll(".api-regression .regression-step").length === 50');
+    await checkStepLayout(50);
+    window.setSize(...regressionSize);
+    window.setMinimumSize(...regressionMinimum);
     // Saved examples and definitions survive reload without any hosted service.
     await window.webContents.reload();
     await wait('!!document.querySelector(".shared-sidebar-trigger")');

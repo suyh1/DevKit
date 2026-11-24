@@ -99,6 +99,8 @@ module.exports = async function gitSmoke(window, installation, output) {
     }
   }
   async function checkTextarea(execute) {
+    await click(execute, '.git-open-commit');
+    await wait(execute, 'document.activeElement.id === "git-message"');
     const sizes = await execute(`(async () => {
       const field = document.querySelector('#git-message');
       const measure = async value => {
@@ -119,6 +121,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     assert.equal(sizes.resize, 'none');
     assert.ok(sizes.medium > sizes.initial && sizes.full > sizes.medium && sizes.capped && sizes.scrolls, JSON.stringify(sizes));
     assert.equal(sizes.initial, sizes.reset);
+    await click(execute, '[aria-label="关闭提交窗口"]');
   }
   let browser;
   const throttled = window.webContents.getBackgroundThrottling();
@@ -148,11 +151,11 @@ module.exports = async function gitSmoke(window, installation, output) {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     })()`);
     await filterFiles('one.txt');
-    await click(desktop, '[aria-label="全选当前可见的未暂存文件"]');
+    await click(desktop, '[aria-label="全选本页未暂存文件"]');
     await chooseText(desktop, '暂存所选（1）');
     await wait(desktop, 'document.querySelector(\'.git-file-row [aria-label="取消暂存 one.txt"]\')');
     assert.equal(git('diff', '--cached', '--name-only').toString().trim(), 'one.txt');
-    await click(desktop, '[aria-label="全选当前可见的已暂存文件"]');
+    await click(desktop, '[aria-label="全选本页已暂存文件"]');
     await chooseText(desktop, '取消暂存所选（1）');
     await wait(desktop, 'document.querySelector(\'.git-file-row [aria-label="暂存 one.txt"]\')');
     await filterFiles('');
@@ -161,15 +164,15 @@ module.exports = async function gitSmoke(window, installation, output) {
     await chooseText(desktop, '暂存所选（2）');
     await wait(desktop, 'document.querySelector(\'.git-file-row [aria-label="取消暂存 one.txt"]\')');
     assert.deepEqual(git('diff', '--cached', '--name-only').toString().trim().split(/\r?\n/), ['README.md', 'one.txt']);
+    await click(desktop, '.git-open-commit');
     await desktop(
       '(()=>{const field=document.querySelector("#git-message"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,"网页审阅样本"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
     );
-    const editorTop = () => desktop('document.querySelector("#git-message").getBoundingClientRect().top');
-    const beforePreview = await editorTop();
-    await click(desktop, '.git-staged-menu > button');
-    await wait(desktop, 'document.querySelector(".git-staged-menu :popover-open")?.textContent.includes("README.md")');
-    assert.equal(await editorTop(), beforePreview);
-    await click(desktop, '.git-staged-menu .action-popover button');
+    const actionTop = () => desktop('document.querySelector(".git-open-commit").getBoundingClientRect().top');
+    await click(desktop, '.git-review-staged');
+    await wait(desktop, 'document.activeElement.matches(\'.git-file-group[aria-label="已暂存"] h4\')');
+    await click(desktop, '.git-open-commit');
+    await wait(desktop, 'document.querySelector("#git-message")?.value === "网页审阅样本"');
     await click(desktop, '.git-submit-next');
     await wait(desktop, 'document.querySelector(".git-hero-main p")?.textContent.includes("网页审阅样本")');
     await wait(desktop, 'document.querySelector(".git-push-preview ul")?.textContent.includes("网页审阅样本")');
@@ -191,14 +194,14 @@ module.exports = async function gitSmoke(window, installation, output) {
     await wait(desktop, 'document.querySelector(".git-inspector h3, .git-inspector strong")?.textContent.includes("版本差异")');
     await wait(desktop, 'document.querySelector(".git-diff")?.textContent.includes("README.md")');
     await click(desktop, '.git-workspace button[aria-label="工作区"]');
-    await wait(desktop, 'document.querySelector("#git-message")');
-    const beforePublish = await editorTop();
+    await wait(desktop, 'document.querySelector(".git-open-commit")');
+    const beforePublish = await actionTop();
     await chooseText(desktop, '发布到网页');
     await click(desktop, '.confirm-dialog[open] .confirm-discard');
     await wait(desktop, 'document.querySelector(".git-repo-bar")?.textContent.includes("撤下共享")');
 
     assert.equal(await desktop('document.body.innerText.includes("发布仓库完成")'), false);
-    assert.equal(await editorTop(), beforePublish);
+    assert.equal(await actionTop(), beforePublish);
     const socket = net.createServer();
     await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port;
@@ -234,7 +237,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     );
     await click(web, '.portal-login button[type=submit]');
     await wait(web, 'document.querySelector(".git-hero h2")?.textContent === "main"');
-    assert.equal(await web('!!document.querySelector(".git-compose")'), false);
+    assert.equal(await web('!!document.querySelector(".git-open-commit, .git-push")'), false);
     await click(web, '.git-workspace button[aria-label="提交历史"]');
     await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Reviewed change")');
     assert.equal(await web('document.querySelectorAll(".git-commit-row").length'), 4);
@@ -270,6 +273,7 @@ module.exports = async function gitSmoke(window, installation, output) {
     await chooseText(desktop, '保存仓库权限');
     await wait(desktop, 'document.body.innerText.includes("仓库授权已保存")');
     services.git.edit = true;
+    services.git.sync = true;
     const restart = await desktop(
       'window.devkitProjects.request("start",' + JSON.stringify({ host: '127.0.0.1', port, services }) + ')',
     );
@@ -290,7 +294,7 @@ module.exports = async function gitSmoke(window, installation, output) {
       '(()=>{const field=document.querySelector(".portal-login input[type=password]"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(field,"git-smoke-only"); field.dispatchEvent(new Event("input",{bubbles:true}));})()',
     );
     await click(web, '.portal-login button[type=submit]');
-    await wait(web, 'document.querySelector("#git-message")');
+    await wait(web, 'document.querySelector(".git-open-commit")');
     await checkTextarea(web);
     await click(web, '.git-file-row [aria-label="暂存 review.txt"]');
     await click(web, '.git-file-group[aria-label="已暂存"] .git-path[title="review.txt"]');
@@ -301,6 +305,67 @@ module.exports = async function gitSmoke(window, installation, output) {
     await click(web, '.confirm-dialog[open] .confirm-discard');
     await wait(web, 'document.querySelector(".git-diff")?.textContent.includes("+Browser editor")');
     assert.equal(git('status', '--porcelain').toString().trim(), '');
+    const bulk = path.join(repo, 'many-files');
+    await fs.mkdir(bulk);
+    for (let start = 0; start < 1000; start += 50) {
+      await Promise.all(Array.from({ length: 50 }, (_, i) =>
+        fs.writeFile(path.join(bulk, String(start + i).padStart(4, '0') + '.txt'), 'staged\n')));
+    }
+    git('add', '--', 'many-files');
+    await fs.appendFile(path.join(repo, 'README.md'), 'long diff\n'.repeat(400));
+    await chooseText(web, '工作区');
+    for (const execute of [desktop, web]) {
+      await click(execute, '[aria-label="刷新仓库"]');
+      await wait(execute, 'document.querySelector(\'.git-file-group[aria-label="已暂存"] h4 small\')?.textContent === "1000"');
+      await wait(execute, 'document.querySelector(".git-diff")?.textContent.includes("long diff")');
+      const metrics = await execute(`(() => {
+        const box = selector => document.querySelector(selector).getBoundingClientRect();
+        const root = document.querySelector('.git-workspace').closest('.workspace, .portal-content');
+        if (root) root.scrollTop = 0;
+        const start = box('.git-working-layout').top;
+        const accessible = selector => {
+          const button = document.querySelector(selector), rect = button.getBoundingClientRect();
+          return rect.top >= 0 && rect.bottom <= innerHeight && button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+        };
+        const initiallyVisible = accessible('.git-open-commit') && accessible('.git-push');
+        const offsets = ['.git-open-commit', '.git-push'].map(selector => Math.round(box(selector).top - start));
+        const diff = document.querySelector('.git-diff');
+        diff.scrollTop = diff.scrollHeight;
+        diff.scrollIntoView({block:'end'});
+        const afterReview = accessible('.git-open-commit') && accessible('.git-push');
+        diff.scrollTop = 0;
+        if (root) root.scrollTop = 0;
+        return { width: innerWidth, height: innerHeight, fileRows: document.querySelectorAll('.git-file-row').length,
+          bothVisible: initiallyVisible && afterReview,
+          commit: offsets[0], push: offsets[1] };
+      })()`);
+      assert.ok(metrics.fileRows <= 51 && metrics.commit < 60 && metrics.push < 60 && metrics.bothVisible, JSON.stringify(metrics));
+      console.log('Git 1000 staged files', metrics);
+      const contents = (execute === desktop ? window : browser).webContents;
+      await fs.writeFile(path.join(output, execute === desktop ? 'git-many-files-desktop.png' : 'git-many-files-mobile.png'),
+        (await contents.capturePage()).toPNG());
+      await execute("document.querySelector('.git-open-commit').focus()");
+      contents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+      contents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+      await wait(execute, "document.activeElement.matches('.git-push')");
+      const group = '.git-file-group[aria-label="已暂存"] ';
+      await click(execute, group + '[aria-label="选择已暂存文件 many-files/0000.txt"]');
+      await click(execute, group + '[aria-label="下一页"]');
+      await click(execute, group + '[aria-label="选择已暂存文件 many-files/0050.txt"]');
+      await wait(execute, 'document.querySelector(' + JSON.stringify(group + '.git-batch-action') + ')?.textContent.includes("（2）")');
+      await click(execute, group + '[aria-label="上一页"]');
+      assert.equal(await execute('document.querySelector(' + JSON.stringify(group + '[aria-label="选择已暂存文件 many-files/0000.txt"]') + ').checked'), true);
+      await click(execute, group + 'header input');
+      await wait(execute, 'document.querySelector(' + JSON.stringify(group + '.git-batch-action') + ')?.textContent.includes("（51）")');
+      await click(execute, group + '.git-file-page-tools .text-button');
+      await wait(execute, 'document.querySelector(' + JSON.stringify(group + '.git-batch-action') + ')?.textContent.includes("（1000）")');
+      await click(execute, '.git-open-commit');
+      await wait(execute, 'document.activeElement.id === "git-message" && document.querySelector(".git-review-staged")?.textContent.includes("1000")');
+      await click(execute, '[aria-label="关闭提交窗口"]');
+    }
+    git('restore', '--staged', '--', 'many-files');
+    assert.equal(await fs.realpath(bulk), path.join(await fs.realpath(repo), 'many-files'));
+    await fs.rm(bulk, { recursive: true });
     const cloneParent = path.join(installation, 'clone-parent');
     await fs.mkdir(cloneParent);
     dialog.showOpenDialog = async () => ({ canceled:false, filePaths:[cloneParent] });

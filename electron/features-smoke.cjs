@@ -68,6 +68,28 @@ module.exports = async function featuresSmoke(window, output) {
   await click('用当前原文运行', pane);
   await wait(`document.querySelector('${pane} .devkit-panel')?.textContent.includes('2. JSON 路径提取 · 完成')`);
   await wait(`document.querySelector('${pane} .devkit-panel')?.textContent.includes('1. JSON 格式化 · 完成')`);
+  await js(`document.querySelector('${pane} .regression-cases').closest('details').open=true`);
+  await click('新增样例', pane);
+  for (const [steps, cases] of [[2, 1], [12, 30]]) {
+    for (let i = await js(`document.querySelectorAll('${pane} .recipe-step').length`); i < steps; i++) await click('追加步骤', pane);
+    for (let i = await js(`document.querySelectorAll('${pane} .case-rows > fieldset').length`); i < cases; i++) await click('新增样例', pane);
+    await wait(`document.activeElement === document.querySelector('${pane} .case-rows > fieldset:last-child textarea')`);
+    for (const width of [390, 1440]) {
+      window.setSize(width, 1000);
+      await wait(width < 400 ? 'innerWidth < 420' : 'innerWidth > 1200');
+      assert.ok(await js(`(() => {
+        const panel = document.querySelector('${pane} .recipe-panel');
+        const precedes = (action, list) => {
+          const r = action.getBoundingClientRect();
+          return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= list.getBoundingClientRect().top + 1;
+        };
+        const stepList = panel.querySelector('.recipe-steps'), caseList = panel.querySelector('.case-rows');
+        return precedes(panel.querySelector('.recipe-actions .run-button'), stepList)
+          && precedes(panel.querySelector('.regression-cases > button'), caseList)
+          && (${steps} < 12 || (stepList.scrollHeight > stepList.clientHeight && caseList.scrollHeight > caseList.clientHeight));
+      })()`), `Recipe controls with ${steps} steps and ${cases} cases at ${width}px`);
+    }
+  }
   await js('[...document.querySelectorAll(".tab-close")].forEach(button=>button.click())');
   await openTool('批量 Mock 数据'); await click('示例', `${pane} .input-card`); await fill(`${pane} .field-rules input`, '{"id":"sequence","name":"name"}');
   await click('生成 Mock 数据', pane); await wait(`!!document.querySelector('${pane} .status-success')`);
@@ -92,7 +114,11 @@ module.exports = async function featuresSmoke(window, output) {
     await editor('.http-request .cm-content', config); await fill('input[aria-label="请求名称"]', '本地回显');
     await click('发送请求', '.http-main'); await wait('document.querySelector(".http-response")?.textContent.includes("201")');
     assert.ok(await js('document.querySelector(".http-response .cm-content").textContent.includes("9007199254740993")'));
-    await click('保存请求', '.http-main'); await wait('document.querySelectorAll(".http-collection>div:not(.feature-toolbar)").length===1');
+    await click('保存请求', '.http-main'); await wait('document.querySelectorAll(".http-collection [data-motion-key]").length===1');
+    assert.ok(await js(`(() => {
+      const panel = document.querySelector('.http-collection');
+      return panel.querySelector('.feature-toolbar').getBoundingClientRect().bottom <= panel.querySelector('[data-motion-key]').getBoundingClientRect().top + 1;
+    })()`));
     await fill('input[aria-label="搜索请求集合"]', 'no such request');
     await wait('document.querySelector(".http-collection").innerText.includes("没有匹配的请求")');
     await fill('input[aria-label="搜索请求集合"]', '');
@@ -109,6 +135,38 @@ module.exports = async function featuresSmoke(window, output) {
     }
     window.setSize(1440, 1000); await js('document.documentElement.dataset.theme="light"');
     await js('document.querySelector(".http-sensitive input").click()'); await click('保存请求', '.http-main');
+    await js(`(() => {
+      const input = document.querySelector('input[aria-label="导入请求集合"]');
+      const data = JSON.parse(localStorage.getItem('devkit:http-collection'));
+      data.entries = Array.from({ length: 100 - data.entries.length }, (_, i) => ({
+        ...data.entries[0], id: 'record-' + i, name: '集合长列表 ' + i,
+      }));
+      const dt = new DataTransfer();
+      dt.items.add(new File([JSON.stringify(data)], 'collection.json'));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await click('合并导入', '.confirm-dialog');
+    for (const width of [1440, 390]) {
+      window.setSize(width, 1000);
+      await wait(width < 400 ? 'innerWidth < 420' : 'innerWidth > 1200');
+      if (width === 390) await js('document.querySelector(".http-collection-toggle").click()');
+      await wait('document.querySelector(".http-collection").offsetWidth > 0 && document.querySelectorAll(".http-collection [data-motion-key]").length === 10');
+      assert.ok(await js(`(() => {
+        const panel = document.querySelector('.http-collection');
+        const list = panel.querySelector('.http-collection-body'), toolbar = panel.querySelector('.feature-toolbar');
+        const offset = toolbar.getBoundingClientRect().top;
+        list.scrollTop = list.scrollHeight;
+        return panel.textContent.includes('100/100') && list.scrollTop > 0 && toolbar.getBoundingClientRect().top === offset;
+      })()`), 'Collection toolbar remains accessible at ' + width + 'px');
+      await js('document.querySelector(\'[aria-label="请求集合分页"] [aria-label="下一页"]\').click()');
+      await wait('document.querySelector(\'[aria-label="请求集合分页"]\').textContent.includes("2 / 10")');
+      await fill('input[aria-label="搜索请求集合"]', '集合长列表 98');
+      await wait('document.querySelectorAll(".http-collection [data-motion-key]").length === 1 && !document.querySelector(\'[aria-label="请求集合分页"]\')');
+      await fill('input[aria-label="搜索请求集合"]', '');
+      if (width === 390) await js('document.querySelector(\'[aria-label="关闭请求集合"]\').click()');
+    }
+    window.setSize(1440, 1000);
     assert.equal(await js('localStorage.getItem("devkit:http-collection").includes("secret-test")'), true);
     await editor('.http-request .cm-content', JSON.stringify({ url: base + '/slow' }));
     await click('发送请求', '.http-main'); await click('取消请求', '.http-main'); await wait('document.querySelector(".http-main .task-error")?.textContent.includes("取消")');

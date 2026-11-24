@@ -58,25 +58,6 @@ export default function GitStashes({
           <h3>贮藏记录</h3>
           <small>最近 {state.stashes.length} 条</small>
         </header>
-        <div className="git-rows">
-          {state.stashes.map((s) => (
-            <button
-              className="git-commit-row"
-              key={s.ref}
-              aria-pressed={s.id === current?.id}
-              onClick={() => select(s.id)}
-            >
-              <Archive size={15} />
-              <span>
-                <strong title={s.message}>{s.message}</strong>
-                <small>
-                  {s.ref} · {s.date.slice(0, 10)}
-                </small>
-              </span>
-            </button>
-          ))}
-          {!current && <p className="git-quiet">尚无贮藏记录。</p>}
-        </div>
         {edit && (
           <div className="git-compose">
             {current && (
@@ -107,6 +88,25 @@ export default function GitStashes({
             </MotionButton>
           </div>
         )}
+        <div className="git-rows">
+          {state.stashes.map((s) => (
+            <button
+              className="git-commit-row"
+              key={s.ref}
+              aria-pressed={s.id === current?.id}
+              onClick={() => select(s.id)}
+            >
+              <Archive size={15} />
+              <span>
+                <strong title={s.message}>{s.message}</strong>
+                <small>
+                  {s.ref} · {s.date.slice(0, 10)}
+                </small>
+              </span>
+            </button>
+          ))}
+          {!current && <p className="git-quiet">尚无贮藏记录。</p>}
+        </div>
       </section>
       <PatchView key={current?.id} portal={portal} id={id} stash={current?.id} generation={generation} />
     </div>

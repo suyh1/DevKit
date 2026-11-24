@@ -1,6 +1,6 @@
 import FloatingDetails from '../FloatingDetails';
 import { TextArea } from '../TextControl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Options } from '../tools';
 export type RegressionCase = { input: string; expected: string; step?: number };
 export function validCases(v: unknown): v is RegressionCase[] {
@@ -25,44 +25,56 @@ export function CaseList({
   change: (c: RegressionCase[]) => void;
   steps?: number;
 }) {
+  const list = useRef<HTMLDivElement>(null);
   return (
     <div className="regression-cases">
-      {cases.map((item, i) => (
-        <fieldset key={i}>
-          <legend>样例 {i + 1}</legend>
-          {(['input', 'expected'] as const).map((k) => (
-            <label key={k}>
-              {k === 'input' ? '输入' : '期望输出'}
-              <TextArea
-                value={item[k]}
-                onChange={(e) => change(cases.map((c, j) => (i === j ? { ...c, [k]: e.target.value } : c)))}
-              />
-            </label>
-          ))}
-          {steps && (
-            <label>
-              验证位置
-              <select
-                value={item.step ?? 0}
-                onChange={(e) =>
-                  change(cases.map((c, j) => (j === i ? { ...c, step: +e.target.value || undefined } : c)))
-                }
-              >
-                <option value="0">最终输出</option>
-                {Array.from({ length: steps }, (_, i) => (
-                  <option key={i} value={i + 1}>
-                    步骤 {i + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <button className="text-button" onClick={() => change(cases.filter((_, j) => i !== j))}>移除样例</button>
-        </fieldset>
-      ))}
-      <button className="secondary-button" disabled={cases.length >= 30} onClick={() => change([...cases, { input: '', expected: '' }])}>
+      <button
+        className="secondary-button"
+        disabled={cases.length >= 30}
+        onClick={() => {
+          change([...cases, { input: '', expected: '' }]);
+          requestAnimationFrame(() => list.current?.lastElementChild?.querySelector('textarea')?.focus());
+        }}
+      >
         新增样例
       </button>
+      <div className="case-rows" ref={list}>
+        {cases.map((item, i) => (
+          <fieldset key={i}>
+            <legend>样例 {i + 1}</legend>
+            {(['input', 'expected'] as const).map((k) => (
+              <label key={k}>
+                {k === 'input' ? '输入' : '期望输出'}
+                <TextArea
+                  value={item[k]}
+                  onChange={(e) => change(cases.map((c, j) => (i === j ? { ...c, [k]: e.target.value } : c)))}
+                />
+              </label>
+            ))}
+            {steps && (
+              <label>
+                验证位置
+                <select
+                  value={item.step ?? 0}
+                  onChange={(e) =>
+                    change(cases.map((c, j) => (j === i ? { ...c, step: +e.target.value || undefined } : c)))
+                  }
+                >
+                  <option value="0">最终输出</option>
+                  {Array.from({ length: steps }, (_, i) => (
+                    <option key={i} value={i + 1}>
+                      步骤 {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button className="text-button" onClick={() => change(cases.filter((_, j) => i !== j))}>
+              移除样例
+            </button>
+          </fieldset>
+        ))}
+      </div>
     </div>
   );
 }
@@ -103,9 +115,7 @@ export default function RegexCases({ options }: { options: Options }) {
                   .matches.map((m: { match: string }) => m.match)
                   .join('\n');
           results.push(
-            '样例 ' +
-              (i + 1) +
-              (actual === c.expected ? ' · 通过' : ' · 失败，实际输出：' + JSON.stringify(actual)),
+            '样例 ' + (i + 1) + (actual === c.expected ? ' · 通过' : ' · 失败，实际输出：' + JSON.stringify(actual)),
           );
         } catch (e) {
           results.push('样例 ' + (i + 1) + ' · ' + String(e));
@@ -129,7 +139,6 @@ export default function RegexCases({ options }: { options: Options }) {
     <FloatingDetails className="analysis-file" data-upgrade="regex" onToggle={(e) => toggle(e.currentTarget.open)}>
       <summary>正则回归样例</summary>
       <p>匹配模式每行填写一个期望匹配。替换模式填写替换后的全文。</p>
-      <CaseList cases={cases} change={change} />
       <button
         onClick={() => {
           try {
@@ -142,6 +151,7 @@ export default function RegexCases({ options }: { options: Options }) {
       >
         保存样例
       </button>
+      <CaseList cases={cases} change={change} />
       {rows.map((s, i) => (
         <pre key={i}>{s}</pre>
       ))}

@@ -353,6 +353,7 @@ export function detectTools(input: string): Suggestion[] {
       ...(command === 'merge' && argument && !argument.startsWith('-') && { branch: argument }),
       ...(historyPath && { path: unquote(historyPath) }),
       ...((staged || command === 'commit') && { staged: true }),
+      ...(command === 'commit' && { compose: true }),
       ...(file && { path: file }),
     };
     add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode,gitSeed });

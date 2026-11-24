@@ -2,12 +2,7 @@ import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import type { ApiEnvironment, ApiProject } from '../shared/api-workspace.mjs';
-import {
-  buildApiRequest,
-  validateRequestSchemas,
-  responseContract,
-  validateResponseSchema,
-} from './api-request';
+import { buildApiRequest, validateRequestSchemas, responseContract, validateResponseSchema } from './api-request';
 import { sendHttp, cancelHttp } from './http-api';
 import { newProjectId } from './project-api';
 import { canSendHttp, remoteAccess } from './workspace-remote';
@@ -48,9 +43,7 @@ export default function ApiRegression({
         Array.isArray(rows) &&
         rows.length &&
         rows.length <= 50 &&
-        rows.every(
-          (row) => row && ['id', 'status', 'pointer', 'variable'].every((k) => typeof row[k] === 'string'),
-        )
+        rows.every((row) => row && ['id', 'status', 'pointer', 'variable'].every((k) => typeof row[k] === 'string'))
       )
         return rows;
     } catch {
@@ -60,6 +53,7 @@ export default function ApiRegression({
   });
   const [report, setReport] = useState<string[]>([]),
     [notice, setNotice] = useState('');
+  const stepList = useRef<HTMLDivElement>(null);
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   function change(next: Step[]) {
@@ -146,55 +140,20 @@ export default function ApiRegression({
   return (
     <FloatingDetails className="devkit-panel api-regression">
       <summary>接口集合回归</summary>
+      {active.current && (
+        <button className="secondary-button" onClick={() => active.current?.abort()}>
+          停止回归
+        </button>
+      )}
       <fieldset disabled={sending}>
-        {steps.map((s, i) => (
-          <div className="devkit-fields regression-step" key={i}>
-            <label>
-              步骤 {i + 1}
-              <select value={s.id} onChange={(e) => patch(i, { id: e.target.value })}>
-                {!project.endpoints.some((e) => e.id === s.id) && <option value={s.id}>接口已移除</option>}
-                {project.endpoints.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.method} · {e.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              预期状态码
-              <TextInput
-                placeholder="按接口定义"
-                value={s.status}
-                maxLength={3}
-                onChange={(e) => patch(i, { status: e.target.value })}
-              />
-            </label>
-            <label>
-              提取响应字段
-              <TextInput
-                placeholder="/data/id"
-                value={s.pointer}
-                onChange={(e) => patch(i, { pointer: e.target.value })}
-              />
-            </label>
-            <label>
-              存为变量
-              <TextInput
-                placeholder="projectId"
-                value={s.variable}
-                onChange={(e) => patch(i, { variable: e.target.value })}
-              />
-            </label>
-            <button className="text-button" onClick={() => change(steps.filter((_, j) => j !== i))}>
-              移除步骤
-            </button>
-          </div>
-        ))}
         <div className="regression-actions">
           <button
             className="secondary-button"
             disabled={!project.endpoints.length || steps.length >= 50}
-            onClick={() => change([...steps, first(project.endpoints[0].id)])}
+            onClick={() => {
+              change([...steps, first(project.endpoints[0].id)]);
+              requestAnimationFrame(() => stepList.current?.lastElementChild?.querySelector('select')?.focus());
+            }}
           >
             追加接口
           </button>
@@ -220,17 +179,52 @@ export default function ApiRegression({
             依次发送并校验
           </button>
         </div>
+        <div className="regression-steps" ref={stepList}>
+          {steps.map((s, i) => (
+            <div className="devkit-fields regression-step" key={i}>
+              <label>
+                步骤 {i + 1}
+                <select value={s.id} onChange={(e) => patch(i, { id: e.target.value })}>
+                  {!project.endpoints.some((e) => e.id === s.id) && <option value={s.id}>接口已移除</option>}
+                  {project.endpoints.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.method} · {e.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                预期状态码
+                <TextInput
+                  placeholder="按接口定义"
+                  value={s.status}
+                  maxLength={3}
+                  onChange={(e) => patch(i, { status: e.target.value })}
+                />
+              </label>
+              <label>
+                提取响应字段
+                <TextInput
+                  placeholder="/data/id"
+                  value={s.pointer}
+                  onChange={(e) => patch(i, { pointer: e.target.value })}
+                />
+              </label>
+              <label>
+                存为变量
+                <TextInput
+                  placeholder="projectId"
+                  value={s.variable}
+                  onChange={(e) => patch(i, { variable: e.target.value })}
+                />
+              </label>
+              <button className="text-button" onClick={() => change(steps.filter((_, j) => j !== i))}>
+                移除步骤
+              </button>
+            </div>
+          ))}
+        </div>
       </fieldset>
-      {active.current && (
-        <button className="secondary-button" onClick={() => active.current?.abort()}>
-          停止回归
-        </button>
-      )}
-      <ol aria-live="polite">
-        {report.map((r, i) => (
-          <li key={i}>{r}</li>
-        ))}
-      </ol>
       {!!report.length && (
         <button
           className="secondary-button"
@@ -243,6 +237,11 @@ export default function ApiRegression({
           导出运行报告
         </button>
       )}
+      <ol aria-live="polite">
+        {report.map((r, i) => (
+          <li key={i}>{r}</li>
+        ))}
+      </ol>
       <p role="status">{notice}</p>
     </FloatingDetails>
   );

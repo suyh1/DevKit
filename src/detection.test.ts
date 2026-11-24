@@ -57,7 +57,7 @@ describe('推荐顺序和打开方式', () => {
       ['git diff --cached -- src/unit.ts', { mode: 'changes', staged: true, path: 'src/unit.ts' }],
       ['git add a.ts b.ts', { mode: 'changes' }],
       ['git diff -S needle', { mode: 'changes' }],
-      ['git commit', { mode: 'changes', staged: true }],
+      ['git commit', { mode: 'changes', staged: true, compose: true }],
       ['git log --graph --decorate --all', { mode: 'history' }],
     ] as const) {
       const match = detectTools(input)[0];

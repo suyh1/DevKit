@@ -40,6 +40,7 @@ export default function ToolRecipes({ input }: { input: string }) {
   const [report, setReport] = useState<{ name: string; input: string; output: string; error?: string }[]>([]);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
+  const stepList = useRef<HTMLDivElement>(null);
   const interrupted = useRef(false);
   const cancel = useRef<(() => void) | undefined>(undefined);
   useEffect(
@@ -100,10 +101,7 @@ export default function ToolRecipes({ input }: { input: string }) {
     setReport([]);
     setMessage('');
     try {
-      for (const [index, test] of (regression
-        ? cases
-        : [{ input, expected: '', step: undefined }]
-      ).entries()) {
+      for (const [index, test] of (regression ? cases : [{ input, expected: '', step: undefined }]).entries()) {
         if (interrupted.current) break;
         let value = test.input;
         for (const [si, step] of steps.entries()) {
@@ -133,9 +131,7 @@ export default function ToolRecipes({ input }: { input: string }) {
                   (si + 1) +
                   ' ' +
                   label(step.tool) +
-                  (output === test.expected
-                    ? ' · 通过'
-                    : ' · 失败，实际 ' + JSON.stringify(output.slice(0, 200))),
+                  (output === test.expected ? ' · 通过' : ' · 失败，实际 ' + JSON.stringify(output.slice(0, 200))),
               );
               break;
             }
@@ -143,14 +139,7 @@ export default function ToolRecipes({ input }: { input: string }) {
             results.push({ name: label(step.tool), input: value, output: '', error: String(error) });
             if (regression)
               notices.push(
-                '样例 ' +
-                  (index + 1) +
-                  ' · 步骤 ' +
-                  (si + 1) +
-                  ' ' +
-                  label(step.tool) +
-                  ' · ' +
-                  String(error),
+                '样例 ' + (index + 1) + ' · 步骤 ' + (si + 1) + ' ' + label(step.tool) + ' · ' + String(error),
               );
             break;
           }
@@ -173,6 +162,17 @@ export default function ToolRecipes({ input }: { input: string }) {
       }}
     >
       <summary>工具处理流程</summary>
+      {busy && (
+        <button
+          className="secondary-button"
+          onClick={() => {
+            interrupted.current = true;
+            cancel.current?.();
+          }}
+        >
+          取消流程
+        </button>
+      )}
       {open && (
         <fieldset disabled={busy}>
           <div className="recipe-library">
@@ -207,57 +207,14 @@ export default function ToolRecipes({ input }: { input: string }) {
               </button>
             </div>
           </div>
-          {steps.map((step, i) => (
-            <section className="recipe-step" key={i} aria-label={`步骤 ${i + 1}`}>
-              <header>
-                <label>
-                  步骤 {i + 1}
-                  <select
-                    value={step.tool}
-                    onChange={(e) =>
-                      change(steps.map((s, j) => (i === j ? makeStep(e.target.value as ToolId) : s)))
-                    }
-                  >
-                    {allowed.map((id) => (
-                      <option value={id} key={id}>
-                        {label(id)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  className="text-button"
-                  aria-label={`移除步骤 ${i + 1}`}
-                  disabled={steps.length === 1}
-                  onClick={() => change(steps.filter((_, j) => i !== j))}
-                >
-                  移除此步
-                </button>
-              </header>
-              <ToolOptions
-                toolId={step.tool}
-                options={step.options}
-                busy={busy}
-                onChange={(key, value) =>
-                  change(
-                    steps.map((s, j) => (i === j ? { ...s, options: { ...s.options, [key]: value } } : s)),
-                  )
-                }
-              />
-            </section>
-          ))}
-          <FloatingDetails>
-            <summary>流程回归样例</summary>
-            <CaseList cases={cases} change={setCases} steps={steps.length} />
-            <button className="secondary-button" disabled={!cases.length} onClick={() => void run(true)}>
-              运行全部样例
-            </button>
-          </FloatingDetails>
           <div className="recipe-actions">
             <button
               className="secondary-button"
               disabled={steps.length >= 12}
-              onClick={() => change([...steps, makeStep('json-path')])}
+              onClick={() => {
+                change([...steps, makeStep('json-path')]);
+                requestAnimationFrame(() => stepList.current?.lastElementChild?.querySelector('select')?.focus());
+              }}
             >
               追加步骤
             </button>
@@ -265,17 +222,51 @@ export default function ToolRecipes({ input }: { input: string }) {
               用当前原文运行
             </button>
           </div>
+          <div className="recipe-steps" ref={stepList}>
+            {steps.map((step, i) => (
+              <section className="recipe-step" key={i} aria-label={`步骤 ${i + 1}`}>
+                <header>
+                  <label>
+                    步骤 {i + 1}
+                    <select
+                      value={step.tool}
+                      onChange={(e) => change(steps.map((s, j) => (i === j ? makeStep(e.target.value as ToolId) : s)))}
+                    >
+                      {allowed.map((id) => (
+                        <option value={id} key={id}>
+                          {label(id)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="text-button"
+                    aria-label={`移除步骤 ${i + 1}`}
+                    disabled={steps.length === 1}
+                    onClick={() => change(steps.filter((_, j) => i !== j))}
+                  >
+                    移除此步
+                  </button>
+                </header>
+                <ToolOptions
+                  toolId={step.tool}
+                  options={step.options}
+                  busy={busy}
+                  onChange={(key, value) =>
+                    change(steps.map((s, j) => (i === j ? { ...s, options: { ...s.options, [key]: value } } : s)))
+                  }
+                />
+              </section>
+            ))}
+          </div>
+          <FloatingDetails>
+            <summary>流程回归样例</summary>
+            <button className="secondary-button" disabled={!cases.length} onClick={() => void run(true)}>
+              运行全部样例
+            </button>
+            <CaseList cases={cases} change={setCases} steps={steps.length} />
+          </FloatingDetails>
         </fieldset>
-      )}
-      {busy && (
-        <button className="secondary-button"
-          onClick={() => {
-            interrupted.current = true;
-            cancel.current?.();
-          }}
-        >
-          取消流程
-        </button>
       )}
       <pre role="status">{message}</pre>
       {report.map((row, i) => (
@@ -289,13 +280,19 @@ export default function ToolRecipes({ input }: { input: string }) {
               <pre>{row.input.slice(0, previewLimit)}</pre>
             </figure>
             <figure>
-              <figcaption>{row.error ? '错误' : '输出'}{previewLength(row.output)}</figcaption>
+              <figcaption>
+                {row.error ? '错误' : '输出'}
+                {previewLength(row.output)}
+              </figcaption>
               {row.error && <p className="task-error">{row.error}</p>}
               <pre>{row.output.slice(0, previewLimit)}</pre>
             </figure>
           </div>
           {!row.error && (
-            <MotionButton variant="copy" className="secondary-button" aria-label="复制完整输出"
+            <MotionButton
+              variant="copy"
+              className="secondary-button"
+              aria-label="复制完整输出"
               onClick={() =>
                 void copyText(row.output)
                   .then(() => setMessage('已复制完整结果'))

@@ -158,8 +158,19 @@
   display: block !important;
 }
 .http-collection {
-  max-height: calc(100vh - 240px);
+  display: flex;
+  flex-direction: column;
+  max-height: max(16rem, calc(100dvh - 240px));
+}
+.http-collection > :not(.http-collection-body) {
+  flex-shrink: 0;
+}
+.http-collection-body {
+  min-height: 0;
   overflow: auto;
+}
+.pc-dialog .http-collection {
+  max-height: min(70dvh, 600px);
 }
 .http-collection-toggle {
   display: none;

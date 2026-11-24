@@ -1,4 +1,5 @@
 import { OptionalPanel } from './project-components';
+import ResultPager from './ResultPager';
 import { TextInput } from './TextControl';
 import type { Notify } from './ToastStack';
 import { navigateTabList } from './tab-navigation';
@@ -24,6 +25,7 @@ import './features.css';
 
 const example = '{\n  "method": "GET",\n  "url": "http://127.0.0.1:8080/",\n  "headers": {}\n}';
 const storageKey = 'devkit:http-collection';
+const collectionPageSize = 10;
 function initialCollection() {
   try {
     const text = localStorage.getItem(storageKey);
@@ -85,7 +87,8 @@ export default function HttpWorkbench({
   const collectionId = useId();
   const collectionToggle = useRef<HTMLButtonElement>(null);
   const [collectionOpen, setCollectionOpen] = useState(false);
-  useMotionList(collection, entries.map((entry) => entry.id).join('|'));
+  const [requestedPage, setRequestedPage] = useState(0);
+  const collectionBody = useRef<HTMLElement>(null);
   const confirm = useConfirmation();
   const dirty =
     invalidDraft || !!multipart ||
@@ -257,6 +260,13 @@ export default function HttpWorkbench({
     }
   }
   const matchingEntries = entries.filter(entry => (entry.name + entry.config).toLowerCase().includes(search.toLowerCase()));
+  const pages = Math.max(1, Math.ceil(matchingEntries.length / collectionPageSize));
+  const page = Math.min(requestedPage, pages - 1);
+  const pageEntries = matchingEntries.slice(page * collectionPageSize, (page + 1) * collectionPageSize);
+  useMotionList(collectionBody, pageEntries.map((entry) => entry.id).join('|'), !!search);
+  useEffect(() => {
+    if (collectionBody.current) collectionBody.current.scrollTop = 0;
+  }, [page, search]);
   return (
     <><div className="http-workspace-topline"><div className="http-product-tabs" role="tablist" onKeyDown={navigateTabList} aria-label="HTTP工作台模式"><button role="tab" aria-selected={workspaceMode==='api'} tabIndex={workspaceMode==='api' ? 0 : -1} disabled={!!running} onClick={()=>setWorkspaceMode('api')}>接口项目</button><button role="tab" aria-selected={workspaceMode==='quick'} tabIndex={workspaceMode==='quick' ? 0 : -1} disabled={apiBusy} onClick={()=>setWorkspaceMode('quick')}>快速请求</button></div></div><div hidden={workspaceMode!=='api'} inert={workspaceMode!=='api'}><ApiWorkspace active={active} showApi={() => setWorkspaceMode('api')} onBusy={setApiBusy} onGenerate={onGenerate} onNotice={onNotice}/></div><section className="http-workbench" hidden={workspaceMode!=='quick'} inert={workspaceMode!=='quick'}>
       <div className="page-heading workspace-banner">
@@ -296,33 +306,11 @@ export default function HttpWorkbench({
             aria-label="搜索请求集合"
             placeholder="搜索集合…"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setRequestedPage(0);
+            }}
           />
-          {matchingEntries.map((entry) => (
-              <div className={selected === entry.id ? 'selected' : ''} key={entry.id} data-motion-key={entry.id}>
-                <button
-                  disabled={!!running}
-                  onClick={() =>
-                    void allowReplace().then((allow) => {
-                      if (allow) reset(entry.config, entry.name, entry.timeout, entry.id, entry.sensitive);
-                    })
-                  }
-                >
-                  {entry.name}
-                  <small>{entry.sensitive ? '含明文请求数据' : '已排除鉴权与正文'}</small>
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label={`删除请求 ${entry.name}`}
-                  disabled={!!running}
-                  onClick={() => void remove(entry)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          {!!entries.length && !matchingEntries.length && <p role="status" className="preview-note">没有匹配的请求。</p>}
-          {!entries.length && <p className="preview-note">保存常用请求后，可在这里切换。</p>}
           <div className="feature-toolbar">
             <button
               className="text-button"
@@ -371,33 +359,61 @@ export default function HttpWorkbench({
               })();
             }}
           />
-          <section className="http-history">
-            <h3>
-              会话历史 <small>{history.length}/20 · 仅内存</small>
-            </h3>
-            {history.length > 0 && (
-              <button className="text-button" onClick={() => setHistory([])}>
-                清空历史
-              </button>
-            )}
-            {history.map((item) => (
-              <button
-                key={item.id}
-                disabled={!!running}
-                onClick={() =>
-                  void allowReplace().then((allow) => {
-                    if (allow) reset(item.config, item.name, item.timeout);
-                  })
-                }
-              >
-                <strong>
-                  {item.method} · {item.status}
-                </strong>
-                <small>{item.url}</small>
-                <small>{item.time} · 点击恢复请求</small>
-              </button>
+          <ResultPager page={page} pages={pages} onPage={setRequestedPage} label="请求集合分页" />
+          <section ref={collectionBody} className="http-collection-body" aria-label="保存的请求与会话历史">
+            {pageEntries.map((entry) => (
+              <div className={selected === entry.id ? 'selected' : ''} key={entry.id} data-motion-key={entry.id}>
+                <button
+                  disabled={!!running}
+                  onClick={() =>
+                    void allowReplace().then((allow) => {
+                      if (allow) reset(entry.config, entry.name, entry.timeout, entry.id, entry.sensitive);
+                    })
+                  }
+                >
+                  {entry.name}
+                  <small>{entry.sensitive ? '含明文请求数据' : '已排除鉴权与正文'}</small>
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label={`删除请求 ${entry.name}`}
+                  disabled={!!running}
+                  onClick={() => void remove(entry)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
-            {!history.length && <p className="preview-note">发送后记录最近 20 次请求。</p>}
+            {!!entries.length && !matchingEntries.length && <p role="status" className="preview-note">没有匹配的请求。</p>}
+            {!entries.length && <p className="preview-note">保存常用请求后，可在这里切换。</p>}
+            <section className="http-history">
+              <h3>
+                会话历史 <small>{history.length}/20 · 仅内存</small>
+              </h3>
+              {history.length > 0 && (
+                <button className="text-button" onClick={() => setHistory([])}>
+                  清空历史
+                </button>
+              )}
+              {history.map((item) => (
+                <button
+                  key={item.id}
+                  disabled={!!running}
+                  onClick={() =>
+                    void allowReplace().then((allow) => {
+                      if (allow) reset(item.config, item.name, item.timeout);
+                    })
+                  }
+                >
+                  <strong>
+                    {item.method} · {item.status}
+                  </strong>
+                  <small>{item.url}</small>
+                  <small>{item.time} · 点击恢复请求</small>
+                </button>
+              ))}
+              {!history.length && <p className="preview-note">发送后记录最近 20 次请求。</p>}
+            </section>
           </section>
         </aside></OptionalPanel>
         <div className="http-main">

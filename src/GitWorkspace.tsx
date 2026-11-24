@@ -1,5 +1,5 @@
 import { TextArea } from './TextControl';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Archive,
   ArrowDown,
@@ -26,7 +26,7 @@ import { useCardLight } from './tool-card-motion';
 import GitFileGroup from './GitFileGroup';
 import GitStashes from './GitStashes';
 import { createPortal } from 'react-dom';
-import ActionPopover from './ActionPopover';
+import { Modal, ModalForm } from './project-components';
 import { ToastStack, type Notice } from './ToastStack';
 import GitDelivery from './GitDelivery';
 import { FileReview, ConflictReview } from './GitReview';
@@ -81,17 +81,23 @@ function Changes({
 }) {
   const [selection, select] = useState({ path: seed?.path ?? '', staged: !!seed?.staged });
   const [query, setQuery] = useState('');
+  const [composing, setComposing] = useState(!!seed?.compose && edit && !state.mergeHead);
+  const stagedHeading = useRef<HTMLHeadingElement>(null);
   // Keep the reviewed bytes bound to the view that displayed them, including partially staged files.
   const reviewed = useRef(new Map<string, string>());
   const rememberReview = useCallback((path: string, staged: boolean, token: string) => {
     reviewed.current.set((staged ? 'index:' : 'work:') + path, token);
   }, []);
-  const groups = [false, true].map((staged) => {
-    const all = state.files.filter((file) =>
-      staged ? file.index !== '.' && !file.conflict : file.work !== '.' || file.conflict,
-    );
-    return { staged, all, visible: all.filter((file) => file.path.toLowerCase().includes(query.toLowerCase())) };
-  });
+  const groups = useMemo(
+    () =>
+      [false, true].map((staged) => {
+        const all = state.files.filter((file) =>
+          staged ? file.index !== '.' && !file.conflict : file.work !== '.' || file.conflict,
+        );
+        return { staged, all, visible: all.filter((file) => file.path.toLowerCase().includes(query.toLowerCase())) };
+      }),
+    [state.files, query],
+  );
   const items = groups.flatMap((group) => group.visible.map((file) => ({ file, staged: group.staged })));
   const current =
     items.find((i) => i.staged === selection.staged && i.file.path === selection.path) ??
@@ -119,6 +125,7 @@ function Changes({
   const commit = async (preview = false) => {
     if (canCommit && (await mutate('commit', { message }, '已提交到 ' + state.branch))) {
       setMessage('');
+      setComposing(false);
       if (preview) onPreviewPush?.();
     }
   };
@@ -127,6 +134,87 @@ function Changes({
     : null;
   return (
     <div className="git-working-layout devkit-bento">
+      {((edit && !state.mergeHead) || delivery) && (
+        <div className="git-command-strip" role="group" aria-label="提交与推送">
+          {edit && !state.mergeHead && (
+            <MotionButton
+              className="run-button git-open-commit"
+              aria-label={`提交暂存区（${stagedCount} 个文件）`}
+              aria-haspopup="dialog"
+              disabled={busy}
+              onClick={() => setComposing(true)}
+            >
+              <GitCommitHorizontal size={16} />
+              提交… <span>{stagedCount}</span>
+            </MotionButton>
+          )}
+          {delivery}
+        </div>
+      )}
+      {composing && edit && !state.mergeHead && (
+        <Modal
+          title={'提交到 ' + branchName(state)}
+          closeLabel="关闭提交窗口"
+          className="git-commit-dialog"
+          close={() => setComposing(false)}
+          busy={busy}
+        >
+          <ModalForm
+            className="git-commit-desk"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void commit();
+            }}
+            footer={
+              <footer className="pc-form-footer">
+                <MotionButton type="submit" className="run-button" disabled={!canCommit} title="Ctrl / ⌘ + Enter">
+                  <GitCommitHorizontal size={16} />
+                  提交到 {branchName(state)}
+                </MotionButton>
+                {onPreviewPush && (
+                  <button
+                    type="button"
+                    className="text-button git-submit-next"
+                    disabled={!canCommit}
+                    onClick={() => void commit(true)}
+                  >
+                    提交后预览推送 →
+                  </button>
+                )}
+              </footer>
+            }
+          >
+            <button
+              type="button"
+              className="text-button git-review-staged"
+              disabled={!stagedCount || busy}
+              onClick={() => {
+                setComposing(false);
+                setQuery('');
+                select({ path: groups[1].all[0].path, staged: true });
+                requestAnimationFrame(() => stagedHeading.current?.focus());
+              }}
+            >
+              已暂存 {stagedCount} 个文件{stagedCount ? ' · 查看文件' : ''}
+            </button>
+            <label htmlFor="git-message">提交说明</label>
+            <TextArea
+              id="git-message"
+              data-modal-focus
+              placeholder="概括这次提交的改动…"
+              value={message}
+              maxLength={8000}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  void commit();
+                }
+              }}
+            />
+          </ModalForm>
+        </Modal>
+      )}
       <section className="git-panel git-files-panel">
         <header>
           <h3>
@@ -142,12 +230,13 @@ function Changes({
             />
           )}
         </header>
-        <div className="git-rows">
+        <div className="git-file-groups">
           {groups.map(({ staged, visible }) => (
             <GitFileGroup
               key={JSON.stringify([staged, query])}
               files={visible}
               staged={staged}
+              headingRef={staged ? stagedHeading : undefined}
               activePath={current?.staged === staged ? current.file.path : undefined}
               edit={edit}
               busy={busy}
@@ -178,74 +267,6 @@ function Changes({
           <p className="git-quiet">选择变更文件后可审阅差异。</p>
         </article>
       )}
-      {edit && !state.mergeHead && (
-        <form
-          className="git-compose git-commit-desk"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void commit();
-          }}
-        >
-          <div className="git-commit-destination">
-            <GitCommitHorizontal size={19} />
-            <div>
-              <small>提交到本地分支</small>
-              <strong>{branchName(state)}</strong>
-            </div>
-            <ActionPopover
-              className="git-staged-menu"
-              triggerClassName="text-button"
-              label="查看已暂存文件"
-              trigger={'已暂存 ' + stagedCount + ' 个文件'}
-            >
-              {groups[1].all.map((file) => (
-                <button
-                  type="button"
-                  key={file.path}
-                  onClick={() => {
-                    setQuery('');
-                    select({ staged: true, path: file.path });
-                  }}
-                >
-                  {file.path}
-                </button>
-              ))}
-              {!stagedCount && <small>在文件列表中选择要暂存的改动。</small>}
-            </ActionPopover>
-          </div>
-          <label htmlFor="git-message">提交说明</label>
-          <div className="git-commit-controls">
-            <TextArea
-              id="git-message"
-              placeholder="概括这次提交的改动…"
-              value={message}
-              maxLength={8000}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  void commit();
-                }
-              }}
-            />
-            <MotionButton type="submit" className="run-button" disabled={!canCommit} title="Ctrl / ⌘ + Enter">
-              <GitCommitHorizontal size={16} />
-              提交到 {branchName(state)}
-            </MotionButton>
-          </div>
-          {onPreviewPush && (
-            <button
-              type="button"
-              className="text-button git-submit-next"
-              disabled={!canCommit}
-              onClick={() => void commit(true)}
-            >
-              提交后预览推送 →
-            </button>
-          )}
-        </form>
-      )}
-      {delivery}
     </div>
   );
 }
@@ -299,6 +320,29 @@ function References({
             { value: 'tags', label: '标签' },
           ]}
         />
+        {edit && kind !== 'remotes' && (
+          <form
+            className="git-compose"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (await mutate(kind === 'tags' ? 'tag' : 'create-branch', { name: name.trim() }, '引用已创建'))
+                setName('');
+            }}
+          >
+            <label htmlFor="git-reference">从当前提交创建{kind === 'tags' ? '标签' : '分支'}</label>
+            <input
+              id="git-reference"
+              placeholder={kind === 'tags' ? 'v1.0.0' : 'feature/search'}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={240}
+            />
+            <MotionButton className="secondary-button" disabled={!state.head || !name.trim() || busy}>
+              <Plus size={15} />
+              创建{kind === 'tags' ? '标签' : '分支'}
+            </MotionButton>
+          </form>
+        )}
         <div className="git-rows">
           {refs.map((r) => (
             <div className="git-ref" key={r.name}>
@@ -327,29 +371,6 @@ function References({
           ))}
           {!refs.length && <p className="git-quiet">暂无此类引用。</p>}
         </div>
-        {edit && kind !== 'remotes' && (
-          <form
-            className="git-compose"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (await mutate(kind === 'tags' ? 'tag' : 'create-branch', { name: name.trim() }, '引用已创建'))
-                setName('');
-            }}
-          >
-            <label htmlFor="git-reference">从当前提交创建{kind === 'tags' ? '标签' : '分支'}</label>
-            <input
-              id="git-reference"
-              placeholder={kind === 'tags' ? 'v1.0.0' : 'feature/search'}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={240}
-            />
-            <MotionButton className="secondary-button" disabled={!state.head || !name.trim() || busy}>
-              <Plus size={15} />
-              创建{kind === 'tags' ? '标签' : '分支'}
-            </MotionButton>
-          </form>
-        )}
       </section>
       <section className="git-panel git-sync">
         <header>
@@ -584,8 +605,8 @@ function RepositoryView({
             busy={busy || loading}
             mutate={mutate}
           />
-          <References state={state} edit={edit} sync={sync} busy={busy || loading} mutate={mutate} />
           {delivery}
+          <References state={state} edit={edit} sync={sync} busy={busy || loading} mutate={mutate} />
         </>
       )}
     </>

@@ -471,6 +471,8 @@
   justify-self: start;
 }
 .collab-pending {
+  max-block-size: min(32dvh, 280px);
+  overflow: auto;
   display: grid;
   gap: 4px;
 }

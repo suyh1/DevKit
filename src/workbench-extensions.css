@@ -134,7 +134,8 @@
 .recipe-step .option { min-width: 0; max-width: 100%; }
 .recipe-step .field-path { flex: 1 1 16rem; }
 .recipe-step .field-path input { flex: 1; width: auto; min-width: 0; }
-.recipe-actions { justify-content: flex-end; }
+.case-rows, .recipe-steps { display: grid; gap: 8px; max-block-size: min(48dvh, 460px); overflow: auto; }
+.recipe-actions { justify-content: flex-start; }
 .recipe-actions button { height: 36px; font-size: 12px; }
 @media (max-width: 700px) {
   .recipe-library { grid-template-columns: minmax(0, 1fr); }

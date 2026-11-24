@@ -452,6 +452,34 @@ module.exports = async function collaborationSmoke(window, output) {
       }
     }
     await capture('collab-transfer-compose-mobile');
+    const sendOffset = () => web(`(() => {
+      const panel = document.querySelector("${current}.collab-compose");
+      return panel.querySelector('.transfer-submit').getBoundingClientRect().top - panel.getBoundingClientRect().top;
+    })()`);
+    const widths = [1120, 390];
+    const emptyOffsets = new Map();
+    for (const width of widths) {
+      browser.setContentSize(width, 844);
+      await wait(web, 'innerWidth === ' + width);
+      emptyOffsets.set(width, await sendOffset());
+    }
+    await web(`(() => {
+      const input = document.querySelector('${current}.collab-compose input[type=file]');
+      const dt = new DataTransfer();
+      for (let i = 0; i < 95; i++) dt.items.add(new File(['x'], 'queue-' + i + '.txt'));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', {bubbles:true}));
+    })()`);
+    await wait(web, "document.querySelectorAll('.collab-pending > div').length === 30");
+    for (const width of widths) {
+      browser.setContentSize(width, 844);
+      await wait(web, 'innerWidth === ' + width);
+      assert.ok(Math.abs(await sendOffset() - emptyOffsets.get(width)) <= 1, 'Send stays in place at ' + width + 'px');
+    }
+    await web("document.querySelector('[aria-label=待发送文件分页] [aria-label=下一页]').click()");
+    await wait(web, "!!document.querySelector('[aria-label=\"取消选择 queue-30.txt\"]')");
+    await web(`document.querySelector('[aria-label="取消选择 queue-30.txt"]').click()`);
+    await wait(web, "document.querySelector('.portal-page:not([hidden]) .send-summary')?.textContent.includes('94 个文件')");
     await click(web, current + '.transfer-switch ', '收件箱');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden]) .collab-inbox").offsetWidth');
     await web('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');

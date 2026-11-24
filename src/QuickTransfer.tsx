@@ -3,6 +3,7 @@ import { Modal as WorkspaceDialog } from './project-components';
 import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import { fileDigest, uploadIdentity } from './file-digest';
+import ResultPager from './ResultPager';
 import SegmentedControl from './SegmentedControl';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -78,6 +79,10 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
     [pickup, setPickup] = useState('');
   const [revealed, setRevealed] = useState<{ id: string; text: string }>();
   const [files, setFiles] = useState<File[]>([]);
+  const [queuePage, setQueuePage] = useState(0);
+  const pageSize = 30;
+  const queuePages = Math.ceil(files.length / pageSize);
+  const page = Math.min(queuePage, Math.max(0, queuePages - 1));
   const [dragging, setDragging] = useState(false);
   const [fileIssue, setFileIssue] = useState<{ file: File; message: string }>();
   const [direct, setDirect] = useState(true);
@@ -118,6 +123,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
   }, [active]);
   function choose(selected: File[]) {
     if (!edit || op.busy) return;
+    if (!files.length || fileIssue) setQueuePage(0);
     setFiles(current => {
       const remaining = [...selected];
       const next = current.map(file => {
@@ -184,6 +190,7 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
             await collab('transfer', 'part', { id, offset, data });
           }
           if (cancelled.current) {
+            setQueuePage(0);
             setFileIssue({file, message: '已暂停，再次发送可续传。'});
             break;
           }
@@ -210,7 +217,10 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
         else if (direct) detail = '请保持此页面在线。';
       } catch (failure) {
         const reason = failure instanceof Error ? failure.message : String(failure);
-        if (currentFile) setFileIssue({ file: currentFile, message: reason });
+        if (currentFile) {
+          setQueuePage(0);
+          setFileIssue({ file: currentFile, message: reason });
+        }
         detail = currentFile ? `${currentFile.name}：${reason}` : reason;
       } finally {
         setProgress('');
@@ -294,24 +304,6 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
               e.target.value = '';
             }}
           />
-          {!!files.length && (
-            <div className="collab-pending">
-              {files.map((file, i) => (
-                <div key={i}>
-                  <span>
-                    <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}{fileIssue?.file === file && <small>{fileIssue.message}</small>}
-                  </span>
-                  <button
-                    disabled={op.busy}
-                    aria-label={'取消选择 ' + file.name}
-                    onClick={() => setFiles((current) => current.filter((_, index) => index !== i))}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
           {!direct && (
             <label className="transfer-note">
               文字或链接
@@ -373,6 +365,27 @@ export function QuickTransfer({ active, edit, directory, origin, quickLink = fal
                 暂停上传
               </button>
             </p>
+          )}
+          {!!files.length && (
+            <section aria-label="待发送文件">
+              <ResultPager label="待发送文件分页" page={page} pages={queuePages} onPage={setQueuePage} />
+              <div className="collab-pending" key={page}>
+                {files.slice(page * pageSize, (page + 1) * pageSize).map((file, i) => (
+                  <div key={i}>
+                    <span>
+                      <Paperclip size={15} /> {file.name} · {sizeOf(file.size)}{fileIssue?.file === file && <small>{fileIssue.message}</small>}
+                    </span>
+                    <button
+                      disabled={op.busy}
+                      aria-label={'取消选择 ' + file.name}
+                      onClick={() => setFiles((current) => current.filter((_, index) => index !== page * pageSize + i))}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </section>
       )}

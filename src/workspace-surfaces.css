@@ -61,7 +61,7 @@
 .project-center .pc-profile.selected,
 .ng-center .ng-instance.selected,
 .api-workspace .api-tree-item.selected,
-.http-workbench .http-collection > div.selected,
+.http-collection-body > div.selected,
 .log-center .log-source-item.selected {
   box-shadow: inset 2px 0 var(--accent);
 }
