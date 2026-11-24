@@ -3,7 +3,7 @@ import { TextArea, TextInput } from './TextControl';
 import type { ServiceDraft } from './detection';
 import Skeleton from './Skeleton';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ServerCog, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, X, Search } from 'lucide-react';
+import { ServerCog, Plus, RefreshCw, Play, Square, Settings2, Trash2, FileText, FolderOpen, Upload, X, Search } from 'lucide-react';
 import { MotionButton } from './Motion';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
@@ -318,7 +318,6 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           {(!remoteAccess() || remoteAccess()?.services?.projects.enabled) && <button className="text-button" onClick={() => setProjectService(item)}>关联项目</button>}
           <RelatedLink page="monitor" id={`source:jar:${item.id}`}>关联监控</RelatedLink>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
-          {item.kind !== 'npm' && (item.hostId ? group.fileReplacement : state?.fileReplacement) && <button className="text-button" disabled={busy || !write || !control} onClick={() => setReplacement(item)}>替换服务文件</button>}
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
           <button className="text-button" disabled={busy} onClick={() => setStartup(item)}><Play size={14} />系统自启</button>
           <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: `目标主机 ${hostName}。只移除列表记录，保留服务文件、日志与运行文件。移除前需关闭系统自启。`, confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
@@ -336,6 +335,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
         <td><div className="jar-row-actions">
           <button className="text-button" disabled={busy || !control || !stopped || status.fileMissing} onClick={() => void command(item, 'start')}><Play size={14} />启动</button>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
+          {item.kind !== 'npm' && (item.hostId ? group.fileReplacement : state?.fileReplacement) && <button className="text-button" disabled={busy || !write || !control} onClick={() => setReplacement(item)}><Upload size={14} />替换服务文件</button>}
           {readLogs && <button className="text-button" disabled={busy} onClick={() => { if (item.logMode === 'console') setConsoleId(consoleId === item.id ? '' : item.id); else { setLog(null); setLogError(''); setLogId(logId === item.id ? '' : item.id); } }}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
         </div><FloatingDetails className="jar-advanced"><summary>更多操作与运行详情</summary>{narrow && <><p>{serviceLocation(item)}</p><p>运行 {duration(status?.uptime)} · PID {status?.pid ?? '—'} · 内存 {bytes(status?.memory)} · CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</p></>}<div className="jar-row-actions">{extraActions}</div><p>启动程序：{item.kind === 'npm' ? (item.nodePath ? 'npm · ' + item.nodePath : 'npm · 按 PATH 选择 Node.js') : item.program || status?.executable || item.executable || '自动检测'}</p>{item.kind && status?.businessPid && <p>入口进程 PID：{status.businessPid} · 资源统计取自此进程</p>}<p>PID 文件：{status?.pidPath}</p><p>日志：{status?.logPath}</p><p>健康：{status?.health?.detail || '未配置'}{status?.health?.checkedAt ? ` · ${new Date(status.health.checkedAt).toLocaleTimeString()}` : ''}</p>

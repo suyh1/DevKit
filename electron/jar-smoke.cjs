@@ -179,7 +179,7 @@ module.exports = async (window, output) => {
     assert.equal(item.restart.enabled, true); assert.equal(item.restart.maxRetries, 3);
     assert.equal(item.profile, 'test'); assert.equal(item.profiles.find(profile => profile.id === 'test').env.APP_MODE, 'test');
     assert.equal(item.env.TOKEN, 'a=b');
-    await click('替换服务文件', '.jar-instance');
+    await click('替换服务文件', '.jar-instance td > .jar-row-actions');
     const replacement = 'dialog[open].pc-dialog';
     await wait(`document.querySelector('${replacement}')?.textContent.includes('替换服务文件')`);
     await click('停止服务并继续', replacement);
@@ -208,9 +208,10 @@ module.exports = async (window, output) => {
     await checkServiceHeader();
     assert.equal(await js(`(() => {
       const row = document.querySelector('.jar-instance'), bounds = row.getBoundingClientRect();
-      const actions = [...row.querySelectorAll('.jar-row-actions button')].slice(0, 3);
-      return bounds.right <= innerWidth && actions.every(button => button.getBoundingClientRect().right <= bounds.right) && !row.querySelector('details').open;
-    })()`), true, 'Narrow JAR cards expose start, stop and logs without horizontal scrolling');
+      const actions = [...row.querySelectorAll('td > .jar-row-actions button')];
+      return bounds.right <= innerWidth && ['启动', '停止', '替换服务文件', '日志'].every(label => actions.some(button => button.textContent.trim() === label))
+        && actions.every(button => button.offsetWidth > 0 && button.getBoundingClientRect().right <= bounds.right) && !row.querySelector('details').open;
+    })()`), true, 'Narrow JAR cards expose replacement and other primary actions without horizontal scrolling');
     await js('document.querySelector(".jar-instance").scrollIntoView({ block: "center", behavior: "instant" })');
     await fs.writeFile(path.join(output, 'jar-mobile-card.png'), (await window.webContents.capturePage()).toPNG());
     window.setMinimumSize(...cardMinimum); window.setSize(...cardSize);
