@@ -440,6 +440,7 @@ dialog.command-dialog[data-capsule]:not([open]) {
 }
 .motion-label-slot {
   display: inline-grid;
+  justify-items: center;
   position: relative;
   vertical-align: middle;
   min-width: 0;

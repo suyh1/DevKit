@@ -229,9 +229,30 @@ module.exports = async (window, output) => {
     assert.equal(item.env.TOKEN, 'a=b');
     await click('替换服务文件', '.jar-instance td > .jar-row-actions');
     const replacement = 'dialog[open].pc-dialog';
+    const uploadButton = replacement + ' .run-button';
     await wait(`document.querySelector('${replacement}')?.textContent.includes('替换服务文件')`);
+    await wait(`parseFloat(document.querySelector('${uploadButton} .motion-label-slot').style.minWidth) > 0`);
     await click('停止服务并继续', replacement);
     await wait(`!!document.querySelector('${replacement} input[type=file]')`);
+    async function checkUploadLabel() {
+      const { left, right } = await js(`{
+        const button = document.querySelector('${uploadButton}');
+        const bounds = button.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(button.querySelector('.motion-text-current'));
+        const label = range.getBoundingClientRect();
+        ({ left: label.left - bounds.left, right: bounds.right - label.right });
+      }`);
+      assert.ok(Math.abs(left - right) < 1, `Upload label should be centered (left ${left}px, right ${right}px)`);
+    }
+    await js(`Promise.allSettled(document.querySelector('${replacement}').getAnimations({subtree:true})
+      .filter(animation => animation.effect.getComputedTiming().endTime < Infinity).map(animation => animation.finished))`);
+    await checkUploadLabel();
+    const buttonRect = await js(`{
+      const r = document.querySelector('${uploadButton}').getBoundingClientRect();
+      ({ x: Math.floor(r.x) - 5, y: Math.floor(r.y) - 5, width: Math.ceil(r.width) + 10, height: Math.ceil(r.height) + 10 });
+    }`);
+    await fs.writeFile(path.join(output, 'jar-upload-button.png'), (await window.webContents.capturePage(buttonRect)).toPNG());
     assert.deepEqual(await js(`[...document.querySelectorAll('${replacement} input[type=checkbox]')].map(input => input.checked)`), [true, true]);
     await js(`document.querySelectorAll('${replacement} input[type=checkbox]')[1].click()`);
     await cancelReplacementPicker(window, replacement + ' input[type=file]', js);
@@ -246,6 +267,7 @@ module.exports = async (window, output) => {
       await window.webContents.debugger.sendCommand('DOM.setFileInputFiles', { nodeId, files: [updatedJar] });
     } finally { window.webContents.debugger.detach(); }
     await wait(`document.querySelector('${replacement} input[type=file]').files[0]?.name === 'updated.jar' && !document.querySelector('${replacement} .run-button').disabled`);
+    await checkUploadLabel();
     await js(`document.querySelector('${replacement} .run-button').click()`);
     await wait(`document.querySelector('${replacement} [role=status]')?.textContent.includes('文件已替换，服务已停止')`);
     assert.equal(await fs.readFile(jar, 'utf8'), 'replacement fixture');
