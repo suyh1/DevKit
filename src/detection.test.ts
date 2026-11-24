@@ -59,6 +59,15 @@ describe('推荐顺序和打开方式', () => {
     expect(detectTools('https://kit.example/#git/' + id)[0]).toMatchObject({ id: 'git', resourceId: id });
     expect(detectTools('digital art').map(s => s.id)).not.toContain('git');
   });
+  it('替换操作打开服务列表，JAR 路径保留登记、归档检查与传输入口', () => {
+    for (const command of ['替换服务文件', '替换 JAR']) {
+      expect(detectTools(command)[0]).toMatchObject({ id: 'jar', kind: 'workspace' });
+      expect(detectTools(command)[0]).not.toHaveProperty('service');
+    }
+    const jar = '/srv/订单 服务/app.jar', matches = detectTools('"' + jar + '"');
+    expect(matches).toContainEqual(expect.objectContaining({ id: 'jar', service: { kind: 'jar', jar } }));
+    expect(matches.map(m => m.id)).toEqual(expect.arrayContaining(['jar-inspect', 'zip-inventory', 'file-shares', 'transfer']));
+  });
   it('从脚本命令带入启动方式、含空格的脚本路径和逐行参数', () => {
     expect(detectTools('python3 "/srv/my app/main.py" --port 9000')).toContainEqual(expect.objectContaining({
       id: 'jar', service: { kind: 'script', script: '/srv/my app/main.py', args: '--port\n9000' },

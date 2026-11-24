@@ -12,7 +12,7 @@ if (process.argv.includes("--packaged"))
     "resources/app.asar",
   );
 delete env.ELECTRON_RUN_AS_NODE;
-const child = spawn(electron, ["electron/portal-smoke.cjs", ...process.argv.slice(2).filter(arg => arg === '--legacy-popover')], {
+const child = spawn(electron, ["electron/portal-smoke.cjs", ...process.argv.slice(2).filter(arg => arg === '--legacy-popover' || arg === '--select-only')], {
   stdio: "inherit",
   windowsHide: true,
   env,

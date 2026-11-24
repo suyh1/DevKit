@@ -10,6 +10,7 @@ import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-super
 import { createJarAutostart } from './jar-autostart.mjs';
 import { discoverRuntimes } from './runtime-discovery.mjs';
 import { jarConfigs } from './jar-configs.mjs';
+import { createReplacements, replacementActions } from './jar-replacement.mjs';
 
 import { isJar, serviceEntry, serviceDirectory, projectScripts, validScript, resolveNode, detectNpm, checkProgram, launchSpec, matchesService, launchIdentity, jobRunner } from './backend-launch.mjs';
 
@@ -119,6 +120,20 @@ export async function createJarManager(directory, dependencies = {}) {
     }
   } catch (error) { await unlock(); throw error; }
   let queue = Promise.resolve(), closed = false;
+  function enqueue(work) {
+    const pending = queue.then(work);
+    queue = pending.catch(() => {});
+    return pending;
+  }
+  const replacements = createReplacements({ enqueue, stop, start, status, targetFor(item) {
+    if (item.kind === 'npm') throw new Error('npm 项目以目录登记，没有单个服务文件。');
+    const target = serviceEntry(item), key = pathKey(target);
+    if (isJar(item) && path.extname(target).toLowerCase() !== '.jar') throw new Error('登记的 JAR 入口需要指向 .jar 文件。');
+    if (state.instances.some(other => other.id !== item.id &&
+      [serviceEntry(other), other.program, other.executable, other.nodePath].some(file => file && pathKey(file) === key)))
+      throw new Error('此文件也被其他服务使用，请先核对服务入口。');
+    return target;
+  } });
   const children = new Map(), samples = new Map();
   const discoveries = new Map();
   const snapshot = () => ({ ...structuredClone(state), backendTypes: true, platform: process.platform, directory: folder });
@@ -279,6 +294,12 @@ export async function createJarManager(directory, dependencies = {}) {
         selected && !isJar(selected) && !['log-tail', 'console-read', 'startup-get', 'monitor-probe'].includes(action))) {
       throw Object.assign(new Error('未授予 npm 与可执行程序管理权限。'), { status: 403 });
     }
+    if (replacementActions.includes(action)) {
+      if (options.allowControl === false || options.allowEdit === false) throw Object.assign(new Error('替换文件需要编辑和运行管理权限。'), { status: 403 });
+      return replacements.request(action, find(value.id), value, options.session);
+    }
+    if (selected && replacements.busy(selected.id) && ['upsert', 'remove', 'command'].includes(action))
+      throw new Error('正在替换服务文件，请完成或取消后再操作。');
     if (action === 'list-runtimes') {
       const kind = value.kind;
       if (!['java', 'node'].includes(kind)) throw new Error('未知运行时类型。');
@@ -303,6 +324,7 @@ export async function createJarManager(directory, dependencies = {}) {
       result.supportsNodePath = result.backendTypes;
       result.supportsScripts = result.backendTypes;
       result.runtimeDiscovery = true;
+      result.fileReplacement = true;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;
@@ -397,9 +419,13 @@ export async function createJarManager(directory, dependencies = {}) {
     request(action, value, options) {
       if (closed) return Promise.reject(new Error('服务管理器已关闭。'));
       if (action === 'list-runtimes' || action.startsWith('console-')) return request(action, value, options);
-      const pending = queue.then(() => request(action, value, options)); queue = pending.catch(() => {}); return pending;
+      return enqueue(() => request(action, value, options));
     },
     releaseConsoleSession,
-    async close() { closed = true; await queue; await releaseConsoleSession(); await unlock(); },
+    async releaseSession(session) {
+      await enqueue(() => replacements.release(session));
+      await releaseConsoleSession(session);
+    },
+    async close() { closed = true; await queue; await replacements.close(); await releaseConsoleSession(); await unlock(); },
   };
 }

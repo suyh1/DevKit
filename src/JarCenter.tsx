@@ -10,6 +10,7 @@ import SegmentedControl from './SegmentedControl';
 import { jarRequest, serviceLocation, type BackendKind } from './jar-api';
 import JarRuntimeSettings, { npmSearchPath, runtimeDraft, runtimePayload } from './JarRuntimeSettings';
 import ServiceProjects from './ServiceProjects';
+import JarReplaceDialog from './JarReplaceDialog';
 import JarStartupDialog from './JarStartupDialog';
 import JarConsole from './JarConsole';
 import HostPathPicker, { HostSelect } from './HostPathPicker';
@@ -198,6 +199,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
   const [narrow, setNarrow] = useState(() => matchMedia('(max-width: 920px)').matches);
   const workspace = useRef<HTMLElement>(null);
   const [projectService, setProjectService] = useState<JarInstance | null>(null);
+  const [replacement, setReplacement] = useState<JarInstance | null>(null);
   const [startup, setStartup] = useState<JarInstance | null>(null);
   const [consoleId, setConsoleId] = useState('');
   const [auto, setAuto] = useState(true), [logId, setLogId] = useState(''), [log, setLog] = useState<JarLog | null>(null), [logError, setLogError] = useState('');
@@ -316,6 +318,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           {(!remoteAccess() || remoteAccess()?.services?.projects.enabled) && <button className="text-button" onClick={() => setProjectService(item)}>关联项目</button>}
           <RelatedLink page="monitor" id={`source:jar:${item.id}`}>关联监控</RelatedLink>
           <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'restart')}><RefreshCw size={14} />重启</button>
+          {item.kind !== 'npm' && (item.hostId ? group.fileReplacement : state?.fileReplacement) && <button className="text-button" disabled={busy || !write || !control} onClick={() => setReplacement(item)}>替换服务文件</button>}
           <button className="text-button" disabled={busy || !write} onClick={() => setForm(item)}><Settings2 size={14} />设置</button>
           <button className="text-button" disabled={busy} onClick={() => setStartup(item)}><Play size={14} />系统自启</button>
           <button className="text-button jar-danger" disabled={busy || !write || !stopped || supervised} onClick={() => void (async () => { if (await confirm({ title: `移除 ${item.name}？`, detail: `目标主机 ${hostName}。只移除列表记录，保留服务文件、日志与运行文件。移除前需关闭系统自启。`, confirm: '移除记录' })) await task(async () => { await jarRequest<JarState>('remove', { id: item.id, revision: targetGroup(state?.groups, item.hostId)?.revision ?? state?.revision }); if (logId === item.id) setLogId(''); await refresh(); }); })()}><Trash2 size={14} />移除</button>
@@ -350,6 +353,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
     <p className="jar-help jar-footer">路径、进程和文件均属于各应用登记的主机。关闭控制台或网页后，服务会继续运行。只读访客无法查看环境变量值和启动参数。</p>
     {form && state && <JarForm active={active} seed={formSeed} instance={form === 'new' ? undefined : form} state={state} close={closeForm} saved={() => { closeForm(); void task(refresh); }} />}
     {projectService && <ServiceProjects service={projectService} close={() => setProjectService(null)} />}
+    {replacement && <JarReplaceDialog item={replacement} host={targetGroup(state?.groups, replacement.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')} close={() => { setReplacement(null); void task(refresh); }} />}
     {startup && <JarStartupDialog item={startup} control={canControl(startup)} platform={targetGroup(state?.groups, startup.hostId)?.platform ?? state?.platform ?? ''} close={() => setStartup(null)} />}
   </section>;
 }

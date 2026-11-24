@@ -23,7 +23,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
   function releaseManaged(token) {
     lan?.()?.release(token);
     rdpSessions.release(token);
-    void jar?.()?.releaseConsoleSession?.(token)?.catch(() => {});
+    void jar?.()?.releaseSession?.(token)?.catch(() => {});
   }
   async function manage(token, action) {
     const session = managedSessions.get(token) || { closed: false };

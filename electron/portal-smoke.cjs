@@ -150,14 +150,14 @@ app
         await button("登录");
         await wait('!!document.querySelector(".portal-navigation")');
       };
-      if (process.argv.includes('--legacy-popover')) {
-        console.log('Portal: simulating browser without native Popover');
+      if (process.argv.includes('--legacy-popover') || process.argv.includes('--select-only')) {
         await window.loadURL('about:blank');
         window.webContents.debugger.attach('1.3');
         await window.webContents.debugger.sendCommand('Page.enable');
-        await window.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `
+        await window.webContents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
           const cssSupports = CSS.supports.bind(CSS);
           CSS.supports = (...args) => !String(args[0]).includes('base-select') && cssSupports(...args);
+          if (!${process.argv.includes('--legacy-popover')}) return;
           delete HTMLElement.prototype.popover;
           delete HTMLElement.prototype.showPopover;
           delete HTMLElement.prototype.hidePopover;
@@ -177,7 +177,7 @@ app
             style.textContent = '.ng-help-popover.\\\\:popover-open { display: block; }';
             document.head.append(style);
           });
-        ` });
+        })()` });
       }
       await window.loadURL(fixture.url + "#projects");
       console.log('Portal: loaded');
@@ -186,6 +186,30 @@ app
       window.webContents.focus();
       await login();
       console.log('Portal: authenticated');
+      if (process.argv.includes('--select-only') || process.argv.includes('--legacy-popover')) {
+        await selector('.portal-appearance > summary');
+        await selector('[aria-label="共享页面主题风格"]');
+        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
+        await selector('.select-menu [role=option]:nth-child(2)');
+        await wait(`!document.querySelector('.select-menu') && document.querySelector('[aria-label="共享页面主题风格"]').selectedIndex === 1`);
+        const touchPoint = await js(`(()=>{const r=document.querySelector('[aria-label="共享页面主题风格"]').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+        await window.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint] });
+        await window.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
+        key('Escape');
+        await wait('!document.querySelector(".select-menu")');
+        key('Return');
+        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
+        await js(`{const menu=document.activeElement;for(const key of ['End','Enter'])menu.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));}`);
+        await wait(`!document.querySelector('.select-menu') && document.querySelector('[aria-label="共享页面主题风格"]').selectedIndex === document.querySelector('[aria-label="共享页面主题风格"]').options.length - 1`);
+        key('Return');
+        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
+        key('Home'); key('Return');
+        await wait(`document.querySelector('[aria-label="共享页面主题风格"]').selectedIndex === 0`);
+        key('Escape');
+        await wait("!document.querySelector('.portal-appearance').open");
+        if (process.argv.includes('--select-only')) return;
+      }
       {
         const [width, height] = window.getContentSize();
         const list = "document.querySelector('.portal-sidebar .portal-navigation')";
@@ -444,12 +468,6 @@ app
         await selector('.portal-appearance > summary');
       }
       await selector('[aria-label="共享页面主题"] button[aria-pressed=true]');
-      if (process.argv.includes('--legacy-popover')) {
-        await js(`{const field=document.querySelector('[aria-label="共享页面主题风格"]'); field.focus(); field.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));}`);
-        await wait('document.activeElement?.matches(".select-menu[role=listbox]")');
-        await js(`{const menu=document.activeElement;for(const key of ['End','Enter'])menu.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));}`);
-        await wait(`!document.querySelector('.select-menu') && document.querySelector('[aria-label="共享页面主题风格"]').selectedIndex === document.querySelector('[aria-label="共享页面主题风格"]').options.length - 1`);
-      }
       await js('document.querySelector(\'[aria-label="共享页面主题"] button[aria-pressed=true]\').focus()');
       key("End");
       key("Return");

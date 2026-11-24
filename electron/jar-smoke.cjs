@@ -179,6 +179,29 @@ module.exports = async (window, output) => {
     assert.equal(item.restart.enabled, true); assert.equal(item.restart.maxRetries, 3);
     assert.equal(item.profile, 'test'); assert.equal(item.profiles.find(profile => profile.id === 'test').env.APP_MODE, 'test');
     assert.equal(item.env.TOKEN, 'a=b');
+    await click('替换服务文件', '.jar-instance');
+    const replacement = 'dialog[open].pc-dialog';
+    await wait(`document.querySelector('${replacement}')?.textContent.includes('替换服务文件')`);
+    await click('停止服务并继续', replacement);
+    await wait(`!!document.querySelector('${replacement} input[type=file]')`);
+    assert.deepEqual(await js(`[...document.querySelectorAll('${replacement} input[type=checkbox]')].map(input => input.checked)`), [true, true]);
+    await js(`document.querySelectorAll('${replacement} input[type=checkbox]')[1].click()`);
+    const updatedJar = path.join(folder, 'updated.jar');
+    await fs.writeFile(updatedJar, 'replacement fixture');
+    window.webContents.debugger.attach('1.3');
+    try {
+      const { root } = await window.webContents.debugger.sendCommand('DOM.getDocument');
+      const { nodeId } = await window.webContents.debugger.sendCommand('DOM.querySelector', { nodeId: root.nodeId, selector: replacement + ' input[type=file]' });
+      await window.webContents.debugger.sendCommand('DOM.setFileInputFiles', { nodeId, files: [updatedJar] });
+    } finally { window.webContents.debugger.detach(); }
+    await wait(`document.querySelector('${replacement} input[type=file]').files[0]?.name === 'updated.jar' && !document.querySelector('${replacement} .run-button').disabled`);
+    await js(`document.querySelector('${replacement} .run-button').click()`);
+    await wait(`document.querySelector('${replacement} [role=status]')?.textContent.includes('文件已替换，服务已停止')`);
+    assert.equal(await fs.readFile(jar, 'utf8'), 'replacement fixture');
+    const backupName = (await fs.readdir(folder)).find(name => name.startsWith('order service.jar.') && name.endsWith('.bak'));
+    assert.equal(await fs.readFile(path.join(folder, backupName), 'utf8'), 'Not executable; used only for UI registration');
+    await click('关闭', replacement);
+    await wait(`!document.querySelector('${replacement}')`);
     const cardSize = window.getSize(), cardMinimum = window.getMinimumSize();
     window.setMinimumSize(360, 600); window.setSize(391, 830);
     await wait('innerWidth < 430 && getComputedStyle(document.querySelector(".jar-instance")).display === "grid" && document.querySelector(".sidebar").getBoundingClientRect().right <= 0');
@@ -264,7 +287,7 @@ module.exports = async (window, output) => {
     await click('移除'); await wait('!!document.querySelector(".confirm-dialog[open]")');
     await click('移除记录', '.confirm-dialog[open]');
     await wait('!document.querySelector(".jar-table tbody tr")');
-    assert.match(await fs.readFile(jar, 'utf8'), /Not executable/);
+    assert.equal(await fs.readFile(jar, 'utf8'), 'replacement fixture');
     await js('document.querySelector(\'.nav-item[title="设置"]\').click()');
     await wait('!!document.querySelector(\'.settings-page button[value="performance"]\')');
     await js(`document.querySelector('.settings-page button[value="performance"]').click()`);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, realpath, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -66,6 +66,79 @@ test('start, restart, stop and reopen preserve exact arguments, append logs and 
     assert.equal(await readFile(jar, 'utf8'), 'fixture'); assert.equal(await readFile(paths.logPath, 'utf8'), 'history\n');
   }, fake.dependencies);
 });
+test('replace stops first, stages ordered chunks, preserves backups and starts only on request', async () => {
+  const fake = fakeRuntime();
+  let javaAvailable = true;
+  fake.dependencies.detect = async () => ({ found: javaAvailable, executable: fake.java, output: 'Java unavailable' });
+  await fixture(async ({ add, manager, jar, folder }) => {
+    const { id } = (await add()).instances[0];
+    const begin = () => manager.request('replace-begin', { id, expectedPath: jar });
+    await manager.request('command', { id, command: 'start' });
+    await assert.rejects(manager.request('replace-begin', { id, expectedPath: jar }, { allowControl: false }), /权限/);
+    await assert.rejects(manager.request('replace-begin', { id, expectedPath: jar }, { allowEdit: false }), /权限/);
+    await assert.rejects(manager.request('replace-begin', { id, expectedPath: jar + '.other' }), /路径/);
+    assert.equal((await manager.request('statuses'))[0].state, 'running');
+    for (const backup of [true, false]) {
+      const previous = await readFile(jar);
+      const session = { id, ...await begin() };
+      assert.equal((await manager.request('statuses'))[0].state, 'stopped');
+      await assert.rejects(begin(), /正在替换/);
+      await assert.rejects(manager.request('command', { id, command: 'start' }), /替换/);
+      const chunk = { ...session, offset: 0, data: Buffer.from('first').toString('base64') };
+      await assert.rejects(manager.request('replace-chunk', chunk, { session: 'different' }), /会话/);
+      await manager.request('replace-chunk', chunk);
+      await assert.rejects(manager.request('replace-chunk', chunk), /位置/);
+      await manager.request('replace-chunk', { ...chunk, offset: 5, data: Buffer.from('second').toString('base64') });
+      assert.deepEqual(await readFile(jar), previous);
+      const result = await manager.request('replace-finish', { ...session, size: 11, backup, start: backup });
+      assert.equal(await readFile(jar, 'utf8'), 'firstsecond');
+      if (backup) assert.deepEqual(await readFile(result.backup), previous);
+      else assert.equal(result.backup, '');
+      assert.equal((await manager.request('statuses'))[0].state, backup ? 'running' : 'stopped');
+    }
+    for (const cancel of [false, true]) {
+      const session = { id, ...await begin() };
+      await manager.request('replace-chunk', { ...session, offset: 0, data: 'YQ==' });
+      if (cancel) await manager.request('replace-cancel', session);
+      else await assert.rejects(manager.request('replace-finish', { ...session, size: 4, backup: false, start: true }), /不完整/);
+      assert.equal(await readFile(jar, 'utf8'), 'firstsecond');
+    }
+    assert.equal((await readdir(folder)).filter(name => name.endsWith('.bak')).length, 1);
+    assert.equal((await readdir(folder)).some(name => name.endsWith('.tmp')), false);
+    const changed = { id, ...await begin() };
+    await manager.request('replace-chunk', { ...changed, offset: 0, data: 'YQ==' });
+    await writeFile(jar, 'another deployment');
+    await assert.rejects(manager.request('replace-finish', { ...changed, size: 1, backup: true, start: true }), /原文件已变化/);
+    assert.equal(await readFile(jar, 'utf8'), 'another deployment');
+    const failedStart = { id, ...await begin() };
+    await manager.request('replace-chunk', { ...failedStart, offset: 0, data: 'YQ==' });
+    javaAvailable = false;
+    const installed = await manager.request('replace-finish', { ...failedStart, size: 1, backup: true, start: true });
+    assert.match(installed.startError, /Java unavailable/);
+    assert.equal(await readFile(jar, 'utf8'), 'a');
+    assert.equal(await readFile(installed.backup, 'utf8'), 'another deployment');
+  }, fake.dependencies);
+});
+
+test('replacement targets the script or program entry and respects backend permissions and execution mode', async () => {
+  await fixture(async ({ manager, add, folder }) => {
+    const script = path.join(folder, 'main.js'), program = path.join(folder, process.platform === 'win32' ? 'app.exe' : 'app');
+    for (const [kind, target] of [['script', script], ['program', program]]) {
+      await writeFile(target, 'old', { mode: 0o750 });
+      const mode = (await stat(target)).mode;
+      const state = await add({ kind, workDir: folder, program: kind === 'script' ? process.execPath : program, script });
+      const { id } = state.instances.at(-1);
+      const begin = { id, expectedPath: target };
+      await assert.rejects(manager.request('replace-begin', begin, { allowBackend: false }), /权限/);
+      const session = { id, ...await manager.request('replace-begin', begin) };
+      await manager.request('replace-chunk', { ...session, offset: 0, data: 'YWJj' });
+      await manager.request('replace-finish', { ...session, size: 3, start: false, backup: false });
+      assert.equal(await readFile(target, 'utf8'), 'abc');
+      assert.equal((await stat(target)).mode, mode);
+    }
+  }, fakeRuntime().dependencies);
+});
+
 test('PID reuse, missing PID, malformed PID and legacy PID cannot terminate another process', async () => {
   const fake = fakeRuntime();
   await fixture(async ({ add, manager }) => {
@@ -85,6 +158,8 @@ test('stop timeout keeps process and blocks restart until an explicit force stop
   fake.dependencies.signal = async (pid, force) => { if (force) await original(pid, force); };
   await fixture(async ({ add, manager }) => {
     const item = (await add()).instances[0]; await manager.request('command', { id: item.id, command: 'start' });
+    await assert.rejects(manager.request('replace-begin', { id: item.id, expectedPath: item.jar }), /仍未退出/);
+    assert.equal(await readFile(item.jar, 'utf8'), 'fixture');
     await assert.rejects(manager.request('command', { id: item.id, command: 'restart' }), /仍未退出/);
     assert.equal(fake.calls.filter(call => call.args).length, 1);
     assert.equal((await manager.request('statuses'))[0].state, 'running');

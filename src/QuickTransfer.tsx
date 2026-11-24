@@ -1,3 +1,4 @@
+import { fileBase64 as base64 } from './file-base64';
 import { Modal as WorkspaceDialog } from './project-components';
 import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
@@ -46,14 +47,6 @@ function sizeOf(bytes: number) {
     unit++;
   }
   return bytes.toFixed(unit ? 1 : 0) + ' ' + units[unit];
-}
-function base64(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1]);
-    reader.onerror = () => reject(new Error('文件读取失败。'));
-    reader.readAsDataURL(blob);
-  });
 }
 function sharedDestination(text: string | undefined, origin: string | undefined) {
   if (!text || !origin) return;

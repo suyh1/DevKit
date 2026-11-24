@@ -47,7 +47,7 @@ async function handle({ id, module, action, payload, access, session }) {
       return;
     }
     if (action === 'release') {
-      await (await managers.get('jar'))?.releaseConsoleSession(session);
+      await (await managers.get('jar'))?.releaseSession(session);
     } else {
       send({ id, result: await managedRequest(await manager(module), module, action, payload, access, session) });
       return;

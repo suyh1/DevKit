@@ -29,7 +29,7 @@ test('existing sharing settings leave JAR closed; JAR grants are independent of 
   const old = emptySharingServices(); delete old.jar;
   assert.deepEqual(sharingServices({ services: old }).jar, { enabled: false, edit: false, control: false, backend: false });
   const calls = [], revoked = [];
-  const manager = { request: async (action, value, options) => { calls.push({ action, value, options }); return { ok: true }; }, releaseConsoleSession: async token => revoked.push(token) };
+  const manager = { request: async (action, value, options) => { calls.push({ action, value, options }); return { ok: true }; }, releaseSession: async token => revoked.push(token) };
   const workspaces = createSharedWorkspaces({ jar: () => manager });
   const services = emptySharingServices(); services.jar.enabled = true;
   const options = { token: 'session', settings: { services } };

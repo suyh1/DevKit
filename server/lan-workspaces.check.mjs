@@ -144,7 +144,11 @@ test('LAN gateway shares local and remote registries, confines operations to the
     services.logs = { enabled: true, jar: true, nginx: false, export: name === 'gateway', raw: name === 'gateway' };
     const listening = await port(), password = `${name}-workspaces-fixture`;
     await host.start({ host: '127.0.0.1', port: listening, password, services });
-    return { directory, lan, jar, nginx, address: `http://127.0.0.1:${listening}`, password };
+    async function enableJarControl() {
+      services.jar.control = true;
+      await host.start({ host: '127.0.0.1', port: listening, password, services });
+    }
+    return { directory, lan, jar, nginx, address: `http://127.0.0.1:${listening}`, password, enableJarControl };
   }
   const target = await endpoint('target', { edit: true, control: false });
   const gateway = await endpoint('gateway', { edit: true, control: true });
@@ -176,6 +180,8 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.equal((await gateway.jar.request('get')).instances.length, 0);
   assert.equal((await target.jar.request('get')).instances[0].jar, canonicalSource);
   assert.equal((await api('jar', 'command', { id: instance.id, command: 'start' })).status, 403);
+  const selection = { id: instance.id, expectedPath: instance.jar };
+  assert.equal((await api('jar', 'replace-begin', selection)).status, 403);
   assert.equal((await api('jar', 'get', { hostId, scope: 'local' })).status, 400);
   assert.deepEqual((await api('jar', 'statuses', { scope: 'inventory' })).data.map(status => status.id), [instance.id]);
   const viewer = await gateway.lan.request(gateway.jar, 'jar', 'get', { scope: 'inventory' }, { edit: false, control: false }, 'viewer');
@@ -190,6 +196,15 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.equal(logSources[0].instanceId, instance.id);
   const exported = (await api('logs', 'export', { raw: true, sources: [{ id: logSources[0].id }] })).data.results[0];
   assert.match(exported.error, /导出权限/);
+  await target.enableJarControl();
+  const begin = await api('jar', 'replace-begin', selection);
+  assert.equal(begin.status, 200, JSON.stringify(begin.data));
+  const upload = { id: instance.id, token: begin.data.token };
+  assert.equal((await api('jar', 'replace-chunk', { ...upload, offset: 0, data: 'YWJj' })).status, 200);
+  const finished = await api('jar', 'replace-finish', { ...upload, size: 3, backup: true, start: false });
+  assert.equal(finished.status, 200, JSON.stringify(finished.data));
+  assert.equal(await readFile(canonicalSource, 'utf8'), 'abc');
+  assert.equal(await readFile(finished.data.backup, 'utf8'), 'fixture');
 
   const installed = await api('nginx', 'upsert', { hostId, revision: 0, instance: { name: 'Proxy', platform: 'any', main: config, prefix: folder, files: [] } });
   assert.equal(installed.status, 200, JSON.stringify(installed.data));
@@ -666,6 +681,14 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
       const [restored] = await lan.request(null, 'jar', 'statuses', { hostId: stdio.id });
       assert.equal(restored.pid, started.status.pid);
       assert.equal(restored.state, 'running');
+      await waitForOutput();
+      const bytes = await readFile(runnableJar);
+      const { token } = await lan.request(null, 'jar', 'replace-begin', { id: example.id, expectedPath: await realpath(runnableJar) });
+      const upload = { id: example.id, token };
+      await lan.request(null, 'jar', 'replace-chunk', { ...upload, offset: 0, data: bytes.toString('base64') });
+      const replacement = await lan.request(null, 'jar', 'replace-finish', { ...upload, size: bytes.length, backup: true, start: true });
+      assert.equal(replacement.started, true, replacement.startError);
+      assert.deepEqual(await readFile(replacement.backup), bytes);
       await waitForOutput();
     } finally { await command('stop'); }
   });

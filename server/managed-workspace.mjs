@@ -1,6 +1,7 @@
 import { opendir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { replacementActions } from './jar-replacement.mjs';
 
 const actions = {
   jar: {
@@ -16,7 +17,7 @@ const actions = {
 };
 export const fullAccess = { edit: true, control: true, backend: true };
 export function authorizeWorkspace(module, action, access) {
-  if (module === 'jar' && ['detect-npm', 'list-runtimes'].includes(action) || module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
+  if (module === 'jar' && ['detect-npm', 'list-runtimes', ...replacementActions].includes(action) || module === 'nginx' && ['apply-draft', 'restore-backup', 'restore-disk'].includes(action)) {
     if (access.edit && access.control) return;
     throw Object.assign(new Error('此操作需要编辑和运行管理权限。'), { status: 403 });
   }

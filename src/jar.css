@@ -140,6 +140,8 @@
 .jar-dialog .jar-path-input { gap: 6px; padding: 4px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; }
 .jar-dialog .jar-path-input .text-control { flex: 1; min-width: 0; border-color: transparent; background: transparent; }
 .jar-dialog .jar-path-input .file-pick-button { background: var(--tint); border-color: transparent; }
+.jar-replace-path { overflow-wrap: anywhere; }
+.jar-replace-option { display: flex; align-items: center; gap: .5rem; margin-block: .75rem; }
 .jar-dialog .jar-path-input:focus-within { border-color: var(--accent); }
 @media(max-width:760px) {
   .jar-dialog .jar-path-input { flex-flow: row wrap; }

@@ -317,7 +317,7 @@ export function detectTools(input: string): Suggestion[] {
       if ([t.name, t.english, t.id, ...(intents[t.id] ?? [])].some(name => name.toLowerCase() === key))
         rules.open(t.id, '打开' + t.name);
     }
-    for (const w of workspaceModules) if (w.name === text || w.id === key || (w.id === 'jar' && text === '后端管理')) rules.workspace(w.id, '进入' + w.name);
+    for (const w of workspaceModules) if (w.name === text || w.id === key || (w.id === 'jar' && ['后端管理', '替换服务文件', '替换 JAR'].includes(text))) rules.workspace(w.id, '进入' + w.name);
     if (matches.size) return [...matches.values()];
   }
   if (/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00a0]/.test(input)) rules.tool('invisible', '定位隐形字符与方向控制符');

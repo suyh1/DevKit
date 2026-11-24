@@ -98,6 +98,11 @@ function installSelectMenu() {
     window.addEventListener('scroll', event => { if (event.target !== menu && !menu.contains(event.target as Node)) close(); }, { capture: true, signal: listeners.signal });
   }
   document.addEventListener('pointerdown', event => {
+    // Suppress the system picker. Opening an auto popover here lets the
+    // matching pointerup light-dismiss it before the user can choose.
+    if (event.button === 0 && single(event.target)) event.preventDefault();
+  });
+  document.addEventListener('click', event => {
     if (event.button === 0 && single(event.target)) {
       event.preventDefault();
       show(event.target);

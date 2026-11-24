@@ -15,7 +15,7 @@ import { gitReads } from './git-workspace.mjs';
 import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } from './sharing-visitors.mjs';
 import { webTransferLimit } from './lan-sftp.mjs';
 
-const auditActions = new Set(['command', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
+const auditActions = new Set(['command', 'replace-begin', 'replace-finish', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
 const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'scan-start', 'wake', 'rdp-open', 'file-upload', 'file-download']);
 const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 const visitorsFor = settings => settings.visitors || [];

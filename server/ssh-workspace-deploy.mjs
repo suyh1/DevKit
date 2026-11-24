@@ -12,7 +12,7 @@ const managerFiles = [
   'server/nginx-draft.mjs', 'server/backend-launch.mjs', 'server/runtime-discovery.mjs', 'server/backend-job.mjs', 'server/backend-job.ps1',
   'server/log-center.mjs', 'server/log-redaction.mjs',
   'server/ssh-workspace-agent.mjs', 'server/ssh-windows-process.mjs', 'server/ssh-lines.mjs', 'server/managed-workspace.mjs', 'server/project-lock.mjs', 'server/atomic-file.mjs',
-  ...['manager', 'process', 'policies', 'supervisor-client', 'supervisor-worker', 'autostart', 'configs', 'log-writer', 'console'].map(name => `server/jar-${name}.mjs`),
+  ...['manager', 'process', 'policies', 'supervisor-client', 'supervisor-worker', 'autostart', 'replacement', 'configs', 'log-writer', 'console'].map(name => `server/jar-${name}.mjs`),
   ...['manager', 'process', 'create', 'inspection', 'directories'].map(name => `server/nginx-${name}.mjs`), 'shared/nginx.mjs',
 ];
 let bundle;
