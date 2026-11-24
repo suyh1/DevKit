@@ -126,6 +126,9 @@ describe('推荐顺序和打开方式', () => {
     expect(detectTools('192.168.1.1')[0]).toMatchObject({ id: 'ipv4', input: '192.168.1.1/32' });
   });
   it('名称、文件、共享栏目只打开入口', () => {
+    for (const term of ['快速链接设置', '快传链接设置']) {
+      expect(detectTools(term)).toEqual([expect.objectContaining({ kind: 'workspace', id: 'transfer' })]);
+    }
     expect(detectTools('生成 UUID')[0]).not.toHaveProperty('input');
     for (const result of detectTools('设计稿.png')) expect(result).not.toHaveProperty('input');
     const url = 'https://example.org/search?q=secret';

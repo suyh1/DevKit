@@ -316,6 +316,7 @@ export function detectTools(input: string): Suggestion[] {
         rules.open(t.id, '打开' + t.name);
     }
     for (const w of workspaceModules) if (w.name === text || w.id === key || (w.id === 'jar' && ['后端管理', '替换服务文件', '替换 JAR', '恢复服务备份', '恢复 JAR 备份'].includes(text))) rules.workspace(w.id, '进入' + w.name);
+    if (text === '快速链接设置' || text === '快传链接设置') rules.workspace('transfer', '进入局域网快传管理快速链接');
     if (matches.size) return [...matches.values()];
   }
   if (/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00a0]/.test(input)) rules.tool('invisible', '定位隐形字符与方向控制符');

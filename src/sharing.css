@@ -44,20 +44,3 @@
 @media (max-width: 550px) { .global-sharing-button > span { display: none; } }
 
 .sharing-panel .pc-sharing-state small > code { overflow-wrap: anywhere; font-family: var(--font-mono); }
-
-.transfer-link-settings {
-  margin-bottom: 18px;
-  padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.transfer-link-settings summary { cursor: pointer; font-weight: 600; }
-.transfer-link-settings > div { display: grid; gap: 12px; margin-top: 12px; }
-.transfer-port-fields, .transfer-port-links > div {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-.transfer-port-links code { overflow-wrap: anywhere; user-select: all; }

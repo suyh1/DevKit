@@ -9,6 +9,7 @@ import { copyText } from './motion-primitives';
 import { useWorkspaceResource, workspaceHash } from './workspace-links';
 import { type CollabModule, type PageProps } from './collab-api';
 import { QuickTransfer } from './QuickTransfer';
+import { TransferLinkSettings } from './TransferLinkSettings';
 import { MockService } from './MockService';
 import { ScreenshotBoard } from './ScreenshotBoard';
 import { CreateRelated } from './related-workspaces';
@@ -76,7 +77,12 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
             )}
           </div>
         </div>
-        {inviteButton}
+        {module === 'transfer' && window.devkitCollab ? (
+          <div className="collab-actions">
+            {inviteButton}
+            <TransferLinkSettings />
+          </div>
+        ) : inviteButton}
       </header>}
       {active && invite && (
         <WorkspaceDialog title="邀请设备" closeLabel="关闭邀请设备" close={() => setInvite(false)}><div className="collab-invite" id={module + '-invite'}>

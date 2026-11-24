@@ -1,5 +1,4 @@
 import FloatingDetails from './FloatingDetails';
-import { TransferLinkSettings } from './TransferLinkSettings';
 import { TextInput } from './TextControl';
 import {
   createContext,
@@ -295,7 +294,6 @@ function SharingPanel({
             </>
           ) : (
             <>
-              {window.devkitCollab && <TransferLinkSettings />}
               <div className="pc-sharing-state">
                 <strong>{draft.running ? "共享正在运行" : "共享已停止"}</strong>
                 {draft.addresses.map((url) => (

@@ -131,7 +131,7 @@
 | 团队知识库（`knowledge`） | Markdown 文档 |
 | 待办清单（`project-todos`） | Markdown 复选框或 ☐、✔、✘ 任务行 |
 | 本机文件共享管理（`file-shares`） | 本地绝对路径或 UNC 共享路径 |
-| 局域网快传（`transfer`） | 文件名、本地路径或 HTTP(S) 链接 |
+| 局域网快传（`transfer`） | 文件名、本地路径或 HTTP(S) 链接。输入“快速链接设置”或“快传链接设置”可进入该栏目，在标题栏管理快传端口。 |
 | 接口模拟服务（`mock`） | OpenAPI/Swagger 定义或 JSON Schema |
 | 截图协作白板（`whiteboard`） | 图片文件名，如 screenshot.png |
 | Nginx 配置（`nginx`） | server、upstream 配置块或 proxy_pass 指令 |

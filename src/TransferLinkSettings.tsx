@@ -52,9 +52,9 @@ export function TransferLinkSettings() {
 
   return (
     <FloatingDetails className="transfer-link-settings" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>快速链接设置</summary>
+      <summary className="secondary-button">快速链接设置</summary>
       {open && (
-        <div>
+        <>
           <p>新端口只需告诉对方局域网 IP 和端口，例如 192.168.1.20:8780。能连到该端口的人可直接收发同一收件箱的内容，无需共享口令或访客账号。已设取件密码的内容仍需凭密码领取。</p>
           <div className="transfer-port-fields">
             <label>
@@ -68,22 +68,21 @@ export function TransferLinkSettings() {
               />
               <small>多个端口用逗号分隔。移除端口并保存即可关闭对应链接。</small>
             </label>
-            {links?.filter(link => !link.short).map(link => (
-              <label key={link.port}>
+            <button type="button" className="secondary-button" onClick={savePorts} disabled={!links || op.busy}>
+              保存端口
+            </button>
+          </div>
+          {(loadError || op.message) && <p role="status">{loadError || op.message}</p>}
+          {links?.map((link) => (
+            <div key={link.port} className="transfer-port-links">
+              {!link.short && <label>
                 <input className="form-check" type="checkbox" disabled={op.busy} checked={shorten.includes(link.port)}
                   onChange={event => {
                     const checked = event.target.checked;
                     setShorten(current => checked ? [...current, link.port] : current.filter(port => port !== link.port));
                   }} />
                 为旧端口 {link.port} 开启短地址（原长链接仍可用）
-              </label>
-            ))}
-            <button type="button" className="secondary-button" onClick={savePorts} disabled={!links || op.busy}>
-              保存端口
-            </button>
-          </div>
-          {links?.map((link) => (
-            <div key={link.port} className="transfer-port-links">
+              </label>}
               {link.error && (
                 <p role="status">
                   {link.port} · {link.error}
@@ -108,8 +107,7 @@ export function TransferLinkSettings() {
               ))}
             </div>
           ))}
-          {(loadError || op.message) && <p role="status">{loadError || op.message}</p>}
-        </div>
+        </>
       )}
     </FloatingDetails>
   );

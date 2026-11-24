@@ -71,6 +71,7 @@ module.exports = async function collaborationSmoke(window, output) {
       desktop,
       'document.querySelector(".topbar .global-sharing-button")?.dataset.sharingState === "running" && document.querySelector(".sharing-panel dialog")?.getAttribute("aria-busy") !== "true"',
     );
+    assert.equal(await desktop('!!document.querySelector(".sharing-panel .transfer-link-settings")'), false);
     await desktop('document.querySelector(".sharing-panel button[aria-label=关闭共享设置]").click()');
     await wait(desktop, '!document.querySelector(".sharing-panel")');
     await openWorkspace('局域网快传');
@@ -93,6 +94,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await fill(web, '.portal-login input[type=password]', settings.password);
     await click(web, '.portal-login ', '登录');
     await click(web, current, '凭密码取件');
+    assert.equal(await web('!!document.querySelector(".transfer-link-settings")'), false);
     assert.equal(await web('document.querySelector(' + JSON.stringify(current + '[aria-label="发送方式"] button[aria-pressed=true]') + ').value'), 'direct');
     await fill(web, current + 'input[aria-label="输入取件密码"]', 'bad');
     await click(web, current, '确认取件');
@@ -490,13 +492,15 @@ module.exports = async function collaborationSmoke(window, output) {
 
     await desktop('window.devkitProjects.request("stop")');
     await openWorkspace('局域网快传');
+    const quickSettings = main + '.collab-header .transfer-link-settings';
     const openQuickLinks = async () => {
-      await desktop('document.querySelector(".global-sharing-button").click()');
-      await wait(desktop, '!!document.querySelector("dialog[open] .transfer-link-settings summary")');
-      await desktop('document.querySelector(".transfer-link-settings summary").click()');
-      await wait(desktop, '!!document.querySelector(".transfer-link-settings input:not(:disabled)")');
+      await desktop(`document.querySelector('${quickSettings} summary').click()`);
+      await wait(desktop, `!!document.querySelector('${quickSettings}[open] input:not(:disabled)')`);
     };
-    const closeSharing = () => desktop('document.querySelector("dialog[open] button[aria-label=关闭共享设置]").click()');
+    const closeQuickLinks = async () => {
+      await desktop(`document.querySelector('${quickSettings} .floating-details-close').click()`);
+      await wait(desktop, `document.activeElement === document.querySelector('${quickSettings} summary')`);
+    };
     await openQuickLinks();
     await fill(desktop, '.transfer-link-settings input', String(port));
     await click(desktop, '.transfer-link-settings ', '保存端口');
@@ -508,7 +512,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await click(desktop, '.transfer-port-links ', '复制链接');
     await wait(desktop, 'document.querySelector(".transfer-link-settings").innerText.includes("已复制快速链接")');
     assert.equal(await clipboard.readText(), quick);
-    await closeSharing();
+    await closeQuickLinks();
     await browser.webContents.session.setProxy({ mode: 'direct' });
     await browser.loadURL(quick);
     const standalone = '.transfer-link-page .collab-page ';
@@ -526,10 +530,11 @@ module.exports = async function collaborationSmoke(window, output) {
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick-stored.bin');
     await exchange(desktop, main, web, standalone, browser, 'desktop-to-quick.bin', true);
     await openQuickLinks();
+    assert.equal(await desktop(`document.querySelector('${quickSettings} input').value`), String(port));
     await fill(desktop, '.transfer-link-settings input', '');
     await click(desktop, '.transfer-link-settings ', '保存端口');
     await wait(desktop, '!document.querySelector(".transfer-port-links code")');
-    await closeSharing();
+    await closeQuickLinks();
   } finally {
     browser.destroy();
     await desktop('window.devkitProjects.request("stop")');
