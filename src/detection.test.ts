@@ -60,7 +60,7 @@ describe('推荐顺序和打开方式', () => {
     expect(detectTools('digital art').map(s => s.id)).not.toContain('git');
   });
   it('替换操作打开服务列表，JAR 路径保留登记、归档检查与传输入口', () => {
-    for (const command of ['替换服务文件', '替换 JAR']) {
+    for (const command of ['替换服务文件', '替换 JAR', '恢复服务备份', '恢复 JAR 备份']) {
       expect(detectTools(command)[0]).toMatchObject({ id: 'jar', kind: 'workspace' });
       expect(detectTools(command)[0]).not.toHaveProperty('service');
     }

@@ -325,6 +325,7 @@ export async function createJarManager(directory, dependencies = {}) {
       result.supportsScripts = result.backendTypes;
       result.runtimeDiscovery = true;
       result.fileReplacement = true;
+      result.backupRestore = true;
       if (!result.backendTypes) result.instances = result.instances.filter(isJar);
       for (const item of result.instances) if (options.allowEdit === false) { item.env = {}; item.profiles = item.profiles.map(profile => ({ ...profile, env: {} })); item.jvmArgs = []; item.appArgs = []; }
       return result;

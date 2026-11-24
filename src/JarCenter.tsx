@@ -353,7 +353,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
     <p className="jar-help jar-footer">路径、进程和文件均属于各应用登记的主机。关闭控制台或网页后，服务会继续运行。只读访客无法查看环境变量值和启动参数。</p>
     {form && state && <JarForm active={active} seed={formSeed} instance={form === 'new' ? undefined : form} state={state} close={closeForm} saved={() => { closeForm(); void task(refresh); }} />}
     {projectService && <ServiceProjects service={projectService} close={() => setProjectService(null)} />}
-    {replacement && <JarReplaceDialog item={replacement} host={targetGroup(state?.groups, replacement.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')} close={() => { setReplacement(null); void task(refresh); }} />}
+    {replacement && <JarReplaceDialog item={replacement} canRestore={!!(replacement.hostId ? targetGroup(state?.groups, replacement.hostId)?.backupRestore : state?.backupRestore)} host={targetGroup(state?.groups, replacement.hostId)?.name || (remoteAccess() ? '共享主机' : '本机')} close={() => { setReplacement(null); void task(refresh); }} />}
     {startup && <JarStartupDialog item={startup} control={canControl(startup)} platform={targetGroup(state?.groups, startup.hostId)?.platform ?? state?.platform ?? ''} close={() => setStartup(null)} />}
   </section>;
 }

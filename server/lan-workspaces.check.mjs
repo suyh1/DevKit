@@ -182,6 +182,8 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.equal((await api('jar', 'command', { id: instance.id, command: 'start' })).status, 403);
   const selection = { id: instance.id, expectedPath: instance.jar };
   assert.equal((await api('jar', 'replace-begin', selection)).status, 403);
+  assert.equal((await api('jar', 'replace-backups', selection)).status, 403);
+  assert.equal((await api('jar', 'replace-restore', selection)).status, 403);
   assert.equal((await api('jar', 'get', { hostId, scope: 'local' })).status, 400);
   assert.deepEqual((await api('jar', 'statuses', { scope: 'inventory' })).data.map(status => status.id), [instance.id]);
   const viewer = await gateway.lan.request(gateway.jar, 'jar', 'get', { scope: 'inventory' }, { edit: false, control: false }, 'viewer');
@@ -205,6 +207,12 @@ test('LAN gateway shares local and remote registries, confines operations to the
   assert.equal(finished.status, 200, JSON.stringify(finished.data));
   assert.equal(await readFile(canonicalSource, 'utf8'), 'abc');
   assert.equal(await readFile(finished.data.backup, 'utf8'), 'fixture');
+  const history = await api('jar', 'replace-backups', selection);
+  assert.deepEqual(history.data, [path.basename(finished.data.backup)]);
+  const recovered = await api('jar', 'replace-restore', { ...selection, name: history.data[0], backup: true, start: false });
+  assert.equal(recovered.status, 200, JSON.stringify(recovered.data));
+  assert.equal(await readFile(canonicalSource, 'utf8'), 'fixture');
+  assert.equal(await readFile(recovered.data.backup, 'utf8'), 'abc');
 
   const installed = await api('nginx', 'upsert', { hostId, revision: 0, instance: { name: 'Proxy', platform: 'any', main: config, prefix: folder, files: [] } });
   assert.equal(installed.status, 200, JSON.stringify(installed.data));
@@ -689,6 +697,13 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
       const replacement = await lan.request(null, 'jar', 'replace-finish', { ...upload, size: bytes.length, backup: true, start: true });
       assert.equal(replacement.started, true, replacement.startError);
       assert.deepEqual(await readFile(replacement.backup), bytes);
+      await waitForOutput();
+      const [name] = await lan.request(null, 'jar', 'replace-backups', { id: example.id });
+      assert.equal(name, path.basename(replacement.backup));
+      const rollback = await lan.request(null, 'jar', 'replace-restore', {
+        id: example.id, expectedPath: await realpath(runnableJar), name, backup: false, start: true,
+      });
+      assert.equal(rollback.started, true, rollback.startError);
       await waitForOutput();
     } finally { await command('stop'); }
   });

@@ -120,6 +120,42 @@ test('replace stops first, stages ordered chunks, preserves backups and starts o
   }, fake.dependencies);
 });
 
+test('restore selects one historical backup, preserves it, and only stops after checking the selection', async () => {
+  await fixture(async ({ add, manager, jar, folder, reopen }) => {
+    const { id } = (await add()).instances[0], base = { id, expectedPath: jar };
+    const old = path.basename(jar) + '.2026-01-02T03-04-05-678Z.0123abcd.bak';
+    const newer = old.replace('2026-01', '2026-02');
+    const other = 'other.jar' + old.slice(path.basename(jar).length);
+    for (const name of [old, newer, other, old + '.tmp']) await writeFile(path.join(folder, name), name);
+    manager = await reopen();
+    await manager.request('command', { id, command: 'start' });
+    assert.deepEqual(await manager.request('replace-backups', base), [newer, old]);
+    const restore = { ...base, start: true, backup: true };
+    for (const name of [other, '../' + old, old.replace('2026', '2000')]) {
+      await assert.rejects(manager.request('replace-restore', { ...restore, name }));
+    }
+    for (const options of [{ allowControl: false }, { allowEdit: false }]) {
+      await assert.rejects(manager.request('replace-restore', { ...restore, name: old }, options), /权限/);
+    }
+    assert.equal((await manager.request('statuses'))[0].state, 'running');
+    const result = await manager.request('replace-restore', { ...restore, name: old });
+    assert.equal(result.started, true);
+    assert.equal(await readFile(jar, 'utf8'), old);
+    assert.equal(await readFile(result.backup, 'utf8'), 'fixture');
+    assert.equal(await readFile(path.join(folder, old), 'utf8'), old);
+    assert.equal((await manager.request('statuses'))[0].state, 'running');
+    const stopped = await manager.request('replace-restore', { ...restore, name: newer, start: false, backup: false });
+    assert.equal(stopped.backup, '');
+    assert.equal(await readFile(jar, 'utf8'), newer);
+    assert.equal((await manager.request('statuses'))[0].state, 'stopped');
+    await rm(jar);
+    const recovered = await manager.request('replace-restore', { ...restore, name: old });
+    assert.equal(recovered.started, true);
+    assert.equal(recovered.backup, '');
+    assert.equal(await readFile(jar, 'utf8'), old);
+  }, fakeRuntime().dependencies);
+});
+
 test('replacement targets the script or program entry and respects backend permissions and execution mode', async () => {
   await fixture(async ({ manager, add, folder }) => {
     const script = path.join(folder, 'main.js'), program = path.join(folder, process.platform === 'win32' ? 'app.exe' : 'app');

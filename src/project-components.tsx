@@ -133,6 +133,7 @@ export function Modal({
           if (event.target.matches("input, select, textarea, [contenteditable=true]")) lastField.current = event.target;
         }}
         onCancel={(event) => {
+          if (event.target !== event.currentTarget) return;
           event.preventDefault();
           requestClose();
         }}

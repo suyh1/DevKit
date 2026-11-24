@@ -3,6 +3,54 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { BrowserWindow, dialog } = require('electron');
 
+// With an interactive Windows desktop, exercise the actual common file dialog.
+// Only click Cancel on the native dialog owned by this test window.
+async function cancelReplacementPicker(window, selector, js) {
+  await js(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new Event('cancel', { bubbles: true }))`);
+  assert.ok(await js(`!!document.querySelector(${JSON.stringify(selector)})`), 'A bubbling file-input cancel leaves the dialog open');
+  if (process.platform !== 'win32' || process.env.DEVKIT_TEST_NATIVE_PICKER !== '1') return;
+  const chooseAndWait = () => js(`new Promise((resolve, reject) => {
+    const input = document.querySelector(${JSON.stringify(selector)});
+    const timer = setTimeout(() => reject(new Error('No file chooser cancel event')), 20000);
+    input.addEventListener('cancel', event => { clearTimeout(timer); resolve(event.isTrusted); }, { once: true });
+    input.showPicker();
+  })`);
+  const script = `
+      Add-Type @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public class Picker {
+  [DllImport("user32.dll")] public static extern IntPtr GetLastActivePopup(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
+  [DllImport("user32.dll")] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+}
+'@
+      $owner = [IntPtr]::new(${window.getNativeWindowHandle().readBigUInt64LE()})
+      $deadline = [DateTime]::UtcNow.AddSeconds(12)
+      do {
+        $popup = [Picker]::GetLastActivePopup($owner)
+        $class = [Text.StringBuilder]::new(128)
+        $null = [Picker]::GetClassName($popup, $class, 128)
+        if ($popup -ne $owner -and $class.ToString() -eq '#32770') {
+          $cancel = [Picker]::GetDlgItem($popup, 2)
+          if ($cancel -ne [IntPtr]::Zero) {
+            if ([Picker]::PostMessage($cancel, 245, [IntPtr]::Zero, [IntPtr]::Zero)) { exit 0 }
+          }
+        }
+        Start-Sleep -Milliseconds 100
+      } while ([DateTime]::UtcNow -lt $deadline)
+      throw "No native Cancel button for owner $owner (popup $popup, class $class)"
+    `;
+  window.show();
+  const [, cancelled] = await Promise.all([
+    require('node:util').promisify(require('node:child_process').execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, timeout: 20000 }),
+    chooseAndWait(),
+  ]);
+  assert.equal(cancelled, true, 'The browser delivered a trusted file-input cancel event');
+}
+
 async function openShared(window, name, wait) {
   const selector = `#shared-sidebar-panel [title="${name}"]`;
   await window.webContents.executeJavaScript('document.querySelector(".shared-sidebar-trigger").click()');
@@ -186,6 +234,9 @@ module.exports = async (window, output) => {
     await wait(`!!document.querySelector('${replacement} input[type=file]')`);
     assert.deepEqual(await js(`[...document.querySelectorAll('${replacement} input[type=checkbox]')].map(input => input.checked)`), [true, true]);
     await js(`document.querySelectorAll('${replacement} input[type=checkbox]')[1].click()`);
+    await cancelReplacementPicker(window, replacement + ' input[type=file]', js);
+    assert.ok(await js(`!!document.querySelector('${replacement} input[type=file]')`), 'Cancel in the file chooser keeps the stopped-service dialog open');
+    assert.equal(await js(`document.querySelectorAll('${replacement} input[type=checkbox]')[1].checked`), false);
     const updatedJar = path.join(folder, 'updated.jar');
     await fs.writeFile(updatedJar, 'replacement fixture');
     window.webContents.debugger.attach('1.3');
@@ -323,6 +374,26 @@ module.exports = async (window, output) => {
         await click('控制台'); await wait('document.querySelector(".jar-console pre")?.textContent.includes("ECHO:console 中文")');
         await click('停止'); await wait('!!document.querySelector(".confirm-dialog[open]")'); await click('停止服务', '.confirm-dialog[open]');
         await wait('document.querySelector(".jar-status")?.textContent === "已停止"');
+        const request = async (action, payload) => {
+          const response = await js(`window.devkitJar.request(${JSON.stringify(action)},${JSON.stringify({ id: live.id, ...payload })})`);
+          assert.equal(response.error, undefined); return response.data;
+        };
+        const validJar = await fs.readFile(liveJar);
+        const { token } = await request('replace-begin', { expectedPath: live.jar });
+        await request('replace-chunk', { token, offset: 0, data: 'YWJj' });
+        const archived = await request('replace-finish', { token, size: 3, backup: true, start: false });
+        await click('替换服务文件', '.jar-instance td > .jar-row-actions');
+        await click('恢复历史备份', replacement);
+        await wait(`!!document.querySelector('${replacement} select option[value]:not([value=""])')`);
+        assert.equal(await js(`document.querySelector('${replacement} .run-button').disabled`), true);
+        await js(`{const s=document.querySelector('${replacement} select');s.value=${JSON.stringify(path.basename(archived.backup))};s.dispatchEvent(new Event('change',{bubbles:true}));}`);
+        await click('恢复并启动', replacement);
+        await wait(`document.querySelector('${replacement} [role=status]')?.textContent.includes('备份已恢复，服务已启动')`);
+        assert.deepEqual(await fs.readFile(liveJar), validJar);
+        assert.deepEqual(await fs.readFile(archived.backup), validJar);
+        const statuses = await request('statuses', {});
+        assert.equal(statuses.find(status => status.id === live.id).state, 'running');
+        await click('关闭', replacement);
       } finally { await js(`window.devkitJar.request('command',{id:${JSON.stringify(live.id)},command:'force-stop'})`); }
       await verifyLanHost(window, folder, liveJar, java.executable, click, wait);
     }

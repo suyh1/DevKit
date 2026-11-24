@@ -135,5 +135,5 @@
 | 接口模拟服务（`mock`） | OpenAPI/Swagger 定义或 JSON Schema |
 | 截图协作白板（`whiteboard`） | 图片文件名，如 screenshot.png |
 | Nginx 配置（`nginx`） | server、upstream 配置块或 proxy_pass 指令 |
-| 服务管理（`jar`） | JAR、可执行程序或脚本路径，java -jar、npm run、python3 main.py 或 node server.mjs 启动命令；打开相应登记表单并带入入口、JVM 参数、npm 脚本或应用参数。输入“替换服务文件”或“替换 JAR”打开服务列表，从中选择已登记实例 |
+| 服务管理（`jar`） | JAR、可执行程序或脚本路径，java -jar、npm run、python3 main.py 或 node server.mjs 启动命令；打开相应登记表单并带入入口、JVM 参数、npm 脚本或应用参数。输入“替换服务文件”“替换 JAR”“恢复服务备份”或“恢复 JAR 备份”打开服务列表，从中选择已登记实例 |
 | 局域网主机（`lan-hosts`） | IPv4 地址、SSH 地址或 ssh 连接命令 |
