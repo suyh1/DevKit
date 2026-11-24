@@ -49,9 +49,91 @@
 .portal-notice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--tint); font-size:13px; line-height:1.6; }
 .portal-empty { padding:40px 20px; text-align:center; }
 .portal-empty p { color:var(--muted); }
-.portal-login { max-width:480px; margin:8vh auto; }
-.portal-login form,.portal-login label { display:grid; gap:16px; }
-.portal-login input { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--text); }
+.portal-guest .portal-bar { padding-inline: clamp(8px, 2vw, 32px); }
+.portal-login-brand { display: flex; align-items: center; gap: 10px; }
+.portal-brand-context { margin-left: 4px; padding-left: 14px; border-left: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.portal-guest .portal-content {
+  display: flex;
+  padding: clamp(16px, 4vh, 40px) 8px;
+  scrollbar-gutter: auto;
+}
+.portal-login {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1fr);
+  width: min(100%, 920px);
+  margin: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.portal-login-host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--soft);
+}
+.portal-login-art {
+  flex: 1;
+  min-height: 280px;
+  background: #c5cfe6 url('./assets/portal-folder.webp') center / cover no-repeat;
+}
+:root[data-theme=dark] .portal-login-art { background-color: #a6b1c9; background-blend-mode: multiply; }
+.portal-host-caption { display: flex; align-items: center; gap: 12px; padding: 16px 24px; color: var(--muted); }
+.portal-host-caption > svg { flex: none; }
+.portal-host-caption > div { display: grid; gap: 2px; min-width: 0; }
+.portal-host-caption span { font-size: 12px; line-height: 1.5; }
+.portal-host-caption bdi { overflow-wrap: anywhere; font: 500 14px/1.5 var(--font-mono); color: var(--text); }
+.portal-login-body { min-width: 0; align-self: center; padding: clamp(32px, 4.5vw, 64px); }
+.portal-login-body h1 { margin: 0; color: var(--text); font-size: clamp(28px, 3vw, 36px); font-weight: 600; line-height: 1.25; }
+.portal-login-body > p { margin: 12px 0 32px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.portal-login-form, .portal-login-field { display: grid; min-width: 0; }
+.portal-login-form { gap: 20px; }
+.portal-login-field { gap: 8px; }
+.portal-login-form label { color: var(--text); font-size: 14px; font-weight: 600; }
+.portal-login-label { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; }
+.portal-login-label small { color: var(--muted); font-size: 12px; }
+.portal-login-field input.text-control {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+.portal-login-secret { position: relative; }
+.portal-login-form .portal-login-secret input.text-control { padding-inline-end: 48px; }
+.portal-login-secret > button {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+.portal-login-secret > button:is(:hover, :focus-visible) { color: var(--accent); background: var(--tint); }
+.portal-login-form > .run-button { width: 100%; min-height: 46px; margin: 4px 0 0; font-size: 15px; }
+.portal-login-form > .pc-error { margin: 0; overflow-wrap: anywhere; }
+.portal-login-form > .text-button { justify-self: center; }
+@media (max-width: 680px) {
+  .portal-login { grid-template-columns: minmax(0, 1fr); max-width: 448px; }
+  .portal-login-host { flex-direction: row; align-items: stretch; }
+  .portal-login-art { flex: 0 0 76px; min-height: 76px; }
+  .portal-host-caption { min-width: 0; padding: 12px 16px; }
+  .portal-host-caption > svg { display: none; }
+  .portal-login-body { padding: 28px clamp(8px, 4vw, 24px) 20px; }
+  .portal-login-body > p { margin: 8px 0 24px; }
+}
+@media (max-width: 360px) {
+  .portal-guest .portal-content { padding: 12px 2px; }
+  .portal-login-art { flex-basis: 56px; min-height: 64px; }
+  .portal-host-caption { padding: 8px 12px; }
+  .portal-login-body { padding: 24px 8px 12px; }
+}
 .workspace-portal .project-center,.workspace-portal .ng-center { padding:0; }
 .workspace-portal .pc-heading { padding-bottom:12px; margin-bottom:12px; }
 .workspace-portal .ng-heading { margin-bottom:16px; }

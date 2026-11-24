@@ -184,6 +184,32 @@ app
       window.show();
       window.focus();
       window.webContents.focus();
+      await wait('!!document.querySelector(".portal-login button[type=submit]:enabled")');
+      for (const [width, height] of [[1440, 900], [320, 568]]) {
+        window.setContentSize(width, height);
+        await wait(`Math.abs(innerWidth - ${width}) <= 1`);
+        assert.ok(await js(`(() => {
+          const panel = document.querySelector('.portal-login');
+          const fields = [...panel.querySelectorAll('input, button[type=submit]')].map(el => el.getBoundingClientRect());
+          return panel.querySelector('bdi').textContent === location.host &&
+            panel.scrollWidth <= panel.clientWidth && panel.getBoundingClientRect().right <= innerWidth &&
+            fields.every(r => Math.abs(r.width - fields[0].width) < 1 && r.height >= 44 && r.bottom <= innerHeight);
+        })()`), 'Host, both fields and the full-width login action fit the viewport');
+        await screenshot(width === 320 ? 'login-mobile' : 'login-desktop');
+      }
+      await selector('#visitor-login-name');
+      key('Tab');
+      await wait('document.activeElement.id === "visitor-login-password"');
+      key('Tab');
+      await wait('document.activeElement.matches("button[aria-label=显示口令]")');
+      key('Space');
+      await wait('document.querySelector("#visitor-login-password").type === "text"');
+      key('Space');
+      await wait('document.querySelector("#visitor-login-password").type === "password"');
+      key('Tab');
+      await wait('document.activeElement.matches("button[type=submit]")');
+      window.setContentSize(1440, 900);
+      await wait('innerWidth >= 1300');
       await login();
       console.log('Portal: authenticated');
       if (process.argv.includes('--select-only') || process.argv.includes('--legacy-popover')) {

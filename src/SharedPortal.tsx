@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { SunMoon, LogOut, Copy, Download, Menu, X, Search, ListOrdered, ChevronRight, Info } from "lucide-react";
+import { SunMoon, LogOut, Copy, Download, Menu, X, Search, ListOrdered, ChevronRight, Info, Code2, Eye, EyeOff, Server } from "lucide-react";
 import { workspaceModuleNav } from './ui';
 import { normalizeSharedModuleOrder, workspaceModules } from './catalog';
 import { WorkspaceFeedback } from './related-workspaces';
@@ -499,12 +499,25 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         .filter(Boolean)
         .join(" · ");
   const loginForm = (
-    <form onSubmit={(event) => void login(event)}>
-      <label>访客名称（共享口令登录可留空）<TextInput autoComplete="username" maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} /></label>
-      <div className="portal-password"><label htmlFor="visitor-login-password">访问口令</label>
-        <div className="password-entry"><TextInput id="visitor-login-password" type={showPassword ? "text" : "password"} autoComplete="current-password"
-          required value={password} onChange={event => setPassword(event.target.value)} />
-          <button type="button" className="text-button" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "隐藏口令" : "显示口令"}</button></div>
+    <form className="portal-login-form" onSubmit={(event) => void login(event)}>
+      <div className="portal-login-field">
+        <div className="portal-login-label">
+          <label htmlFor="visitor-login-name">访客名称</label>
+          <small id="visitor-login-hint">使用共享口令时可留空</small>
+        </div>
+        <TextInput id="visitor-login-name" autoComplete="username" aria-describedby="visitor-login-hint"
+          maxLength={48} value={visitor} onChange={event => setVisitor(event.target.value)} />
+      </div>
+      <div className="portal-login-field">
+        <label htmlFor="visitor-login-password">访问口令</label>
+        <div className="portal-login-secret">
+          <TextInput id="visitor-login-password" type={showPassword ? "text" : "password"} autoComplete="current-password"
+            required value={password} onChange={event => setPassword(event.target.value)} />
+          <button type="button" aria-label="显示口令" aria-pressed={showPassword}
+            title={showPassword ? "隐藏口令" : "显示口令"} onClick={() => setShowPassword(!showPassword)}>
+            {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+          </button>
+        </div>
       </div>
       <button type="submit" className="run-button" disabled={busy}>
         {busy ? "正在连接…" : "登录"}
@@ -526,10 +539,21 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     </form>
   );
   return (
-    <main className={`workspace-portal ${session?.authenticated ? 'portal-authenticated' : ''}`}>
+    <main className={`workspace-portal ${session?.authenticated ? 'portal-authenticated' : 'portal-guest'}`}>
       <header className="portal-bar" ref={bar}>
         {session?.authenticated && <button className="portal-menu-button secondary-button" aria-label="打开共享导航" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={18} /></button>}
-        <div className="portal-current"><strong>{session?.authenticated ? modules.find(item => item.id === page)?.name || '共享工作台' : 'DevKit 共享工作台'}</strong>{session?.authenticated && <small><span title={summary}>{summary}</span>{session.visitor && <span title={session.visitor}>{session.visitor}</span>}</small>}</div>
+        {session?.authenticated ? (
+          <div className="portal-current">
+            <strong>{modules.find(item => item.id === page)?.name || '共享工作台'}</strong>
+            <small><span title={summary}>{summary}</span>{session.visitor && <span title={session.visitor}>{session.visitor}</span>}</small>
+          </div>
+        ) : (
+          <div className="portal-login-brand">
+            <span className="brand-mark"><Code2 size={22} aria-hidden="true" /></span>
+            <span className="brand-word"><strong>DevKit<span>.</span></strong></span>
+            <span className="portal-brand-context">共享工作台</span>
+          </div>
+        )}
         <div className="portal-account">
           {session?.authenticated && <button data-search-capsule className="secondary-button" aria-label="搜索共享资源" onClick={event => { event.currentTarget.focus({ preventScroll: true }); setSearchOpen(true); }}><Search size={16} /></button>}
           {session?.authenticated && services.jar.enabled && services.jar.edit && <ConfigStorage key={workspaceEpoch} portal />}
@@ -559,12 +583,21 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             setOrder(next);
           }} />}
       </>}
-      <div key={workspaceEpoch} data-page={page} className={`portal-content ${page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
+      <div key={workspaceEpoch} data-page={page} className={`portal-content ${session?.authenticated && page === 'projects' ? 'portal-projects-content' : ''}`} ref={attachContent}>
         {!session?.authenticated ? (
-          <section className="portal-login">
-            <h1>登录共享工作台</h1>
-            <p>输入主机设置的访问口令，登录后只展示已开放的服务。</p>
-            {loginForm}
+          <section className="portal-login" aria-labelledby="portal-login-title">
+            <div className="portal-login-host">
+              <div className="portal-login-art" aria-hidden="true" />
+              <div className="portal-host-caption">
+                <Server size={20} aria-hidden="true" />
+                <div><span>共享主机</span><bdi>{location.host}</bdi></div>
+              </div>
+            </div>
+            <div className="portal-login-body">
+              <h1 id="portal-login-title">访客登录</h1>
+              <p>输入主机管理员提供的口令。</p>
+              {loginForm}
+            </div>
           </section>
         ) : (
           <WorkspaceFeedback>

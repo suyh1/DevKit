@@ -448,20 +448,6 @@
 .resource-copy.compact:is(:hover, :focus-within) input {
   display: block;
 }
-.password-entry {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.password-entry input {
-  flex: 1;
-  min-width: 0;
-}
-.password-entry button {
-  flex: none;
-  white-space: nowrap;
-}
-
 .impact-flow button {
   justify-self: start;
   padding: 3px 8px;
