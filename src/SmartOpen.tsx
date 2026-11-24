@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import { TextArea } from './TextControl';
 import { useRef, useState } from 'react';
 import { ArrowRight, ClipboardPaste, ScanLine } from 'lucide-react';
@@ -86,8 +85,8 @@ export default function SmartOpen({ onOpen }: { onOpen: (match: Suggestion) => v
       return <section key={kind} className="smart-open-results" aria-label={kind === 'tool' ? '本机工具' : '共享栏目'}>
         <p role="status">{kind === 'tool' ? '本机工具' : '共享栏目'} <span>{matches.length}</span></p>
         <div className="smart-suggestions">{matches.slice(0, 6).map(button)}</div>
-        {matches.length > 6 && <FloatingDetails><summary>更多匹配（{matches.length - 6}）</summary>
-          <div className="smart-suggestions">{matches.slice(6).map(button)}</div></FloatingDetails>}
+        {matches.length > 6 && <details><summary>更多匹配（{matches.length - 6}）</summary>
+          <div className="smart-suggestions disclosure-scroll">{matches.slice(6).map(button)}</div></details>}
       </section>;
     })}
   </section>;

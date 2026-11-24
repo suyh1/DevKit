@@ -456,7 +456,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
         </FloatingDetails>
       )}
       {edit && board && (
-        <FloatingDetails className="board-manage">
+        <details className="board-manage">
           <summary>管理画板</summary>
           <div className="collab-actions">
             {rename === undefined ? (
@@ -504,7 +504,7 @@ function BoardEditor({ id, active, edit, refreshList }: PageProps & { id: string
               删除白板
             </button>
           </div>
-        </FloatingDetails>
+        </details>
       )}
     </section>
   );

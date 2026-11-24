@@ -361,7 +361,7 @@ function SharingPanel({
                     onChange={(event) => setPassword(event.target.value)}
                   />
                 </Field>}
-                <FloatingDetails className="sharing-production">
+                <details className="sharing-production">
                   <summary>HTTPS 与证书</summary>
                   <label><input role="switch" className="liquid-toggle" type="checkbox" checked={!!draft.tls} onChange={event => setDraft({ ...draft, tls: event.target.checked ? { cert: '', key: '', hostname: '' } : null })} />使用 HTTPS</label>
                   {draft.tls && <div className="pc-form-grid">
@@ -369,7 +369,7 @@ function SharingPanel({
                     <Field label="PEM 私钥绝对路径"><TextInput required value={draft.tls.key} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, key: event.target.value } })} /></Field>
                     <Field label="证书对应域名或 IPv4"><TextInput placeholder="留空时使用主机 IP" value={draft.tls.hostname} onChange={event => setDraft({ ...draft, tls: { ...draft.tls!, hostname: event.target.value } })} /></Field>
                   </div>}
-                </FloatingDetails>
+                </details>
                 <div className="sharing-services-heading">
                   <h3>开放栏目</h3>
                   <p className="pc-hint">

@@ -5,7 +5,7 @@ import FileChecksums from './FileChecksums';
 import './workbench-extensions.css';
 import ResultSelection from './ResultSelection';
 import SegmentedControl from './SegmentedControl';
-import { MotionDrop, MotionButton, MotionPresence } from './Motion';
+import { MotionDetails, MotionDrop, MotionButton, MotionPresence } from './Motion';
 import { copyText } from './motion-primitives';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent } from 'react';
@@ -177,6 +177,6 @@ export default function ToolWorkspace({ task, preferences, onEdit, onRun, onCanc
     {active==='regex'&&<RegexCases options={task.options}/>}
     <UpgradePanel id={active} current={task.input}/>{active==='base64'&&<Base64Files/>}
     <ToolRecipes input={task.input} />
-    <FloatingDetails className="tool-help"><summary>使用提示与边界</summary><p>{experience.hint}</p><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></FloatingDetails>
+    <MotionDetails className="tool-help"><summary>使用提示与边界</summary><p>{experience.hint}</p><p>{tool.description}</p><p>输入上限 2,000,000 字符。正则任务超时 3 秒，其他文本任务 10 秒；可主动取消。JSON 结构预览保留数字原文与重复字段，支持最多 8,000 节点。</p><p>代码编辑器支持 Ctrl / Cmd + F 查找、撤销与重做；按 Esc 再按 Tab 离开编辑区。拖入文件会替换当前输入，可通过底部“撤销”恢复。</p></MotionDetails>
   </div>;
 }

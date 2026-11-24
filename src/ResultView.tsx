@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import ResultPager from './ResultPager';
 import SegmentedControl from './SegmentedControl';
@@ -42,7 +41,7 @@ function MatchView({ text, source }: { text: string; source: string }) {
     position = match.index + match.match.length;
   }
   fragments.push(source.slice(position));
-  return <div className="match-preview"><p className="preview-note">{data.count} 个匹配{data.limitReached ? '（达到结果上限）' : ''} · 预览前 200 项</p><pre className="match-source">{fragments}</pre>{data.matches.slice(0, 200).map((match, index) => <FloatingDetails className="match-item" key={index}><summary><span>#{index + 1} · 位置 {match.index}</span><code>{match.match || '空匹配'}</code></summary><pre>{JSON.stringify({ groups: match.groups, namedGroups: match.namedGroups }, null, 2)}</pre></FloatingDetails>)}</div>;
+  return <div className="match-preview"><p className="preview-note">{data.count} 个匹配{data.limitReached ? '（达到结果上限）' : ''} · 预览前 200 项</p><pre className="match-source">{fragments}</pre>{data.matches.slice(0, 200).map((match, index) => <MotionDetails className="match-item" key={index}><summary><span>#{index + 1} · 位置 {match.index}</span><code>{match.match || '空匹配'}</code></summary><pre className="disclosure-scroll">{JSON.stringify({ groups: match.groups, namedGroups: match.namedGroups }, null, 2)}</pre></MotionDetails>)}</div>;
 }
 
 function TableView({ node, query }: { node: JsonNode; query: string }) {

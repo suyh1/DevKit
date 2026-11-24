@@ -135,6 +135,12 @@ module.exports = async function inventoryNavigation(window, output) {
       await click(source);
       for (const width of [1340, 390]) {
         await resize(width);
+        const pathDetails = '.log-source-item:has(' + source + ') .path-summary';
+        await click(pathDetails + ' summary');
+        await wait(element(pathDetails) + '.open && document.activeElement === ' + element(pathDetails + ' summary'));
+        assert.equal(await js(element(pathDetails + ' > code') + '.innerText'), '/fixture/' + (sources - 1) + '.log');
+        assert.equal(await js(element(pathDetails + ' [popover]') + ' === null'), true);
+        await click(pathDetails + ' summary');
         await click('.log-show-output');
         await wait('document.activeElement.matches(".log-pane[data-focused=true] pre") && document.activeElement.textContent.includes("log-' + (sources - 1) + '")');
         await wait(visible('.log-pane[data-focused=true] pre'));

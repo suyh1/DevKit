@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import PathSummary from './PathSummary';
 import Skeleton from './Skeleton';
@@ -140,9 +139,9 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
         {!!availableCreation.length && <div className="log-actions">{availableCreation.map(({ page, label }) =>
           <CreateRelated key={page} from="logs" page={page} beforeOpen={page === 'lan-hosts' ? undefined : () => guard('logs', page)}>{label}</CreateRelated>
         )}</div>}
-        {!!restrictedCreation.length && <FloatingDetails className="log-source-permissions"><summary>来源管理权限</summary>
+        {!!restrictedCreation.length && <details className="log-source-permissions"><summary>来源管理权限</summary>
           {restrictedCreation.map(item => <p key={item.page}>{item.label} · {item.reason}</p>)}
-        </FloatingDetails>}
+        </details>}
         <div className="log-source-list" onTouchStart={e => {
           const layout = e.currentTarget.closest('.log-layout');
           touchStart.current = !paused && !loading && layout && getComputedStyle(layout).display === 'block' && e.currentTarget.scrollTop <= 0 && e.touches.length === 1 ? {y:e.touches[0].clientY,x:e.touches[0].clientX} : null;
@@ -159,7 +158,7 @@ export default function LogCenter({ active = true }: { active?: boolean }) {
           <label><input className="form-check" type="checkbox" data-source-id={item.id} checked={selected.includes(item.id)} disabled={!selected.includes(item.id) && selected.length >= 4} onChange={() => toggle(item.id)} /><strong>{item.name}</strong></label>
           {item.mode === 'console' ? <small>标准输出 / 错误</small> : <PathSummary label={item.kind === 'jar' ? '服务' : 'Nginx'} path={item.path} />}
         </div>)}</section>)}{!matching.length && (hostLoad === 'pending' || loading && !hostLoad) ? <Skeleton kind="list" label="正在读取日志来源…" /> : !matching.length && <p>{hostLoad === 'failed' ? '读取目标主机的日志来源失败，请查看来源提示。' : missingHost ? '目标主机已移除或当前访客无权查看其日志。' : '暂无匹配的日志来源。'}</p>}</div>
-        {!!catalog.warnings.length && <FloatingDetails className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</FloatingDetails>}
+        {!!catalog.warnings.length && <details className="log-warnings"><summary>来源提示（{catalog.warnings.length}）</summary>{catalog.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</details>}
       </aside>
       <div className="source-resizer" role="separator" aria-orientation="vertical" aria-label="调整日志来源宽度" aria-valuenow={sourceWidth} aria-valuemin={160} aria-valuemax={480} tabIndex={0}
         onDoubleClick={() => setSourceWidth(220)} onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); resize(sourceWidth + (e.key === 'ArrowRight' ? 10 : -10)); } else if (e.key === 'Home') setSourceWidth(220); }}

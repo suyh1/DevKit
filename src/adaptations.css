@@ -474,3 +474,8 @@
   outline: var(--focus-outline);
   outline-offset: -2px;
 }
+.disclosure-scroll {
+  max-block-size: min(12rem, 28dvh);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}

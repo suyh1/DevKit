@@ -10,7 +10,15 @@ module.exports = async function geographySmoke(window, output) {
   const click = async label => { await js(`document.querySelector('${pane} [aria-label=${JSON.stringify(label)}]').click()`); };
   const set = async (label, value) => { await js(`{ const el = document.querySelector('${pane} [aria-label=${JSON.stringify(label)}]'); if (el.getAttribute('role') === 'group') { [...el.querySelectorAll('button')].find(button => button.value === ${JSON.stringify(value)}).click(); } else { const proto = el.tagName === 'SELECT' ? HTMLSelectElement : el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement; Object.getOwnPropertyDescriptor(proto.prototype,'value').set.call(el,${JSON.stringify(value)}); el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input',{bubbles:true})); } }`); };
   const run = async () => { await js(`document.querySelector('${pane} .run-button').click()`); await wait(`!!document.querySelector('${pane} .status-success')`); };
-  const copy = async label => { await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()'); await wait('!document.querySelector(".app-toast")'); await clipboard.clear(); await click(label); await wait(`document.querySelector('.app-toast')?.textContent.includes('已复制坐标')`); return (await clipboard.readText()).replace(/\r\n/g, '\n'); };
+  const copy = async label => {
+    window.focus(); window.webContents.focus();
+    await wait('document.hasFocus()');
+    await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
+    await wait('!document.querySelector(".app-toast")');
+    await clipboard.clear(); await click(label);
+    await wait(`document.querySelector('.app-toast')?.textContent.includes('已复制坐标')`);
+    return (await clipboard.readText()).replace(/\r\n/g, '\n');
+  };
   assert.match(await js(`document.querySelector('${pane} .geo-output').textContent`), /116°23′28.68″E/);
   assert.equal(await copy('复制全部坐标'), '116.391300,39.907500');
   assert.equal(await copy('复制经度十进制度'), '116.391300');
@@ -51,6 +59,7 @@ module.exports = async function geographySmoke(window, output) {
   assert.ok(all.startsWith('纬度\t经度\n39.907500\t116.391300'));
   assert.equal(all.includes('点位'), false);
   assert.match(await js(`document.querySelector('${pane} .geo-issues').textContent`), /180/);
+  await checkIssueDisclosure();
   await set('重复点', 'on'); await run();
   assert.equal(await js(`document.querySelectorAll('${pane} .geo-table tbody tr').length`), 2);
   // Use the repeating-fraction coordinate from row two; do not overwrite the transferred center with a sample.
@@ -95,5 +104,59 @@ module.exports = async function geographySmoke(window, output) {
   }
   window.setSize(1440, 1000);
   await fs.writeFile(path.join(output, 'geography-report.json'), JSON.stringify({ conversion: true, pastePair: true, pastePreservesDms: true, extractedCenterPreservesSource: true, singleCopyMatchesVisibleFormat: true, hiddenExtractionNotUsedForEmptyConversion: true, ellipsoidAndSphere: true, fourDirections: true, extraction: true, extractedCenterCalculatedWithoutReplacing: true, calculatedPointConverted: true, actualClipboard: true, columnAndTsv: true, rejectedCoordinates: true, tabCache: true, dedupe: true, responsiveThemes: true }, null, 2));
+  async function checkIssueDisclosure() {
+    const input = '包含度分秒坐标的文本';
+    const saved = await js(`document.querySelector('${pane} [aria-label="${input}"]').value`);
+    const details = `document.querySelector('${pane} .geo-issues')`;
+    const summary = details + '.querySelector("summary")';
+    await js('document.querySelector(\'button[aria-label="关闭通知"]\')?.click()');
+    const key = keyCode => {
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+    };
+    for (const width of [1340, 390]) {
+      window.setContentSize(width, 844);
+      await wait(width < 500 ? 'innerWidth < 450' : 'innerWidth > 1200');
+      assert.equal(await js(`(() => {
+        const groups = [...document.querySelectorAll('${pane} .geo-output .geo-format .segmented-control')];
+        return groups.length === 4 && groups.every(group => {
+          const buttons = [...group.querySelectorAll('button')];
+          const first = buttons[0].getBoundingClientRect();
+          return first.width > 0 && buttons.every(button =>
+            button.getBoundingClientRect().top === first.top && button.scrollWidth <= button.clientWidth + 1);
+        });
+      })()`), true, 'Inline export settings keep every choice visible on a single line');
+      for (const count of [1, 200]) {
+        await set(input, ['东经116度0分0秒，北纬39度0分0秒', ...Array(count).fill('东经181度0分0秒，北纬39度0分0秒')].join('\n'));
+        await run();
+        await wait(summary + '.textContent.includes("待核对 ' + count + ' 项")');
+        window.focus(); window.webContents.focus();
+        await js(summary + '.scrollIntoView({block:"center",behavior:"instant"});' + summary + '.focus({preventScroll:true})');
+        await wait('document.hasFocus() && document.activeElement === ' + summary);
+        const height = await js(details + '.offsetHeight');
+        key('Space');
+        await wait(details + '.open');
+        if (count === 1) {
+          await wait(`${details}.offsetHeight > ${height} && document.activeElement === ${summary}`);
+          assert.equal(await js(details + '.querySelector("[popover]") === null'), true);
+          assert.equal(await js(details + '.querySelector("code").innerText.includes("181")'), true);
+        } else {
+          const body = details + '.querySelector(".floating-details-body")';
+          await wait(details + '.querySelector("[popover]").matches(":popover-open") && ' + body + '.scrollHeight > ' + body + '.clientHeight');
+          assert.equal(await js(details + '.offsetHeight'), height, 'Opening long results leaves the underlying layout in place');
+          await js(body + '.scrollTop = ' + body + '.scrollHeight');
+        }
+        if (width === 390) {
+          await js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+          await fs.writeFile(path.join(output, 'geo-issues-' + count + '-narrow.png'), (await window.webContents.capturePage()).toPNG());
+        }
+        key(count === 1 ? 'Space' : 'Escape');
+        await wait(`!${details}.open && document.activeElement === ${summary}`);
+      }
+    }
+    window.setContentSize(1440, 1000);
+    await set(input, saved);
+    await run();
+  }
   async function runError() { await js(`document.querySelector('${pane} .run-button').click()`); await wait(`!!document.querySelector('${pane} .status-error')`); }
 };

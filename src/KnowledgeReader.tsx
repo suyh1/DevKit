@@ -16,6 +16,7 @@ export function KnowledgeReader({
   jump?: { id: string; line: number };
 }) {
   const content = useMemo(() => articleLayout(page.body), [page.body]);
+  const ContentsDetails = content.headings.length > 6 ? FloatingDetails : 'details';
   const root = useRef<HTMLDivElement>(null),
     guard = useWorkspaceGuard();
   useCodeBlockColors(root, content.html);
@@ -40,9 +41,9 @@ export function KnowledgeReader({
   return (
     <>
       {content.headings.length > 0 && (
-        <FloatingDetails className="kb-toc">
+        <ContentsDetails className="kb-toc">
           <summary>本文目录 · {content.headings.length}</summary>
-          <nav aria-label="本文目录">
+          <nav aria-label="本文目录" className={ContentsDetails === 'details' ? 'disclosure-scroll' : undefined}>
             {content.headings.map((h) => (
               <div key={h.key} style={{ paddingInlineStart: Math.max(0, h.level - 2) * 10 }}>
                 <button
@@ -65,7 +66,7 @@ export function KnowledgeReader({
               </div>
             ))}
           </nav>
-        </FloatingDetails>
+        </ContentsDetails>
       )}
       <div
         className="kb-prose"

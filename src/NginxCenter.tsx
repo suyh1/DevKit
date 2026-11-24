@@ -1,5 +1,4 @@
 import { Modal as WorkspaceDialog } from './project-components';
-import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import { navigateTabList } from './tab-navigation';
 import PathSummary, { pathSuffix } from './PathSummary';
@@ -112,7 +111,7 @@ function InstanceForm({ active, instance, platform, groups, busy, error, submit,
         const found = await nginxRequest<NginxDetection>('detect', { ...draft, hostId }); setDetection(found.output);
         if (found.found) patch({ executable: found.executable, ...(setup === 'existing' ? { prefix: found.prefix } : {}) });
       })}><Search size={14} />{setup === 'create' ? '检测 nginx' : '检测 nginx 并填入运行目录'}</button></div>
-      {detection && <FloatingDetails className="ng-detection-panel"><summary>{detection.split(/\r?\n/)[0]}<small>查看详情</small></summary><pre className="ng-detection">{detection}</pre></FloatingDetails>}
+      {detection && <details className="ng-detection-panel"><summary>{detection.split(/\r?\n/)[0]}<small>查看详情</small></summary><pre className="ng-detection">{detection}</pre></details>}
       {setup === 'existing' && <><label>附属文件（每行一个绝对路径）<TextArea rows={4} aria-describedby={hintId('files')} value={manualFiles} onChange={event => setManualFiles(event.target.value)} placeholder="可自动解析 include，也可手动添加未引用的配置文件" />{hint('files')}</label>
       <button type="button" hidden={!canPick} className="file-pick-button" onClick={() => setPicker('files')}><Plus size={14} />选择附属文件</button>
       {warnings.length > 0 && <div className="ng-warning">{warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}</>}
@@ -425,9 +424,9 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
                 <MotionButton busy={busy} type="button" className="text-button ng-instance-delete" disabled={busy || !currentEdit} onClick={() => deleteInstance(current)}><Trash2 size={15} />删除实例</MotionButton>
               </div>
             </header>
-            <FloatingDetails key={current.id} className="ng-runtime">
+            <MotionDetails key={current.id} className="ng-runtime">
               <summary><ChevronRight size={14} /><strong>实例路径</strong><span>{hostFor(current)?.name || (remoteAccess() ? '共享主机' : '本机')} · {pathSuffix(current.main, state.instances.map(item => item.main))}</span></summary>
-              <dl>
+              <dl className="disclosure-scroll">
                 {hostFor(current) && <><dt>目标主机</dt><dd>{hostFor(current)!.name} · {hostRole(hostFor(current)!)} · {hostAccessLabel(hostFor(current)!)}</dd></>}
                 <dt>主配置</dt><dd>{current.main}</dd>
                 <dt>运行目录</dt><dd>{current.prefix}</dd>
@@ -435,7 +434,7 @@ export default function NginxCenter({ active, scrollRoot }: { active: boolean; s
                 {status?.pidPath && <><dt>PID 文件</dt><dd>{status.pidPath}</dd></>}
                 {status?.detail && <><dt>运行状态</dt><dd>{status.detail}</dd></>}
               </dl>
-            </FloatingDetails>
+            </MotionDetails>
             <div className="ng-status-connection" role="status" data-stale={statusStale}>
               <span>{statusError || (statusChecking ? '正在读取运行状态…' : '状态信息已更新')}{statusTime > 0 && <small>上次读取：{new Date(statusTime).toLocaleTimeString()}</small>}</span>
               <button type="button" className="text-button" disabled={busy || statusChecking} onClick={() => void task(refreshStatuses)}>重新确认状态</button>

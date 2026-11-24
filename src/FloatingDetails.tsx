@@ -10,7 +10,7 @@ import {
   type ReactElement,
   type HTMLAttributes,
 } from 'react';
-import { X } from 'lucide-react';
+import { AppWindow, X } from 'lucide-react';
 import './floating-details.css';
 import { followSurfaceHost, surfaceHostVisible } from './surface-visibility';
 
@@ -57,7 +57,8 @@ export default function FloatingDetails({
         onToggle?.(event);
       }}
     >
-      {cloneElement(trigger, { 'aria-controls': id, 'aria-haspopup': 'dialog' })}
+      {cloneElement(trigger, { 'aria-controls': id, 'aria-haspopup': 'dialog' },
+        trigger.props.children, <AppWindow className="floating-details-icon" size={14} aria-hidden />)}
       <section
         id={id}
         ref={panel}

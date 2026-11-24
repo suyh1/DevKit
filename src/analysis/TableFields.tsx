@@ -1,4 +1,3 @@
-import FloatingDetails from '../FloatingDetails';
 import { useMemo } from 'react';
 import { parseCsv } from '../practical';
 const eligible = new Set(['reconcile', 'pivot', 'pseudonym']);
@@ -38,9 +37,9 @@ export default function TableFields({
     .map((x) => x.trim())
     .filter(Boolean);
   return (
-    <FloatingDetails className="analysis-file">
+    <details className="analysis-file">
       <summary>从表头选择字段</summary>
-      <div className="analysis-fields field-choices">
+      <div className="analysis-fields field-choices disclosure-scroll">
         {header.map((name, i) => (
           <label key={i}>
             <input
@@ -68,6 +67,6 @@ export default function TableFields({
           </select>
         </label>
       )}
-    </FloatingDetails>
+    </details>
   );
 }

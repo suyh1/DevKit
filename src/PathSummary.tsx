@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import './path-summary.css';
 
 /** Keep the file and its nearest parent, adding ancestors for otherwise identical labels. */
@@ -13,8 +12,8 @@ export function pathSuffix(path: string, others: string[] = []) {
 }
 
 export default function PathSummary({ path, label, others }: { path: string; label: string; others?: string[] }) {
-  return <FloatingDetails className="path-summary">
+  return <details className="path-summary">
     <summary title={path}><span>{label} · {pathSuffix(path, others)}</span></summary>
-    <code>{path}</code>
-  </FloatingDetails>;
+    <code className="disclosure-scroll">{path}</code>
+  </details>;
 }

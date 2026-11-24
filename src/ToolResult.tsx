@@ -1,7 +1,6 @@
-import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useMemo, useState } from 'react';
-import { MotionButton } from './Motion';
+import { MotionDetails, MotionButton } from './Motion';
 import type { JsonChange } from './structured-diff';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import type { Options, ToolId } from './tools';
@@ -39,13 +38,13 @@ function EnvChanges({ text, source, target }: { text: string; source: string; ta
     <SegmentedControl label="差异类型" value={group}
       options={Object.entries(groups).map(([name, items]) => ({ value: name, label: name + ' · ' + items.length }))}
       onChange={name => { setGroup(name); setPage(0); }} />
-    {keys.slice(current * 50, current * 50 + 50).map(key => <FloatingDetails key={key} className="workbench-disclosure env-change">
+    {keys.slice(current * 50, current * 50 + 50).map(key => <MotionDetails key={key} className="workbench-disclosure env-change">
       <summary><code>{key}</code></summary>
-      <dl>{values.map((side, i) => <div key={i}>
+      <dl className="disclosure-scroll">{values.map((side, i) => <div key={i}>
         <dt>{i === 0 ? '左侧' : '右侧'}</dt>
         <dd><code>{Object.hasOwn(side, key) ? JSON.stringify(side[key]) : '缺失'}</code></dd>
       </div>)}</dl>
-    </FloatingDetails>)}
+    </MotionDetails>)}
     {!keys.length && <p className="preview-note" role="status">此组没有差异</p>}
     <ResultPager page={current} pages={pages} onPage={setPage} />
   </div>;

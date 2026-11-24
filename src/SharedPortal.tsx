@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import ConfigStorage from './ConfigStorage';
 import AboutDetails from './AboutDetails';
 import { TextInput } from './TextControl';
@@ -569,7 +568,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
           </section>
         ) : (
           <WorkspaceFeedback>
-            {active?.enabled && <div className="portal-context-row"><FloatingDetails className="portal-access">
+            {active?.enabled && <div className="portal-context-row"><details className="portal-access">
               <summary>主机与权限 <span>{location.host}</span></summary>
               <p>{summary}。{{
                 projects: '从当前浏览器打开入口，检测由共享主机发起。',
@@ -587,7 +586,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 nginx: '配置和运行操作作用于选中的实例主机。',
                 http: '由共享主机发送请求；快速请求集合保存在当前浏览器。',
               }[page]}</p>
-            </FloatingDetails><div className="portal-module-actions" ref={setCollaborationActions} /></div>}
+            </details><div className="portal-module-actions" ref={setCollaborationActions} /></div>}
             {notice && (
               <div className="portal-notice" role="status">
                 <span>{notice}</span>

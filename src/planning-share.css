@@ -148,7 +148,7 @@
 .pl-share-detail > header > div:first-child { flex: 1 1 140px; min-width: 0; }
 .pl-share-detail header h2 { font-size: 16px; }
 .pl-share-detail-body { display: grid; gap: 12px; padding: 12px; }
-.pl-share-detail-title, .pl-share-links > div { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
+.pl-share-detail-title, .pl-share-links li { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
 .pl-share-detail-title small, .pl-share-roots small, .pl-share-roots code { color: var(--pl-quiet); font-size: 11px; }
 .pl-share-endpoint { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--pl-line); border-radius: 7px; background: var(--pl-wash); }
 .pl-share-endpoint code { color: var(--accent); font: 600 14px var(--pl-mono); }
@@ -156,7 +156,8 @@
 .pl-share-endpoint strong { font-weight: 580; }
 .pl-share-endpoint span, .pl-share-endpoint svg { color: var(--pl-quiet); font-size: 12px; }
 .pl-share-links { display: grid; gap: 4px; }
-.pl-share-links > div { min-height: 32px; border-bottom: 1px solid var(--pl-line); }
+.pl-share-links ul { list-style: none; margin: 0; padding: 0; }
+.pl-share-links li { min-height: 32px; border-bottom: 1px solid var(--pl-line); }
 .pl-share-links code { font-size: 12px; }
 .pl-share-roots { border: 1px solid var(--pl-line); border-radius: 7px; }
 .pl-share-roots > li { display: flex; align-items: start; gap: 8px; padding: 8px; color: var(--pl-quiet); }

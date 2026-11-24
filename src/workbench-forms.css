@@ -62,7 +62,7 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 }
 .workbench-disclosure > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:24px; list-style:none; font-weight:600; cursor:pointer; }
 .workbench-disclosure > summary::-webkit-details-marker { display:none; }
-.workbench-disclosure > summary::after { content:''; flex:none; width:7px; height:7px; margin-inline-end:4px; border:solid var(--muted); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
+.workbench-disclosure:where(:not(.floating-details)) > summary::after { content:''; flex:none; width:7px; height:7px; margin-inline-end:4px; border:solid var(--muted); border-width:0 1.5px 1.5px 0; transform:rotate(45deg); }
 .workbench-disclosure[open] > summary::after { transform:rotate(225deg); }
 .workbench-disclosure[data-motion-expanding=false] > summary::after { transform:rotate(45deg); }
 @media (prefers-reduced-motion:no-preference) {
@@ -111,7 +111,7 @@ input[type=checkbox]:is(.form-check,.liquid-toggle):focus-visible { outline:var(
 .env-changes > .segmented-control { justify-self:start; max-width:100%; }
 .env-change { padding:8px 12px; }
 .env-change summary code { overflow-wrap:anywhere; }
-.env-change dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; border:1px solid var(--line); border-radius:6px; overflow:hidden; margin:0; background:var(--line); }
+.env-change dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; border:1px solid var(--line); border-radius:6px; margin:0; background:var(--line); }
 .env-change dl > div { padding:8px 12px; background:var(--soft); }
 .env-change dt { font-size:12px; color:var(--muted); }
 .env-change dd { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }

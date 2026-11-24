@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import { TextArea, TextInput } from './TextControl';
 import SegmentedControl from './SegmentedControl';
 import { newProjectId } from './project-api';
@@ -87,7 +86,7 @@ export function ApiParameters({
                           patch(row.id, { name: event.target.value })
                         }
                       />
-                      <FloatingDetails className="api-parameter-schema">
+                      <details className="api-parameter-schema">
                         <summary>约束Schema</summary>
                         <TextArea
                           aria-label={`参数${index + 1}Schema`}
@@ -98,7 +97,7 @@ export function ApiParameters({
                           }
                           placeholder='{"minLength":1}'
                         />
-                      </FloatingDetails>
+                      </details>
                     </div>
                   )}
                 </td>

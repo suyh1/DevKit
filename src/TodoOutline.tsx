@@ -1,4 +1,3 @@
-import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useState } from 'react';
 import { CalendarDays, GitBranch, ListTree, Play } from 'lucide-react';
@@ -97,7 +96,7 @@ export default function TodoOutline({ model, today, jump }: { model: TodoModel; 
             <progress aria-label="验收进度" value={checked} max={item.checks.length} />
           </span> : <small>{item.line}</small>}
         </button>
-        <div className="td-outline-details">{item.checks.length > 0 && <FloatingDetails><summary>验收明细</summary>{item.checks.map(check => <button key={check.line} onClick={() => jump(check.line)}>{check.checked ? '已验收' : '待验收'} · {check.text}</button>)}</FloatingDetails>}
+        <div className="td-outline-details">{item.checks.length > 0 && <details><summary>验收明细</summary><div className="disclosure-scroll">{item.checks.map(check => <button key={check.line} onClick={() => jump(check.line)}>{check.checked ? '已验收' : '待验收'} · {check.text}</button>)}</div></details>}
           {resume && <button type="button" className="td-outline-resume" onClick={() => jump(resume.line)}><Play size={12} aria-hidden="true" /><span>继续做 · {resume.text}</span></button>}
           {!item.archived && item.status === 'open' && item.waiting && <small data-due={followUp}>
             <CalendarDays size={12} aria-hidden="true" /><span>{followUp ? '回访到期' : '等待回访'}{item.waiting.person && ` · ${item.waiting.person}`}{item.waiting.review && ` · ${item.waiting.review}`}</span>

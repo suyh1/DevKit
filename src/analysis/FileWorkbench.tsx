@@ -347,11 +347,11 @@ export default function FileWorkbench({ id, preset }: { id: string; preset?: Rec
               </button>
             )}
           </div>
-          <FloatingDetails className="file-guide"><summary>文件格式与使用说明</summary>
+          <details className="file-guide"><summary>文件格式与使用说明</summary>
           <p className="file-description">
             {byAnalysis.get(id)?.description ?? '选择二维码图片，或聚焦此区域后粘贴截图。'}
           </p>
-          </FloatingDetails>
+          </details>
         </section>
         <section className="file-output-panel">
           {isKit ? (

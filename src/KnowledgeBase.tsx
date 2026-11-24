@@ -1,5 +1,4 @@
 import { Modal as WorkspaceDialog } from './project-components';
-import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, FolderPlus, Plus, RefreshCw, Search } from 'lucide-react';
@@ -327,7 +326,7 @@ export default function KnowledgeBase({
                 </button>
               </form>{error && <p role="alert">{error}</p>}</WorkspaceDialog>
             )}
-            <FloatingDetails className="kb-filters"><summary>项目与标签{(project || tag) && ' · '+[project,tag].filter(Boolean).join(' / ')}</summary>
+            <details className="kb-filters"><summary>项目与标签{(project || tag) && ' · '+[project,tag].filter(Boolean).join(' / ')}</summary>
             <div className="kb-fields">
               <select aria-label="筛选项目" value={project} onChange={(e) => setProject(e.target.value)}>
                 <option value="">全部项目</option>
@@ -342,16 +341,18 @@ export default function KnowledgeBase({
                 ))}
               </select>
             </div>
-            </FloatingDetails>
+            </details>
             {drafts.length > 0 && (
-              <FloatingDetails className="kb-drafts">
+              <details className="kb-drafts">
                 <summary>本机草稿 · {drafts.length}</summary>
-                {drafts.map((d) => (
-                  <button className="text-button" key={d.token} onClick={() => navigate('write:' + d.token)}>
-                    {d.form.title || '无标题草稿'} · 继续写作
-                  </button>
-                ))}
-              </FloatingDetails>
+                <div className="disclosure-scroll">
+                  {drafts.map((d) => (
+                    <button className="text-button" key={d.token} onClick={() => navigate('write:' + d.token)}>
+                      {d.form.title || '无标题草稿'} · 继续写作
+                    </button>
+                  ))}
+                </div>
+              </details>
             )}
             {related && (
               <div className="kb-scope">

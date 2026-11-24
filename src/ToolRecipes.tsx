@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { defaultOptions, tools, type Options, type ToolId } from './tools';
 import { CaseList, validCases, type RegressionCase } from './analysis/Cases';
 import ToolOptions from './ToolOptions';
-import { MotionButton } from './Motion';
+import { MotionDetails, MotionButton } from './Motion';
 import { copyText } from './motion-primitives';
 
 const allowed: ToolId[] = [
@@ -270,11 +270,11 @@ export default function ToolRecipes({ input }: { input: string }) {
       )}
       <pre role="status">{message}</pre>
       {report.map((row, i) => (
-        <FloatingDetails key={i} className="workbench-disclosure recipe-result">
+        <MotionDetails key={i} className="workbench-disclosure recipe-result">
           <summary>
             {i + 1}. {row.name} · {row.error ? '失败' : '完成'}
           </summary>
-          <div className="recipe-result-values">
+          <div className="recipe-result-values disclosure-scroll">
             <figure>
               <figcaption>输入{previewLength(row.input)}</figcaption>
               <pre>{row.input.slice(0, previewLimit)}</pre>
@@ -302,7 +302,7 @@ export default function ToolRecipes({ input }: { input: string }) {
               复制完整输出
             </MotionButton>
           )}
-        </FloatingDetails>
+        </MotionDetails>
       ))}
     </FloatingDetails>
   );

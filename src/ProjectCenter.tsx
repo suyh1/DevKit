@@ -1,6 +1,6 @@
 import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
-import { useMotionList, useSkeletonMorph, MotionButton, MotionPresence } from './Motion';
+import { MotionDetails, useMotionList, useSkeletonMorph, MotionButton, MotionPresence } from './Motion';
 import { buttonFeedback, copyText } from './motion-primitives';
 import ProjectComparison from './ProjectComparison';
 import './features.css';
@@ -908,7 +908,7 @@ export default function ProjectCenter({
                       {project.description}
                     </p>
                   )}
-                  <FloatingDetails className="pc-address">
+                  <MotionDetails className="pc-address">
                     <summary
                       aria-label={`展开 ${project.name} 完整地址`}
                       title={result.error || result.url}
@@ -918,10 +918,10 @@ export default function ProjectCenter({
                       </code>
                       <ChevronDown size={13} />
                     </summary>
-                    <div>
+                    <div className="disclosure-scroll">
                       <code>{result.error || result.url}</code>
                     </div>
-                  </FloatingDetails>
+                  </MotionDetails>
                   {result.missingVariables.length > 0 && canEdit && <button type="button" className="text-button pc-repair-variable" onClick={() => manageVariables(result.missingVariables)}>填写缺少的变量：{result.missingVariables.join('、')}</button>}
                   {portal && result.localOnly && (
                     <small className="pc-invalid">

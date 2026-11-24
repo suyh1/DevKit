@@ -44,6 +44,35 @@ module.exports = async function analysisWorkflows(window) {
         ')',
     );
   }
+  await open('json-csv');
+  const records = Array.from({ length: 52 }, (_, i) => ({ id: i, name: i === 51 ? '长文本'.repeat(100) : '简短值' }));
+  await wait('JSON 输入编辑器', '!!' + find('.input-card .cm-content'));
+  await js(find('.input-card .cm-content') + '.focus()');
+  await window.webContents.insertText(JSON.stringify(records));
+  await js(find('.run-button') + '.click()');
+  const nextPage = find('.analysis-data [aria-label=下一页]');
+  await wait('表格分页', nextPage + ' && !' + nextPage + '.disabled');
+  await js(nextPage + '.click()');
+  const inline = find('.analysis-row-toggle[aria-expanded]'), long = find('.analysis-row-toggle[aria-haspopup=dialog]');
+  const size = window.getSize(), minimum = window.getMinimumSize();
+  try {
+    window.setMinimumSize(360, 600);
+    for (const width of [1340, 390]) {
+      window.setContentSize(width, 844);
+      await wait('窗口调整宽度', width < 500 ? 'innerWidth < 450' : 'innerWidth > 1200');
+      await js(inline + '.focus();' + inline + '.click()');
+      await wait('简短记录在行下展开', find('tr.analysis-row-detail') + '?.innerText.includes("简短值") && document.activeElement === ' + inline);
+      assert.equal(await js('!!document.querySelector("dialog[open]")'), false);
+      await js(inline + '.click()');
+      await js(long + '.focus();' + long + '.click()');
+      await wait('长记录的完整内容', find('dialog[open] .analysis-row-detail') + '?.textContent.includes(' + JSON.stringify(records[51].name) + ')');
+      await js(find('button[aria-label=关闭记录详情]') + '.click()');
+      await wait('返回原记录与页码', 'document.activeElement === ' + long + ' && ' + long + '.textContent === "51"');
+    }
+  } finally {
+    window.setSize(...size);
+    window.setMinimumSize(...minimum);
+  }
   for (const [id, expected] of Object.entries({
     diff: '冲突',
     json: '"patch"',
