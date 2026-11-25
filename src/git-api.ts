@@ -10,7 +10,7 @@ declare global {
 export type GitMode = 'changes' | 'history' | 'refs' | 'stash';
 export type RepoLevel = 'none' | 'history' | 'worktree' | 'edit' | 'sync' | 'collaborate';
 export type RepoPolicy = { default: RepoLevel; visitors: { name: string; level: RepoLevel }[] };
-export type GitSeed = { mode: GitMode; clone?: string; branch?: string; path?: string; staged?: boolean; compose?: boolean; push?: boolean };
+export type GitSeed = { mode: GitMode; clone?: string; branch?: string; path?: string; staged?: boolean; compose?: boolean; amend?: boolean; push?: boolean };
 export type Repository = {
   id: string;
   name: string;

@@ -328,7 +328,7 @@ export function detectTools(input: string): Suggestion[] {
       return [...matches.values()];
     }
   }
-  const gitCommand = /^git\s+(status|diff|add|restore|commit|log|show|branch|switch|tag|fetch|pull|push|stash|clone|merge)(?:\s|$)/i.exec(text);
+  const gitCommand = /^git\s+(status|diff|add|restore|reset|commit|log|show|branch|switch|tag|fetch|pull|push|stash|clone|merge)(?:\s|$)/i.exec(text);
   if (gitCommand || /^(?:diff --git |On branch [^\n]+\r?\n|commit [a-f\d]{40}(?:\s|$))/i.test(text)) {
     const command = gitCommand?.[1].toLowerCase();
     const gitMode = command === 'stash' ? 'stash' : ['log', 'show'].includes(command || '') || /^commit /i.test(text) ? 'history'
@@ -336,11 +336,13 @@ export function detectTools(input: string): Suggestion[] {
     const argument=text.replace(/^git\s+\S+\s*/i,'').trim();
     const unquote=(s:string)=>s.replace(/^(["'])(.*)\1$/,'$2');
     const historyPath = command === 'log' ? /(?:^|\s)--\s+(.+)$/.exec(argument)?.[1] : undefined;
-    const fileCommand = command === 'add' || command === 'diff' || command === 'restore';
+    const resetPath = command === 'reset' && /^(?:HEAD(?:\s+|$))?--(?:\s+|$)/.test(argument);
+    const fileCommand = command === 'add' || command === 'diff' || command === 'restore' || resetPath;
     // Match a single literal path. Options or multiple pathspecs still open the appropriate group.
     const stageFlag = command === 'restore' ? /^(?:--staged|-S)(?:\s+|$)/ : /^(?:--staged|--cached)(?:\s+|$)/;
-    const staged = (command === 'restore' || command === 'diff') && stageFlag.test(argument);
-    const operand = staged ? argument.replace(stageFlag, '') : argument;
+    const staged = resetPath || ((command === 'restore' || command === 'diff') && stageFlag.test(argument));
+    const operand = resetPath ? argument.replace(/^HEAD\s+/, '') : staged ? argument.replace(stageFlag, '') :
+      command === 'restore' ? argument.replace(/^(?:--worktree|-W)\s+/, '') : argument;
     const afterSeparator = /^--\s+/.test(operand);
     const single = operand.replace(/^--\s+/, '');
     const file = fileCommand && (afterSeparator || (command !== 'diff' && !single.startsWith('-'))) && /^(?:"[^"\n]+"|'[^'\n]+'|[^\s"']+)$/.test(single)
@@ -353,6 +355,7 @@ export function detectTools(input: string): Suggestion[] {
       ...(historyPath && { path: unquote(historyPath) }),
       ...((staged || command === 'commit') && { staged: true }),
       ...(command === 'commit' && { compose: true }),
+      ...(command === 'commit' && /^(?:--amend)(?:\s|$)/.test(argument) && { amend: true }),
       ...(file && { path: file }),
     };
     add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode,gitSeed });

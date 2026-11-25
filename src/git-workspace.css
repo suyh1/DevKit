@@ -185,6 +185,8 @@
 .git-commit-dialog.pc-dialog { width: min(490px, calc(100vw - 24px)); }
 .git-commit-desk .pc-modal-body { display: grid; gap: 8px; }
 .git-commit-desk .git-review-staged { justify-self: start; }
+.git-commit-desk label.git-amend-choice { display: flex; align-items: center; gap: 6px; }
+.git-commit-desk .git-amend-choice input { width: auto; }
 .git-commit-desk textarea { width: 100%; min-height: min(60px, var(--textarea-limit)); }
 @container (max-width: 720px) {
   .git-working-layout.devkit-bento { grid-template-columns: minmax(0, 1fr); }

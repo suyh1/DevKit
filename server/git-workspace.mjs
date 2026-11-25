@@ -10,7 +10,7 @@ import {
   cloneRepository,
 } from './git-operations.mjs';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFile, realpath } from 'node:fs/promises';
+import { access, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 
 import { atomicFile } from './atomic-file.mjs';
@@ -24,12 +24,16 @@ const editActions = new Set([
   'resolve',
   'stage',
   'unstage',
+  'discard',
+  'undo-commit',
   'commit',
   'create-branch',
   'switch',
   'tag',
   'stash-save',
   'stash-apply',
+  'stash-pop',
+  'stash-drop',
 ]);
 export const gitReads = new Set([
   'list',
@@ -42,6 +46,8 @@ export const gitReads = new Set([
   'history',
   'compare',
   'push-plan',
+  'head-commit',
+  'discard-plan',
 ]);
 const publicReads = new Set(['state', 'history', 'compare', 'show']);
 const levels = ['none', 'history', 'worktree', 'edit', 'sync', 'collaborate'];
@@ -100,6 +106,7 @@ async function status(root) {
         index: fields[1][0],
         work: fields[1][1],
         conflict: unmerged,
+        ...(fields[2].startsWith('S') && { submodule: true }),
       });
     }
   }
@@ -172,6 +179,13 @@ async function perform(root, action, value, current, authorize, worktree) {
       remotes: remotes.trim().split('\n').filter(Boolean),
     };
   }
+  if (action === 'head-commit') {
+    if (!current.head || current.head !== value.head) fail(409, '分支已更新，请重新核对上次提交。');
+    const [parents, subject, message] = (
+      await git(root, ['log', '-1', '--format=%P%x00%s%x00%B', current.head, '--'])
+    ).split('\0');
+    return { id: current.head, parents: parents.split(' ').filter(Boolean), subject, message: message.trimEnd() };
+  }
   if (action === 'history') return history(root, current.head, value);
   if (action === 'compare') return compareCommits(root, current.head, value);
   if (action === 'show') {
@@ -187,18 +201,26 @@ async function perform(root, action, value, current, authorize, worktree) {
     if (typeof value.message !== 'string' || value.message.length > 500) fail(400, '贮藏说明最多 500 字符。');
     return run(['stash', 'push', '--include-untracked', ...(value.message.trim() ? ['-m', value.message.trim()] : [])]);
   }
-  if (action === 'stash-show' || action === 'stash-apply') {
-    const entry = (await stashes(root)).find((item) => item.id === value.stash);
+  if (['stash-show', 'stash-apply', 'stash-pop', 'stash-drop'].includes(action)) {
+    const removes = action === 'stash-pop' || action === 'stash-drop';
+    const entry = (await stashes(root)).find((item) => item.id === value.stash && (!removes || item.ref === value.ref));
     if (!entry) fail(404, '找不到该贮藏记录，请刷新。');
     if (action === 'stash-show')
       return run(['stash', 'show', '--include-untracked', '--patch', ...patches, entry.id], { preview: true });
+    if (action === 'stash-drop') return run(['stash', 'drop', entry.ref]);
     if (current.files.length) fail(409, '请先提交或贮藏当前改动，再应用贮藏。');
+    if (action === 'stash-pop') return run(['stash', 'pop', '--index', entry.ref]);
     return run(['stash', 'apply', '--index', entry.id]);
   }
-  if (['patch', 'review', 'stage', 'unstage', 'conflict', 'resolve'].includes(action)) {
-    if ((action === 'stage' || action === 'unstage') && value.files !== undefined)
-      return applyFiles(root, current.files, action === 'unstage', value.files, authorize);
-    const file = current.files.find((f) => f.path === value.path);
+  if (action === 'discard-plan' || (value.files !== undefined && ['stage', 'unstage', 'discard'].includes(action))) {
+    if (value.revision !== current.revision) fail(409, '文件列表已变化，请刷新后重选。');
+    return applyFiles(root, current.files, action, value.files, authorize, value.token);
+  }
+  if (['patch', 'review', 'stage', 'unstage', 'discard', 'conflict', 'resolve'].includes(action)) {
+    const staged = action === 'unstage' || (['patch', 'review'].includes(action) && value.staged);
+    const file = current.files.find(
+      (f) => f.path === value.path && (f.conflict || (staged ? f.index : f.work) !== '.'),
+    );
     if (!file) fail(409, '文件状态已变化，请刷新。');
     if (action === 'conflict') return conflictView(root, file);
     if (action === 'resolve') return resolveConflict(root, file, value, authorize);
@@ -206,7 +228,7 @@ async function perform(root, action, value, current, authorize, worktree) {
       const review = await reviewFile(root, file, !!value.staged);
       return action === 'patch' ? review.text : review;
     }
-    return applyReview(root, file, action === 'unstage', value, authorize);
+    return applyReview(root, file, action, value, authorize);
   }
   if (action === 'merge') return startMerge(root, current, value, authorize);
   if (action === 'merge-abort' || action === 'merge-continue') {
@@ -214,11 +236,55 @@ async function perform(root, action, value, current, authorize, worktree) {
     if (action === 'merge-continue' && current.files.some((f) => f.conflict)) fail(409, '请先解决所有冲突。');
     return run(action === 'merge-abort' ? ['merge', '--abort'] : ['commit', '--no-edit']);
   }
+  if (action === 'undo-commit') {
+    if (
+      !current.head ||
+      value.head !== current.head ||
+      current.branch === '(detached)' ||
+      current.mergeHead ||
+      current.files.some((file) => file.conflict)
+    )
+      fail(409, '请在没有合并冲突的本地分支上重新核对要撤销的提交。');
+    const gitDir = (await git(root, ['rev-parse', '--absolute-git-dir'])).trimEnd();
+    for (const marker of ['CHERRY_PICK_HEAD', 'REVERT_HEAD', 'sequencer', 'rebase-merge', 'rebase-apply']) {
+      const pending = await access(path.join(gitDir, marker)).then(
+        () => true,
+        (error) => {
+          if (error.code !== 'ENOENT') throw error;
+          return false;
+        },
+      );
+      if (pending) fail(409, '请先完成或中止当前的 Git 操作，再撤销提交。');
+    }
+    // A shallow boundary still has a parent in the commit object and must never be treated as a root.
+    const commit = await git(root, ['cat-file', 'commit', current.head]);
+    const end = commit.indexOf('\n\n');
+    const parent = /^parent ([0-9a-f]+)$/m.exec(commit.slice(0, end))?.[1];
+    const message = commit.slice(end + 2).trimEnd();
+    const branchRef = 'refs/heads/' + current.branch;
+    const move = parent ? 'update ' + branchRef + ' ' + parent : 'delete ' + branchRef;
+    // Move only the reviewed tip, keeping both the index and worktree intact (including on an unborn branch).
+    await run(['update-ref', '-m', 'DevKit: undo commit', '--stdin'], {
+      input: 'update ORIG_HEAD ' + current.head + '\n' + move + ' ' + current.head + '\n',
+    });
+    return { message };
+  }
   if (action === 'commit') {
     if (typeof value.message !== 'string' || !value.message.trim() || value.message.length > 8000)
       fail(400, '请填写 1 至 8000 字符的提交信息。');
     if (current.files.some((f) => f.conflict)) fail(409, '请先解决冲突。');
-    return run(['commit', '-m', value.message.trim()]);
+    if (
+      value.amendHead !== undefined &&
+      (!current.head || current.head !== value.amendHead || current.mergeHead || value.stageAll)
+    )
+      fail(409, '请重新核对要修改的提交。');
+    if (value.stageAll === true) {
+      if (current.mergeHead || !current.files.length || current.files.some((file) => file.index !== '.'))
+        fail(409, '暂存区已变化，请重新核对提交范围。');
+      if (value.files?.length !== current.files.length) fail(409, '文件列表已变化，请重新核对。');
+      await applyFiles(root, current.files, 'stage', value.files, authorize);
+    }
+    return run(['commit', ...(value.amendHead ? ['--amend'] : []), '-m', value.message.trim()]);
   }
   if (['create-branch', 'switch', 'tag'].includes(action)) {
     const name = value.name;
@@ -411,7 +477,13 @@ export async function createGitWorkspace(directory) {
             };
         const result = await perform(repo.root, action, value, current, verify, rights.worktree);
         verify();
-        return mutation ? { ok: true, ...(result?.notice ? { notice: result.notice } : {}) } : result;
+        return mutation
+          ? {
+              ok: true,
+              ...(result?.notice && { notice: result.notice }),
+              ...(action === 'undo-commit' && { message: result.message }),
+            }
+          : result;
       } catch (error) {
         if (portal && !error.status) fail(409, '仓库文件已变化或读取失败，请刷新后重试。');
         if (error.gitFailure && /non-fast-forward|fetch first|rejected.*behind/i.test(error.message))

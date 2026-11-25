@@ -10,11 +10,13 @@ export function DiffText({
   text,
   onHunk,
   actionLabel,
+  onDiscardHunk,
   busy = false,
 }: {
   text: string;
   onHunk?: (index: number) => void;
   actionLabel?: string;
+  onDiscardHunk?: (index: number) => void;
   busy?: boolean;
 }) {
   const [limit, setLimit] = useState(400);
@@ -41,6 +43,11 @@ export function DiffText({
               {isHunk && onHunk && (
                 <button type="button" className="git-hunk-button" disabled={busy} onClick={() => onHunk(index)}>
                   {actionLabel}此块
+                </button>
+              )}
+              {isHunk && onDiscardHunk && (
+                <button type="button" className="git-hunk-button" disabled={busy} onClick={() => onDiscardHunk(index)}>
+                  放弃此块
                 </button>
               )}
               {line || ' '}
@@ -79,7 +86,9 @@ export function FileReview({
   busy,
   mutate,
   onReviewed,
+  onChanged,
 }: Props & {
+  onChanged: (path: string, staged: boolean) => void;
   onReviewed: (path: string, staged: boolean, token: string) => void;
 }) {
   const { data, error, loading } = useGitRead<Review>(
@@ -89,16 +98,40 @@ export function FileReview({
     true,
     generation,
   );
+  const confirm = useConfirmation();
   const label = staged ? '取消暂存' : '暂存';
   useEffect(() => {
     if (data && !loading) onReviewed(file.path, staged, data.token);
   }, [data, loading, file.path, staged, onReviewed]);
-  const apply = (hunk?: number) =>
-    void mutate(
-      staged ? 'unstage' : 'stage',
-      { path: file.path, token: data?.token, hunk },
-      hunk === undefined ? '已更新文件暂存状态' : '已更新所选差异块',
-    );
+  const apply = async (hunk?: number) => {
+    if (
+      await mutate(
+        staged ? 'unstage' : 'stage',
+        { path: file.path, token: data?.token, hunk },
+        hunk === undefined ? '已更新文件暂存状态' : '已更新所选差异块',
+      )
+    )
+      onChanged(file.path, hunk === undefined ? !staged : staged);
+  };
+  const discard = async (hunk?: number) => {
+    if (
+      !data ||
+      !(await confirm({
+        title:
+          hunk !== undefined ? '放弃这个差异块？' : file.work === '?' ? '删除未跟踪文件？' : '放弃文件的未暂存更改？',
+        context: file.path,
+        detail:
+          file.work === '?'
+            ? '文件将从工作目录删除，Git 中没有可恢复的版本。'
+            : '所选未暂存改动将从工作目录移除。已经暂存的内容会保留。',
+        confirm: file.work === '?' ? '删除文件' : '放弃更改',
+        cancel: '保留更改',
+      }))
+    )
+      return;
+    if (await mutate('discard', { path: file.path, token: data.token, hunk }, '已放弃所选改动'))
+      onChanged(file.path, false);
+  };
   return (
     <article className="git-inspector">
       <header>
@@ -121,6 +154,16 @@ export function FileReview({
               >
                 {staged ? <Minus size={14} /> : <Plus size={14} />} {label}整个文件
               </button>
+              {!staged && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy || loading || !data.text}
+                  onClick={() => void discard()}
+                >
+                  {file.work === '?' ? '删除未跟踪文件…' : '放弃文件更改…'}
+                </button>
+              )}
               {data.hunks.length > 0 && <small>{data.hunks.length} 个差异块</small>}
             </div>
           )}
@@ -129,6 +172,7 @@ export function FileReview({
             key={data.token}
             text={data.text || '无文本差异。'}
             onHunk={edit && data.hunks.length ? apply : undefined}
+            onDiscardHunk={edit && !staged && data.hunks.length ? discard : undefined}
             actionLabel={label}
             busy={busy || loading}
           />

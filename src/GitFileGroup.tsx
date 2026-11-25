@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { CircleDot, Layers, Minus, Plus } from 'lucide-react';
+import { CircleDot, Layers, Minus, Plus, Undo2 } from 'lucide-react';
 import ResultPager from './ResultPager';
 import type { Change } from './git-api';
 
@@ -15,6 +15,7 @@ const statusNames: Record<string, string> = {
 
 export default function GitFileGroup({
   files,
+  filtered,
   staged,
   activePath,
   headingRef,
@@ -22,14 +23,17 @@ export default function GitFileGroup({
   busy,
   onSelect,
   onApply,
+  onDiscard,
 }: {
   files: Change[];
+  filtered: boolean;
   staged: boolean;
   activePath?: string;
   headingRef?: RefObject<HTMLHeadingElement | null>;
   edit: boolean;
   busy: boolean;
   onSelect: (path: string) => void;
+  onDiscard: (paths: string[]) => void;
   onApply: (paths: string[]) => Promise<boolean>;
 }) {
   const [checked, setChecked] = useState<string[]>([]);
@@ -60,6 +64,8 @@ export default function GitFileGroup({
   const pagePicked = onPage.filter((path) => picked.has(path)).length;
   const name = staged ? '已暂存' : '未暂存';
   const action = staged ? '取消暂存' : '暂存';
+  const targets = selected.length ? selected : eligible;
+  const scope = (selected.length ? '所选' : filtered ? '匹配文件' : '全部') + '（' + targets.length + '）';
   const Icon = staged ? Minus : Plus;
   useEffect(() => {
     if (all.current) all.current.indeterminate = pagePicked > 0 && pagePicked < onPage.length;
@@ -94,14 +100,27 @@ export default function GitFileGroup({
         <h4 ref={headingRef} tabIndex={-1}>
           {staged ? <Layers size={14} /> : <CircleDot size={14} />} {name} <small>{files.length}</small>
         </h4>
-        {edit && selected.length > 0 && (
+        {edit && eligible.length > 0 && (
           <button
             type="button"
             className="text-button git-batch-action"
             disabled={busy}
-            onClick={() => void apply(selected)}
+            onClick={() => void apply(targets)}
           >
-            {action}所选（{selected.length}）
+            {action}
+            {scope}
+          </button>
+        )}
+        {edit && !staged && eligible.length > 0 && (
+          <button
+            type="button"
+            className="icon-button git-file-action"
+            aria-label={'放弃' + scope}
+            title={'放弃更改 · ' + scope}
+            disabled={busy}
+            onClick={() => onDiscard(targets)}
+          >
+            <Undo2 size={15} />
           </button>
         )}
       </header>
@@ -156,6 +175,18 @@ export default function GitFileGroup({
                 <span dir="auto">{file.path}</span>
                 <em data-code={status}>{file.conflict ? '冲突' : statusNames[status] || '改动'}</em>
               </button>
+              {edit && !staged && !file.conflict && (
+                <button
+                  type="button"
+                  className="icon-button git-file-action"
+                  aria-label={'放弃更改 ' + file.path}
+                  title={file.work === '?' ? '删除未跟踪文件…' : '放弃未暂存更改…'}
+                  disabled={busy}
+                  onClick={() => onDiscard([file.path])}
+                >
+                  <Undo2 size={15} />
+                </button>
+              )}
               {edit && !file.conflict && (
                 <button
                   type="button"

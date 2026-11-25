@@ -42,10 +42,12 @@ export async function git(
   const literal = ['add', 'diff', 'rm', 'restore', 'checkout', 'ls-files', 'log', 'ls-tree'].includes(args[0])
     ? ['--literal-pathspecs']
     : [];
+  // Older Git releases reject the diff option --no-relative. Set its config before the subcommand.
+  const diffConfig = args[0] === 'diff' ? ['-c', 'diff.relative=false'] : [];
   return new Promise((resolve, reject) => {
     const proc = execFile(
       binary,
-      ['--no-pager', ...literal, '-c', 'color.ui=false', '-c', 'core.quotepath=false', ...args],
+      ['--no-pager', ...literal, '-c', 'color.ui=false', '-c', 'core.quotepath=false', ...diffConfig, ...args],
       {
         cwd,
         windowsHide: true,

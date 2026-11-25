@@ -82,6 +82,20 @@ function Changes({
   const [selection, select] = useState({ path: seed?.path ?? '', staged: !!seed?.staged });
   const [query, setQuery] = useState('');
   const [composing, setComposing] = useState(!!seed?.compose && edit && !state.mergeHead);
+  const [amend, setAmend] = useState<{ head: string; message?: string } | undefined>(
+    seed?.amend && state.head ? { head: state.head } : undefined,
+  );
+  const amending = !!amend && amend.head === state.head;
+  const headCommit = useGitRead<{ id: string; parents: string[]; subject: string; message: string }>(
+    portal,
+    'head-commit',
+    { id, head: state.head },
+    composing && !!state.head,
+    generation,
+  );
+  const lastCommit = headCommit.data;
+  const commitMessage = amending ? (amend.message ?? lastCommit?.message ?? '') : message;
+  const confirm = useConfirmation();
   const stagedHeading = useRef<HTMLHeadingElement>(null);
   // Keep the reviewed bytes bound to the view that displayed them, including partially staged files.
   const reviewed = useRef(new Map<string, string>());
@@ -101,33 +115,115 @@ function Changes({
   const items = groups.flatMap((group) => group.visible.map((file) => ({ file, staged: group.staged })));
   const current =
     items.find((i) => i.staged === selection.staged && i.file.path === selection.path) ??
+    items.find((i) => i.file.path === selection.path) ??
     items.find((i) => i.staged === selection.staged) ??
     items[0];
   const stagedCount = groups[1].all.length;
+  const selectedFiles = (paths: string[], staged: boolean) =>
+    paths.map((path) => ({ path, token: reviewed.current.get((staged ? 'index:' : 'work:') + path) }));
+  const [discard, setDiscard] = useState<{
+    files: ReturnType<typeof selectedFiles>;
+    revision: string;
+    untracked: number;
+  }>();
+  const discardPlan = useGitRead<{ token: string }>(
+    portal,
+    'discard-plan',
+    { id, files: discard?.files, revision: discard?.revision },
+    !!discard,
+    generation,
+  );
+  const requestDiscard = (paths: string[]) => {
+    const targets = new Set(paths);
+    const untracked = groups[0].all.filter((file) => targets.has(file.path) && file.work === '?').length;
+    setDiscard({ files: selectedFiles(paths, false), revision: state.revision, untracked });
+  };
+  const forgetReviews = (paths: string[]) => {
+    for (const path of paths) {
+      reviewed.current.delete('index:' + path);
+      reviewed.current.delete('work:' + path);
+    }
+  };
+  const discardFiles = async () => {
+    if (!discard || !discardPlan.data || discardPlan.loading || busy) return;
+    const ok = await mutate(
+      'discard',
+      { files: discard.files, token: discardPlan.data.token, revision: discard.revision },
+      '已放弃 ' + discard.files.length + ' 个文件的未暂存更改',
+    );
+    if (ok) forgetReviews(discard.files.map((file) => file.path));
+    setDiscard(undefined);
+  };
   const applyFiles = async (paths: string[], staged: boolean) => {
     const applied = await mutate(
       staged ? 'unstage' : 'stage',
-      {
-        files: paths.map((path) => ({ path, token: reviewed.current.get((staged ? 'index:' : 'work:') + path) })),
-      },
+      { files: selectedFiles(paths, staged) },
       (staged ? '已取消暂存 ' : '已暂存 ') + paths.length + ' 个文件',
     );
     if (applied) {
-      for (const path of paths) {
-        reviewed.current.delete('index:' + path);
-        reviewed.current.delete('work:' + path);
-      }
+      if (paths.length === 1) select({ path: paths[0], staged: !staged });
+      forgetReviews(paths);
     }
     return applied;
   };
+  const stageAll = !amending && stagedCount === 0 && groups[0].all.length > 0;
   const canCommit =
-    !busy && !!message.trim() && stagedCount > 0 && !state.mergeHead && !state.files.some((f) => f.conflict);
+    !busy &&
+    !!commitMessage.trim() &&
+    commitMessage.length <= 8000 &&
+    (amending || stagedCount > 0 || stageAll) &&
+    !state.mergeHead &&
+    !state.files.some((f) => f.conflict);
   const commit = async (preview = false) => {
-    if (canCommit && (await mutate('commit', { message }, '已提交到 ' + state.branch))) {
-      setMessage('');
+    if (!canCommit) return;
+    if (
+      stageAll &&
+      !(await confirm({
+        title: '暂存全部改动并提交？',
+        context: state.branch,
+        detail: '暂存区为空。这次提交将包含整个仓库的 ' + groups[0].all.length + ' 个变更文件，包括未跟踪文件。',
+        confirm: '暂存全部并提交',
+        cancel: '返回提交窗口',
+      }))
+    )
+      return;
+    const files = stageAll
+      ? selectedFiles(
+          groups[0].all.map((file) => file.path),
+          false,
+        )
+      : undefined;
+    if (
+      await mutate(
+        'commit',
+        { message: commitMessage, amendHead: amending ? amend.head : undefined, stageAll, files },
+        '已提交到 ' + state.branch,
+      )
+    ) {
+      if (!amending) setMessage('');
+      setAmend(undefined);
       setComposing(false);
       if (preview) onPreviewPush?.();
     }
+  };
+  const undoCommit = async () => {
+    if (
+      !lastCommit ||
+      !(await confirm({
+        title: '撤销上次提交？',
+        context: branchName(state) + ' · ' + lastCommit.id.slice(0, 8),
+        detail:
+          '“' +
+          lastCommit.subject +
+          '” 将从本地分支撤回。' +
+          (lastCommit.parents.length > 1 ? '这是合并提交，分支将回到第一父提交。' : '') +
+          '改动保留在暂存区，工作文件保留当前内容。原提交说明会填回输入框。',
+        confirm: '撤销上次提交',
+        cancel: '返回提交窗口',
+      }))
+    )
+      return;
+    if (await mutate('undo-commit', { head: lastCommit.id }, '已撤销上次提交')) setAmend(undefined);
   };
   const reviewProps = current
     ? { id, portal, file: current.file, staged: current.staged, generation, edit, busy, mutate }
@@ -151,6 +247,37 @@ function Changes({
           {delivery}
         </div>
       )}
+      {discard && edit && (
+        <Modal title="放弃未暂存更改？" closeLabel="保留更改" close={() => setDiscard(undefined)} busy={busy}>
+          <div className="pc-modal-body">
+            <p>
+              {discard.files.length === 1 ? discard.files[0].path : '已选 ' + discard.files.length + ' 个文件'} ·
+              已暂存内容会保留。
+            </p>
+            {discard.untracked > 0 && <p>其中 {discard.untracked} 个未跟踪文件将从磁盘删除。</p>}
+            {discardPlan.error && <p role="alert">{discardPlan.error}</p>}
+          </div>
+          <footer className="pc-form-footer">
+            <button
+              type="button"
+              className="secondary-button"
+              data-modal-focus
+              disabled={busy}
+              onClick={() => setDiscard(undefined)}
+            >
+              保留更改
+            </button>
+            <button
+              type="button"
+              className="run-button"
+              disabled={busy || discardPlan.loading || !discardPlan.data}
+              onClick={() => void discardFiles()}
+            >
+              放弃更改
+            </button>
+          </footer>
+        </Modal>
+      )}
       {composing && edit && !state.mergeHead && (
         <Modal
           title={'提交到 ' + branchName(state)}
@@ -169,7 +296,8 @@ function Changes({
               <footer className="pc-form-footer">
                 <MotionButton type="submit" className="run-button" disabled={!canCommit} title="Ctrl / ⌘ + Enter">
                   <GitCommitHorizontal size={16} />
-                  提交到 {branchName(state)}
+                  {amending ? '修改上次提交 · ' : stageAll ? '暂存全部并提交到 ' : '提交到 '}
+                  {branchName(state)}
                 </MotionButton>
                 {onPreviewPush && (
                   <button
@@ -197,14 +325,38 @@ function Changes({
             >
               已暂存 {stagedCount} 个文件{stagedCount ? ' · 查看文件' : ''}
             </button>
+            {lastCommit && (
+              <label className="git-amend-choice">
+                <input
+                  type="checkbox"
+                  checked={amending}
+                  disabled={busy}
+                  onChange={(event) => setAmend(event.target.checked ? { head: state.head } : undefined)}
+                />
+                修改上次提交（{lastCommit.id.slice(0, 8)}）
+              </label>
+            )}
+            {headCommit.error && <p role="alert">{headCommit.error}</p>}
+            {lastCommit && state.branch !== '(detached)' && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy || state.files.some((f) => f.conflict)}
+                onClick={() => void undoCommit()}
+              >
+                撤销上次提交…
+              </button>
+            )}
             <label htmlFor="git-message">提交说明</label>
             <TextArea
               id="git-message"
               data-modal-focus
               placeholder="概括这次提交的改动…"
-              value={message}
+              value={commitMessage}
               maxLength={8000}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) =>
+                amending ? setAmend({ head: state.head, message: e.target.value }) : setMessage(e.target.value)
+              }
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
@@ -235,6 +387,7 @@ function Changes({
             <GitFileGroup
               key={JSON.stringify([staged, query])}
               files={visible}
+              filtered={!!query}
               staged={staged}
               headingRef={staged ? stagedHeading : undefined}
               activePath={current?.staged === staged ? current.file.path : undefined}
@@ -242,6 +395,7 @@ function Changes({
               busy={busy}
               onSelect={(path) => select({ path, staged })}
               onApply={(paths) => applyFiles(paths, staged)}
+              onDiscard={requestDiscard}
             />
           ))}
           {!items.length && (
@@ -257,6 +411,10 @@ function Changes({
             key={JSON.stringify([current?.file.path, current?.staged])}
             {...reviewProps}
             onReviewed={rememberReview}
+            onChanged={(path, staged) => {
+              forgetReviews([path]);
+              select({ path, staged });
+            }}
           />
         )
       ) : (
@@ -466,11 +624,12 @@ function RepositoryView({
     setBusy(true);
     report('');
     try {
-      const result = await gitRequest<{ notice?: string }>(portal, action, {
+      const result = await gitRequest<{ notice?: string; message?: string }>(portal, action, {
         id: repo.id,
         revision: state.revision,
         ...payload,
       });
+      if (action === 'undo-commit' && result.message !== undefined) setMessage(result.message);
       report(result.notice || notice);
       return true;
     } catch (failure) {

@@ -32,7 +32,6 @@ async function patchBytes(root, file, staged) {
       ...patches,
       '--binary',
       '--full-index',
-      '--no-relative',
       '--src-prefix=a/',
       '--dst-prefix=b/',
       '--unified=3',
@@ -71,8 +70,21 @@ export async function reviewFile(root, file, staged) {
       : [],
   };
 }
-export async function applyReview(root, file, staged, value, authorize) {
-  const raw = await patchBytes(root, file, staged);
+function patchForAction(root, file, action) {
+  if (file.submodule && (action === 'discard' || action === 'discard-plan'))
+    fail(409, '请在子模块工作目录中处理改动。');
+  return patchBytes(root, file, action === 'unstage');
+}
+function applyPatch(root, action, input, authorize) {
+  authorize();
+  const target = action === 'discard' ? [] : ['--cached'];
+  return git(root, ['apply', ...target, '--whitespace=nowarn', ...(action === 'stage' ? [] : ['--reverse']), '-'], {
+    input,
+  });
+}
+
+export async function applyReview(root, file, action, value, authorize) {
+  const raw = await patchForAction(root, file, action);
   if (!raw.length || value.token !== digest(raw)) fail(409, '文件内容已改变，请核对刷新后的差异，再次操作。');
   let input = raw;
   if (value.hunk !== undefined) {
@@ -86,12 +98,11 @@ export async function applyReview(root, file, staged, value, authorize) {
       fail(400, '请选择预览中的差异块。');
     input = Buffer.from(header + chunks[value.hunk], 'latin1');
   }
-  authorize();
-  // Apply exactly these reviewed bytes to the index. Never re-read the worktree via git add.
-  return git(root, ['apply', '--cached', '--whitespace=nowarn', ...(staged ? ['--reverse'] : []), '-'], { input });
+  return applyPatch(root, action, input, authorize);
 }
 
-export async function applyFiles(root, changes, staged, selection, authorize) {
+export async function applyFiles(root, changes, action, selection, authorize, token) {
+  const staged = action === 'unstage';
   if (!Array.isArray(selection) || !selection.length || selection.length > changes.length)
     fail(409, '所选文件已变化，请刷新后重选。');
   const candidates = new Map(
@@ -105,18 +116,17 @@ export async function applyFiles(root, changes, staged, selection, authorize) {
     const file = candidates.get(item?.path);
     if (!file) fail(409, '所选文件已变化，请刷新后重选。');
     candidates.delete(file.path);
-    const raw = await patchBytes(root, file, staged);
+    const raw = await patchForAction(root, file, action);
     if (!raw.length || (item.token !== undefined && item.token !== digest(raw)))
       fail(409, '文件内容已改变，请核对刷新后的差异，再次操作。');
     size += raw.length;
     if (size > 48 * 1024 * 1024) fail(413, '所选补丁超过 48 MiB，请分批操作。');
     patches.push(raw);
   }
-  // A single apply holds Git's index lock and leaves the index intact on a rejected patch.
-  authorize();
-  return git(root, ['apply', '--cached', '--whitespace=nowarn', ...(staged ? ['--reverse'] : []), '-'], {
-    input: Buffer.concat(patches, size),
-  });
+  const input = Buffer.concat(patches, size);
+  if (action === 'discard-plan') return { token: digest(input) };
+  if (action === 'discard' && token !== digest(input)) fail(409, '文件内容已改变，请重新核对要放弃的改动。');
+  return applyPatch(root, action, input, authorize);
 }
 
 export async function conflictView(root, file) {
