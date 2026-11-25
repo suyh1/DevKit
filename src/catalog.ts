@@ -9,6 +9,7 @@ export const workspaceModules = [
   { id: 'http', name: 'HTTP 调试', description: '可局域网共享的 API 项目、接口设计、文档与调试，支持快速请求、multipart 字段与文件上传、环境变量、接口集合回归、响应 Schema 校验及 OpenAPI/Swagger 导入导出。', category: '工作台', badge: '共享' },
   { id: 'projects', name: '项目中心', description: '管理项目入口与环境档案，关联 API、应用服务、Nginx 和监控，查看项目运维总览。', category: '工作台', badge: '共享' },
   { id: 'git', name: 'Git 仓库管理', description: '选择文件批量暂存或按差异块暂存，提交并预览推送，在提交图查看分叉、合并、分支与标签。支持克隆、冲突处理和逐仓库授权。', category: '工作台', badge: '共享' },
+  { id: 'dev-docs', name: '开发文档管理', description: '按文件夹收藏与编写开发文档，离线查阅 Linux 命令大全，全文检索中文说明、命令和用法示例。', category: '工作台', badge: '共享' },
   { id: 'knowledge', name: '团队知识库', description: '按目录、项目和标签组织团队知识，在独立 Markdown 写作页编辑、恢复草稿，批量引用文档与实例，搜索正文并分享章节链接。', category: '工作台', badge: '共享' },
   { id: 'project-todos', name: '待办清单', description: '像编辑文本文件一样管理待办，支持分组、标签、快捷键、归档、清单导入导出及局域网共享。', category: '工作台', badge: '共享' },
   { id: 'file-shares', name: '本机文件共享管理', description: '通过共享清单和详情查看状态、端口和文件范围，管理多项只读共享并在网页下载文件或文件夹 ZIP。', category: '工作台', badge: '共享' },

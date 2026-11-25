@@ -22,9 +22,9 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const directory = path.resolve(process.env.DEVKIT_PROJECT_DATA || path.join(root, 'configs'));
 await prepareProjectConfigs(directory, [path.join(root, 'data/project-center')]);
 const store = await createProjectStore(directory);
-let gitWorkspace, collab, transferLinks, nginx, library, jar, monitor, lan, fileShares, projectTodos, knowledge;
+let gitWorkspace, collab, transferLinks, nginx, library, jar, monitor, lan, fileShares, projectTodos, knowledge, developmentDocs;
 const logs = createLogCenter({ nginx: () => nginx, jar: () => jar, lan: () => lan });
-const host = await createProjectHost(store, path.join(root, "dist"), { git: () => gitWorkspace, nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
+const host = await createProjectHost(store, path.join(root, "dist"), { git: () => gitWorkspace, nginx: () => nginx, library: () => library, jar: () => jar, monitor: () => monitor, logs: () => logs, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, 'dev-docs': () => developmentDocs, collab: () => collab });
 try {
   lan = await createLanWorkspaces(directory);
   const saved = await store.settings();
@@ -50,6 +50,7 @@ try {
   monitor = await createMonitorManager(directory, { projects: () => store, jar: () => jar, lan: () => lan });
   fileShares = await createFileShares(directory).catch(error => console.error(`文件共享配置：${error.message}`));
   if (services.git.enabled) gitWorkspace = await createGitWorkspace(directory);
+  if (services['dev-docs'].enabled) developmentDocs = await createKnowledgeBase(directory, 'dev-docs');
   if (services.knowledge.enabled) knowledge = await createKnowledgeBase(directory);
   if (services['project-todos'].enabled)
     projectTodos = await createTodoLists(directory).catch(error => console.error(`待办清单配置：${error.message}`));
@@ -77,6 +78,7 @@ try {
   await fileShares?.close();
   await projectTodos?.close();
   await knowledge?.close();
+  await developmentDocs?.close();
   lan?.close();
   await monitor?.close();
   await nginx?.close();
@@ -97,6 +99,7 @@ for (const signal of ["SIGINT", "SIGTERM"])
     await fileShares?.close();
     await projectTodos?.close();
     await knowledge?.close();
+    await developmentDocs?.close();
     lan?.close();
     await monitor?.close();
     await nginx?.close();

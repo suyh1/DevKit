@@ -128,6 +128,7 @@
 | 监控中心（`monitor`） | HTTP(S) 地址或 TCP 检测地址 |
 | HTTP 调试（`http`） | HTTP(S) 地址、cURL、HTTP 请求行、请求配置或 OpenAPI/Swagger |
 | 项目中心（`projects`） | HTTP(S) 项目入口或项目中心导出 JSON |
+| 开发文档管理（`dev-docs`） | 输入「Linux 命令大全」打开手册；`df -h`、`ls -la`、`journalctl -b` 等常用命令带入全文搜索，定位对应章节。文档链接直接打开指定文档或章节。 |
 | 团队知识库（`knowledge`） | Markdown 文档 |
 | 待办清单（`project-todos`） | Markdown 复选框或 ☐、✔、✘ 任务行 |
 | 本机文件共享管理（`file-shares`） | 本地绝对路径或 UNC 共享路径 |

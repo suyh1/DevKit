@@ -20,7 +20,7 @@ import type { HostGroup } from './lan-api';
 import { fileShareRequest, publishedShares, todoRequest } from './planning-share-api';
 import type { FileShareState } from './planning-share-api';
 import { gitRequest, type Repository } from './git-api';
-import { knowledgeRequest, type KnowledgePage } from './knowledge-api';
+import { developmentDocsRequest, knowledgeRequest, type KnowledgePage } from './knowledge-api';
 import { parseTodo } from '../shared/todo-text.mjs';
 import { parseWorkspaceLink, type WorkspaceLink } from './workspace-link-format';
 
@@ -79,6 +79,10 @@ export function workspaceSearch(pages: WorkspacePage[], add: (results: Workspace
     git: async () => {
       const repositories = await gitRequest<Repository[]>(!window.devkitGit, 'list');
       add(repositories.map(r => perModule('git', r.id, r.name, 'Git 仓库')));
+    },
+    'dev-docs': async () => {
+      const pages = await developmentDocsRequest<Pick<KnowledgePage, 'id' | 'title' | 'folder'>[]>('list', { summary: true });
+      add(pages.map(item => perModule('dev-docs', item.id, item.title, item.folder)));
     },
     knowledge: async () => {
       const pages = await knowledgeRequest<Pick<KnowledgePage, 'id' | 'title' | 'project' | 'folder'>[]>('list', { summary: true });

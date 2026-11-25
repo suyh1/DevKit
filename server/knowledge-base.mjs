@@ -37,8 +37,8 @@ function content(input) {
   };
 }
 
-export async function createKnowledgeBase(directory) {
-  const file = path.join(await configGroup(directory, 'planning'), 'knowledge.json');
+export async function createKnowledgeBase(directory, section = 'knowledge') {
+  const file = path.join(await configGroup(directory, 'planning'), section === 'dev-docs' ? 'dev-docs.json' : 'knowledge.json');
   let pages = [],
     folders = [];
   try {
@@ -58,6 +58,10 @@ export async function createKnowledgeBase(directory) {
     ];
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
+    if (section === 'dev-docs') {
+      pages = await (await import('./linux-manual.mjs')).linuxManual();
+      folders = [...new Set(pages.map(page => page.folder))];
+    }
   }
   const current = ({ history, ...entry }) => entry;
   function requirePage(id) {

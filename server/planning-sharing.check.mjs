@@ -121,7 +121,8 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
   const store = await createProjectStore(configs);
   const todos = await createTodoLists(configs), files = await createFileShares(configs);
   const knowledge = await createKnowledgeBase(configs);
-  const host = await createProjectHost(store, dist, { fileShares: () => files, projectTodos: () => todos, knowledge: () => knowledge });
+  const developmentDocs = await createKnowledgeBase(configs, 'dev-docs');
+  const host = await createProjectHost(store, dist, { fileShares: () => files, projectTodos: () => todos, knowledge: () => knowledge, 'dev-docs': () => developmentDocs });
   try {
     const { shares: [share] } = await files.request('save', { revision: 0, value: {
       name: '访客共享', paths: [file], port: await freePort(), enabled: true, published: true,
@@ -131,6 +132,8 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
     const services = emptySharingServices(), viewer = emptySharingServices();
     services.knowledge = { enabled: true, edit: true };
     viewer.knowledge.enabled = true;
+    services['dev-docs'] = { enabled: true, edit: true };
+    viewer['dev-docs'].enabled = true;
     services['project-todos'] = { enabled: true, edit: true };
     services['file-shares'].enabled = true;
     viewer['project-todos'].enabled = true;
@@ -152,6 +155,32 @@ test('portal enforces file, knowledge and TODO permissions and serializes concur
     }
     const readOnly = await login('viewer-test-only', 'viewer');
     const editor = await login('owner-test-only');
+    assert.equal((await post('dev-docs/library', {})).status, 401);
+    const manual = await (await post('dev-docs/library', {}, readOnly)).json();
+    assert.deepEqual(manual.folders, ['Linux 命令大全']);
+    const commands = new Set();
+    for (const chapter of manual.pages) {
+      assert.equal(chapter.folder, 'Linux 命令大全');
+      const sections = chapter.body.split(/^## /m).slice(1);
+      assert.ok(sections.length > 0, chapter.title);
+      for (const section of sections) {
+        const [command, ...lines] = section.split('\n');
+        assert.ok(!commands.has(command), command);
+        commands.add(command);
+        assert.match(lines.join('\n'), /[\u4e00-\u9fff]/);
+        assert.match(section, /`{3}sh\n[^\n]+\n`{3}/);
+      }
+    }
+    assert.ok(commands.size >= 400);
+    assert.equal((await post('dev-docs/remove', manual.pages[0], readOnly)).status, 403);
+    const guide = await (await post('dev-docs/create', { folder: '服务手册', title: '开发环境', body: '本机配置' }, editor)).json();
+    assert.equal(guide.folder, '服务手册');
+    assert.deepEqual(await knowledge.request('list'), []);
+    assert.equal((await post('dev-docs/remove', manual.pages[0], editor)).status, 200);
+    const reopenedDocs = await createKnowledgeBase(configs, 'dev-docs');
+    const persisted = await reopenedDocs.request('list');
+    assert.ok(persisted.some(page => page.id === guide.id && page.body === '本机配置'));
+    assert.ok(!persisted.some(page => page.id === manual.pages[0].id));
     assert.equal((await post('knowledge/create-folder', {folder:'不允许'}, readOnly)).status, 403);
     assert.equal((await post('knowledge/library', {}, readOnly)).status, 200);
     const article = { title: '部署', kind: '部署手册', body: '步骤 A' };

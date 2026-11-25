@@ -1,6 +1,6 @@
 import FloatingDetails from './FloatingDetails';
 import { useEffect, useMemo, useRef } from 'react';
-import type { KnowledgePage } from './knowledge-api';
+import { useDocumentLibrary, type KnowledgePage } from './knowledge-api';
 import { useCodeBlockColors } from './knowledge-code-blocks';
 import { articleLayout, resourceTarget } from './knowledge-markdown';
 import { openWorkspaceLink, ResourceLink, workspaceHash } from './workspace-links';
@@ -15,6 +15,7 @@ export function KnowledgeReader({
   anchor?: string;
   jump?: { id: string; line: number };
 }) {
+  const { section } = useDocumentLibrary();
   const content = useMemo(() => articleLayout(page.body), [page.body]);
   const ContentsDetails = content.headings.length > 6 ? FloatingDetails : 'details';
   const root = useRef<HTMLDivElement>(null),
@@ -51,7 +52,7 @@ export function KnowledgeReader({
                   onClick={event => {
                     const directory = event.currentTarget.closest('details');
                     if (directory) directory.open = false;
-                    openWorkspaceLink('knowledge', page.id + '~' + h.key);
+                    openWorkspaceLink(section, page.id + '~' + h.key);
                     const heading = root.current?.querySelector<HTMLElement>('[data-kb-heading="' + h.key + '"]');
                     if (heading) {
                       heading.tabIndex = -1;
@@ -62,7 +63,7 @@ export function KnowledgeReader({
                 >
                   {h.title}
                 </button>
-                <ResourceLink page="knowledge" id={page.id + '~' + h.key} compact />
+                <ResourceLink page={section} id={page.id + '~' + h.key} compact />
               </div>
             ))}
           </nav>
@@ -79,7 +80,7 @@ export function KnowledgeReader({
             history.replaceState(
               history.state,
               '',
-              workspaceHash('knowledge', page.id + (anchor ? '~' + anchor : '')),
+              workspaceHash(section, page.id + (anchor ? '~' + anchor : '')),
             );
             openWorkspaceLink(link.page, link.id);
           }

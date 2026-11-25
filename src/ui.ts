@@ -23,6 +23,7 @@ export const categoryOrder = categories.map(category => category.name);
 export const workspaceModuleNav = {
   http: { Icon: Send, hint: '接口设计与调试' },
   projects: { Icon: FolderOpen, hint: '项目入口与环境档案' },
+  'dev-docs': { Icon: BookOpen, hint: 'Linux 命令大全与开发手册' },
   knowledge: { Icon: BookOpen, hint: '部署手册、排查与交接' },
   'project-todos': { Icon: ClipboardList, hint: '纯文本任务与标签' },
   git: { Icon: GitBranch, hint: '审阅改动、提交历史与分支' },

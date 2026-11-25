@@ -316,6 +316,7 @@ export function detectTools(input: string): Suggestion[] {
         rules.open(t.id, '打开' + t.name);
     }
     for (const w of workspaceModules) if (w.name === text || w.id === key || (w.id === 'jar' && ['后端管理', '替换服务文件', '替换 JAR', '恢复服务备份', '恢复 JAR 备份'].includes(text))) rules.workspace(w.id, '进入' + w.name);
+    if (/^linux\s*命令(?:大全|手册)$/i.test(text)) rules.workspace('dev-docs', '查阅 Linux 命令分类文档', undefined, 'folder:Linux 命令大全');
     if (text === '快速链接设置' || text === '快传链接设置') rules.workspace('transfer', '进入局域网快传管理快速链接');
     if (matches.size) return [...matches.values()];
   }
@@ -367,6 +368,8 @@ export function detectTools(input: string): Suggestion[] {
   codeRules(text, lines, rules);
   serviceRules(text, lines[0], rules);
   documentRules(text, lines, rules);
+  const commandHelp = /^(?:sudo\s+)?(ls|df|du|find|grep|awk|sed|tar|chmod|chown|systemctl|journalctl|free|lsblk|lscpu|vmstat|ps|ss|ip|man)(?:\s+[^\n]+)?$/.exec(text);
+  if (commandHelp) rules.workspace('dev-docs', '查阅命令的中文用法和示例', undefined, 'search:' + commandHelp[1]);
   if (!matches.size) fileRules(text, rules);
   if (!matches.size || (matches.size === 1 && matches.has('invisible'))) {
     rules.tool('text-stats', '查看文本、字节和行数统计');

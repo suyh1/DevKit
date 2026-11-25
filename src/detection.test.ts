@@ -18,7 +18,7 @@ const examples: Partial<Record<ToolId, string>> = {
 };
 const workspaces: Record<WorkspaceModuleId, string> = {
   logs: '[WARN] cache unavailable', http: 'GET /hello HTTP/1.1', monitor: 'tcp://localhost:8080',
-  git: 'git status', projects: '{"format":"devkit-project-center"}', knowledge: '# 交接记录', 'project-todos': '- [ ] 核对订单',
+  'dev-docs': 'df -h', git: 'git status', projects: '{"format":"devkit-project-center"}', knowledge: '# 交接记录', 'project-todos': '- [ ] 核对订单',
   'file-shares': 'D:\\资料\\年度报告', transfer: 'report.xlsx', mock: '{"type":"object","properties":{}}',
   whiteboard: '设计稿.png', nginx: 'server { listen 80; }', jar: 'java -jar app.jar', 'lan-hosts': 'ssh dev@server',
 };
@@ -48,6 +48,13 @@ describe('推荐顺序和打开方式', () => {
       expect(colors.every(s => s.kind === 'tool' && s.input === value)).toBe(true);
     },
   );
+  it('从命令或章节链接定位开发文档', () => {
+    for (const [input, term] of [['df -h', 'df'], ['sudo journalctl -b', 'journalctl']])
+      expect(detectTools(input)).toContainEqual(expect.objectContaining({ id: 'dev-docs', resourceId: 'search:' + term }));
+    expect(detectTools('Linux 命令大全')[0]).toMatchObject({ id: 'dev-docs', resourceId: 'folder:Linux 命令大全' });
+    expect(detectTools('https://kit.example/#dev-docs/linux-storage')[0]).toMatchObject({ id: 'dev-docs', resourceId: 'linux-storage' });
+    expect(detectTools('difference').map(s => s.id)).not.toContain('dev-docs');
+  });
   it('按 Git 输入打开正确视图，并保留本机工具匹配', () => {
     for (const [source, gitMode] of [['git status', 'changes'], ['diff --git a/a b/a', 'changes'], ['git log --graph', 'history'], ['git switch demo', 'refs'], ['git stash list', 'stash']])
       expect(detectTools(source)).toContainEqual(expect.objectContaining({ id: 'git', gitMode }));

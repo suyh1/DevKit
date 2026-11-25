@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { knowledgeRequest, type KnowledgePage } from './knowledge-api';
+import { useDocumentLibrary, type KnowledgePage } from './knowledge-api';
 import { Modal } from './project-components';
 import Skeleton from './Skeleton';
 import { renderArticle } from './knowledge-markdown';
@@ -18,12 +18,13 @@ export function Versions({
   editable: boolean;
   error: string;
 }) {
+  const { request } = useDocumentLibrary();
   const [entries, setEntries] = useState<KnowledgePage[]>();
   const [failure, setFailure] = useState(''),
     [selected, setSelected] = useState(0);
   useEffect(() => {
     let live = true;
-    void knowledgeRequest<KnowledgePage[]>('history', { id: page.id }).then(
+    void request<KnowledgePage[]>('history', { id: page.id }).then(
       (rows) => {
         if (live) setEntries(rows);
       },
@@ -34,7 +35,7 @@ export function Versions({
     return () => {
       live = false;
     };
-  }, [page.id, page.revision]);
+  }, [page.id, page.revision, request]);
   const item = entries?.find((entry) => entry.revision === selected) ?? entries?.[0];
   return (
     <Modal

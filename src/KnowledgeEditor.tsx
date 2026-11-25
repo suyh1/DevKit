@@ -7,7 +7,7 @@ import { ArrowLeft, Link2, PanelRightOpen, Save } from 'lucide-react';
 import CodeEditor from './CodeEditor';
 import SegmentedControl from './SegmentedControl';
 import { useBeforeUnload, useConfirmation } from './Confirmation';
-import { knowledgeRequest, type Article, type KnowledgePage, type Template } from './knowledge-api';
+import { useDocumentLibrary, type Article, type KnowledgePage, type Template } from './knowledge-api';
 import { articleFields, type WritingDraft } from './knowledge-drafts';
 import { useCodeBlockColors } from './knowledge-code-blocks';
 import { referenceText, renderArticle } from './knowledge-markdown';
@@ -28,6 +28,7 @@ type Props = {
   leave: (id?: string) => void;
 };
 export function KnowledgeEditor({ initial, prefix, active, folders, projects, saved, leave }: Props) {
+  const { request, name } = useDocumentLibrary();
   const [draft, setDraft] = useState(initial),
     live = useRef(draft),
     view = useRef<EditorView | null>(null);
@@ -80,7 +81,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
   }, [storageKey]);
   useLayoutEffect(() => {
     const ok = persist();
-    setDiskError(ok ? '' : '设备存储空间不足，草稿尚未写入本机。请保存到知识库。');
+    setDiskError(ok ? '' : '设备存储空间不足，草稿尚未写入本机。请保存文档。');
     if (ok) setStored(draft.time);
   }, [draft, persist]);
   useEffect(() => {
@@ -152,7 +153,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
       const data = copy
         ? { ...original.form, title: original.form.title.slice(0, 115) + '（副本）' }
         : original.form;
-      const page = await knowledgeRequest<KnowledgePage>(original.documentId && !copy ? 'save' : 'create', {
+      const page = await request<KnowledgePage>(original.documentId && !copy ? 'save' : 'create', {
         ...data,
         id: copy ? undefined : original.documentId,
         revision: revision ?? original.revision,
@@ -178,7 +179,7 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
       if (status === 404) setConflict(null);
       if (status === 409) {
         try {
-          const pages = await knowledgeRequest<KnowledgePage[]>('list');
+          const pages = await request<KnowledgePage[]>('list');
           setConflict(pages.find((p) => p.id === original.documentId) ?? null);
         } catch (failure) {
           setError((failure as Error).message);
@@ -226,11 +227,11 @@ export function KnowledgeEditor({ initial, prefix, active, folders, projects, sa
   const preview = useRef<HTMLDivElement>(null);
   useCodeBlockColors(preview, rendered);
   return (
-    <section className="kb-writing" aria-label="知识库写作页">
+    <section className="kb-writing" aria-label={name === '团队知识库' ? '知识库写作页' : '开发文档写作页'}>
       <header className="kb-writing-bar">
         <button className="text-button" onClick={back} disabled={busy}>
           <ArrowLeft size={16} />
-          知识库
+          {name === '团队知识库' ? '知识库' : name}
         </button>
         <span role="status" className="kb-save-state">
           {busy

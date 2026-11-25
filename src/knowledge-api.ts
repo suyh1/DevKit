@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { desktopRequest } from './planning-share-api';
 import { remoteRequest } from './workspace-remote';
 
@@ -10,3 +11,16 @@ export function knowledgeRequest<T>(action: string, value?: unknown) {
     ? desktopRequest<T>(window.devkitKnowledge, action, value)
     : remoteRequest<T>('knowledge', action, value);
 }
+
+export function developmentDocsRequest<T>(action: string, value?: unknown) {
+  return window.devkitDevelopmentDocs
+    ? desktopRequest<T>(window.devkitDevelopmentDocs, action, value)
+    : remoteRequest<T>('dev-docs', action, value);
+}
+const libraries = {
+  knowledge: { section: 'knowledge', name: '团队知识库', request: knowledgeRequest },
+  'dev-docs': { section: 'dev-docs', name: '开发文档管理', request: developmentDocsRequest },
+} as const;
+export type DocumentSection = keyof typeof libraries;
+export const DocumentSectionContext = createContext<DocumentSection>('knowledge');
+export const useDocumentLibrary = () => libraries[useContext(DocumentSectionContext)];

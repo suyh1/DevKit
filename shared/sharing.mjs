@@ -2,6 +2,7 @@ const fields = {
   projects: ["edit", "probe"],
   git: ['edit', 'sync'],
   knowledge: ['edit'],
+  'dev-docs': ['edit'],
   'project-todos': ['edit'],
   'file-shares': [],
   transfer: ['edit'],

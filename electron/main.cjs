@@ -25,7 +25,7 @@ let nginxManager, nginxError = '';
 let jarManager, jarError = '';
 let lan, lanError = '';
 let collab, collabError = '', transferLinks, transferLinksError = '';
-let knowledge, knowledgeError = '';
+let knowledge, knowledgeError = '', developmentDocs, developmentDocsError = '';
 let gitWorkspace, gitError = '';
 let fileShares, fileSharesError = '', projectTodos, projectTodosError = '';
 let monitorManager, monitorError = '';
@@ -201,6 +201,8 @@ app.whenReady().then(async () => {
     catch (error) { fileSharesError = error.message; }
     try { knowledge = await (await import('./server/knowledge-base.mjs')).createKnowledgeBase(projectStorage.directory); }
     catch (error) { knowledgeError = error.message; }
+    try { developmentDocs = await (await import('./server/knowledge-base.mjs')).createKnowledgeBase(projectStorage.directory, 'dev-docs'); }
+    catch (error) { developmentDocsError = error.message; }
     try { projectTodos = await (await import('./server/todo-lists.mjs')).createTodoLists(projectStorage.directory); }
     catch (error) { projectTodosError = error.message; }
     try { collab = await (await import('./server/collab-store.mjs')).createCollabStore(projectStorage.directory); }
@@ -211,7 +213,7 @@ app.whenReady().then(async () => {
         transferLinks = await createTransferLinks(projectStorage.directory, path.join(__dirname, 'dist'), collab);
       } catch (error) { transferLinksError = error.message; }
     }
-    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { git: () => gitWorkspace, nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, collab: () => collab });
+    projectHost = await createProjectHost(projectStore, path.join(__dirname, 'dist'), { git: () => gitWorkspace, nginx: () => nginxManager, library: () => apiWorkspace, jar: () => jarManager, monitor: () => monitorManager, logs: () => logCenter, lan: () => lan, fileShares: () => fileShares, projectTodos: () => projectTodos, knowledge: () => knowledge, 'dev-docs': () => developmentDocs, collab: () => collab });
     const sharing = await projectStore.settings();
     if (sharing.autoStart) {
       try { await projectHost.start(sharing); }
@@ -393,6 +395,13 @@ app.whenReady().then(async () => {
       return { data: await knowledge.request(action, value) };
     } catch (error) { return { error: error.message, status: error.status }; }
   });
+  ipcMain.handle('devkit:dev-docs', async (event, action, value) => {
+    if (!trustedDesktop(event)) throw new Error('拒绝未知页面的开发文档库请求。');
+    try {
+      if (!developmentDocs) throw new Error(developmentDocsError || projectError || '开发文档库尚未准备好。');
+      return { data: await developmentDocs.request(action, value) };
+    } catch (error) { return { error: error.message, status: error.status }; }
+  });
   ipcMain.handle('devkit:project-todos', async (event, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的待办清单请求。');
     try {
@@ -506,6 +515,6 @@ app.on('before-quit', event => {
   if (window && !window.isDestroyed() && !closeAllowed) { event.preventDefault(); requestQuit(); return; }
   if ((!projectStore && !nginxManager && !apiWorkspace && !jarManager && !monitorManager) || closing) return;
   event.preventDefault(); closing = true;
-  (async () => { try { await projectHost?.stop(); await transferLinks?.close(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); await knowledge?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
+  (async () => { try { await projectHost?.stop(); await transferLinks?.close(); await collab?.close(); await fileShares?.close(); await projectTodos?.close(); await knowledge?.close(); await developmentDocs?.close(); lan?.close(); await monitorManager?.close(); await projectStore?.close(); await nginxManager?.close(); await jarManager?.close(); await apiWorkspace?.close(); } finally { app.quit(); } })().catch(() => app.exit(1));
 });
 app.on('will-quit', () => tray?.destroy());

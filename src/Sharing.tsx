@@ -412,6 +412,8 @@ function SharingPanel({
                         permissions: [{ key: 'edit', label: '发送与移除', detail: '可向共享收件箱发送内容，也可从所有设备的收件箱移除条目。' }] },
                       { id: 'mock', name: '接口模拟服务', description: '多场景响应与调用记录',
                         permissions: [{ key: 'edit', label: '编辑与发布模拟接口', detail: '可维护响应场景、发布或撤下接口，以及更换调用地址。' }] },
+                      { id: 'dev-docs', name: '开发文档管理', description: '查阅 Linux 命令大全和主机上的开发文档',
+                        permissions: [{ key: 'edit', label: '编辑开发文档', detail: '新建目录、编辑或删除开发文档、恢复历史版本。' }] },
                       { id: 'knowledge', name: '团队知识库', description: '查看共享主机上的全部手册与版本历史',
                         permissions: [{ key: 'edit', label: '编辑团队文档', detail: '可创建、编辑、恢复历史版本和删除文档。' }] },
                       { id: 'whiteboard', name: '截图协作白板', description: '截图与多人标注',
@@ -547,7 +549,7 @@ function SharingPanel({
                                 : service.id === 'whiteboard' ? '白板、截图和全部标注'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
                                 : service.id === 'git' ? '已发布仓库的代码差异、分支、标签与提交历史'
-                                : service.id === 'knowledge' ? '全部团队文档及历史版本' : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
+                                : service.id === 'dev-docs' ? '全部开发文档及历史版本' : service.id === 'knowledge' ? '全部团队文档及历史版本' : service.id === 'project-todos' ? '已发布的待办清单' : "项目与档案"}
                             。
                           </p>
                           {service.permissions.map((permission) => (

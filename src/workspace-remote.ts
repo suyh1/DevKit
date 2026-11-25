@@ -26,7 +26,7 @@ export async function remoteResponse(path: string, options: RequestInit) {
   return response;
 }
 export async function remoteRequest<T>(
-  module: "git" | "knowledge" | "http" | "nginx" | "jar" | "monitor" | "logs" | "lan-hosts" | "file-shares" | "project-todos" | "transfer" | "mock" | "whiteboard",
+  module: "git" | "dev-docs" | "knowledge" | "http" | "nginx" | "jar" | "monitor" | "logs" | "lan-hosts" | "file-shares" | "project-todos" | "transfer" | "mock" | "whiteboard",
   action: string,
   payload?: unknown,
   signal?: AbortSignal,

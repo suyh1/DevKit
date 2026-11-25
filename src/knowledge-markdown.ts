@@ -3,6 +3,7 @@ import MarkdownIt from 'markdown-it';
 const md = new MarkdownIt({ html: false }).disable('image');
 export const resourceKinds = [
   'knowledge',
+  'dev-docs',
   'jar',
   'nginx',
   'projects',
@@ -13,6 +14,7 @@ export const resourceKinds = [
 export type ResourceKind = (typeof resourceKinds)[number];
 export const resourceNames: Record<ResourceKind, string> = {
   knowledge: '知识库文档',
+  'dev-docs': '开发文档',
   jar: '应用服务',
   nginx: 'Nginx 实例',
   projects: '项目入口',
@@ -61,14 +63,17 @@ export function articleLayout(body: string) {
   });
   return { html: md.renderer.render(tokens, md.options, {}), headings };
 }
-export function bodyMatch(body: string, query: string) {
+export function bodyMatch(body: string, query: string, preferHeading = false) {
   const term = query.trim().toLowerCase();
   if (!term) return;
-  const offset = body.toLowerCase().indexOf(term);
+  const lower = body.toLowerCase();
+  const heading = preferHeading ? [...lower.matchAll(/^#{1,6} (.+)$/gm)].find(m => m[1].trim() === term) : undefined;
+  const offset = heading?.index ?? lower.indexOf(term);
   if (offset < 0) return;
   const start = body.lastIndexOf('\n', offset - 1) + 1,
     end = body.indexOf('\n', offset);
   return {
+    ...(heading && { heading: true }),
     line: body.slice(0, start).split('\n').length - 1,
     snippet: body.slice(
       Math.max(start, offset - 32),
@@ -77,11 +82,12 @@ export function bodyMatch(body: string, query: string) {
   };
 }
 export function refersTo(body: string, page: ResourceKind, id: string) {
+  if (!body.includes('#' + page + '/') && !body.includes('&')) return false;
   return md.parse(body, {}).some((block) =>
     block.children?.some((token) => {
       if (token.type !== 'link_open') return false;
       const target = resourceTarget(token.attrGet('href') ?? '');
-      return target?.page === page && (page === 'knowledge' ? target.id.split('~')[0] : target.id) === id;
+      return target?.page === page && ((page === 'knowledge' || page === 'dev-docs') ? target.id.split('~')[0] : target.id) === id;
     }),
   );
 }

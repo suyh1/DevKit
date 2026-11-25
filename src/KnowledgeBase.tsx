@@ -1,9 +1,16 @@
 import { Modal as WorkspaceDialog } from './project-components';
 import { TextInput } from './TextControl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, FolderPlus, Plus, RefreshCw, Search } from 'lucide-react';
+import { BookOpen, FolderOpen, FolderPlus, Plus, RefreshCw, Search } from 'lucide-react';
 import { useConfirmation } from './Confirmation';
-import { knowledgeRequest, templates, type KnowledgePage, type Template } from './knowledge-api';
+import {
+  DocumentSectionContext,
+  useDocumentLibrary,
+  type DocumentSection,
+  templates,
+  type KnowledgePage,
+  type Template,
+} from './knowledge-api';
 import {
   articleFields,
   createDraft,
@@ -22,19 +29,26 @@ import { useCardLight } from './tool-card-motion';
 import Skeleton from './Skeleton';
 import './knowledge.css';
 
+type LibraryProps = { active: boolean; portal?: boolean; canEdit?: boolean; visitor?: string };
+
 export default function KnowledgeBase({
-  active,
-  portal = false,
-  canEdit = !portal,
-  visitor = '',
-}: {
-  active: boolean;
-  portal?: boolean;
-  canEdit?: boolean;
-  visitor?: string;
-}) {
-  const resource = useWorkspaceResource('knowledge'),
-    prefix = draftPrefix(portal, visitor);
+  section = 'knowledge',
+  ...props
+}: LibraryProps & { section?: DocumentSection }) {
+  return (
+    <DocumentSectionContext.Provider value={section}>
+      <DocumentLibrary {...props} />
+    </DocumentSectionContext.Provider>
+  );
+}
+
+function DocumentLibrary({ active, portal = false, canEdit = !portal, visitor = '' }: LibraryProps) {
+  const { section, name, request } = useDocumentLibrary();
+  const developer = section === 'dev-docs';
+  const resource = useWorkspaceResource(section),
+    prefix = draftPrefix(portal, visitor, section);
+  const seedQuery = developer && resource?.startsWith('search:') ? resource.slice(7) : undefined;
+  const seedFolder = developer && resource?.startsWith('folder:') ? resource.slice(7) : undefined;
   const token = resource?.startsWith('write:') ? resource.slice(6) : '';
   const initial = useMemo(
     () => (token && canEdit ? readDraft(prefix, token) : undefined),
@@ -74,6 +88,7 @@ export default function KnowledgeBase({
     [busy, setBusy] = useState(false);
   const [versions, setVersions] = useState<KnowledgePage>(),
     [jump, setJump] = useState<{ id: string; line: number }>();
+  const readerHeading = useRef<HTMLHeadingElement>(null);
   const seq = useRef(0),
     grid = useRef<HTMLDivElement>(null),
     selectedHere = useRef<string>(''),
@@ -81,7 +96,7 @@ export default function KnowledgeBase({
   const refresh = useCallback(async () => {
     const tick = ++seq.current;
     try {
-      const lib = await knowledgeRequest<{ pages: KnowledgePage[]; folders: string[] }>('library');
+      const lib = await request<{ pages: KnowledgePage[]; folders: string[] }>('library');
       if (tick === seq.current) {
         setPages(lib.pages);
         setDirectories(lib.folders);
@@ -90,7 +105,7 @@ export default function KnowledgeBase({
     } catch (e) {
       if (tick === seq.current) setError((e as Error).message);
     }
-  }, []);
+  }, [request]);
   useEffect(() => {
     if (active) void refresh();
     return () => {
@@ -111,6 +126,10 @@ export default function KnowledgeBase({
   const projects = useMemo(() => [...new Set(pages?.map((p) => p.project).filter(Boolean))].sort(), [pages]);
   const tags = useMemo(() => [...new Set(pages?.flatMap((p) => p.tags))].sort(), [pages]);
   const term = query.trim().toLowerCase();
+  const hits = useMemo(
+    () => new Map((pages ?? []).map((p) => [p.id, bodyMatch(p.body, term, developer)])),
+    [pages, term, developer],
+  );
   const visible = useMemo(
     () =>
       (pages ?? [])
@@ -125,31 +144,49 @@ export default function KnowledgeBase({
                 value.toLowerCase().includes(term),
               )),
         )
-        .sort((a, b) => b.updated.localeCompare(a.updated)),
-    [pages, folder, project, tag, related, term],
+        .sort(
+          (a, b) =>
+            Number(!!hits.get(b.id)?.heading) - Number(!!hits.get(a.id)?.heading) ||
+            b.updated.localeCompare(a.updated),
+        ),
+    [pages, folder, project, tag, related, term, hits],
   );
-  const [id, anchor] = (resource ?? '').split('~');
-  const missing = !!resource && !related && !token && !!pages && !pages.some((p) => p.id === id);
+  const byFolder = useMemo(() => {
+    const groups = new Map<string, KnowledgePage[]>();
+    if (developer && !term)
+      for (const item of visible) {
+        const group = groups.get(item.folder);
+        if (group) group.push(item);
+        else groups.set(item.folder, [item]);
+      }
+    return groups;
+  }, [developer, term, visible]);
+  const [id, anchor] = (seedQuery !== undefined || seedFolder !== undefined ? '' : (resource ?? '')).split('~');
+  const missing =
+    !!id && !related && !token && !!pages && !pages.some((p) => p.id === id);
   const page = missing ? undefined : (visible.find((p) => p.id === id) ?? visible[0]);
+  const seededJump = useMemo(() => {
+    const hit = page && seedQuery === query ? hits.get(page.id) : undefined;
+    return page && hit ? { id: page.id, line: hit.line } : undefined;
+  }, [page, seedQuery, query, hits]);
   const backlinks = useMemo(
-    () =>
-      page ? (pages ?? []).filter((p) => p.id !== page.id && refersTo(p.body, 'knowledge', page.id)) : [],
-    [pages, page],
+    () => (page ? (pages ?? []).filter((p) => p.id !== page.id && refersTo(p.body, section, page.id)) : []),
+    [pages, page, section],
   );
   useCardLight(grid, active && !!pages && !initial, '[data-resource-card]');
   useEffect(() => {
-    if (selectedHere.current !== id && !token) {
-      setQuery('');
-      setFolder(null);
+    if ((seedQuery !== undefined || seedFolder !== undefined || selectedHere.current !== id) && !token) {
+      setQuery(seedQuery ?? '');
+      setFolder(seedFolder ?? null);
       setProject('');
       setTag('');
       setJump(undefined);
     }
     selectedHere.current = '';
-  }, [id, token]);
+  }, [id, token, seedQuery, seedFolder]);
   const drafts = canEdit && !initial && active ? savedDrafts(prefix) : [];
   function navigate(id?: string) {
-    openWorkspaceLink('knowledge', id);
+    openWorkspaceLink(section, id);
   }
   function openDraft(draft: WritingDraft) {
     try {
@@ -188,6 +225,36 @@ export default function KnowledgeBase({
       setBusy(false);
     }
   }
+  function documentCard(row: KnowledgePage) {
+    const hit = hits.get(row.id);
+    return (
+      <button
+        key={row.id}
+        data-resource-card
+        className="kb-card"
+        aria-current={page?.id === row.id ? 'page' : undefined}
+        onClick={() => {
+          selectedHere.current = row.id;
+          setJump(hit ? { id: row.id, line: hit.line } : undefined);
+          navigate(row.id);
+          if (developer && !hit)
+            requestAnimationFrame(() => {
+              readerHeading.current?.focus({ preventScroll: true });
+              readerHeading.current?.scrollIntoView({ block: 'nearest' });
+            });
+        }}
+      >
+        {(!developer || term) && (
+          <span>
+            {row.folder || '未归档'}
+            {row.project && ' · ' + row.project}
+          </span>
+        )}
+        <strong title={row.title}>{row.title}</strong>
+        {hit && <small>{hit.snippet}</small>}
+      </button>
+    );
+  }
   if (initial && canEdit)
     return (
       <KnowledgeEditor
@@ -202,14 +269,13 @@ export default function KnowledgeBase({
       />
     );
   return (
-    <section className="kb-center" aria-label="团队知识库">
+    <section className="kb-center" aria-label={name}>
       <header className="kb-header">
         <div>
           <BookOpen size={22} />
-          <h1>团队知识库</h1>
+          <h1>{name}</h1>
         </div>
         <div>
-
           <button className="icon-button" aria-label="刷新文档" onClick={() => void refresh()}>
             <RefreshCw size={16} />
           </button>
@@ -247,22 +313,31 @@ export default function KnowledgeBase({
         <p role="status">
           此草稿已结束或仅保存在原设备上。
           <button className="text-button" onClick={() => navigate()}>
-            返回知识库
+            返回文档目录
           </button>
         </p>
       )}
-      {!pages && !error && <Skeleton kind="list" label="正在读取知识库" />}
+      {!pages && !error && <Skeleton kind="list" label={developer ? "正在读取开发文档" : "正在读取知识库"} />}
       {pages && (
         <div className="kb-layout">
           <aside className="kb-library">
             <label className="kb-search">
               <Search size={16} />
-              <TextInput embedded
+              <TextInput
+                embedded
                 type="search"
-                aria-label="知识库全文搜索"
-                placeholder="搜索标题或正文"
+                aria-label={developer ? '开发文档全文搜索' : '知识库全文搜索'}
+                placeholder={developer ? '搜索全部文档、命令或用法' : '搜索标题或正文'}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setJump(undefined);
+                  if (developer) {
+                    setFolder(null);
+                    setProject('');
+                    setTag('');
+                  }
+                }}
               />
             </label>
             <div className="kb-folder-nav">
@@ -291,63 +366,78 @@ export default function KnowledgeBase({
               )}
             </div>
             {folderInput !== null && canEdit && (
-              <WorkspaceDialog title="新建目录" closeLabel="关闭新建目录" close={() => setFolderInput(null)} busy={busy}><form
-                className="kb-folder-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void action(async () => {
-                    const all = await knowledgeRequest<string[]>('create-folder', { folder: folderInput });
-                    setDirectories(all);
-                    setFolder(
-                      folderInput
-                        .split('/')
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                        .join('/'),
-                    );
-                    setFolderInput(null);
-                  });
-                }}
+              <WorkspaceDialog
+                title="新建目录"
+                closeLabel="关闭新建目录"
+                close={() => setFolderInput(null)}
+                busy={busy}
               >
-                <TextInput
-                  autoFocus
-                  aria-label="目录路径"
-                  placeholder="基础知识 / 网络"
-                  required
-                  maxLength={240}
-                  value={folderInput}
-                  onChange={(e) => setFolderInput(e.target.value)}
-                />
-                <button disabled={busy} className="secondary-button">
-                  创建目录
-                </button>
-                <button type="button" className="text-button" onClick={() => setFolderInput(null)}>
-                  取消
-                </button>
-              </form>{error && <p role="alert">{error}</p>}</WorkspaceDialog>
+                <form
+                  className="kb-folder-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void action(async () => {
+                      const all = await request<string[]>('create-folder', { folder: folderInput });
+                      setDirectories(all);
+                      setFolder(
+                        folderInput
+                          .split('/')
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .join('/'),
+                      );
+                      setFolderInput(null);
+                    });
+                  }}
+                >
+                  <TextInput
+                    autoFocus
+                    aria-label="目录路径"
+                    placeholder="基础知识 / 网络"
+                    required
+                    maxLength={240}
+                    value={folderInput}
+                    onChange={(e) => setFolderInput(e.target.value)}
+                  />
+                  <button disabled={busy} className="secondary-button">
+                    创建目录
+                  </button>
+                  <button type="button" className="text-button" onClick={() => setFolderInput(null)}>
+                    取消
+                  </button>
+                </form>
+                {error && <p role="alert">{error}</p>}
+              </WorkspaceDialog>
             )}
-            <details className="kb-filters"><summary>项目与标签{(project || tag) && ' · '+[project,tag].filter(Boolean).join(' / ')}</summary>
-            <div className="kb-fields">
-              <select aria-label="筛选项目" value={project} onChange={(e) => setProject(e.target.value)}>
-                <option value="">全部项目</option>
-                {projects.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-              <select aria-label="筛选标签" value={tag} onChange={(e) => setTag(e.target.value)}>
-                <option value="">全部标签</option>
-                {tags.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </div>
+            <details className="kb-filters">
+              <summary>
+                项目与标签{(project || tag) && ' · ' + [project, tag].filter(Boolean).join(' / ')}
+              </summary>
+              <div className="kb-fields">
+                <select aria-label="筛选项目" value={project} onChange={(e) => setProject(e.target.value)}>
+                  <option value="">全部项目</option>
+                  {projects.map((p) => (
+                    <option key={p}>{p}</option>
+                  ))}
+                </select>
+                <select aria-label="筛选标签" value={tag} onChange={(e) => setTag(e.target.value)}>
+                  <option value="">全部标签</option>
+                  {tags.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
             </details>
             {drafts.length > 0 && (
               <details className="kb-drafts">
                 <summary>本机草稿 · {drafts.length}</summary>
                 <div className="disclosure-scroll">
                   {drafts.map((d) => (
-                    <button className="text-button" key={d.token} onClick={() => navigate('write:' + d.token)}>
+                    <button
+                      className="text-button"
+                      key={d.token}
+                      onClick={() => navigate('write:' + d.token)}
+                    >
                       {d.form.title || '无标题草稿'} · 继续写作
                     </button>
                   ))}
@@ -368,29 +458,16 @@ export default function KnowledgeBase({
               </div>
             )}
             <div className="kb-cards" ref={grid} aria-label="文档目录">
-              {visible.map((row) => {
-                const hit = bodyMatch(row.body, term);
-                return (
-                  <button
-                    key={row.id}
-                    data-resource-card
-                    className="kb-card"
-                    aria-current={page?.id === row.id ? 'page' : undefined}
-                    onClick={() => {
-                      selectedHere.current = row.id;
-                      setJump(hit ? { id: row.id, line: hit.line } : undefined);
-                      navigate(row.id);
-                    }}
-                  >
-                    <span>
-                      {row.folder || '未归档'}
-                      {row.project && ' · ' + row.project}
-                    </span>
-                    <strong title={row.title}>{row.title}</strong>
-                    {hit && <small>{hit.snippet}</small>}
-                  </button>
-                );
-              })}
+              {developer && !term
+                ? [...byFolder].map(([path, rows]) => (
+                    <details className="dev-doc-folder" key={path} open>
+                      <summary>
+                        <FolderOpen size={15} /> {path || '未归档'} <small>{rows.length}</small>
+                      </summary>
+                      {rows.map(documentCard)}
+                    </details>
+                  ))
+                : visible.map(documentCard)}
             </div>
           </aside>
           <article className="kb-reader">
@@ -399,12 +476,28 @@ export default function KnowledgeBase({
                 <small>
                   {[page.folder || '未归档', page.project, ...page.tags].filter(Boolean).join(' / ')}
                 </small>
-                <h2>{page.title}</h2>
+                <h2 ref={readerHeading} tabIndex={-1}>
+                  {page.title}
+                </h2>
                 <div className="kb-meta">
                   v{page.revision} · {page.actor} · {new Date(page.updated).toLocaleString()}
                 </div>
                 <div className="kb-actions">
-                  <ResourceLink page="knowledge" id={page.id} compact />
+                  {developer && (
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        const selected =
+                          grid.current?.querySelector<HTMLButtonElement>('[aria-current="page"]');
+                        const group = selected?.closest('details');
+                        if (group) group.open = true;
+                        selected?.focus();
+                      }}
+                    >
+                      返回文档目录
+                    </button>
+                  )}
+                  <ResourceLink page={section} id={page.id} compact />
                   <button className="text-button" onClick={() => setVersions(page)}>
                     版本历史
                   </button>
@@ -433,7 +526,7 @@ export default function KnowledgeBase({
                             })
                           )
                             void action(async () => {
-                              await knowledgeRequest('remove', { id: page.id, revision: page.revision });
+                              await request('remove', { id: page.id, revision: page.revision });
                               await refresh();
                               navigate();
                             });
@@ -444,7 +537,7 @@ export default function KnowledgeBase({
                     </>
                   )}
                 </div>
-                <KnowledgeReader page={page} anchor={anchor} jump={jump} />
+                <KnowledgeReader page={page} anchor={anchor} jump={jump ?? seededJump} />
                 {!!backlinks.length && (
                   <aside className="kb-backlinks">
                     <h3>引用本文的文档</h3>
@@ -461,7 +554,7 @@ export default function KnowledgeBase({
                 {missing
                   ? '链接中的文档已删除或不存在。'
                   : !pages.length
-                    ? '知识库中还没有文档。'
+                    ? '当前文档库还没有文档。'
                     : related
                       ? '没有文档引用这个实例。'
                       : '当前条件下没有文档。'}
@@ -479,7 +572,7 @@ export default function KnowledgeBase({
           error={error}
           restore={(version) =>
             void action(async () => {
-              const p = await knowledgeRequest<KnowledgePage>('restore', {
+              const p = await request<KnowledgePage>('restore', {
                 id: versions.id,
                 revision: versions.revision,
                 version,

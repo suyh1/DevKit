@@ -9,8 +9,8 @@ export type WritingDraft = {
   time: number;
   position?: { anchor: number; head: number; top: number };
 };
-export function draftPrefix(portal: boolean, visitor: string) {
-  return 'devkit:knowledge-draft:2:' + (portal ? 'visitor:' + encodeURIComponent(visitor) : 'desktop') + ':';
+export function draftPrefix(portal: boolean, visitor: string, section: 'knowledge' | 'dev-docs' = 'knowledge') {
+  return 'devkit:' + section + '-draft:2:' + (portal ? 'visitor:' + encodeURIComponent(visitor) : 'desktop') + ':';
 }
 export function createDraft(form: Article, page?: KnowledgePage): WritingDraft {
   return {

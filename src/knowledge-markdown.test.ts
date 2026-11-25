@@ -29,3 +29,8 @@ it('renders formatted text offline and keeps raw HTML as article text', () => {
   expect(html).toContain('&lt;em&gt;');
   expect(html).not.toContain('<img');
 });
+
+it('locates an exact Linux command heading before incidental mentions in a chapter', () => {
+  expect(bodyMatch('## lsblk\n\nls also lists files.\n\n## ls\n\n列出文件', 'ls', true)).toMatchObject({ heading: true, line: 4 });
+  expect(refersTo(referenceText('dev-docs', 'linux-files~h2', 'ls'), 'dev-docs', 'linux-files')).toBe(true);
+});

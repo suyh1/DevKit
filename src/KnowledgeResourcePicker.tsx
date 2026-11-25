@@ -2,6 +2,7 @@ import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './project-components';
 import { workspaceRestriction } from './related-workspaces';
+import { useDocumentLibrary } from './knowledge-api';
 import { resourceKinds, resourceNames, type ResourceKind } from './knowledge-markdown';
 import { workspaceSearch, type WorkspaceResult } from './workspace-links';
 import { lanRequest, sharedLanInventory, type LanHost } from './lan-api';
@@ -31,8 +32,9 @@ export function KnowledgeResourcePicker({
   insert: (rows: ResourceChoice[]) => void;
   documentId?: string;
 }) {
+  const { section } = useDocumentLibrary();
   const allowed = resourceKinds.filter((kind) => !workspaceRestriction(kind));
-  const [filters, setFilters] = useState<ResourceKind[]>(['knowledge']);
+  const [filters, setFilters] = useState<ResourceKind[]>([section]);
   const [selected, setSelected] = useState<ResourceChoice[]>([]),
     [rows, setRows] = useState<ResourceChoice[]>([]);
   const [query, setQuery] = useState(''),
@@ -66,7 +68,7 @@ export function KnowledgeResourcePicker({
   const visible = rows.filter(
     (row) =>
       filters.includes(row.page) &&
-      !(row.page === 'knowledge' && row.id === documentId) &&
+      !(row.page === section && row.id === documentId) &&
       [row.label, row.detail, row.host].join(' ').toLowerCase().includes(term),
   );
   function toggle(row: ResourceChoice) {

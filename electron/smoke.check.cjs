@@ -47,6 +47,10 @@ app.on('browser-window-created', (_event, window) => {
         await require('./analysis-workflows-smoke.cjs')(window);
         clearTimeout(timeout); app.exit(0); return;
       }
+      if (process.env.DEVKIT_TEST_DEV_DOCS_ONLY === '1') {
+        await require('./development-docs-smoke.cjs')(window);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_GIT_ONLY === '1') {
         await require('./git-workspace-smoke.cjs')(window, installation, output);
         clearTimeout(timeout); app.exit(0); return;

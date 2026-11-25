@@ -315,20 +315,22 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (writing) audit.record(session.visitor, 'git.' + action, 'ok');
             return json(200, result);
           }
-          if (url.pathname.startsWith('/api/knowledge/')) {
-            const access = services.knowledge;
-            if (!access.enabled) return json(404, { error: '未开放团队知识库共享。' });
+          if (url.pathname.startsWith('/api/knowledge/') || url.pathname.startsWith('/api/dev-docs/')) {
+            const section = url.pathname.split('/')[2];
+            const name = section === 'knowledge' ? '团队知识库' : '开发文档管理';
+            const access = services[section];
+            if (!access.enabled) return json(404, { error: '未开放' + name + '共享。' });
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
-            const knowledge = managers.knowledge?.();
-            if (!knowledge) return json(503, { error: '团队知识库暂不可用。' });
-            const action = url.pathname.slice('/api/knowledge/'.length);
+            const knowledge = managers[section]?.();
+            if (!knowledge) return json(503, { error: name + '暂不可用。' });
+            const action = url.pathname.slice(('/api/' + section + '/').length);
             const writing = !['list', 'library', 'history'].includes(action);
-            if (writing && !access.edit) return json(403, { error: '团队知识库为只读模式。' });
+            if (writing && !access.edit) return json(403, { error: name + '为只读模式。' });
             const input = await body();
             ensureCurrentSession();
             const result = await knowledge.request(action, input, { authorize: ensureCurrentSession, actor: session.visitor || '共享访客' });
             ensureCurrentSession();
-            if (writing) audit.record(session.visitor, 'knowledge.' + action, 'ok');
+            if (writing) audit.record(session.visitor, section + '.' + action, 'ok');
             return json(200, result);
           }
           if (url.pathname.startsWith('/api/project-todos/')) {

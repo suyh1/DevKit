@@ -5,6 +5,7 @@ declare global {
   interface Window {
     devkitFileShares?: DesktopBridge;
     devkitKnowledge?: DesktopBridge;
+    devkitDevelopmentDocs?: DesktopBridge;
     devkitProjectTodos?: DesktopBridge;
   }
 }

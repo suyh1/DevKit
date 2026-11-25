@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('devkitGit', {
 contextBridge.exposeInMainWorld('devkitKnowledge', {
   request: (action, payload) => ipcRenderer.invoke('devkit:knowledge', action, payload),
 });
+contextBridge.exposeInMainWorld('devkitDevelopmentDocs', {
+  request: (action, payload) => ipcRenderer.invoke('devkit:dev-docs', action, payload),
+});
 contextBridge.exposeInMainWorld('devkitProjectTodos', {
   request: (action, payload) => ipcRenderer.invoke('devkit:project-todos', action, payload),
 });
