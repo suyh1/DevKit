@@ -214,30 +214,6 @@
   padding: 3px 9px;
   background: var(--soft);
 }
-.host-preview {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.host-preview-card {
-  display: none;
-  z-index: 12;
-  position: absolute;
-  pointer-events: none;
-  left: 0;
-  top: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px #0002;
-  min-width: 100%;
-  background: var(--surface-raised);
-  padding: 10px;
-  overflow-wrap: anywhere;
-}
-.host-preview:is(:hover, :focus-within) .host-preview-card {
-  display: grid;
-  gap: 4px;
-}
 .impact-graph {
   padding: 12px;
   border: 1px solid var(--line);

@@ -13,6 +13,19 @@ module.exports = async function inventoryNavigation(window, output) {
   let logRevision = 0;
   const fixtures = make => Array.from({length: count}, (_, i) => make(i));
   const state = instances => ({ revision: 1, platform: process.platform, directory: '/fixture', instances });
+  const hostCount = () => Math.min(50, count);
+  const group = (id, phase) => ({ id, name: id || '本机', platform: 'linux', revision: 1, phase, edit: true, control: true });
+  function inventory(payload, makeInstance) {
+    if (payload?.scope === 'inventory-progress') return [];
+    if (payload?.scope === 'inventory-host') {
+      const failed = payload.hostId === 'host-0';
+      const remote = group(payload.hostId, failed ? 'failed' : 'ready');
+      if (failed) remote.error = '测试连接失败';
+      return { ...state([]), groups: [remote] };
+    }
+    const groups = Array.from({length: hostCount()}, (_, i) => group('host-' + i, 'connecting'));
+    return { ...state(fixtures(makeInstance)), groups: [group('', 'ready'), ...groups] };
+  }
   const jar = i => ({ id: 'service-' + i, name: '服务 ' + i, jar: '/fixture/' + i + '.jar',
     logMode: i % 2 ? 'console' : 'file', profiles: [], health: { type: 'none' }, restart: {}, jvmArgs: [], appArgs: [] });
   const nginx = i => ({ id: 'ng-' + i, name: '网关 ' + i, main: '/fixture/' + i + '.conf', files: [], platform: 'any' });
@@ -44,6 +57,36 @@ module.exports = async function inventoryNavigation(window, output) {
     window.setContentSize(width, 844);
     await wait(width < 500 ? 'innerWidth < 450' : 'innerWidth > 1200');
     await painted();
+  }
+  async function checkHostProgress(workspace) {
+    const details = workspace + ' .host-progress', list = details + ' ul';
+    await wait(element(details + ' summary') + '?.textContent.includes("已连接 ' + (hostCount() - 1) + '")');
+    assert.match(await js(element(details + ' summary') + '.textContent'), /失败 1/);
+    assert.ok(await js('!' + element(details) + '.open && ' + element(details) + '.offsetHeight <= 40'));
+    await click(details + ' summary');
+    await wait(element(list) + '.offsetHeight > 0');
+    const metrics = await js(`(() => { const list = ${element(list)}; return [list.children.length, list.clientHeight, list.scrollHeight]; })()`);
+    assert.equal(metrics[0], hostCount());
+    assert.ok(metrics[1] <= 180);
+    if (hostCount() === 50) assert.ok(metrics[2] > metrics[1]);
+    assert.equal(await js(element(list + ' button') + '.textContent'), '重试');
+    await click(details + ' summary');
+  }
+  async function hoverHost(summary) {
+    const rect = await js(`(() => {
+      const target = ${element(summary)};
+      target.scrollIntoView({block:'nearest'});
+      const {x,y,width,height} = target.getBoundingClientRect();
+      return {x: Math.round(x + width / 2), y: Math.round(y + height / 2)};
+    })()`);
+    const layout = () => js(`(() => { const list = document.querySelector('.lan-host-list');
+      return [list.clientHeight, list.scrollHeight, list.scrollTop, ${element(summary)}.offsetHeight, ${element(summary)}.closest('li').innerText]; })()`);
+    const before = await layout();
+    contents.sendInputEvent({type: 'mouseMove', ...rect});
+    await wait(element(summary) + '.matches(":hover")');
+    await painted();
+    assert.deepEqual(await layout(), before, 'Hover keeps host content, height and scroll position stable');
+    assert.equal(await js(element(summary) + '.parentElement.open'), false);
   }
   async function serviceOutput(index) {
     const trigger = '[data-service-output="service-' + index + '"]';
@@ -82,14 +125,14 @@ module.exports = async function inventoryNavigation(window, output) {
   }
   try {
     handle('devkit:jar', (action, payload) => {
-      if (action === 'get') return state(fixtures(jar));
+      if (action === 'get') return inventory(payload, jar);
       if (action === 'statuses') return [];
       if (action === 'log-tail') return { text: (payload.id + ' log\n').repeat(400) + 'revision ' + (++logRevision), path: '/fixture/log' };
       if (action === 'console-read') return { available: true, inputOpen: true, lease: null, cursor: 1, end: 1,
         ...(!payload.cursor && {reset: true, text: (payload.id + ' console\n').repeat(400)}) };
     });
     handle('devkit:nginx', (action, payload) => {
-      if (action === 'get') return state(fixtures(nginx));
+      if (action === 'get') return inventory(payload, nginx);
       if (action === 'statuses') return [];
       if (action === 'documents') return { files: [{path: '/fixture/' + payload.id.slice(3) + '.conf', content: 'events {}', hash: 'fixture'}], warnings: [] };
     });
@@ -115,6 +158,7 @@ module.exports = async function inventoryNavigation(window, output) {
       await wait('document.querySelector(".jar-summary strong")?.textContent === "' + count + '"');
       for (const width of [1340, 390]) {
         await resize(width);
+        await checkHostProgress('.jar-center');
         if (count === 100 && width === 1340) {
           const next = '[aria-label=服务列表分页] [aria-label=下一页]';
           for (let page = 1; page < 5; page++) { await click(next); await painted(); }
@@ -156,6 +200,7 @@ module.exports = async function inventoryNavigation(window, output) {
       const target = '[data-instance-id="ng-' + (count - 1) + '"] .ng-instance-select';
       for (const width of [1340, 390]) {
         await resize(width);
+        await checkHostProgress('.ng-center');
         await click(target);
         await wait('document.activeElement.matches(".ng-instance-heading h2") && ' + visible('.ng-instance-heading h2'));
         await js("[...document.querySelectorAll('.ng-detail button')].find(b => b.textContent === '返回实例列表').click()");
@@ -165,15 +210,22 @@ module.exports = async function inventoryNavigation(window, output) {
       await wait('document.activeElement.matches(".ng-instance-heading h2") && document.activeElement.textContent.includes("网关 0")');
       await resize(1340);
       await openWorkspace('局域网主机');
-      const host = '[data-host-id="host-' + (Math.min(50, count) - 1) + '"]', summary = host + ' summary';
+      await wait('document.querySelectorAll(".lan-host-list [data-host-id]").length === ' + hostCount());
       for (const width of [1340, 390]) {
         await resize(width);
-        await click(summary);
-        await wait(element(host + ' details') + '.open');
-        await js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
-        await wait(visible('.lan-terminal-tabs [aria-selected=true]'));
-        await js("document.querySelector('.lan-terminal-tabs .icon-button').click()");
-        await wait('document.activeElement === ' + element(summary) + ' && ' + visible(summary));
+        const list = element('.lan-host-list');
+        assert.ok(await js(list + '.clientHeight') <= (width < 500 ? 240 : 360));
+        assert.equal(await js(list + '.scrollHeight > ' + list + '.clientHeight'), count > 2);
+        for (const id of [0, hostCount() - 1]) {
+          const host = '[data-host-id="host-' + id + '"]', summary = host + ' summary';
+          await hoverHost(summary);
+          await click(summary);
+          await wait(element(host + ' details') + '.open');
+          await js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
+          await wait(visible('.lan-terminal-tabs [aria-selected=true]'));
+          await js("document.querySelector('.lan-terminal-tabs .icon-button').click()");
+          await wait('document.activeElement === ' + element(summary) + ' && ' + visible(summary));
+        }
       }
     }
     console.log('Desktop and narrow list/detail navigation passed with 2 entries and 100 services, 300 log sources, 100 Nginx instances and 50 hosts.');

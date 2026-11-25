@@ -106,6 +106,8 @@ HAR、CPU Profile、Source Map 和构建体积工具还提供「直接分析大�
 
 从桌面的“共享栏目”管理远程连接。支持按直连 IPv4 网段发现主机、CSV 或 OpenSSH 配置预览导入、分组、标签、置顶和分步连接诊断。SSH 支持密码、SSH Agent、默认或指定私钥、跳板机及指纹校验。终端支持多会话、重连和 SFTP 文件传输。主机卡片可启用端口监控、打开 Windows 远程桌面或向直连网段发送网络唤醒包。
 
+主机清单在搜索框下独立滚动。点主机名称可查看连接详情和可用操作。服务管理和 Nginx 配置顶部默认汇总目标主机的连接状态，展开可查看每台主机的进度，并重试失败的连接。
+
 通过 SSH 集中管理时，DevKit 自动识别 Windows x64、Linux x64 和 Linux ARM64（含兼容的麒麟 ARM64），从中心端离线部署便携 Node.js 和管理程序。优先使用 SFTP，未开放时通过 SSH 命令通道上传。JAR 目标需安装适合该应用的 Java，Nginx 目标需安装 nginx。见 [连接与权限](docs/workspace-sharing.md)。
 
 ## Nginx 配置

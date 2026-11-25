@@ -8,11 +8,10 @@
 .lan-search { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
 .lan-search input { border: 0; background: transparent; min-width: 0; width: 100%; }
 .lan-host-list, .host-directory-list { list-style: none; padding: 0; margin: 0; }
-.lan-host-list > li { padding: 14px 1px; border-bottom: 1px solid var(--line); }
+.lan-host-list > li { padding: 5px 1px; border-bottom: 1px solid var(--line); }
 .lan-host-list > li:last-child { border-bottom: 0; padding-bottom: 1px; }
-.lan-host-list header { display: flex; align-items: start; gap: 8px; }
-.lan-host-list header > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.lan-host-list header > svg { color: var(--accent); flex-shrink: 0; margin-top: 3px; }
+.lan-host-list > li > header { display: flex; align-items: center; gap: 4px; }
+.lan-host-list header > details { flex: 1; min-width: 0; }
 .lan-host-list small { display: block; margin-top: 4px; color: var(--muted); }
 .lan-host-list .pc-actions { gap: 4px; }
 .lan-host-list .pc-actions button, .lan-heading .run-button { display: inline-flex; gap: 5px; align-items: center; }
@@ -278,7 +277,11 @@
 .lan-diagnostic small { grid-column:1 / -1; color:var(--muted); overflow-wrap:anywhere; }
 .lan-diagnostic [data-state=pass] { color:var(--success); }
 .lan-diagnostic [data-state=fail] { color:var(--error); }
-.host-progress { list-style:none; margin:10px 0; padding:0; display:grid; gap:5px; }
+.host-progress { margin: 8px 0; font-size: 12px; }
+.host-progress summary { width: fit-content; padding: 5px 2px; cursor: pointer; color: var(--muted); }
+.host-progress summary span { margin-inline-start: 8px; }
+.host-progress .host-progress-failed { color: var(--error); }
+.host-progress ul { list-style: none; margin: 4px 0; padding: 2px; display: grid; gap: 5px; max-height: min(24dvh, 180px); overflow: auto; }
 .host-progress li { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 .host-progress strong { color:var(--text); }
 
@@ -287,6 +290,7 @@
   padding: 7px 8px; background: transparent; border-radius: 6px; overflow-wrap: anywhere;
 }
 .lan-connection-select > svg { flex: none; align-self: start; }
+.lan-host-list .lan-connection-select:hover { background: var(--soft); }
 .lan-host-list .lan-connection-select[aria-expanded=true] { background: var(--tint); color: var(--accent); }
 .lan-host-list .pc-actions[hidden] { display: none; }
 .lan-terminal-tabs small { font-family: var(--font-mono); color: var(--muted); }
@@ -297,8 +301,7 @@
 .host-directory-list .path-next { margin-inline-start:auto; color:var(--muted); }
 .host-directory-list button:is(:hover,:focus-visible) { background:var(--tint); }
 .host-directory footer { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
-.lan-connections .lan-host-list { max-height: 62dvh; overflow: auto; padding-inline: 2px; }
-.host-progress { max-height: 24dvh; overflow: auto; }
+.lan-connections .lan-host-list { max-height: min(42dvh, 360px); overflow: auto; scrollbar-gutter: stable; padding-inline: 2px; }
 @media (max-width: 760px) {
-  .lan-connections .lan-host-list { max-height: 36dvh; }
+  .lan-connections .lan-host-list { max-height: min(30dvh, 240px); }
 }

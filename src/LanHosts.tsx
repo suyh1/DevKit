@@ -325,12 +325,14 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
             const status = statuses.find(item => item.hostId === host.id);
             const link = portal && host.mode === 'share' ? workbenchLink(host.address) : undefined;
             return <li key={host.id} data-host-id={host.id} ref={host.id === linked ? linkedRow : undefined}>
-          <header><div className="host-preview"><FloatingDetails open={focusedHost === host.id} onToggle={event => {
+          <header><FloatingDetails open={focusedHost === host.id} onToggle={event => {
               if (event.currentTarget.open) setFocusedHost(host.id);
               else setFocusedHost(current => current === host.id ? '' : current);
             }}><summary className="lan-connection-select" aria-expanded={focusedHost === host.id}>
             {host.mode === 'ssh' ? <Terminal size={17} /> : <Globe size={17} />}<span><strong>{host.name}</strong><small>{endpoint(host)}</small></span>
-          </summary>          <div className="pc-actions" id={`lan-actions-${host.id}`} onClick={event => {
+          </summary>
+          <p className="lan-note">{host.mode === 'ssh' ? (!portal || allowed('edit') ? `${host.platform === 'win32' ? 'Windows' : 'Linux'} · ${host.auth === 'password' ? '密码' : '密钥'} · ${host.fingerprint ? '已信任' : '待验证指纹'}` : `SSH${host.fingerprint ? ' · 已信任' : ''}`) : 'DevKit 共享'}{(Object.keys(titles) as ManagedModule[]).filter(module => host.modules[module]).map(module => ` · ${titles[module]}`).join('')}</p>
+          <div className="pc-actions" id={`lan-actions-${host.id}`} onClick={event => {
               if ((event.target as Element).closest('button, a')) setFocusedHost('');
             }}>
             {host.mode === 'ssh' ? allowed('terminal') && <button className="secondary-button" disabled={busy || !host.fingerprint && !(allowed('edit') && allowed('diagnose'))} title={!host.fingerprint ? '首次连接需核对 SSH 指纹' : undefined} onClick={() => void task(async () => { if (host.fingerprint || await verify(host)) { const id = nextTab++; setTabs(items => [...items, { id, host }]); setSelected(id); focusSession(); } })}><Terminal size={14} />打开终端</button> : portal ? link && <a className="text-button" href={link} target="_blank" rel="noreferrer"><ExternalLink size={14} />打开工作台</a> : <button className="secondary-button" disabled={busy} onClick={() => void task(async () => { const result = await window.devkitDesktop?.openLanHost?.(host.address, host.modules.nginx && !host.modules.jar ? 'nginx' : 'jar'); if (!result || result.error) throw new Error(result?.error || '远程工作台不可用。'); })}><ExternalLink size={14} />打开工作台</button>}
@@ -362,14 +364,13 @@ export default function LanHosts({ active, onOpenMonitor, portal = false }: { ac
                 setSelected(current => tabs.find(tab => tab.id === current)?.host.id === host.id ? tabs.filter(tab => tab.host.id !== host.id).at(-1)?.id : current);
               }
             })}><Trash2 size={15} /></button>}
-          </div></FloatingDetails><div className="host-preview-card"><strong>{host.name}</strong><span>{host.mode === 'ssh' ? 'SSH 主机' : '共享工作台'} · {endpoint(host)}</span><small>{host.group || '未分组'}{host.pinned ? ' · 已置顶' : ''}</small></div></div>
+          </div></FloatingDetails>
             {allowed('edit') && <><button className="icon-button" disabled={busy} aria-label={`${host.pinned ? '取消置顶' : '置顶'} ${host.name}`} aria-pressed={!!host.pinned} onClick={() => void task(async () => {
               setHosts(await lanRequest<LanHost[]>('save', { ...host, pinned: !host.pinned }));
             })}><Pin size={14} /></button>
             <button className="icon-button" disabled={busy} aria-label={`编辑 ${host.name}`} onClick={() => { setError(''); setEditing(host); }}><Pencil size={15} /></button></>}
           </header>
           {!!host.tags?.length && <div className="lan-host-tags">{host.tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
-          <p className="lan-note">{host.mode === 'ssh' ? (!portal || allowed('edit') ? `${host.platform === 'win32' ? 'Windows' : 'Linux'} · ${host.auth === 'password' ? '密码' : '密钥'} · ${host.fingerprint ? '已信任' : '待验证指纹'}` : `SSH${host.fingerprint ? ' · 已信任' : ''}`) : 'DevKit 共享'}{(Object.keys(titles) as ManagedModule[]).filter(module => host.modules[module]).map(module => ` · ${titles[module]}`).join('')}</p>
           {status && <p className="lan-monitor-status"><span className={`monitor-status ${status.state}`}>{lanMonitorLabels[status.state]}</span>{status.checkedAt && <small>最近检测 {new Date(status.checkedAt).toLocaleString()}{status.elapsed === undefined ? '' : ` · ${status.elapsed} ms`}</small>}</p>}
 
         </li>; })}</Fragment>)}</ul>

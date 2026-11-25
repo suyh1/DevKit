@@ -92,8 +92,17 @@ export function useHostInventory<S extends Inventory, T extends { id: string }>(
 export function HostProgress({ groups, retry }: { groups?: HostGroup[]; retry: (id: string) => void }) {
   const remotes = groups?.filter(group => group.id) || [];
   if (!remotes.length) return null;
-  return <ul className="host-progress" aria-label="目标主机连接状态">{remotes.map(group => <li key={group.id}>
-    <strong>{hostRole(group)}</strong><span role="status">{phaseLabel[group.phase || 'ready']}{group.phase === 'ready' && ` · ${hostAccessLabel(group)}`}{group.error && ` · ${group.error}`}{group.checkedAt && ` · 上次成功 ${new Date(group.checkedAt).toLocaleTimeString()}`}</span>
-    {group.phase === 'failed' && <button className="text-button" onClick={() => retry(group.id)}>重试</button>}
-  </li>)}</ul>;
+  const failed = remotes.filter(group => group.phase === 'failed').length;
+  const ready = remotes.filter(group => !group.phase || group.phase === 'ready').length;
+  const pending = remotes.length - ready - failed;
+  return <details className="host-progress">
+    <summary>目标主机 {remotes.length} 台<span>已连接 {ready}</span>
+      {pending > 0 && <span>连接中 {pending}</span>}
+      {failed > 0 && <span className="host-progress-failed">失败 {failed}</span>}
+    </summary>
+    <ul aria-label="目标主机连接状态">{remotes.map(group => <li key={group.id}>
+      <strong>{hostRole(group)}</strong><span role="status">{phaseLabel[group.phase || 'ready']}{group.phase === 'ready' && ` · ${hostAccessLabel(group)}`}{group.error && ` · ${group.error}`}{group.checkedAt && ` · 上次成功 ${new Date(group.checkedAt).toLocaleTimeString()}`}</span>
+      {group.phase === 'failed' && <button className="text-button" onClick={() => retry(group.id)}>重试</button>}
+    </li>)}</ul>
+  </details>;
 }
