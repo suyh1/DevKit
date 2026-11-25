@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useState } from 'react';
 import { Copy, FolderOpen, FolderCog } from 'lucide-react';
 import ConfigFilesDialog from './ConfigFilesDialog';
+import NoticeList from './NoticeList';
 import { jarRequest, serviceLocation, type JarInstance, type JarState } from './jar-api';
 import { targetGroup } from './lan-api';
 import { Modal, ModalCancel } from './project-components';
@@ -42,7 +43,7 @@ function StoragePanel({ portal, close }: { portal: boolean; close: () => void })
         choices?.length ? <label>选择服务<select aria-label="选择服务配置文件" value="" onChange={event => setSelected(choices.find(item => item.id === event.target.value))}>
           <option disabled value="">选择主机上的服务</option>{choices.map(item => <option key={item.id} value={item.id}>{targetGroup(services.groups, item.hostId)?.name || (portal ? '共享主机' : '本机')} · {item.name}</option>)}
         </select></label> : <p>暂无可编辑的服务。</p>}
-      {services?.groups?.filter(group => group.error).map(group => <p key={group.id} role="status">{group.name} · {group.error}</p>)}
+      <NoticeList label="主机读取失败" notices={services?.groups?.filter(group => group.error).map(group => `${group.name} · ${group.error}`) ?? []} />
     </section>
     {!portal && <><h3>工作台配置目录</h3>
     {storage?.error && <p className="pc-error" role="alert">{storage.error}</p>}

@@ -24,6 +24,9 @@ module.exports = async function inventoryNavigation(window, output) {
       return { ...state([]), groups: [remote] };
     }
     const groups = Array.from({length: hostCount()}, (_, i) => group('host-' + i, 'connecting'));
+    if (payload?.scope === 'inventory') {
+      for (const remote of groups) Object.assign(remote, { phase: 'failed', error: '测试连接失败', edit: false, control: false });
+    }
     return { ...state(fixtures(makeInstance)), groups: [group('', 'ready'), ...groups] };
   }
   const jar = i => ({ id: 'service-' + i, name: '服务 ' + i, jar: '/fixture/' + i + '.jar',
@@ -71,6 +74,20 @@ module.exports = async function inventoryNavigation(window, output) {
     if (hostCount() === 50) assert.ok(metrics[2] > metrics[1]);
     assert.equal(await js(element(list + ' button') + '.textContent'), '重试');
     await click(details + ' summary');
+  }
+  async function checkDisclosure(selector, listSelector, items) {
+    const summary = selector + ' > summary', list = element(selector + ' > ' + listSelector);
+    await wait(element(summary) + '?.textContent.includes("' + items + '")');
+    assert.ok(await js('!' + element(selector) + '.open && ' + element(selector) + '.offsetHeight <= 40'));
+    await click(summary);
+    await wait(list + '.clientHeight > 0');
+    assert.equal(await js(list + '.children.length'), items);
+    assert.ok(await js(list + '.clientHeight <= 120'));
+    const before = await js(element(summary) + '.getBoundingClientRect().top');
+    await js(list + '.scrollTop = ' + list + '.scrollHeight');
+    if (items === 50) assert.ok(await js(list + '.scrollTop > 0'));
+    assert.equal(await js(element(summary) + '.getBoundingClientRect().top'), before, 'Summary stays in place when scrolling details');
+    await click(summary);
   }
   async function hoverHost(summary) {
     const rect = await js(`(() => {
@@ -137,9 +154,10 @@ module.exports = async function inventoryNavigation(window, output) {
       if (action === 'documents') return { files: [{path: '/fixture/' + payload.id.slice(3) + '.conf', content: 'events {}', hash: 'fixture'}], warnings: [] };
     });
     handle('devkit:logs', (action, payload) => {
+      if (action === 'sources' && payload?.hostId) return { sources: [], warnings: ['读取失败'] };
       if (action === 'sources') return { sources: Array.from({ length: count === 2 ? 2 : 300 }, (_, i) => ({
         id: 'log-' + i, name: '日志源 ' + i, kind: 'jar', mode: 'file', instanceId: 'service-' + i, path: '/fixture/' + i + '.log',
-      })), warnings: [] };
+      })), warnings: [], hosts: Array.from({length: hostCount()}, (_, i) => ({id: 'host-' + i, name: '主机 ' + i})) };
       if (action === 'read') return { results: payload.sources.map(source => ({ id: source.id, text: 'INFO ' + source.id })) };
     });
     handle('devkit:lan-hosts', action => {
@@ -159,6 +177,10 @@ module.exports = async function inventoryNavigation(window, output) {
       for (const width of [1340, 390]) {
         await resize(width);
         await checkHostProgress('.jar-center');
+        await click('.config-storage-trigger');
+        await checkDisclosure('.config-source .notice-list', 'ul', hostCount());
+        await wait(visible('.config-source select'));
+        await click('dialog:has(.config-source) footer button');
         if (count === 100 && width === 1340) {
           const next = '[aria-label=服务列表分页] [aria-label=下一页]';
           for (let page = 1; page < 5; page++) { await click(next); await painted(); }
@@ -179,6 +201,7 @@ module.exports = async function inventoryNavigation(window, output) {
       await click(source);
       for (const width of [1340, 390]) {
         await resize(width);
+        await checkDisclosure('.log-sources .notice-list', 'ul', hostCount());
         const pathDetails = '.log-source-item:has(' + source + ') .path-summary';
         await click(pathDetails + ' summary');
         await wait(element(pathDetails) + '.open && document.activeElement === ' + element(pathDetails + ' summary'));
@@ -227,6 +250,27 @@ module.exports = async function inventoryNavigation(window, output) {
           await wait('document.activeElement === ' + element(summary) + ' && ' + visible(summary));
         }
       }
+      await resize(1340);
+      await openWorkspace(count === 2 ? '团队知识库' : '开发文档管理');
+      const create = '[...document.querySelectorAll(".kb-header button")].find(button => button.checkVisibility() && button.textContent.trim() === "新建文档")';
+      await wait(create + ' && !' + create + '.disabled');
+      await js(create + '.click()');
+      const picker = '[...document.querySelectorAll(".kb-writing-tools button")].find(button => button.checkVisibility() && button.textContent.trim() === "插入资源")';
+      await wait(picker);
+      await js(picker + '.click()');
+      await js("[...document.querySelectorAll('.kb-filters label')].find(label => label.textContent === '局域网主机').click()");
+      const choices = "[...document.querySelectorAll('.kb-choices label')].filter(label => label.querySelector('small').textContent.startsWith('局域网主机'))";
+      await wait(choices + '.length === ' + hostCount());
+      await js(choices + ".forEach(label => label.querySelector('input').click())");
+      for (const width of [1340, 390]) {
+        await resize(width);
+        await checkDisclosure('.kb-selected', 'div', hostCount());
+        await wait(visible('.kb-resource-dialog footer .run-button'));
+      }
+      await click('.kb-selected summary');
+      await click('.kb-selected button:last-child');
+      await wait(element('.kb-resource-dialog footer .run-button') + '.textContent === "插入 ' + (hostCount() - 1) + ' 项"');
+      await click('.kb-resource-dialog footer .secondary-button');
     }
     console.log('Desktop and narrow list/detail navigation passed with 2 entries and 100 services, 300 log sources, 100 Nginx instances and 50 hosts.');
   } finally {

@@ -220,7 +220,7 @@
   color: var(--muted);
 }
 .kb-writing-tools,
-.kb-selected,
+.kb-selected > div,
 .kb-folder-form,
 .kb-folder-nav,
 .kb-toc nav > div,
@@ -414,6 +414,9 @@
   margin-top: 12px;
   font-size: 12px;
 }
+.kb-selected > summary { cursor: pointer; }
+.kb-selected > div { max-height: 12dvh; overflow: auto; padding: 4px; }
+.kb-selected button { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 .kb-conflict {
   padding: 12px;
   background: var(--soft);
@@ -449,10 +452,6 @@
   .kb-header > div {
     max-width: 100%;
     flex-wrap: wrap;
-  }
-  .kb-resource-dialog .kb-selected {
-    max-height: 12vh;
-    overflow: auto;
   }
 }
 

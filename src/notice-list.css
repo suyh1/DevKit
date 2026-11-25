@@ -1,0 +1,10 @@
+.notice-list { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.notice-list > summary { cursor: pointer; }
+.notice-list > ul {
+  max-height: min(18dvh, 120px);
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 2px 4px 2px 20px;
+  overflow-wrap: anywhere;
+}
+.notice-list li + li { margin-top: 4px; }

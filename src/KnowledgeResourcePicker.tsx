@@ -144,20 +144,22 @@ export function KnowledgeResourcePicker({
         ))}
       </div>
       {!!selected.length && (
-        <div className="kb-selected">
-          <strong>已选 {selected.length} 项</strong>
-          {selected.map((row) => (
-            <button
-              key={key(row)}
-              className="text-button"
-              aria-label={'移除 ' + row.label}
-              onClick={() => toggle(row)}
-            >
-              {row.label}
-              {row.host && ' · ' + row.host} ×
-            </button>
-          ))}
-        </div>
+        <details className="kb-selected">
+          <summary><strong>已选 {selected.length} 项</strong></summary>
+          <div>
+            {selected.map((row) => (
+              <button
+                key={key(row)}
+                className="text-button"
+                aria-label={'移除 ' + row.label}
+                onClick={() => toggle(row)}
+              >
+                {row.label}
+                {row.host && ' · ' + row.host} ×
+              </button>
+            ))}
+          </div>
+        </details>
       )}
     </Modal>
   );
