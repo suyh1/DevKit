@@ -457,7 +457,7 @@ function DocumentLibrary({ active, portal = false, canEdit = !portal, visitor = 
                 </button>
               </div>
             )}
-            <div className="kb-cards" ref={grid} aria-label="文档目录">
+            <div className="kb-cards" data-section={section} ref={grid} aria-label="文档目录">
               {developer && !term
                 ? [...byFolder].map(([path, rows]) => (
                     <details className="dev-doc-folder" key={path} open>

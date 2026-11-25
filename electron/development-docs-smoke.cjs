@@ -22,6 +22,9 @@ module.exports = async function developmentDocsSmoke(desktop) {
     const run = code => contents.executeJavaScript(code, true);
     const cards = JSON.stringify(library + ' .kb-card');
     await wait(contents, 'document.querySelectorAll(' + cards + ').length === ' + (readOnly ? 24 : 23));
+    const fontSize = selector => run(`getComputedStyle(document.querySelector(${JSON.stringify(library + ' ' + selector)})).fontSize`);
+    assert.equal(await fontSize('.dev-doc-folder > summary'), '13px');
+    assert.equal(await fontSize('.kb-card strong'), '13px');
     assert.equal(await run(`!!document.querySelector('${library} .kb-header .run-button')`), !readOnly);
     for (const index of [0, readOnly ? 23 : 22]) {
       await run(`document.querySelectorAll(${cards})[${index}].click()`);
@@ -33,6 +36,8 @@ module.exports = async function developmentDocsSmoke(desktop) {
     for (const term of ['df -h', '校验清单', 'ls']) {
       await run(writeInput(field, term));
       await wait(contents, `document.querySelector(${cards})?.querySelector('small')`);
+      assert.equal(await fontSize('.kb-card strong'), '13px');
+      assert.equal(await fontSize('.kb-card small'), '12px');
       await run(`document.querySelector(${cards}).click()`);
       await wait(contents, `document.querySelector('${library} .kb-location')?.textContent.includes(${JSON.stringify(term)})`);
     }
