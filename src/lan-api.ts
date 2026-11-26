@@ -57,7 +57,7 @@ export async function lanRequest<T>(action: string, value?: unknown): Promise<T>
     ? await window.devkitDesktop.lanHosts(action, value)
     : { data: await remoteRequest<T>('lan-hosts', action, value) };
   if (result.error) throw new Error(result.error);
-  if (['save', 'import', 'import-connections', 'remove', 'reset-trust'].includes(action) || action === 'test' && value && typeof value === 'object' && 'fingerprint' in value) hostRevision++;
+  if (['save', 'import', 'import-connections', 'remove', 'reset-trust', 'routing-enroll'].includes(action) || action === 'test' && value && typeof value === 'object' && 'fingerprint' in value) hostRevision++;
   return result.data as T;
 }
 

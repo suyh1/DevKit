@@ -46,7 +46,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     const [password, privateKey] = await Promise.all([store.password(host), store.privateKey(host)]);
     return connectSsh(host, password, { ...options, privateKey });
   }
-  async function openHost(host, { verifyOnly = false } = {}, route = jumpRoute(host, find)) {
+  async function openHost(host, { verifyOnly = false, password } = {}, route = jumpRoute(host, find)) {
     const clients = [];
     let socket, target = host;
     function cleanup() { for (const client of clients.reverse()) client.destroy(); }
@@ -61,7 +61,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
         socket.on('error', () => {});
       }
       target = host;
-      const client = await connectSaved(host, { verifyOnly, socket });
+      const client = password === undefined ? await connectSaved(host, { verifyOnly, socket }) : await connectSsh(host, password, { socket });
       client.once('close', cleanup);
       return client;
     } catch (error) {
@@ -200,6 +200,34 @@ export async function createLanWorkspaces(directory, transports = { share: share
     const owner = web?.token || desktopSession;
     web?.ensureCurrent();
     if (action === 'list') return store.list().map(publicHost);
+    if (action === 'routing-fingerprint' || action === 'routing-enroll') {
+      if (web) throw Object.assign(new Error('请在 DevKit 桌面端补录管理档案。'), { status:403 });
+      const host = store.routingDraft(value), route = jumpRoute(host, find);
+      const checkIdentity = fingerprint => {
+        if (closed || !routeCurrent(route) || value.id && find(value.id) !== host) throw new Error('管理连接已变化，请重新核对指纹。');
+        const conflict = store.list().some(item => item.mode === 'ssh' && item.address === host.address && item.port === host.port &&
+          item.jumpHostId === host.jumpHostId && item.fingerprint && item.fingerprint !== fingerprint);
+        if (conflict) throw new Error('SSH 主机指纹与同一端点的已信任记录不一致。');
+      };
+      if (action === 'routing-fingerprint') {
+        try { (await openHost(host, { verifyOnly:true }, route)).end(); }
+        catch (error) {
+          if (!error.fingerprint || error.jump) throw error;
+          checkIdentity(error.fingerprint);
+          return { fingerprint:error.fingerprint };
+        }
+        throw new Error('未收到 SSH 主机指纹。');
+      }
+      const password = value.password || (value.id && await store.password(host));
+      if (!/^SHA256:[A-Za-z0-9+/]{43}$/.test(value.fingerprint) || typeof password !== 'string' || !password || password.length > 4096)
+        throw new Error('请确认 SSH 指纹并填写密码。');
+      checkIdentity(value.fingerprint);
+      const client = await openHost({ ...host, fingerprint:value.fingerprint }, { password }, route);
+      client.end();
+      const result = await store.enrollRouting(host, password, value.fingerprint, () => checkIdentity(value.fingerprint));
+      invalidate();
+      return result;
+    }
     if (action === 'scan-interfaces') return lanInterfaces();
     if (action === 'scan-cancel') { if (scan?.owner === owner && scan.id === value?.id) scan.controller.abort(); return true; }
     if (action === 'scan-start') {

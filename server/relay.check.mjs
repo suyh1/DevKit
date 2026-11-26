@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import ssh from 'ssh2';
+import { createLanWorkspaces } from './lan-workspaces.mjs';
 import http from 'node:http';
 import { once } from 'node:events';
 import { createRelay } from './relay.mjs';
@@ -62,6 +68,41 @@ test('interface discovery keeps independent results and only uses the pinned pro
   assert.equal((await discoverRouting({ ...ips, profileA:profile.id },duplicates,local,connect)).ab.ip,'10.1.0.1');
   await assert.rejects(discoverRouting({ ...ips, b:'10.1.0.2; echo' },lan,local));
   await assert.rejects(fixture().call('discover',ips),/桌面/);
+});
+
+test('desktop SSH enrollment confirms identity before password login and commits only verified credentials', async t => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'devkit-enroll-'));
+  const lan = await createLanWorkspaces(directory), password = randomUUID();
+  const hostKey = generateKeyPairSync('rsa',{ modulusLength:2048, privateKeyEncoding:{ format:'pem', type:'pkcs1' }, publicKeyEncoding:{ format:'pem', type:'spki' } }).privateKey;
+  let logins = 0;
+  const server = new ssh.Server({ hostKeys:[hostKey] }, client => {
+    client.on('error',() => {});
+    client.on('authentication',auth => {
+      if (auth.method === 'password') logins++;
+      if (auth.method === 'password' && auth.password === password && auth.username === 'operator') auth.accept();
+      else auth.reject(['password']);
+    });
+  });
+  const port = await bind(server);
+  t.after(async () => { lan.close(); await new Promise(resolve => server.close(resolve)); await rm(directory,{ recursive:true, force:true }); });
+  const draft = { name:'A', address:'127.0.0.1', user:'operator', port, platform:'linux' };
+  await assert.rejects(lan.hostRequest('routing-fingerprint',draft,null,{ token:'guest',ensureCurrent() {} }),/桌面/);
+  const { fingerprint } = await lan.hostRequest('routing-fingerprint',draft);
+  assert.match(fingerprint,/^SHA256:/);
+  await assert.rejects(lan.hostRequest('routing-enroll',{ ...draft,password,fingerprint:'SHA256:' + 'x'.repeat(43) }),/指纹/);
+  assert.equal(logins,0);
+  await assert.rejects(lan.hostRequest('routing-enroll',{ ...draft,fingerprint,password:'incorrect' }),/身份验证失败/);
+  assert.deepEqual(await lan.hostRequest('list'),[]);
+  const [pending] = await lan.hostRequest('save',{ ...draft,mode:'ssh',auth:'password' });
+  const saved = await lan.hostRequest('routing-enroll',{ ...draft,id:pending.id,revision:pending.revision,password,fingerprint });
+  assert.equal(saved.id,pending.id); assert.equal(saved.fingerprint,fingerprint); assert.ok(saved.hasPassword);
+  await assert.rejects(lan.hostRequest('routing-enroll',{ ...draft,id:pending.id,revision:pending.revision,password,fingerprint }),/变化/);
+  await lan.hostRequest('remove',saved.id);
+  const created = await lan.hostRequest('routing-enroll',{ ...draft,password,fingerprint });
+  assert.equal(created.password,undefined); assert.equal(created.secret,undefined);
+  assert.equal((await lan.hostRequest('list')).length,1);
+  assert.ok(!(await readFile(path.join(directory,'lan-hosts','connections.json'),'utf8')).includes(password));
+  const client = await lan.routingSession(created.id); client.client.end();
 });
 
 test('routing runs every preflight before writing and rolls back only its successful changes', async () => {

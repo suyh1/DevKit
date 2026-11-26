@@ -171,6 +171,32 @@ export async function createLanHostStore(directory) {
   }
   return {
     list: () => hosts,
+    routingDraft(value) {
+      if (value.id) {
+        const existing = hosts.find(item => item.id === value.id);
+        if (existing?.mode !== 'ssh' || existing.auth !== 'password' || existing.revision !== value.revision || existing.address !== value.address)
+          throw new Error('原管理档案已变化，请重新选择。');
+        return existing;
+      }
+      const host = normalize({ name:value.name || value.address, address:value.address, user:value.user, port:value.port, platform:value.platform,
+        mode:'ssh', auth:'password', jumpHostId:value.jumpHostId });
+      if (isIP(host.address) !== 4) throw new Error('请选择方案中的 IPv4 地址。');
+      if (hosts.some(item => sameServer(item, host) && item.user === host.user)) throw new Error('此连接已保存，请选择对应的管理档案。');
+      return host;
+    },
+    async enrollRouting(host, password, fingerprint, ensureCurrent) {
+      if (!fingerprintPattern.test(fingerprint)) throw new Error('SSH 指纹格式无效。');
+      const list = await update(async current => {
+        const existing = current.find(item => sameServer(item, host) && item.user === host.user);
+        if (existing && existing !== host) throw new Error('该账号的连接已存在或已变化，请重新选择已有档案。');
+        if (!existing && current.length >= 50) throw new Error('最多保存 50 台主机。');
+        const secret = await encrypt(host, 'secret', password);
+        const next = { ...host, secret, fingerprint, revision:randomUUID() };
+        delete next.previousFingerprint;
+        return existing ? current.map(item => item === existing ? next : item) : [...current, next];
+      }, ensureCurrent);
+      return list.find(item => item.id === host.id);
+    },
     previewImport: (values, web) => planImport(hosts, values, web).rows,
     importConnections: (values, web) => update(current => {
       const { next } = planImport(current, values, web);

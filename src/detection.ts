@@ -321,7 +321,7 @@ export function detectTools(input: string): Suggestion[] {
     if (matches.size) return [...matches.values()];
   }
   if (/^(?:跨网转发|检测\s*A\s*的能力|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式');
-  if (/^(?:原\s*IP\s*(?:双向)?(?:整机)?互通|双向路由|整机互通|B\s*(?:与|和|、|↔)\s*C\s*(?:双向|双方)?互通)$/i.test(text))
+  if (/^(?:原\s*IP\s*(?:双向)?(?:整机)?互通|跨网互联\s*(?:补录|补全)\s*SSH\s*(?:管理)?档案|双向路由|整机互通|B\s*(?:与|和|、|↔)\s*C\s*(?:双向|双方)?互通)$/i.test(text))
     rules.workspace('relay', '按原 IPv4 配置两端路由', undefined, 'routing');
   const triple = /^A\s*[:=：]\s*([\d.]+)[,，\s]+B\s*[:=：]\s*([\d.]+)[,，\s]+C\s*[:=：]\s*([\d.]+)$/i.exec(text)?.slice(1);
   if (triple && new Set(triple).size === 3 && triple.every(ip => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&

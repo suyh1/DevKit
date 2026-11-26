@@ -7,6 +7,7 @@ import { Modal, ModalCancel, ModalForm } from './project-components';
 import { useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
+import RoutingProfileDialog from './RoutingProfileDialog';
 
 type Role = 'A' | 'B' | 'C';
 type Draft = { kind: 'routing'; id?: string; revision?: number; name: string; role: Role; a?: string; b: string; c: string; ab: string; ac: string };
@@ -23,19 +24,25 @@ type Discovery = {
 const sides = [['ab','A 面向 B 的 IPv4'], ['ac','A 面向 C 的 IPv4']] as const;
 function Editor({ initial, close, saved }: { initial: Draft; close: () => void; saved: (plan:Saved, configure:boolean, profiles:Profiles) => Promise<void> }) {
   const desktop = !!window.devkitCollab;
-  const [draft, set] = useState({ ...initial, a:initial.a || initial.ab }), op = useOperation();
+  const [draft, set] = useState({ ...initial, a:initial.a || (initial.role === 'C' ? initial.ac : initial.ab) }), op = useOperation();
   const [result, setResult] = useState<Discovery>(), [chosenRole, chooseRole] = useState<Role>(), [profileA, chooseProfile] = useState('');
+  const [continueConfig,setContinueConfig] = useState(false);
+  const [enrollA,setEnrollA] = useState<boolean | null>(null);
   const [manual, setManual] = useState(!desktop || !!initial.id);
   function changeAddress(key:'a'|'b'|'c', value:string) {
     set({ ...draft, [key]:value.trim(), ab:'', ac:'' });
     setResult(undefined); chooseRole(undefined); chooseProfile(''); setManual(!desktop); op.clear();
   }
-  async function submit(configure:boolean) {
-    let found = result;
+  async function submit(configure:boolean, newA?:string) {
+    setContinueConfig(configure);
+    let found = newA ? undefined : result;
     if (!manual && (!found?.ab || !found.ac)) {
-      found = await collab<Discovery>('relay','discover',{ a:draft.a, b:draft.b, c:draft.c, role:chosenRole, profileA });
+      found = await collab<Discovery>('relay','discover',{ a:draft.a, b:draft.b, c:draft.c, role:chosenRole || result?.role, profileA:newA || profileA });
       setResult(found);
       if (!found.role || !found.ab || !found.ac) return;
+    }
+    if (configure && found?.role && found.role !== 'A' && !found.profiles?.A && !found.candidates && !newA) {
+      setEnrollA(true); return;
     }
     const settings = { ...draft, name:draft.name.trim() || draft.b + ' ↔ ' + draft.c,
       role:found?.role || draft.role, ab:found?.ab?.ip || draft.ab, ac:found?.ac?.ip || draft.ac };
@@ -43,6 +50,11 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
     const ref = await collab<{ id:string; revision:number }>('relay','save',settings);
     await saved({ ...settings, ...ref }, configure, found?.profiles || {});
   }
+  if (desktop && enrollA !== null) return <RoutingProfileDialog device="A" address={draft.a} close={() => setEnrollA(null)} ready={async host => {
+    const configure = enrollA;
+    setEnrollA(null); chooseProfile(host.id);
+    await op.run(() => submit(configure,host.id));
+  }}/>;
   return <Modal title={draft.id ? '编辑互通方案' : '新建互通方案'} close={close} busy={op.busy} closeLabel="关闭路由配置">
     <ModalForm className="relay-form" footer={<footer className="pc-modal-actions"><ModalCancel />
       {desktop && !draft.id && <button type="submit" value="save" disabled={op.busy}>仅保存</button>}
@@ -59,6 +71,8 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
           <option value="">选择安装位置</option>{roles.map(r => <option key={r}>{r}</option>)}</select></label>}
         {result?.candidates && <label>A 有多个已确认的管理档案<select required value={profileA} onChange={e => chooseProfile(e.target.value)}>
           <option value="">选择 A 的档案</option>{result.candidates.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>}
+        {desktop && result?.role && result.role !== 'A' && result.ab && !result.profiles?.A &&
+          <button type="button" onClick={() => setEnrollA(continueConfig)}>补全 A 的 SSH 管理档案并重新检测</button>}
         {sides.map(([key,label]) => result?.[key]?.ip ? <p key={key}>{label} · {result[key]?.ip}（已识别）</p> :
           (manual || result?.[key]) && <label key={key}>{label}{result?.[key]?.reason && <small>{result[key]?.reason}</small>}
             <input required aria-label={label} value={draft[key]} onChange={e => set({ ...draft, [key]:e.target.value.trim() })}/></label>)}
@@ -70,6 +84,15 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
 
 function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profiles; close: () => void; done: (message: string) => void }) {
   const op = useOperation(), [hosts,setHosts] = useState<LanHost[]>([]), [ids,setIds] = useState<Partial<Record<Role,string>>>({}), [error,setError] = useState('');
+  const [enroll,setEnroll] = useState<Role>();
+  function address(role:Role) { return role === 'A' ? plan.a || (plan.role === 'C' ? plan.ac : plan.ab) : role === 'B' ? plan.b : plan.c; }
+  function needsProfile(role:Role, profiles:Profiles, trusted:LanHost[]) {
+    const ips = role === 'A' ? [plan.a,plan.ab,plan.ac] : [address(role)];
+    return role !== plan.role && !profiles[role] && !trusted.some(h => ips.includes(h.address));
+  }
+  function apply(profiles:Profiles) {
+    return op.run(async () => done(await collab<string>('relay','apply',{ id:plan.id, revision:plan.revision, profiles })));
+  }
   useEffect(() => {
     let live = true;
     void lanRequest<LanHost[]>('list').then(list => {
@@ -82,18 +105,27 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
         const found = trusted.filter(host => ips.includes(host.address));
         if (found.length === 1) matches[role] = found[0].id;
       }
-      setIds({ ...matches, ...preset });
+      const profiles = { ...matches, ...preset };
+      setIds(profiles);
+      setEnroll(roles.find(r => needsProfile(r,profiles,trusted)));
     }).catch(e => { if (live) setError(e.message); });
     return () => { live = false; };
   }, [plan.id, plan.revision]);
+  if (enroll) return <RoutingProfileDialog key={enroll} device={enroll} address={address(enroll)} viaA={enroll !== 'A' ? ids.A : undefined} close={() => setEnroll(undefined)} ready={async host => {
+    const profiles = { ...ids, [enroll]:host.id }, trusted = [...hosts.filter(h => h.id !== host.id),host];
+    setIds(profiles); setHosts(trusted);
+    setEnroll(roles.find(r => needsProfile(r,profiles,trusted)));
+    if (roles.every(r => r === plan.role || profiles[r])) await apply(profiles);
+  }}/>;
   return <Modal title="一键配置双向路由" close={close} busy={op.busy} closeLabel="关闭路由配置"><ModalForm className="relay-form" onSubmit={event => {
-    event.preventDefault(); void op.run(async () => done(await collab<string>('relay','apply',{ id:plan.id, revision:plan.revision, profiles:ids })));
+    event.preventDefault(); void apply(ids);
   }} footer={<footer className="pc-modal-actions"><ModalCancel /><button className="run-button" disabled={op.busy || roles.some(r => r !== plan.role && !ids[r])}>{op.busy ? '正在配置…' : '配置 A、B、C'}</button></footer>}>
     <p>在 A 的指定接口开启 IPv4 转发，在 B 和 C 各保存一条通往对方原 IP 的主机路由。A 将按照现有路由表和防火墙策略处理经过这两个接口的流量。</p>
     {roles.map(role => <div key={role}><strong>{role} · {role === 'A' ? plan.ab + ' / ' + plan.ac : role === 'B' ? plan.b : plan.c}</strong>
       {role === plan.role ? <p>当前 DevKit 所在设备，使用本机系统权限。</p> : <label>管理档案<select required value={ids[role] || ''} onChange={e => setIds({ ...ids, [role]:e.target.value })}>
-        <option value="">选择已确认指纹的 SSH 档案</option>{hosts.map(h => <option key={h.id} value={h.id}>{h.name} · {h.user}@{h.address}:{h.port}</option>)}</select></label>}</div>)}
-    <p>首次使用可在「局域网主机」登记管理连接并确认指纹。Windows 使用管理员会话，Linux 使用 root 或已获非交互 sudo 权限的账号。</p>
+        <option value="">选择已确认指纹的 SSH 档案</option>{hosts.map(h => <option key={h.id} value={h.id}>{h.name} · {h.user}@{h.address}:{h.port}</option>)}</select></label>}
+      {role !== plan.role && <button type="button" disabled={op.busy} onClick={() => setEnroll(role)}>补全 {role} 的 SSH 档案</button>}</div>)}
+    <p>缺少管理连接时，可在这里填写账号、密码并确认 SSH 指纹。Windows 使用管理员会话，Linux 使用 root 或已获非交互 sudo 权限的账号。</p>
     {(error || op.message) && <p role="alert">{error || op.message}</p>}
   </ModalForm></Modal>;
 }
