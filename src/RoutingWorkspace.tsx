@@ -7,6 +7,7 @@ import { Modal, ModalCancel, ModalForm } from './project-components';
 import { useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
+import { routingProfiles } from '../shared/routing-profiles.mjs';
 import RoutingProfileDialog from './RoutingProfileDialog';
 
 type Role = 'A' | 'B' | 'C';
@@ -86,9 +87,16 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
   const op = useOperation(), [hosts,setHosts] = useState<LanHost[]>([]), [ids,setIds] = useState<Partial<Record<Role,string>>>({}), [error,setError] = useState('');
   const [enroll,setEnroll] = useState<Role>();
   function address(role:Role) { return role === 'A' ? plan.a || (plan.role === 'C' ? plan.ac : plan.ab) : role === 'B' ? plan.b : plan.c; }
-  function needsProfile(role:Role, profiles:Profiles, trusted:LanHost[]) {
-    const ips = role === 'A' ? [plan.a,plan.ab,plan.ac] : [address(role)];
-    return role !== plan.role && !profiles[role] && !trusted.some(h => ips.includes(h.address));
+  function resolve(list:LanHost[], preferred:Profiles) {
+    return routingProfiles(list, plan.role, { A:[plan.a,plan.ab,plan.ac], B:[plan.b], C:[plan.c] }, preferred);
+  }
+  function selectProfiles(list:LanHost[], preferred:Profiles) {
+    const { profiles, matching } = resolve(list,preferred);
+    setIds(profiles);
+    // An ambiguous A account must be resolved before enrolling its peer.
+    const pending = plan.role !== 'A' && !profiles.A ? ['A'] as const : roles;
+    setEnroll(pending.find(role => role !== plan.role && !profiles[role] && !matching[role].length));
+    return profiles;
   }
   function apply(profiles:Profiles) {
     return op.run(async () => done(await collab<string>('relay','apply',{ id:plan.id, revision:plan.revision, profiles })));
@@ -99,32 +107,25 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
       if (!live) return;
       const trusted = list.filter(h => h.mode === 'ssh' && h.fingerprint);
       setHosts(trusted);
-      const matches: Partial<Record<Role,string>> = {};
-      for (const role of roles.filter(r => r !== plan.role)) {
-        const ips = role === 'A' ? [plan.a,plan.ab,plan.ac] : [role === 'B' ? plan.b : plan.c];
-        const found = trusted.filter(host => ips.includes(host.address));
-        if (found.length === 1) matches[role] = found[0].id;
-      }
-      const profiles = { ...matches, ...preset };
-      setIds(profiles);
-      setEnroll(roles.find(r => needsProfile(r,profiles,trusted)));
+      selectProfiles(trusted,preset);
     }).catch(e => { if (live) setError(e.message); });
     return () => { live = false; };
   }, [plan.id, plan.revision]);
   if (enroll) return <RoutingProfileDialog key={enroll} device={enroll} address={address(enroll)} viaA={enroll !== 'A' ? ids.A : undefined} close={() => setEnroll(undefined)} ready={async host => {
-    const profiles = { ...ids, [enroll]:host.id }, trusted = [...hosts.filter(h => h.id !== host.id),host];
-    setIds(profiles); setHosts(trusted);
-    setEnroll(roles.find(r => needsProfile(r,profiles,trusted)));
+    const trusted = [...hosts.filter(h => h.id !== host.id),host];
+    setHosts(trusted);
+    const profiles = selectProfiles(trusted,{ ...ids, [enroll]:host.id });
     if (roles.every(r => r === plan.role || profiles[r])) await apply(profiles);
   }}/>;
+  const { available } = resolve(hosts,ids);
   return <Modal title="一键配置双向路由" close={close} busy={op.busy} closeLabel="关闭路由配置"><ModalForm className="relay-form" onSubmit={event => {
     event.preventDefault(); void apply(ids);
   }} footer={<footer className="pc-modal-actions"><ModalCancel /><button className="run-button" disabled={op.busy || roles.some(r => r !== plan.role && !ids[r])}>{op.busy ? '正在配置…' : '配置 A、B、C'}</button></footer>}>
     <p>在 A 的指定接口开启 IPv4 转发，在 B 和 C 各保存一条通往对方原 IP 的主机路由。A 将按照现有路由表和防火墙策略处理经过这两个接口的流量。</p>
     {roles.map(role => <div key={role}><strong>{role} · {role === 'A' ? plan.ab + ' / ' + plan.ac : role === 'B' ? plan.b : plan.c}</strong>
-      {role === plan.role ? <p>当前 DevKit 所在设备，使用本机系统权限。</p> : <label>管理档案<select required value={ids[role] || ''} onChange={e => setIds({ ...ids, [role]:e.target.value })}>
-        <option value="">选择已确认指纹的 SSH 档案</option>{hosts.map(h => <option key={h.id} value={h.id}>{h.name} · {h.user}@{h.address}:{h.port}</option>)}</select></label>}
-      {role !== plan.role && <button type="button" disabled={op.busy} onClick={() => setEnroll(role)}>补全 {role} 的 SSH 档案</button>}</div>)}
+      {role === plan.role ? <p>当前 DevKit 所在设备，使用本机系统权限。</p> : <label>管理档案<select required value={ids[role] || ''} onChange={e => selectProfiles(hosts,{ ...ids, [role]:e.target.value })}>
+        <option value="">选择已确认指纹的 SSH 档案</option>{available[role].map(h => <option key={h.id} value={h.id}>{h.name} · {h.user}@{h.address}:{h.port}</option>)}</select></label>}
+      {role !== plan.role && <button type="button" disabled={op.busy || (plan.role !== 'A' && role !== 'A' && !ids.A)} onClick={() => setEnroll(role)}>补全 {role} 的 SSH 档案</button>}</div>)}
     <p>缺少管理连接时，可在这里填写账号、密码并确认 SSH 指纹。Windows 使用管理员会话，Linux 使用 root 或已获非交互 sudo 权限的账号。</p>
     {(error || op.message) && <p role="alert">{error || op.message}</p>}
   </ModalForm></Modal>;

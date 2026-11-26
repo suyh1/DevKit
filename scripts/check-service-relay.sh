@@ -34,7 +34,6 @@ if ip -n B route get 192.0.2.6 || ip -n C route get 192.0.2.2; then exit 1; fi
 
 mkdir "$scratch/files"
 echo 'Single installation file transfer' > "$scratch/files/probe"
-ssh-keygen -q -t ed25519 -N '' -f "$scratch/host"
 ssh-keygen -q -t ed25519 -N '' -f "$scratch/client"
 # Keep persistent configuration and the network-manager profile fixture private to the test.
 mount -t tmpfs tmpfs /etc/sysctl.d
@@ -49,7 +48,8 @@ chmod 755 "$scratch/networkctl"
 mount --bind "$scratch/networkctl" "$(command -v networkctl)"
 ip netns exec B networkctl status --no-pager from-B | grep -q 'Network File: /etc/systemd/network/10-fixture.network'
 for role in A B C; do
-  ip netns exec "$role" /usr/sbin/sshd -f /dev/null -h "$scratch/host" -p 2222 \
+  ssh-keygen -q -t ed25519 -N '' -f "$scratch/host-$role"
+  ip netns exec "$role" /usr/sbin/sshd -f /dev/null -h "$scratch/host-$role" -p 2222 \
     -o ListenAddress=0.0.0.0 -o "AllowUsers=$ssh_user" -o "AuthorizedKeysFile=$scratch/client.pub" \
     -o "PidFile=$scratch/sshd-$role.pid" -o GatewayPorts=clientspecified \
     -o UsePAM=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o 'Subsystem=sftp internal-sftp'
@@ -85,7 +85,7 @@ for role in A B C; do
   for url in "http://$entry:18080/probe" "ftp://$entry:12121/probe"; do
     ip netns exec B curl --noproxy '*' -fsS --max-time 10 "$url" | cmp - "$scratch/files/probe"
   done
-  printf '[%s]:12222 %s\n' "$entry" "$(cat "$scratch/host.pub")" > "$scratch/known_hosts"
+  printf '[%s]:12222 %s\n' "$entry" "$(cat "$scratch/host-C.pub")" > "$scratch/known_hosts"
   options=(-i "$scratch/client" -o IdentitiesOnly=yes -o BatchMode=yes -o Port=12222 -o "UserKnownHostsFile=$scratch/known_hosts")
   ip netns exec B ssh "${options[@]}" "$ssh_user@$entry" 'echo SSH' | grep -qx SSH
   echo "get $scratch/files/probe $scratch/received" > "$scratch/batch"

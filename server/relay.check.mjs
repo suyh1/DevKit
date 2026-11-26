@@ -9,6 +9,7 @@ import ssh from 'ssh2';
 import { createLanWorkspaces } from './lan-workspaces.mjs';
 import http from 'node:http';
 import { once } from 'node:events';
+import { routingProfiles } from '../shared/routing-profiles.mjs';
 import { createRelay } from './relay.mjs';
 import { tcp } from './relay-transport.mjs';
 import { discoverRouting } from './relay-routing-discovery.mjs';
@@ -68,6 +69,21 @@ test('interface discovery keeps independent results and only uses the pinned pro
   assert.equal((await discoverRouting({ ...ips, profileA:profile.id },duplicates,local,connect)).ab.ip,'10.1.0.1');
   await assert.rejects(discoverRouting({ ...ips, b:'10.1.0.2; echo' },lan,local));
   await assert.rejects(fixture().call('discover',ips),/桌面/);
+});
+
+test('peer management profiles follow the chosen hub for either endpoint installation', () => {
+  const addresses = { A:['10.0.0.1'], B:['10.0.0.2'], C:['10.0.0.3'] };
+  const profile = (id,device,jumpHostId) => ({ id, address:addresses[device][0], mode:'ssh', fingerprint:'pinned', jumpHostId });
+  const hub = profile('hub','A'), second = profile('second','A');
+  for (const [local,peer] of [['B','C'],['C','B']]) {
+    const direct = profile('direct',peer), viaHub = profile('via-hub',peer,hub.id), viaSecond = profile('via-second',peer,second.id);
+    const peers = [direct,viaHub,viaSecond], hosts = [hub,...peers];
+    assert.equal(routingProfiles(hosts,local,addresses).profiles[peer],viaHub.id);
+    assert.deepEqual(routingProfiles([hub,direct,viaSecond],local,addresses).matching[peer],[]);
+    assert.equal(routingProfiles([hub,second,...peers],local,addresses).profiles[peer],undefined);
+    assert.equal(routingProfiles([hub,second,...peers],local,addresses,{A:second.id,[peer]:viaHub.id}).profiles[peer],viaSecond.id);
+    assert.equal(routingProfiles([direct], 'A',addresses).profiles[peer],direct.id);
+  }
 });
 
 test('desktop SSH enrollment confirms identity before password login and commits only verified credentials', async t => {

@@ -11,12 +11,13 @@ const lan = await createLanWorkspaces(folder + '/route-' + role);
 const store = await createCollabStore(folder + '/route-' + role, lan);
 try {
   const profiles = {};
-  const pub = (await readFile(folder + '/host.pub','utf8')).split(' ')[1];
-  const fingerprint = 'SHA256:' + createHash('sha256').update(Buffer.from(pub,'base64')).digest('base64').replace(/=+$/, '');
   for (const node of ['A','B','C'].filter(key => key !== role)) {
     const address = node === 'A' ? (role === 'C' ? plan.ac : plan.ab) : node === 'B' ? plan.b : plan.c;
-    const hosts = await lan.hostRequest('save',{ mode:'ssh', name:node, platform:'linux', address, user, port:2222, auth:'key', keyPath:folder + '/client',
-      jumpHostId:role !== 'A' && node !== 'A' ? profiles.A : undefined });
+    const endpoint = { name:node, platform:'linux', address, user, port:2222, jumpHostId:role !== 'A' && node !== 'A' ? profiles.A : undefined };
+    const pub = (await readFile(folder + '/host-' + node + '.pub','utf8')).split(' ')[1];
+    const fingerprint = 'SHA256:' + createHash('sha256').update(Buffer.from(pub,'base64')).digest('base64').replace(/=+$/, '');
+    assert.deepEqual(await lan.hostRequest('routing-fingerprint',endpoint), { fingerprint });
+    const hosts = await lan.hostRequest('save',{ ...endpoint, mode:'ssh', auth:'key', keyPath:folder + '/client' });
     const id = hosts.find(host => host.name === node).id;
     await lan.hostRequest('test',{ id, fingerprint });
     profiles[node] = id;

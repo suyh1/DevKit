@@ -116,48 +116,54 @@ module.exports = async function collaborationSmoke(window, output) {
     await desktop('document.querySelector(\'dialog button[aria-label="关闭路由配置"]\').click()');
     // Exercise the renderer's two missing-profile transitions with a deterministic desktop bridge.
     // The backend suite separately checks real SSH credentials, host keys and persistence.
-    await web(`(() => {
-      const profiles = {}, hosts = [], fingerprint = 'SHA256:' + 'x'.repeat(43);
-      window.routingTrace = [];
-      window.devkitDesktop = { lanHosts: async (action,value) => {
-        if (action === 'list') return {data:hosts};
-        if (action === 'routing-fingerprint') {
-          if ('password' in value) throw Error('Password sent before confirmation');
-          return {data:{fingerprint}};
-        }
-        if (action !== 'routing-enroll' || value.fingerprint !== fingerprint || value.password !== 'fixture') throw Error('Unexpected enrollment');
-        const role=value.address==='192.0.2.1'?'A':'C';
-        const host={id:role,name:role,mode:'ssh',address:value.address,user:value.user,port:value.port,fingerprint};
-        hosts.push(host); profiles[role]=host.id; window.routingTrace.push(role);
-        return {data:host};
-      }};
-      window.devkitCollab = { request:async (module,action,value) => {
-        if(action==='list') return {data:{version:'fixture',items:[]}};
-        if(action==='discover') return {data:{role:'B',profiles:{...profiles},ab:profiles.A?{ip:'192.0.2.1'}:{reason:'A 待补录'},ac:profiles.A?{ip:'192.0.2.5'}:{reason:'A 待补录'}}};
-        if(action==='save') return {data:{id:'fixture-plan',revision:1}};
-        if(action==='apply' && value.profiles.A==='A' && value.profiles.C==='C'){ window.routingTrace.push('apply'); return {data:'完成'}; }
-        throw Error('Unexpected action');
-      }};
-    })()`);
-    await click(web, current, '原 IP 双向互通');
-    await click(web, current, '新建互通方案');
-    for (const [label,value] of [['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
-      await fill(web, 'dialog input[aria-label="' + label + '"]',value);
-    await click(web,'dialog ','检测并配置');
-    for (const role of ['A','C']) {
-      await wait(web, 'document.body.innerText.includes("补全 ' + role + ' 的 SSH 管理档案")');
-      await fill(web,'dialog[open] input[autocomplete=off]','operator');
-      await fill(web,'dialog[open] input[type=password]','fixture');
-      await click(web,'dialog ','核对 SSH 指纹');
-      if (role==='A') {
-        await click(web,'.confirm-dialog ','返回核对');
-        assert.equal(await web('window.routingTrace.length'),0);
+    for (const localRole of ['B','C']) {
+      const peerRole = localRole === 'B' ? 'C' : 'B';
+      await web(`(() => {
+        const local = ${JSON.stringify(localRole)}, peer = ${JSON.stringify(peerRole)};
+        const profiles = {}, hosts = [], fingerprint = 'SHA256:' + 'x'.repeat(43);
+        window.routingTrace = [];
+        window.devkitDesktop = { lanHosts: async (action,value) => {
+          if (action === 'list') return {data:hosts};
+          if (value.jumpHostId !== (value.address === '192.0.2.1' ? undefined : 'A')) throw Error('Unexpected SSH path');
+          if (action === 'routing-fingerprint') {
+            if ('password' in value) throw Error('Password sent before confirmation');
+            return {data:{fingerprint}};
+          }
+          if (action !== 'routing-enroll' || value.fingerprint !== fingerprint || value.password !== 'fixture') throw Error('Unexpected enrollment');
+          const role=value.address==='192.0.2.1'?'A':peer;
+          const host={id:role,name:role,mode:'ssh',address:value.address,user:value.user,port:value.port,jumpHostId:value.jumpHostId,fingerprint};
+          hosts.push(host); profiles[role]=host.id; window.routingTrace.push(role);
+          return {data:host};
+        }};
+        window.devkitCollab = { request:async (module,action,value) => {
+          if(action==='list') return {data:{version:'fixture',items:[]}};
+          if(action==='discover') return {data:{role:local,profiles:{...profiles},ab:profiles.A?{ip:'192.0.2.1'}:{reason:'A 待补录'},ac:profiles.A?{ip:'192.0.2.5'}:{reason:'A 待补录'}}};
+          if(action==='save') return {data:{id:'fixture-plan',revision:1}};
+          if(action==='apply' && value.profiles.A==='A' && value.profiles[peer]===peer){ window.routingTrace.push('apply'); return {data:'完成'}; }
+          throw Error('Unexpected action');
+        }};
+      })()`);
+      await click(web, current, '原 IP 双向互通');
+      await click(web, current, '新建互通方案');
+      for (const [label,value] of [['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
+        await fill(web, 'dialog input[aria-label="' + label + '"]',value);
+      await click(web,'dialog ','检测并配置');
+      for (const role of ['A',peerRole]) {
+        await wait(web, 'document.body.innerText.includes("补全 ' + role + ' 的 SSH 管理档案")');
+        await fill(web,'dialog[open] input[autocomplete=off]','operator');
+        await fill(web,'dialog[open] input[type=password]','fixture');
         await click(web,'dialog ','核对 SSH 指纹');
+        if (role===peerRole) await wait(web, 'document.querySelector(".confirm-dialog[open]")?.innerText.includes("（192.0.2.1）连接")');
+        if (role==='A') {
+          await click(web,'.confirm-dialog ','返回核对');
+          assert.equal(await web('window.routingTrace.length'),0);
+          await click(web,'dialog ','核对 SSH 指纹');
+        }
+        await click(web,'.confirm-dialog ','信任并继续');
       }
-      await click(web,'.confirm-dialog ','信任并继续');
+      await wait(web, 'window.routingTrace.join(",")==="A,' + peerRole + ',apply"');
+      await web('delete window.devkitDesktop; delete window.devkitCollab; delete window.routingTrace; location.hash="relay"');
     }
-    await wait(web, 'window.routingTrace.join(",")==="A,C,apply"');
-    await web('delete window.devkitDesktop; delete window.devkitCollab; delete window.routingTrace; location.hash="relay"');
     await click(web, current, '原 IP 双向互通');
     await wait(web, 'document.body.innerText.includes("测试网络")');
     assert.equal(await web('document.body.innerText.includes("一键配置")'), false);

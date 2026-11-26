@@ -12,7 +12,7 @@ const hub = role === 'C' ? '192.0.2.5' : '192.0.2.1';
 const mode = { A: 'direct', B: 'ssh', C: 'reverse' }[role];
 if (role !== 'A') {
   const [host] = await lan.hostRequest('save', { mode:'ssh', platform:'linux', name:'A', address:hub, port:2222, user, auth:'key', keyPath:folder + '/client' });
-  const pub = (await readFile(folder + '/host.pub','utf8')).split(' ')[1];
+  const pub = (await readFile(folder + '/host-A.pub','utf8')).split(' ')[1];
   const fingerprint = 'SHA256:' + createHash('sha256').update(Buffer.from(pub,'base64')).digest('base64').replace(/=+$/, '');
   await lan.hostRequest('test', { id: host.id, fingerprint });
 }

@@ -9,7 +9,7 @@ type Props = { device:string; address:string; viaA?:string; close:() => void; re
 export default function RoutingProfileDialog({ device,address,viaA,close,ready }:Props) {
   const [hosts,setHosts] = useState<LanHost[]>(), [choice,setChoice] = useState(''), [error,setError] = useState('');
   const [user,setUser] = useState(''), [password,setPassword] = useState(''), [port,setPort] = useState('22');
-  const [platform,setPlatform] = useState<'linux'|'win32'>('linux'), [jump,setJump] = useState('');
+  const [platform,setPlatform] = useState<'linux'|'win32'>('linux');
   const op = useOperation(), confirm = useConfirmation();
   useEffect(() => {
     let active = true;
@@ -17,21 +17,22 @@ export default function RoutingProfileDialog({ device,address,viaA,close,ready }
       if (!active) return;
       const ssh = rows.filter(h => h.mode === 'ssh');
       setHosts(ssh);
-      const matches = ssh.filter(h => h.address === address);
+      const matches = ssh.filter(h => h.address === address && (!viaA || h.jumpHostId === viaA));
       setChoice(matches.length === 1 ? matches[0].id : matches.length ? '' : 'new');
     }).catch(e => { if (active) setError(e.message); });
     return () => { active = false; };
-  }, [address]);
-  const matches = hosts?.filter(h => h.address === address) || [];
+  }, [address,viaA]);
+  const matches = hosts?.filter(h => h.address === address && (!viaA || h.jumpHostId === viaA)) || [];
   const selected = matches.find(h => h.id === choice);
   const hub = hosts?.find(h => h.id === viaA && h.fingerprint);
   const key = selected?.auth === 'key';
   async function verify() {
     if (!hosts || !choice) return;
+    if (viaA && !hub) throw new Error('A 的已信任档案已变化，请返回方案重新确认 A。');
     const details = selected ? { id:selected.id, revision:selected.revision, address } :
-      { name:device + ' · ' + address, address, user:user.trim(), port:Number(port), platform, jumpHostId:jump || undefined };
+      { name:device + ' · ' + address, address, user:user.trim(), port:Number(port), platform, jumpHostId:viaA };
     const endpoint = (selected?.user || user.trim()) + '@' + address + ':' + (selected?.port || port);
-    const jumpHost = hosts.find(h => h.id === (selected?.jumpHostId || jump));
+    const jumpHost = hosts.find(h => h.id === (selected?.jumpHostId || viaA));
     const route = jumpHost ? '\n经 ' + jumpHost.name + '（' + jumpHost.address + '）连接' : '';
     if (selected?.fingerprint && !password) {
       await lanRequest('test',{ id:selected.id });
@@ -57,14 +58,14 @@ export default function RoutingProfileDialog({ device,address,viaA,close,ready }
       footer={<footer className="pc-modal-actions"><ModalCancel /><button className="run-button" disabled={op.busy || !hosts || !choice}>
         {op.busy ? '正在验证…' : selected?.fingerprint && !password ? '使用此档案继续' : '核对 SSH 指纹'}</button></footer>}>
       <p>设备 {device} · <code>{address}</code></p>
+      {viaA && <p>管理路径：本机 → A（{hub?.address || '档案待确认'}）→ {device}（{address}）</p>}
       <fieldset disabled={op.busy || !hosts} className="relay-addresses">
         {!!matches.length && <label>管理档案<select value={choice} onChange={e => { setChoice(e.target.value); setPassword(''); op.clear(); }}>
           <option value="">选择管理档案</option>{matches.map(h => <option key={h.id} value={h.id}>{h.user}@{h.address}:{h.port} · {h.fingerprint ? '已信任' : '待核对指纹'}</option>)}
           <option value="new">新建账号档案</option></select></label>}
         {choice === 'new' && <><label>SSH 用户名<input required autoComplete="off" value={user} onChange={e => setUser(e.target.value)} maxLength={120}/></label>
           <label>目标系统<select value={platform} onChange={e => setPlatform(e.target.value as 'linux'|'win32')}><option value="linux">Linux</option><option value="win32">Windows</option></select></label>
-          <label>SSH 端口<input required type="number" min={1} max={65535} value={port} onChange={e => setPort(e.target.value)}/></label>
-          {hub && <label>管理连接路径<select value={jump} onChange={e => setJump(e.target.value)}><option value="">直接连接</option><option value={hub.id}>经已信任的 A（{hub.address}）</option></select><small>本机无法直达目标时，可选择经 A 连接。</small></label>}</>}
+          <label>SSH 端口<input required type="number" min={1} max={65535} value={port} onChange={e => setPort(e.target.value)}/></label></>}
         {choice && !key && <label>SSH 密码<input type="password" autoComplete="new-password" required={!selected?.hasPassword} value={password}
           placeholder={selected?.hasPassword ? '留空使用已保存的密码' : undefined} maxLength={4096} onChange={e => setPassword(e.target.value)}/></label>}
       </fieldset>

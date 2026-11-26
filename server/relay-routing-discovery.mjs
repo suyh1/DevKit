@@ -1,3 +1,4 @@
+import { routingProfiles } from '../shared/routing-profiles.mjs';
 import { networkInterfaces } from 'node:os';
 import { fail } from './collab-record.mjs';
 import { routingAddress } from './relay-routing.mjs';
@@ -51,15 +52,12 @@ export async function discoverRouting(input, lan, localInterfaces = networkInter
   const matches = roles.filter(role => local.has(ips[role]));
   const role = input.role || (matches.length === 1 ? matches[0] : undefined);
   if (!role) return { reason:'本机接口未能唯一匹配三台设备，请选择 DevKit 所在位置后重新检测。' };
-  let trusted = [];
-  try { trusted = ((await lan?.hostRequest('list')) || []).filter(h => h.mode === 'ssh' && h.fingerprint); }
+  let hosts = [];
+  try { hosts = (await lan?.hostRequest('list')) || []; }
   catch { /* A local route lookup can still proceed without the management inventory. */ }
-  const profiles = {}, candidates = trusted.filter(h => h.address === ips.A);
-  for (const key of roles.filter(key => key !== role)) {
-    const found = trusted.filter(h => h.address === ips[key]);
-    if (found.length === 1) profiles[key] = found[0].id;
-  }
-  if (input.profileA && candidates.some(h => h.id === input.profileA)) profiles.A = input.profileA;
+  const preferredA = hosts.find(h => h.id === input.profileA && h.address === ips.A);
+  const { profiles, matching } = routingProfiles(hosts, role, { A:[ips.A], B:[ips.B], C:[ips.C] }, { A:preferredA?.id });
+  const candidates = matching.A;
   if (role !== 'A' && !profiles.A && candidates.length > 1)
     return { role, candidates:candidates.map(({ id, name, user, port }) => ({ id, label:name + ' · ' + user + ':' + port })) };
   let host;
