@@ -32,7 +32,18 @@ mkdir "$scratch/files"
 echo 'Single installation file transfer' > "$scratch/files/probe"
 ssh-keygen -q -t ed25519 -N '' -f "$scratch/host"
 ssh-keygen -q -t ed25519 -N '' -f "$scratch/client"
-for role in A C; do
+# Keep persistent configuration and the network-manager profile fixture private to the test.
+mount -t tmpfs tmpfs /etc/sysctl.d
+mount -t tmpfs tmpfs /etc/systemd/network
+mkdir -p /run/dbus
+mount -t tmpfs tmpfs /run/dbus
+cat > "$scratch/networkctl" <<'PROFILE'
+#!/bin/sh
+echo 'Network File: /etc/systemd/network/10-fixture.network'
+PROFILE
+chmod 755 "$scratch/networkctl"
+mount --bind "$scratch/networkctl" "$(command -v networkctl)"
+for role in A B C; do
   ip netns exec "$role" /usr/sbin/sshd -f /dev/null -h "$scratch/host" -p 2222 \
     -o ListenAddress=0.0.0.0 -o "AllowUsers=$ssh_user" -o "AuthorizedKeysFile=$scratch/client.pub" \
     -o "PidFile=$scratch/sshd-$role.pid" -o GatewayPorts=clientspecified \
@@ -77,4 +88,26 @@ for role in A B C; do
   cmp "$scratch/files/probe" "$scratch/received"
   kill "$service_pid"
   wait "$service_pid"
+done
+
+for role in A B C; do
+  echo "Applying bidirectional host routes with DevKit installed only on $role"
+  for dev in to-B to-C; do ip netns exec A sysctl -qw "net/ipv4/conf/$dev/forwarding=0"; done
+  if ip -n B route get 192.0.2.6 || ip -n C route get 192.0.2.2; then exit 1; fi
+  ip netns exec "$role" "$node_bin" scripts/routing-fixture.mjs "$role" "$scratch" "$ssh_user"
+
+  # Start previously unknown business ports after DevKit exits; both peers initiate via original addresses.
+  for host in B C; do
+    ip netns exec "$host" /usr/bin/python3 -m http.server 19081 --directory "$scratch/files" >/dev/null 2>&1 &
+    if [[ $host == B ]]; then b_pid=$!; else c_pid=$!; fi
+  done
+  ip netns exec B curl --noproxy '*' --retry 4 --retry-connrefused -fsS --max-time 6 http://192.0.2.6:19081/probe | cmp - "$scratch/files/probe"
+  ip netns exec C curl --noproxy '*' --retry 4 --retry-connrefused -fsS --max-time 6 http://192.0.2.2:19081/probe | cmp - "$scratch/files/probe"
+  kill "$b_pid" "$c_pid"
+  wait "$b_pid" || true
+  wait "$c_pid" || true
+  ip -n B route del 192.0.2.6/32 via 192.0.2.1
+  ip -n C route del 192.0.2.2/32 via 192.0.2.5
+  for ip in 192.0.2.1 192.0.2.5; do rm "/etc/sysctl.d/95-devkit-route-$ip.conf"; done
+  for ip in 192.0.2.2 192.0.2.6; do rm "/etc/systemd/network/10-fixture.network.d/95-devkit-$ip.conf"; done
 done

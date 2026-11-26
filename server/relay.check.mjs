@@ -5,6 +5,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { createRelay } from './relay.mjs';
 import { tcp } from './relay-transport.mjs';
+import { applyRouting } from './relay-routing-apply.mjs';
 
 async function bind(server) {
   server.listen(0,'127.0.0.1');
@@ -22,6 +23,45 @@ function fixture() {
   let rows = [];
   return { ...relay, call(action, input) { return relay.request({ rows, action, input, access: { owner:'test' }, commit: async next => { rows = next; } }); } };
 }
+const routingPlan = { kind:'routing', name:'互通', role:'A', ab:'192.0.2.1', b:'192.0.2.2', ac:'192.0.2.5', c:'192.0.2.6' };
+
+test('routing plans validate endpoints, share both host routes and reserve writes for the trusted desktop', async () => {
+  const relay = fixture();
+  for (const c of ['0.0.0.0','127.0.0.1','224.1.2.3',routingPlan.b,'192.0.2.6/24','$(id)'])
+    await assert.rejects(relay.call('save',{ ...routingPlan, c }));
+  const ref = await relay.call('save',routingPlan);
+  const [saved] = await relay.call('list');
+  assert.match(saved.steps.B.linux,/192\.0\.2\.6\/32 via 192\.0\.2\.1/);
+  assert.match(saved.steps.C.windows,/'192\.0\.2\.2\/32'.*'192\.0\.2\.5'/);
+  await assert.rejects(relay.call('apply',{ ...ref, desktopAdmin:true }),/桌面/);
+  await assert.rejects(relay.call('start',{ ...ref, mode:'direct' }));
+  await relay.call('remove',ref);
+});
+
+test('routing runs every preflight before writing and rolls back only its successful changes', async () => {
+  const ids = { B:'b'.repeat(36), C:'c'.repeat(36) };
+  for (const when of ['preflight','apply']) {
+    const changes = [], live = new Set(['A1']);
+    let n = 0;
+    const connect = async () => {
+      const role = ['A','B','C'][n++];
+      return { platform:'win32', close() {}, async run(script) {
+        const key = role === 'A' ? (script.includes(routingPlan.ab) ? 'A1' : 'A2') : role;
+        if (script.includes("'missing'")) {
+          if (role === 'C' && when === 'preflight') throw new Error('冲突');
+          return live.has(key) ? 'present' : 'missing';
+        }
+        if (script.includes('Remove-NetRoute') || script.includes('-Forwarding Disabled')) { live.delete(key); changes.push('-' + key); return ''; }
+        if (role === 'C') throw new Error('拒绝写入');
+        live.add(key); changes.push('+' + key); return '';
+      }};
+    };
+    await assert.rejects(applyRouting(routingPlan,ids,null,connect),/C/);
+    assert.deepEqual(changes, when === 'preflight' ? [] : ['+A2','+B','-B','-A2']);
+    assert.deepEqual([...live],['A1']);
+  }
+});
+
 function relaySocket(client, targetPort) {
   const remote = net.connect(targetPort, '127.0.0.1');
   remote.on('error', () => client.destroy());

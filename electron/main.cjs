@@ -355,7 +355,7 @@ app.whenReady().then(async () => {
           return { data: '文件已保存' };
         } finally { await file.close(); }
       }
-      return { data: await collab.request(module, action, value, { owner: event.sender.id, actor: '主机' }) };
+      return { data: await collab.request(module, action, value, { owner: event.sender.id, actor: '主机', desktopAdmin: true }) };
     } catch (error) { return { error: error.message, status: error.status }; }
   });
   ipcMain.handle('devkit:git', async (event, action, value) => {

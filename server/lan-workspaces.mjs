@@ -319,6 +319,12 @@ export async function createLanWorkspaces(directory, transports = { share: share
   }
   return {
     request, hostRequest, release, rdpTarget,
+    async routingSession(id) {
+      const host = find(id);
+      if (host?.mode !== 'ssh' || !host.fingerprint) throw new Error('请选择已确认指纹的 SSH 管理档案。');
+      const client = await openHost(host);
+      return { client, platform: host.platform };
+    },
     async openRelay(hostname, port, user) {
       const matches = store.list().filter(host => host.mode === 'ssh' && host.address.toLowerCase() === hostname.toLowerCase() && host.port === port && (!user || host.user === user));
       if (matches.length !== 1) throw new Error(matches.length ? '多个档案匹配，请填写 A 的 SSH 用户名。' : '请在局域网主机登记 A 的 SSH 地址、账号并确认指纹。');

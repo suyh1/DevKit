@@ -5,11 +5,12 @@ import { useConfirmation } from './Confirmation';
 import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { openWorkspaceLink } from './workspace-links';
+import RoutingWorkspace from './RoutingWorkspace';
 import { remoteAccess } from './workspace-remote';
 
 type Role = 'A' | 'B' | 'C';
 type Mode = 'direct' | 'ssh' | 'reverse' | 'http' | 'socks';
-type Rule = { id: string; revision: number; role: Role; name: string; target: string; targetPort: number; bind: string; source: string; listenPort: number; hub: string; sshPort: number; user: string; httpPort: number; socksPort: number; passive: string; mode?: Mode; connected?: boolean; error?: string };
+type Rule = { kind?: 'routing'; id: string; revision: number; role: Role; name: string; target: string; targetPort: number; bind: string; source: string; listenPort: number; hub: string; sshPort: number; user: string; httpPort: number; socksPort: number; passive: string; mode?: Mode; connected?: boolean; error?: string };
 type Result = { mode: Mode; ok: boolean; message: string };
 const roles = [{ value: 'A', label: '中转端 A' }, { value: 'B', label: '访问端 B' }, { value: 'C', label: '服务端 C' }] as const;
 const modes = { direct: '直达目标', ssh: 'SSH 本地转发', reverse: 'SSH 反向转发', http: 'HTTP CONNECT', socks: 'SOCKS5' };
@@ -58,12 +59,21 @@ function Editor({ initial, close, save, detect }: { initial: Rule; close: () => 
   </Modal>;
 }
 
-export function RelayWorkspace({ active, edit, resource }: PageProps & { resource?: string }) {
+export function RelayWorkspace(props: PageProps & { resource?: string }) {
+  const routing = props.resource?.split('/')[0] === 'routing';
+  return <><SegmentedControl label="互联方式" value={routing ? 'routing' : 'services'}
+    options={[{ value: 'services', label: '服务转发' }, { value: 'routing', label: '原 IP 双向互通' }]}
+    onChange={mode => openWorkspaceLink('relay', mode === 'routing' ? 'routing' : undefined)} />
+    {routing ? <RoutingWorkspace {...props} /> : <ServiceWorkspace {...props} />}</>;
+}
+
+function ServiceWorkspace({ active, edit, resource }: PageProps & { resource?: string }) {
   const control = window.devkitCollab ? true : !!remoteAccess()?.services?.relay.control;
   const list = useCollabList<Rule>('relay', active), op = useOperation(), confirm = useConfirmation();
   const [editor, setEditor] = useState<Rule | null>(null);
   const [report, setReport] = useState<{ id: string; revision: number; results: Result[] }>();
-  const selected = list.value?.find(rule => rule.id === resource) || list.value?.[0];
+  const rules = list.value?.filter(rule => rule.kind !== 'routing');
+  const selected = rules?.find(rule => rule.id === resource) || rules?.[0];
   useEffect(() => {
     if (!active || !edit || !resource?.startsWith('new/')) return;
     const [, host, port] = resource.split('/');
@@ -81,7 +91,7 @@ export function RelayWorkspace({ active, edit, resource }: PageProps & { resourc
     {list.error && <p role="alert">{list.error}</p>}
     {!list.value && !list.error && <Skeleton kind="projects" label="正在读取服务规则" />}
     {list.value && !selected && <p>暂无服务规则。{edit ? '新建规则后可检测现场支持的连接方式。' : '等待主机管理者添加规则。'}</p>}
-    {selected && <><label>服务规则<select value={selected.id} onChange={e => { op.clear(); openWorkspaceLink('relay', e.target.value); }}>{list.value?.map(rule => <option value={rule.id} key={rule.id}>{rule.name} · {rule.target}:{rule.targetPort}</option>)}</select></label>
+    {selected && <><label>服务规则<select value={selected.id} onChange={e => { op.clear(); openWorkspaceLink('relay', e.target.value); }}>{rules?.map(rule => <option value={rule.id} key={rule.id}>{rule.name} · {rule.target}:{rule.targetPort}</option>)}</select></label>
       <div className="devkit-bento relay-panels"><section><h3>{selected.name}</h3>
         <p>DevKit 在 {selected.role}。{selected.role === 'C' ? 'A 监听' : selected.role + ' 监听'} <code>{selected.bind}:{selected.listenPort}</code> → <code>{selected.target}:{selected.targetPort}</code></p>
         {selected.hub && <p>A 的地址 <code>{selected.hub}</code>，SSH {selected.sshPort}{selected.role === 'B' && `，HTTP CONNECT ${selected.httpPort}，SOCKS5 ${selected.socksPort}`}。</p>}

@@ -96,6 +96,27 @@ module.exports = async function collaborationSmoke(window, output) {
     await wait(web, '!!document.querySelector(".portal-page:not([hidden])")');
     await openWorkspace('跨网互联');
     await web('location.hash="relay"');
+    await click(desktop, main, '原 IP 双向互通');
+    await click(desktop, main, '新建互通方案');
+    for (const [label,value] of [['方案名称','测试网络'],['B 的原 IPv4','192.0.2.2'],['A 面向 B 的 IPv4','192.0.2.1'],['C 的原 IPv4','192.0.2.6'],['A 面向 C 的 IPv4','192.0.2.5']])
+      await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
+    await click(desktop, 'dialog ', '保存方案');
+    await wait(desktop, 'document.body.innerText.includes("测试网络")');
+    await click(desktop, main, '一键配置');
+    await wait(desktop, 'Array.from(document.querySelectorAll("dialog button")).some(b => b.textContent==="配置 A、B、C" && b.disabled)');
+    await desktop('document.querySelector(\'dialog button[aria-label="关闭路由配置"]\').click()');
+    await click(web, current, '原 IP 双向互通');
+    await wait(web, 'document.body.innerText.includes("测试网络")');
+    assert.equal(await web('document.body.innerText.includes("一键配置")'), false);
+    const routingBounds = browser.getBounds();
+    browser.setContentSize(390,740);
+    await web('document.querySelectorAll(".relay-panels details").forEach(el => el.open=true)');
+    assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);
+    browser.setBounds(routingBounds);
+    await desktop(`(async () => { const result = await window.devkitCollab.request('relay','list');
+      const plan = result.data.find(row => row.kind==='routing'); await window.devkitCollab.request('relay','remove',plan); })()`);
+    await click(web, current, '服务转发');
+    await click(desktop, main, '服务转发');
     await click(desktop, main, '新建规则');
     await click(desktop, 'dialog ', '中转端 A');
     for (const [label, value] of [['服务名称','本机 HTTP'], ['目标服务地址','127.0.0.1'], ['目标 TCP 端口',port], ['B 可达的 A 监听 IPv4','127.0.0.1']])

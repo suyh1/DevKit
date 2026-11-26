@@ -4,6 +4,9 @@ import { sshCall } from './ssh-exec.mjs';
 import { withDeadline } from './lan-probe.mjs';
 import { listen, openDestination, sshBanner, tcp } from './relay-transport.mjs';
 
+import { normalizeRouting, inspectRouting, routingSteps } from './relay-routing.mjs';
+import { applyRouting } from './relay-routing-apply.mjs';
+
 const modes = { A: ['direct'], B: ['direct', 'ssh', 'http', 'socks'], C: ['reverse'] };
 function port(value) {
   if (!Number.isInteger(value) || value < 1 || value > 65535) fail(400, '端口须为 1 至 65535 的整数。');
@@ -145,6 +148,7 @@ export function createRelay(lan, changed) {
   return {
     async request({ rows, commit, action, input, access }) {
       if (action === 'list') return rows.map(row => {
+        if (row.kind === 'routing') return { ...row, steps: routingSteps(row) };
         const run = runs.get(row.id);
         return { ...row, mode: run?.mode, connected: !!run?.connected, error: lastError.get(row.id) || '' };
       });
@@ -153,12 +157,20 @@ export function createRelay(lan, changed) {
         if (before) checkRevision(before, input.revision);
         if (before && runs.has(before.id)) fail(409, '请先停止转发再修改规则。');
         if (!before && rows.length >= 64) fail(400, '最多保存 64 项服务规则。');
-        const row = { ...(before ? { id: before.id, revision: before.revision + 1 } : newRecord()), ...normalize(input) };
+        if (before && (before.kind === 'routing') !== (input.kind === 'routing')) fail(400, '请保留原方案类型。');
+        const settings = input.kind === 'routing' ? normalizeRouting(input) : normalize(input);
+        const row = { ...(before ? { id: before.id, revision: before.revision + 1 } : newRecord()), ...settings };
         await commit(before ? rows.map(item => item.id === row.id ? row : item) : [...rows, row]);
         lastError.delete(row.id); return { id: row.id, revision: row.revision };
       }
       const rule = requireRecord(rows, input.id);
       checkRevision(rule, input.revision);
+      if (rule.kind === 'routing' && action !== 'remove') {
+        const plan = normalizeRouting(rule);
+        if (action === 'detect') return inspectRouting(plan);
+        if (action !== 'apply' || !access.desktopAdmin) fail(403, '一键配置仅限 DevKit 桌面主机。');
+        return applyRouting(plan, input.profiles, lan);
+      }
       switch (action) {
         case 'detect': return detect(rule, access);
         case 'start': await start(rule, input.mode, access); break;

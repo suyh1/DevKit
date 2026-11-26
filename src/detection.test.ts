@@ -43,6 +43,8 @@ describe('总览匹配清单', () => {
 describe('推荐顺序和打开方式', () => {
   it('将服务地址带入单机转发，普通 SSH 命令继续匹配主机栏目', () => {
     expect(detectTools('跨网转发 c.example:8080')[0]).toMatchObject({ kind: 'workspace', id: 'relay', resourceId: 'new/c.example/8080' });
+    for (const source of ['B、C 双向互通', '原 IP 整机互通', '双向路由'])
+      expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'routing' });
     for (const source of ['检测 A 的能力', 'B 通过 A 访问 C']) expect(detectTools(source)[0].id).toBe('relay');
     for (const source of ['wg show','ssh dev@server','https://example.org/','转发 c:88888']) expect(detectTools(source).map(s => s.id)).not.toContain('relay');
   });
