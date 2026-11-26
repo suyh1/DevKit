@@ -156,7 +156,8 @@ def build_package(runtime, version, arch, root):
     with tempfile.TemporaryDirectory(prefix='devkit-deb-') as temporary:
         temporary = Path(temporary)
         data_path = temporary / 'data.tar.gz'
-        with tarfile.open(data_path, 'w:gz', compresslevel=1) as archive:
+        # dpkg accepts GNU long-name entries for unpacked native modules.
+        with tarfile.open(data_path, 'w:gz', format=tarfile.GNU_FORMAT, compresslevel=1) as archive:
             write_data_archive(archive, runtime, launcher, desktop, (root / 'build/icons/128x128.png').read_bytes(), report, (root / 'LICENSE').read_bytes())
         control_buffer = io.BytesIO()
         with tarfile.open(fileobj=control_buffer, mode='w:gz') as archive:

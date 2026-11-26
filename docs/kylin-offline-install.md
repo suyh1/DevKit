@@ -8,7 +8,7 @@
 
 安装包不会执行 apt、下载文件、添加软件源、修改 /usr/lib、/lib 或替换 glibc。依赖不满足时应停止安装并反馈，不要强制忽略依赖，不要更换系统库。Chromium 的沙箱保持开启，安装包包含 root 所有的 setuid chrome-sandbox 帮助程序，不要添加 --no-sandbox。
 
-发行包的文件归档使用 `dpkg` 支持的 gzip 格式。构建会检查归档中的目录、架构和沙箱权限，GitHub Actions 还会用对应架构的 `dpkg --unpack` 实际解包。
+发行包使用 GNU tar 保存串口模块等长路径，再用 gzip 压缩。构建会检查归档中的目录、架构和沙箱权限，GitHub Actions 还会用对应架构的 `dpkg --unpack` 实际解包。
 
 ## 带到离线电脑的文件
 

@@ -14,6 +14,8 @@ def validate_data_entries(entries):
     directories = {PurePosixPath('.')}
     seen = set()
     for entry in entries:
+        if entry.pax_headers:
+            raise ValueError(f'dpkg does not support PAX headers: {entry.name}')
         path = PurePosixPath(entry.name)
         if entry.name.rstrip('/') != f'./{path.as_posix()}' or '..' in path.parts or '\\' in entry.name:
             raise ValueError(f'Unsafe archive path: {entry.name}')

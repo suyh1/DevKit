@@ -121,6 +121,9 @@ class DebPackagingTests(unittest.TestCase):
                 (runtime / 'devkit').write_bytes(executable + b'GLIBC_2.25\x00')
                 (runtime / 'chrome-sandbox').write_bytes(b'sandbox fixture')
                 (runtime / 'resources/app.asar').write_bytes(b'asar fixture')
+                binding = runtime / 'resources/app.asar.unpacked/node_modules/@serialport/bindings-cpp/prebuilds' / f'linux-{arch}' / 'node.napi.glibc.node'
+                binding.parent.mkdir(parents=True)
+                binding.write_bytes(b'long-path binding fixture')
                 (root / 'build/icons').mkdir(parents=True)
                 (root / 'build/icons/128x128.png').write_bytes(b'icon fixture')
                 (root / 'package.json').write_text(json.dumps({'author': {'name': 'fixture', 'email': 'fixture@example.test'}}), encoding='utf-8')
@@ -131,7 +134,7 @@ class DebPackagingTests(unittest.TestCase):
                 self.assertEqual(package.name, f'DevKit_1.1.0-1_{deb_arch}.deb')
                 self.assertIn('"emptyRootExtraction": true', output.getvalue())
                 buffer = io.BytesIO()
-                with tarfile.open(fileobj=buffer, mode='w') as archive:
+                with tarfile.open(fileobj=buffer, mode='w', format=tarfile.GNU_FORMAT) as archive:
                     builder.write_data_archive(archive, runtime, 'launcher', 'desktop', b'icon', {}, b'MIT fixture license')
                 buffer.seek(0)
                 with tarfile.open(fileobj=buffer, mode='r') as archive:
@@ -140,6 +143,7 @@ class DebPackagingTests(unittest.TestCase):
                     verifier.extract_data_archive(archive, destination)
                 self.assertTrue((destination / 'opt/devkit/locales').is_dir())
                 self.assertEqual((destination / 'opt/devkit/resources/app.asar').read_bytes(), b'asar fixture')
+                self.assertEqual((destination / 'opt/devkit' / binding.relative_to(runtime)).read_bytes(), binding.read_bytes())
                 self.assertEqual((destination / 'usr/bin/devkit').read_text(), 'launcher')
                 self.assertTrue((destination / 'usr/share/icons/hicolor/128x128/apps/devkit.png').is_file())
                 self.assertEqual((destination / 'usr/share/doc/devkit/copyright').read_bytes(), b'MIT fixture license')
