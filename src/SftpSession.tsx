@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { lanRequest } from './lan-api';
 import SftpPanel from './SftpPanel';
 
-export default function SftpSession({ id, portal }: { id: string; portal: boolean }) {
+export default function SftpSession({ id, portal, label = 'SFTP' }: { label?: string; id: string; portal: boolean }) {
   const [session, setSession] = useState(''), [running, setRunning] = useState(true);
   const [status, setStatus] = useState('');
   useEffect(() => {
@@ -16,19 +16,19 @@ export default function SftpSession({ id, portal }: { id: string; portal: boolea
       try {
         const state = await lanRequest<{ closed: boolean }>('file-status', { id: connection });
         if (disposed) return;
-        if (state.closed) throw new Error('SFTP 已断开');
+        if (state.closed) throw new Error(label + ' 已断开');
         timer = setTimeout(check, 10000);
       } catch (error) { failed(error as Error); }
     }
-    setSession(''); setStatus('正在连接 SFTP…');
+    setSession(''); setStatus('正在连接 ' + label + '…');
     void lanRequest<{ id: string }>('file-open', { id }).then(result => {
       connection = result.id;
       if (disposed) { close(); return; }
-      setSession(connection); setStatus('SFTP 已连接'); void check();
+      setSession(connection); setStatus(label + ' 已连接'); void check();
     }).catch(failed);
     return () => { disposed = true; clearTimeout(timer); close(); };
-  }, [id, running]);
+  }, [id, running, label]);
   return <div className="lan-file-session"><div className="lan-terminal-message"><span role="status">{status}</span>
     <button className="text-button" onClick={() => { if (running) setStatus('已断开连接'); setRunning(!running); }}>{running ? '断开连接' : '重新连接'}</button>
-  </div>{running && session && <SftpPanel key={session} session={session} portal={portal} />}</div>;
+  </div>{running && session && <SftpPanel label={label} key={session} session={session} portal={portal} />}</div>;
 }

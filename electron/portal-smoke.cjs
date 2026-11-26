@@ -926,6 +926,14 @@ app
         await button('连接', '.lan-rdp-form button');
         await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
         await wait(`Array.from(document.querySelectorAll('.lan-rdp-viewport canvas')).some(canvas=>canvas.width>=640&&Array.from(canvas.getContext('2d').getImageData(1,1,1,1).data).join(',')==='40,100,150,255')`);
+        await selector('.lan-session-clipboard summary');
+        await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "远端文本"');
+        await fill('.lan-session-clipboard textarea:not([readonly])', '本地文本');
+        await button('发送到远端', '.lan-session-clipboard button');
+        await wait('document.querySelector(".lan-session-clipboard [role=status]").textContent.includes("已发送")');
+        await button('会话全屏', '.lan-rdp-toolbar button');
+        await wait('!!(document.fullscreenElement || document.querySelector(".lan-rdp-maximized"))');
+        await button('退出全屏', '.lan-rdp-toolbar button');
         const fixtureConnection = rdp.connections.at(-1);
         assert.deepEqual([fixtureConnection.hostname, fixtureConnection.port, fixtureConnection.username], ['192.0.2.45', '3391', 'portal-rdp-user']);
         await button('发送 Ctrl+Alt+Del', '.lan-rdp-toolbar button');

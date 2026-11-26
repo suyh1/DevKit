@@ -14,6 +14,14 @@ describe('LAN host import', () => {
     expect(rows.map(({ mode, port }) => [mode, port])).toEqual([['vnc', 5900], ['rdp', 3389], ['sftp', 2222]]);
   });
 
+  it('imports terminal, FTP and serial connection settings', () => {
+    expect(parseHostCsv('mode,address,terminalType,lineEnding\ntelnet,switch,vt100,cr')[0]).toMatchObject({ port: 23, terminalType: 'vt100', lineEnding: 'cr' });
+    expect(parseHostCsv('mode,address,ftpSecurity,startDirectory\nftp,nas,implicit,/archive')[0]).toMatchObject({ port: 990, ftpSecurity: 'implicit', startDirectory: '/archive' });
+    expect(parseHostCsv('mode,address,baudRate,dataBits,stopBits,parity,flowControl,lineEnding\nserial,COM3,9600,7,2,odd,software,lf')[0]).toMatchObject({
+      port: 0, baudRate: 9600, dataBits: 7, stopBits: 2, parity: 'odd', flowControl: 'software', lineEnding: 'lf',
+    });
+  });
+
   it('reads SSH aliases and first matching options without evaluating Match or command directives', () => {
     const hosts = parseSshHosts(`
       Host test\nHostName="test.internal" # comment\n  User tester\n  ProxyCommand ignored

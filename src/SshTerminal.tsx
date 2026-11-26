@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { lanRequest } from './lan-api';
 import { copyText } from './motion-primitives';
+import { readSessionClipboard } from './SessionClipboard';
 import SftpPanel from './SftpPanel';
 import '@xterm/xterm/css/xterm.css';
 
@@ -36,7 +37,11 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
     terminal.open(node);
     controls.current = terminal;
     fitAddon.current = fit;
-    const observer = new ResizeObserver(() => { if (node.offsetWidth) fit.fit(); });
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { if (node.offsetWidth) fit.fit(); });
+    });
     observer.observe(node);
     const themeObserver = new MutationObserver(() => {
       terminal.options = appearance();
@@ -51,6 +56,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
     const resize = terminal.onResize(size => { if (session) void lanRequest('terminal-resize', { id: session, ...size }).catch(() => {}); });
     const input = terminal.onData(text => {
       const id = session;
+      if (new TextEncoder().encode(text).length > 524288) { setFeedback('每次最多粘贴 512 KiB 文本'); return; }
       if (id) inputQueue = inputQueue.then(() => {
         if (!disposed && session === id) return lanRequest('terminal-input', { id, text });
       }).catch(() => {});
@@ -76,7 +82,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
       await lanRequest('terminal-resize', { id: session, cols: terminal.cols, rows: terminal.rows });
       if (!disposed) { setConnectionId(session); if (node.offsetWidth && !document.activeElement?.closest('dialog, .lan-terminal-tabs')) terminal.focus(); void poll(); }
     }).catch(error => { if (!disposed) { setConnectionId(''); setMessage(error.message); } void close(); });
-    return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); themeObserver.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
+    return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); cancelAnimationFrame(frame); themeObserver.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
   }, [id, generation, running]);
   useEffect(() => {
     if (active) {
@@ -91,6 +97,13 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
         setRunning(false); setConnectionId(''); setSelection(false); setMessage('会话已断开');
       }}>断开连接</button>}
       <button type="button" className="text-button" disabled={!selection} onClick={() => void copyText(controls.current?.getSelection() || '').then(() => setFeedback('已复制选区'), () => setFeedback('复制失败'))}>复制选区</button>
+      <button type="button" className="text-button" disabled={!connectionId} onClick={async () => {
+        const terminal = controls.current;
+        try {
+          const text = await readSessionClipboard();
+          if (terminal && terminal === controls.current) { terminal.paste(text); terminal.focus(); }
+        } catch { setFeedback('请在终端内按 Ctrl+V 或 ⌘V 粘贴'); controls.current?.focus(); }
+      }}>粘贴</button>
       <button type="button" className="text-button" onClick={() => { controls.current?.clear(); controls.current?.focus(); }}>清空显示</button>
       {allowFiles && <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => setFilesOpen(value => !value)}>SFTP 文件</button>}
     </div>

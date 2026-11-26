@@ -17,13 +17,16 @@ export async function prepareDesktop(platform, arch, stageRoot = path.join(root,
   await cp(path.join(root, 'build', 'icons', '128x128.png'), path.join(staging, 'tray-icon.png'));
   for (const name of ['server', 'shared']) await cp(path.join(root, name), path.join(staging, name), { recursive: true, filter: filename => !/\.(?:check|test)\.m?[jt]s$|\.d\.mts$/.test(filename) });
   const packages = JSON.parse(await readFile(new URL('./server-runtime.json', import.meta.url), 'utf8'));
-  for (const name of packages) {
+  const serialPackages = ['@serialport/bindings-cpp', '@serialport/stream', '@serialport/bindings-interface', '@serialport/parser-readline', '@serialport/parser-delimiter', 'node-gyp-build', 'debug', 'ms'];
+  for (const name of [...packages, ...serialPackages]) {
     const source = path.join(root, 'node_modules', name);
-    const excluded = new Set(['node_modules', 'test', 'examples']);
+    const excluded = new Set(['node_modules', 'test', 'examples', 'prebuilds']);
     const metadata = JSON.parse(await readFile(path.join(source, 'package.json'), 'utf8'));
     if (!/^(?:\.\/)?build\//.test(metadata.main || '')) excluded.add('build');
     await cp(source, path.join(staging, 'node_modules', name), { recursive: true, filter: filename => !path.relative(source, filename).split(path.sep).some(part => excluded.has(part) || part.endsWith('.node')) });
   }
+  const prebuild = path.join('node_modules', '@serialport', 'bindings-cpp', 'prebuilds', platform + '-' + arch);
+  await cp(path.join(root, prebuild), path.join(staging, prebuild), { recursive: true });
   await cp(path.join(root, 'dist'), path.join(staging, 'dist'), { recursive: true });
   await (await import('./stage-ssh-node.mjs')).stageSshNode(path.join(staging, 'ssh-node'));
   await writeFile(path.join(staging, 'package.json'), JSON.stringify({ name: 'devkit', productName: 'DevKit', version: manifest.version, main: 'main.cjs', description: manifest.description, author: manifest.author, license: manifest.license }, null, 2));

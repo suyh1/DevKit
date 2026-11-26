@@ -3,10 +3,11 @@ import RFB from '@novnc/novnc';
 import { VncChannel } from './vnc-channel';
 import SegmentedControl from './SegmentedControl';
 
+import SessionClipboard, { clipboardLimit } from './SessionClipboard';
+
 const fieldLabels: Record<string, string> = { username: '用户名', password: 'VNC 密码', target: '目标' };
 export default function VncSession({ id }: { id: string }) {
-  const panel = useRef<HTMLDivElement>(null);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [remote, setRemote] = useState('');
   const viewport = useRef<HTMLDivElement>(null), client = useRef<RFB | undefined>(undefined);
   const [running, setRunning] = useState(true);
   const resumeDeadline = useRef<() => void>(() => {});
@@ -18,7 +19,7 @@ export default function VncSession({ id }: { id: string }) {
   useEffect(() => {
     if (!running || !viewport.current) return;
     let disposed = false, failure = '';
-    setMessage('正在连接 VNC…'); setFields([]); setFingerprint(''); setConnected(false);
+    setRemote(''); setMessage('正在连接 VNC…'); setFields([]); setFingerprint(''); setConnected(false);
     const channel = new VncChannel(id, message => { failure = message; });
     const rfb = new RFB(viewport.current, channel);
     client.current = rfb;
@@ -34,6 +35,13 @@ export default function VncSession({ id }: { id: string }) {
     rfb.addEventListener('connect', () => {
       clearTimeout(timer);
       if (!disposed) { setConnected(true); setMessage('VNC 已连接'); }
+    });
+    rfb.addEventListener('clipboard', event => {
+      const value = (event as CustomEvent).detail.text;
+      if (!disposed && typeof value === 'string') {
+        if (new TextEncoder().encode(value).length <= clipboardLimit) setRemote(value);
+        else { setRemote(''); setMessage('远端剪贴板文本超过 16 KiB'); }
+      }
     });
     rfb.addEventListener('credentialsrequired', event => {
       clearTimeout(timer);
@@ -55,21 +63,12 @@ export default function VncSession({ id }: { id: string }) {
     return () => { disposed = true; clearTimeout(timer); rfb.disconnect(); channel.close(); client.current = undefined; };
   }, [id, running]);
   useEffect(() => { if (client.current) { client.current.scaleViewport = scale; client.current.viewOnly = viewOnly; } }, [scale, viewOnly]);
-  useEffect(() => {
-    const update = () => setFullscreen(document.fullscreenElement === panel.current);
-    document.addEventListener('fullscreenchange', update);
-    return () => document.removeEventListener('fullscreenchange', update);
-  }, []);
-  return <div ref={panel} className="lan-vnc-session">
+  return <div className="lan-vnc-session">
     <div className="lan-terminal-message"><span role="status">{message}</span>
       {running ? <button className="text-button" onClick={() => { setRunning(false); setMessage('已断开连接'); }}>断开连接</button> :
         <button className="secondary-button" onClick={() => setRunning(true)}>重新连接</button>}
       {running && connected && <>
         <SegmentedControl label="桌面缩放" value={scale ? 'fit' : 'original'} options={[{ value: 'fit', label: '适应窗口' }, { value: 'original', label: '原始大小' }]} onChange={value => setScale(value === 'fit')} />
-        {document.fullscreenEnabled && <button className="text-button" onClick={() => {
-          const pending = fullscreen ? document.exitFullscreen() : panel.current?.requestFullscreen();
-          void pending?.catch(() => setMessage('当前窗口无法切换全屏'));
-        }}>{fullscreen ? '退出全屏' : '全屏'}</button>}
         <label><input type="checkbox" checked={viewOnly} onChange={event => setViewOnly(event.target.checked)} />仅查看</label>
         <button disabled={viewOnly} className="text-button" onClick={() => { client.current?.sendCtrlAltDel(); client.current?.focus(); }}>发送 Ctrl+Alt+Del</button>
       </>}
@@ -86,6 +85,7 @@ export default function VncSession({ id }: { id: string }) {
       <button className="run-button">登录</button>
     </form>}
     {running && fingerprint && <div className="lan-vnc-login"><code>{fingerprint}</code><button className="secondary-button" onClick={() => { resumeDeadline.current(); client.current?.approveServer(); setFingerprint(''); setMessage('正在验证…'); }}>信任本次连接</button></div>}
+    {running && connected && <SessionClipboard remote={remote} readOnly={viewOnly} send={text => client.current?.clipboardPasteFrom(text)} />}
     <div ref={viewport} className="lan-vnc-screen" hidden={!running || !connected} />
   </div>;
 }

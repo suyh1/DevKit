@@ -273,7 +273,7 @@ export async function copyText(text: string): Promise<void> {
     input.value = text; input.readOnly = true; input.tabIndex = -1;
     input.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
     const dialogs = document.querySelectorAll('dialog[open]');
-    (dialogs[dialogs.length - 1] || document.body).appendChild(input);
+    (document.fullscreenElement || dialogs[dialogs.length - 1] || document.body).appendChild(input);
     try { input.focus({ preventScroll: true }); input.select(); copied = document.execCommand('copy'); } catch { copied = false; }
     finally {
       input.remove(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });

@@ -190,7 +190,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           });
         async function body() {
           const largeDocument = ['/api/http/save-library', '/api/project-todos/save', '/api/project-todos/create'].includes(url.pathname);
-          const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
+          const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : ['/api/lan-hosts/rdp-input', '/api/lan-hosts/rdp-clipboard'].includes(url.pathname) ? 80_000 : 4_100_000;
           return jsonBody(request, limit);
         }
         if (

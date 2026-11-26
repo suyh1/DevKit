@@ -492,8 +492,8 @@ function SharingPanel({
                         id: 'lan-hosts', name: '局域网主机', description: '主机清单、连接档案和远程会话', permissions: [
                           { key: 'edit', label: '管理主机档案', detail: '添加、编辑、移除、置顶和导入主机。可提交连接凭据，已保存的凭据留在共享主机。' },
                           { key: 'diagnose', label: '测试与诊断连接', detail: '验证目标地址、端口和已保存的登录。确认或重置 SSH 指纹还需管理主机档案权限。' },
-                          { key: 'terminal', label: '使用 SSH 终端', detail: '使用主机保存的凭据连接已验证指纹的目标，在目标机交互操作。' },
-                          { key: 'files', label: 'SFTP 文件', detail: '通过已打开的 SSH 终端浏览、上传和下载远程文件。' },
+                          { key: 'terminal', label: '使用 SSH / Telnet 终端', detail: '打开已登记的 SSH 或 Telnet 会话。SSH 目标需先确认指纹。' },
+                          { key: 'files', label: 'SFTP / FTP 文件', detail: '配合终端权限浏览、上传和下载远程文件，支持 SFTP 和 FTP/FTPS。' },
                           { key: 'discover', label: '发现主机', detail: '从共享主机选定的网卡检测直连网段。' },
                           { key: 'wake', label: '网络唤醒', detail: '从共享主机唤醒配置了 MAC 地址的设备。' },
                           { key: 'rdp', label: '远程桌面连接', detail: '通过共享主机配置的 guacd，连接已登记的 RDP 或 VNC 桌面。' },
@@ -601,7 +601,7 @@ function SharingPanel({
                   {(draft.visitors || []).map((visitor, index) => {
                     const change = (next: typeof visitor) => setDraft({ ...draft, visitors: draft.visitors!.map((row, position) => position === index ? next : row) });
                     const existing = visitor.hasPassword === true;
-                    const labels: Record<string, string> = { sync: '同步远端', backend: '包含 npm、可执行程序与解释器脚本', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '服务日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH 终端', files: 'SFTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
+                    const labels: Record<string, string> = { sync: '同步远端', backend: '包含 npm、可执行程序与解释器脚本', edit: '编辑', probe: '检测', control: '运行', send: '发送请求', jar: '服务日志', nginx: 'Nginx 日志', export: '导出', raw: '读原始日志', diagnose: '连接诊断', terminal: 'SSH / Telnet 终端', files: 'SFTP / FTP 文件', discover: '发现主机', wake: '网络唤醒', rdp: '远程桌面' };
                     const effective = visitorServices(draft.services, visitor.services);
                     const grants = workspaceModules.flatMap(item => {
                       const service = effective[item.id];

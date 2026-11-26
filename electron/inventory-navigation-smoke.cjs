@@ -9,7 +9,7 @@ module.exports = async function inventoryNavigation(window, output) {
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   const size = window.getSize(), minimum = window.getMinimumSize();
   const channels = [];
-  let count = 2;
+  let count = 2, terminalOpens = 0, pastedText = '';
   let logRevision = 0;
   const fixtures = make => Array.from({length: count}, (_, i) => make(i));
   const state = instances => ({ revision: 1, platform: process.platform, directory: '/fixture', instances });
@@ -83,10 +83,14 @@ module.exports = async function inventoryNavigation(window, output) {
     await wait(list + '.clientHeight > 0');
     assert.equal(await js(list + '.children.length'), items);
     assert.ok(await js(list + '.clientHeight <= 120'));
-    const before = await js(element(summary) + '.getBoundingClientRect().top');
-    await js(list + '.scrollTop = ' + list + '.scrollHeight');
-    if (items === 50) assert.ok(await js(list + '.scrollTop > 0'));
-    assert.equal(await js(element(summary) + '.getBoundingClientRect().top'), before, 'Summary stays in place when scrolling details');
+    const position = await js(`(() => {
+      const title = ${element(summary)}, body = ${list};
+      const before = title.getBoundingClientRect().top;
+      body.scrollTop = body.scrollHeight;
+      return { before, after: title.getBoundingClientRect().top, scroll: body.scrollTop };
+    })()`);
+    if (items === 50) assert.ok(position.scroll > 0);
+    assert.equal(position.after, position.before, 'Summary stays in place when scrolling details');
     await click(summary);
   }
   async function hoverHost(summary) {
@@ -160,12 +164,14 @@ module.exports = async function inventoryNavigation(window, output) {
       })), warnings: [], hosts: Array.from({length: hostCount()}, (_, i) => ({id: 'host-' + i, name: '主机 ' + i})) };
       if (action === 'read') return { results: payload.sources.map(source => ({ id: source.id, text: 'INFO ' + source.id })) };
     });
-    handle('devkit:lan-hosts', action => {
+    handle('devkit:lan-hosts', (action, payload) => {
       if (action === 'list') return Array.from({length: Math.min(50, count)}, (_, i) => ({
         id: 'host-' + i, name: '主机 ' + i, mode: 'ssh', address: 'localhost', port: 22, user: 'test', platform: 'linux',
         fingerprint: 'fixture', auth: 'key', modules: {}, group: '', tags: [],
       }));
-      if (action === 'terminal-open') return { id: 'fixture-session' };
+      if (action === 'terminal-open') return { id: 'fixture-session-' + ++terminalOpens };
+      if (action === 'clipboard-read') return 'paste test';
+      if (action === 'terminal-input') pastedText = payload.text;
       if (action === 'terminal-read') return { data: '', closed: false };
     });
     window.show(); window.focus(); contents.focus();
@@ -246,6 +252,19 @@ module.exports = async function inventoryNavigation(window, output) {
           await wait(element(host + ' details') + '.open');
           await js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
           await wait(visible('.lan-terminal-tabs [aria-selected=true]'));
+          await wait('document.querySelector(".lan-ssh-session [role=status]")?.textContent === "已连接"');
+          const opened = terminalOpens;
+          await click('.lan-session-controls button[aria-pressed=false]');
+          await wait('!document.querySelector(".lan-connections").checkVisibility() && document.querySelector(".lan-xterm")?.clientHeight > innerHeight / 2');
+          await click('.lan-session-controls .secondary-button');
+          await wait('document.fullscreenElement === document.querySelector(".lan-terminal-area")');
+          await click('.lan-session-controls .secondary-button');
+          await wait('!document.fullscreenElement');
+          pastedText = '';
+          await js('[...document.querySelectorAll(".lan-ssh-session button")].find(b => b.textContent === "粘贴").click()');
+          for (let i = 0; i < 40 && !pastedText; i++) await new Promise(resolve => setTimeout(resolve, 25));
+          assert.equal(pastedText, 'paste test');
+          assert.equal(terminalOpens, opened);
           await js("document.querySelector('.lan-terminal-tabs .icon-button').click()");
           await wait('document.activeElement === ' + element(summary) + ' && ' + visible(summary));
         }

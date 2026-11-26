@@ -58,7 +58,7 @@ function optionsFor(target, input) {
     hostname: target.address, port: target.port, ...credentials,
     width: bounded(input.width, 640, 2560, 1280), height: bounded(input.height, 480, 1600, 800), dpi: 96,
     'cert-tofu': target.protocol !== 'vnc' && input.trustCertificate === true ? 'true' : '',
-    'resize-method': 'display-update', 'disable-audio': 'true', 'disable-copy': 'true', 'disable-paste': 'true',
+    'resize-method': 'display-update', 'disable-audio': 'true', 'disable-copy': 'false', 'disable-paste': 'false',
   };
 }
 
@@ -150,6 +150,14 @@ export function createRdpSessions(env = process.env) {
     if (!session || session.token !== token) fail(404, '远程桌面会话已断开或不可用。');
     return session;
   };
+  function writable(payload, token) {
+    const session = owned(payload?.id, token);
+    try { session.verify(); }
+    catch (error) { session.controller.abort(); throw error; }
+    if (!session.socket?.writable) fail(404, '远程桌面会话已断开或不可用。');
+    if (session.socket.writableLength > 256 * 1024) fail(429, '远程桌面暂时无法接收输入。');
+    return session.socket;
+  }
   return {
     async open(target, payload, { token, verify, stream }) {
       if (sessions.size >= 8 || [...sessions.values()].filter(session => session.token === token).length >= 2) fail(429, '远程桌面连接数已达上限。');
@@ -182,12 +190,19 @@ export function createRdpSessions(env = process.env) {
       }
     },
     input(payload, token) {
-      const session = owned(payload?.id, token);
-      try { session.verify(); }
-      catch (error) { session.controller.abort(); throw error; }
-      if (!session.socket?.writable) fail(404, '远程桌面会话已断开或不可用。');
-      if (session.socket.writableLength > 256 * 1024) fail(429, '远程桌面暂时无法接收输入。');
-      session.socket.write(encodeInput(payload.messages));
+      writable(payload, token).write(encodeInput(payload.messages));
+      return true;
+    },
+    clipboard(payload, token) {
+      const socket = writable(payload, token);
+      const text = payload.text;
+      if (typeof text !== 'string' || Buffer.byteLength(text) > 16384) fail(400, '剪贴板每次最多发送 16 KiB 文本。');
+      const bytes = Buffer.from(text);
+      // This channel is the only writer of Guacamole output streams.
+      const index = 0;
+      const parts = [instruction('clipboard', index, 'text/plain')];
+      for (let i = 0; i < bytes.length; i += 4096) parts.push(instruction('blob', index, bytes.subarray(i, i + 4096).toString('base64')));
+      socket.write(parts.join('') + instruction('end', index));
       return true;
     },
     disconnect(payload, token) { owned(payload?.id, token).controller.abort(); return true; },

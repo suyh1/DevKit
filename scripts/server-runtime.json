@@ -1,6 +1,7 @@
 [
   "@faker-js/faker",
   "ssh2",
+  "basic-ftp",
   "socks",
   "smart-buffer",
   "ip-address",

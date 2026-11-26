@@ -83,12 +83,20 @@ test('browser RDP selects only saved targets, relays display and input, and revo
   const [upstream] = fixture.connections;
   assert.deepEqual([upstream.hostname, upstream.port, upstream.username, upstream.password, upstream.domain, upstream['cert-tofu']],
     ['192.0.2.32', '3390', credentials.username, credentials.password, 'FIXTURE', 'true']);
+  assert.deepEqual([upstream['disable-copy'], upstream['disable-paste']], ['false', 'false']);
+  const text = '会话剪贴板';
+  assert.equal((await post('lan-hosts/rdp-clipboard', { id, text }, other)).status, 404);
+  assert.equal((await post('lan-hosts/rdp-clipboard', { id, text }, denied)).status, 403);
+  assert.equal((await post('lan-hosts/rdp-clipboard', { id, text: '中'.repeat(6000) }, allowed)).status, 400);
+  assert.equal((await post('lan-hosts/rdp-clipboard', { id, text }, allowed)).status, 200);
   assert.equal(output.includes(credentials.password), false);
   assert.equal((await post('lan-hosts/rdp-input', { id, messages: [['key', '65', '1']] }, other)).status, 404);
   assert.equal((await post('lan-hosts/rdp-close', { id }, other)).status, 404);
   assert.equal((await post('lan-hosts/rdp-input', { id, messages: [['select', 'ssh']] }, allowed)).status, 400);
   assert.equal((await post('lan-hosts/rdp-input', { id, messages: [['key', '65', '1'], ['mouse', '80', '40', '1']] }, allowed)).status, 200);
   for (let attempt = 0; attempt < 25 && !fixture.messages.some(message => message[0] === 'mouse'); attempt++) await delay(20);
+  assert.deepEqual(fixture.messages.filter(([op]) => ['clipboard','blob','end'].includes(op)),
+    [['clipboard','0','text/plain'], ['blob','0',Buffer.from(text).toString('base64')], ['end','0']]);
   assert.ok(fixture.messages.some(message => message.join(',') === 'key,65,1'));
   assert.ok(fixture.messages.some(message => message.join(',') === 'mouse,80,40,1'));
   const vnc = (await lan.hostRequest('save', { mode: 'vnc', name: 'VNC', address: '192.0.2.44', port: 5901 })).at(-1);

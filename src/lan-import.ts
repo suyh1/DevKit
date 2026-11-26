@@ -10,9 +10,18 @@ export function parseHostCsv(text: string): HostDraft[] {
     const value = (key: string) => row[keys.indexOf(key)]?.trim() || '';
     const enabled = (key: string) => /^(true|1)$/i.test(value(key));
     const mode = (value('mode').toLowerCase() || 'ssh') as HostDraft['mode'];
+    const ftpSecurity = value('ftpsecurity') as HostDraft['ftpSecurity'];
     return {
+      ...(mode === 'ftp' && { ftpSecurity: ftpSecurity || 'plain', startDirectory: value('startdirectory') }),
+      ...(mode === 'telnet' && { terminalType: value('terminaltype') || undefined }),
+      ...(['telnet', 'serial'].includes(mode) && { lineEnding: value('lineending') || undefined }),
+      ...(mode === 'serial' && {
+        baudRate: value('baudrate') ? Number(value('baudrate')) : undefined,
+        dataBits: value('databits') ? Number(value('databits')) : undefined, stopBits: value('stopbits') ? Number(value('stopbits')) : undefined,
+        parity: value('parity') || undefined, flowControl: value('flowcontrol') || undefined,
+      }),
       name: value('name'), address: value('address'), mode,
-      user: value('user'), port: Number(value('port') || defaultPort[mode]), platform: (value('platform') || 'linux') as HostDraft['platform'],
+      user: value('user'), port: Number(value('port') || (mode === 'ftp' && ftpSecurity === 'implicit' ? 990 : defaultPort[mode])), platform: (value('platform') || 'linux') as HostDraft['platform'],
       auth: value('auth') === 'password' ? 'password' : 'key',
       group: value('group'), tags: value('tags').split('|').map(tag => tag.trim()).filter(Boolean), pinned: enabled('pinned'),
       modules: { jar: enabled('jar'), nginx: enabled('nginx') },

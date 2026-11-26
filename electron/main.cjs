@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
+const { app, clipboard, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
 const path = require('node:path');
@@ -244,8 +244,8 @@ app.whenReady().then(async () => {
     } catch { return new Response(null, { status: 404 }); }
   });
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !isAppUrl(details.url) && !details.url.startsWith('blob:devkit://app/') && !details.url.startsWith('data:') }));
-  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => callback(isAppUrl(contents.getURL()) && permission === 'clipboard-sanitized-write'));
-  session.defaultSession.setPermissionCheckHandler((contents, permission) => !!contents && isAppUrl(contents.getURL()) && permission === 'clipboard-sanitized-write');
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => callback(isAppUrl(contents.getURL()) && ['clipboard-sanitized-write', 'fullscreen'].includes(permission)));
+  session.defaultSession.setPermissionCheckHandler((contents, permission) => !!contents && isAppUrl(contents.getURL()) && ['clipboard-sanitized-write', 'fullscreen'].includes(permission));
   ipcMain.handle('devkit:save-text', async (event, value) => {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !isAppUrl(event.senderFrame.url)) throw new Error('拒绝未知页面的保存请求。');
     const { text, filename } = validateSave(value);
@@ -413,6 +413,7 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的局域网主机请求。');
     try {
       if (!lan) throw new Error(lanError || '局域网主机管理器尚未准备好。');
+      if (action === 'clipboard-read') return { data: clipboard.readText() };
       if (action === 'pick-ssh-key') {
         const result = await dialog.showOpenDialog(window, { title: '选择 SSH 私钥', properties: ['openFile', 'showHiddenFiles'] });
         return { data: result.canceled ? null : result.filePaths[0] };
@@ -423,7 +424,7 @@ app.whenReady().then(async () => {
         const endpoint = await lan.hostRequest('rdp-target', value);
         const executable = linux ? 'remmina' : path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
         await new Promise((resolve, reject) => {
-          const child = spawn(executable, linux ? ['-c', `rdp://${endpoint}`] : [`/v:${endpoint}`], { detached: true, stdio: 'ignore' });
+          const child = spawn(executable, linux ? ['-c', `rdp://${endpoint}`] : [`/v:${endpoint}`, '/f'], { detached: true, stdio: 'ignore' });
           child.once('error', error => reject(new Error(linux ? '无法打开 Remmina，请安装 Remmina 及其 RDP 插件。' : `无法打开 Windows 远程桌面：${error.message}`)));
           child.once('spawn', () => { child.unref(); resolve(); });
         });

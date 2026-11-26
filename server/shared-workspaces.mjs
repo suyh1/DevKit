@@ -11,7 +11,7 @@ const lanActions = new Map([
   ['terminal-open', 'terminal'], ['terminal-read', 'terminal'], ['terminal-input', 'terminal'], ['terminal-resize', 'terminal'], ['terminal-close', 'terminal'],
   ['file-open', 'files'], ['file-status', 'files'], ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
   ['scan-interfaces', 'discover'], ['scan-start', 'discover'], ['scan-cancel', 'discover'], ['wake', 'wake'],
-  ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-close', 'rdp'],
+  ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-clipboard', 'rdp'], ['rdp-close', 'rdp'],
 ]);
 const lanChanges = new Set(['save', 'remove', 'import-connections', 'reset-trust']);
 
@@ -74,6 +74,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
           const statuses = services.monitor.enabled ? await monitor?.()?.request('lan-statuses', {}, { allowLan }) || [] : [];
           return { hosts: hosts(), statuses };
         }
+        if (action === 'rdp-clipboard') return rdpSessions.clipboard(payload, token);
         if (action === 'rdp-input') return rdpSessions.input(payload, token);
         if (action === 'rdp-close') return rdpSessions.disconnect(payload, token);
         if (action === 'rdp-open') {

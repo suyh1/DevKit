@@ -36,7 +36,7 @@ export const workspaceModuleNav = {
   jar: { Icon: ServerCog, hint: '应用服务启停与控制台' },
   monitor: { Icon: Activity, hint: '可用率与故障记录' },
   logs: { Icon: ScrollText, hint: '实时日志多窗对照' },
-  'lan-hosts': { Icon: Terminal, hint: 'SSH、文件传输与远程桌面会话' },
+  'lan-hosts': { Icon: Terminal, hint: 'SSH、Telnet、串口、文件传输与远程桌面' },
 } satisfies Record<typeof workspaceModules[number]['id'], { Icon: typeof Send; hint: string }>;
 
 

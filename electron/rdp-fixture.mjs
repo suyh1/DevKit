@@ -2,7 +2,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:net';
 
 const encode = (...values) => values.map(value => `${[...String(value)].length}.${value}`).join(',') + ';';
-const parameters = ['VERSION_1_5_0', 'hostname', 'port', 'username', 'password', 'domain', 'cert-tofu', 'resize-method', 'disable-audio'];
+const parameters = ['VERSION_1_5_0', 'hostname', 'port', 'username', 'password', 'domain', 'cert-tofu', 'resize-method', 'disable-audio', 'disable-copy', 'disable-paste'];
 
 export async function rdpFixture() {
   const messages = [], connections = [], sockets = new Set();
@@ -38,6 +38,7 @@ export async function rdpFixture() {
           socket.write([
             encode('ready', '$fixture'), encode('size', 0, 640, 480), encode('rect', 0, 0, 0, 640, 480),
             encode('cfill', 14, 0, 40, 100, 150, 255), encode('sync', 1000),
+            encode('clipboard', 7, 'text/plain'), encode('blob', 7, Buffer.from('远端文本').toString('base64')), encode('end', 7),
           ].join(''));
         }
       }

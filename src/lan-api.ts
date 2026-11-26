@@ -5,8 +5,10 @@ import type { LanMonitorStatus } from './monitor-api';
 export type ManagedModule = 'jar' | 'nginx';
 export type HostGroup = { id: string; name: string; platform: string; revision: number; edit: boolean; control: boolean; backendTypes?: boolean; backendChecks?: boolean; supportsScripts?: boolean; supportsNodePath?: boolean; runtimeDiscovery?: boolean; fileReplacement?: boolean; backupRestore?: boolean; error?: string; phase?: 'connecting' | 'deploying' | 'reading' | 'ready' | 'failed'; checkedAt?: string };
 export type HostDraft = {
-  name: string; address: string; mode: 'ssh' | 'share' | 'sftp' | 'vnc' | 'rdp'; user: string; port: number; platform: 'linux' | 'win32'; auth: 'key' | 'password';
+  name: string; address: string; mode: 'ssh' | 'share' | 'sftp' | 'vnc' | 'rdp' | 'telnet' | 'ftp' | 'serial'; user: string; port: number; platform: 'linux' | 'win32'; auth: 'key' | 'password';
   modules: Record<ManagedModule, boolean>; password?: string; clearPassword?: boolean;
+  ftpSecurity?: 'plain' | 'explicit' | 'implicit'; startDirectory?: string; terminalType?: string; lineEnding?: string;
+  baudRate?: number; dataBits?: number; stopBits?: number; parity?: string; flowControl?: string;
   visitor?: string; privateKey?: string; clearKey?: boolean;
   group?: string; tags?: string[]; pinned?: boolean; mac?: string; keyPath?: string; jumpHostId?: string; rdpPort?: number;
 };

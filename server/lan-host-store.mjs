@@ -14,10 +14,9 @@ function label(value, max) {
 }
 function normalize(value, existing) {
   const { mode, address, name, user, port, platform, auth } = value ?? {};
-  if (!['share', 'ssh', 'sftp', 'vnc', 'rdp'].includes(mode) || typeof name !== 'string' || name.length > 120 || typeof address !== 'string' || !address.trim() || address.length > 2048) throw new Error('请填写有效的主机名称和地址。');
+  if (!['share', 'ssh', 'sftp', 'vnc', 'rdp', 'telnet', 'ftp', 'serial'].includes(mode) || typeof name !== 'string' || name.length > 120 || typeof address !== 'string' || !address.trim() || address.length > 2048) throw new Error('请填写有效的主机名称和地址。');
   const host = { id: existing?.id || randomUUID(), mode, name: name.trim(), modules: { jar: value.modules?.jar === true, nginx: value.modules?.nginx === true } };
-  const desktop = mode === 'rdp' || mode === 'vnc';
-  if (desktop || mode === 'sftp') host.modules = { jar: false, nginx: false };
+  if (!['ssh','share'].includes(mode)) host.modules = { jar: false, nginx: false };
   const group = label(value.group, 60);
   if (group) host.group = group;
   if (value.tags !== undefined) {
@@ -26,12 +25,23 @@ function normalize(value, existing) {
     if (tags.length) host.tags = tags;
   }
   if (value.pinned === true) host.pinned = true;
-  if (value.mac != null && value.mac !== '') host.mac = normalizeMac(value.mac);
+  if (mode !== 'serial' && value.mac != null && value.mac !== '') host.mac = normalizeMac(value.mac);
   if ((mode === 'ssh' || mode === 'share') && value.rdpPort != null && value.rdpPort !== 0) {
     if (!Number.isInteger(value.rdpPort) || value.rdpPort < 1 || value.rdpPort > 65535) throw new Error('远程桌面端口无效。');
     host.rdpPort = value.rdpPort;
   }
-  if (mode === 'share') {
+  if (mode === 'serial') {
+    const device = address.trim();
+    if (!/^(?:COM[1-9]\d{0,4}|\/dev\/[\w./+-]{1,240})$/i.test(device) || device.includes('..')) throw new Error('串口设备名无效。');
+    host.address = /^com/i.test(device) ? device.toUpperCase() : device;
+    host.port = 0;
+    host.baudRate = value.baudRate ?? 115200;
+    if (!Number.isInteger(host.baudRate) || host.baudRate < 1 || host.baudRate > 4000000) throw new Error('波特率无效。');
+    for (const [key, fallback, choices] of [['dataBits', 8, [5,6,7,8]], ['stopBits', 1, [1,2]], ['parity','none',['none','even','odd']], ['flowControl','none',['none','hardware','software']]]) {
+      host[key] = value[key] ?? fallback;
+      if (!choices.includes(host[key])) throw new Error('串口线路参数无效。');
+    }
+  } else if (mode === 'share') {
     const url = new URL(address.trim());
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('请填写完整的 HTTP(S) 共享地址。');
     host.address = url.origin;
@@ -45,7 +55,17 @@ function normalize(value, existing) {
     if (host.address.length > 253 || (!isIP(host.address) && !/^[a-z0-9][a-z0-9.-]*$/i.test(host.address))) throw new Error('请输入有效的主机名或 IP 地址。');
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('端口须为 1 至 65535 的整数。');
     host.port = port;
-    if (!desktop) {
+    if (mode === 'ftp') {
+      host.user = label(user || 'anonymous', 120) || 'anonymous';
+      host.ftpSecurity = value.ftpSecurity || 'plain';
+      if (!['plain','explicit','implicit'].includes(host.ftpSecurity)) throw new Error('FTP 加密方式无效。');
+      host.startDirectory = label(value.startDirectory, 2048);
+    }
+    if (mode === 'telnet') {
+      host.terminalType = value.terminalType || 'xterm-256color';
+      if (!['xterm-256color','vt100','ansi'].includes(host.terminalType)) throw new Error('Telnet 终端类型无效。');
+    }
+    if (mode === 'ssh' || mode === 'sftp') {
       if (typeof user !== 'string' || !/^[a-z0-9_.@\\-]{1,120}$/i.test(user.trim()) || !['linux', 'win32'].includes(platform)) throw new Error('SSH 用户名、端口或目标系统无效。');
       Object.assign(host, { user: user.trim(), port, platform, auth: auth === 'password' ? 'password' : 'key' });
       if (host.auth === 'key' && value.keyPath) {
@@ -58,6 +78,10 @@ function normalize(value, existing) {
       }
     }
   }
+  if (mode === 'serial' || mode === 'telnet') {
+    host.lineEnding = value.lineEnding || (mode === 'serial' ? 'cr' : 'crlf');
+    if (!(mode === 'serial' ? ['cr','lf','crlf'] : ['cr','crlf']).includes(host.lineEnding)) throw new Error('回车设置无效。');
+  }
   host.name ||= host.address;
   if (existing && (!sameEndpoint(existing, host) || existing.user !== host.user)) host.id = randomUUID();
   if (existing && sameEndpoint(existing, host)) {
@@ -65,7 +89,7 @@ function normalize(value, existing) {
       if (existing.fingerprint) host.fingerprint = existing.fingerprint;
       if (existing.previousFingerprint) host.previousFingerprint = existing.previousFingerprint;
     }
-    if (existing.user === host.user && existing.visitor === host.visitor && existing.auth === host.auth && existing.keyPath === host.keyPath && existing.secret) host.secret = existing.secret;
+    if (existing.user === host.user && existing.visitor === host.visitor && existing.ftpSecurity === host.ftpSecurity && existing.auth === host.auth && existing.keyPath === host.keyPath && existing.secret) host.secret = existing.secret;
   }
   return host;
 }
@@ -93,7 +117,8 @@ function planImport(current, values, web = false) {
   const next = [...current];
   const rows = values.map((value, index) => {
     try {
-      const host = normalize({ ...value, keyPath: undefined, jumpHostId: undefined, user: value?.user || userInfo().username });
+      if (web && value?.mode === 'serial') throw new Error('串口档案仅在桌面端管理。');
+      const host = normalize({ ...value, keyPath: undefined, jumpHostId: undefined, user: value?.user || (value?.mode === 'ftp' ? 'anonymous' : userInfo().username) });
       if (web && ['ssh', 'sftp'].includes(host.mode)) host.explicitKeyOnly = true;
       if (next.some(item => sameServer(item, host) && item.user === host.user)) return { index, host: publicHost(host), error: '重复连接' };
       if (next.length >= 50) return { index, host: publicHost(host), error: '已达 50 台主机上限' };
@@ -145,6 +170,8 @@ export async function createLanHostStore(directory) {
   }
   async function save(value, existing, web) {
     if (web && value?.keyPath !== undefined) throw new Error('请上传要保存的私钥文件。');
+    if (web && (value?.mode === 'serial' || existing?.mode === 'serial')) throw new Error('串口档案仅在桌面端管理。');
+    if (value?.mode === 'ftp' && /[\r\n\0]/.test(value.password || '')) throw new Error('FTP 密码不支持控制字符。');
     const host = normalize(value, existing);
     if (value.password !== undefined && (typeof value.password !== 'string' || value.password.length > (host.mode === 'share' ? 128 : 4096))) throw new Error('密码长度无效。');
     const sameIdentity = !!existing && host.id === existing.id && host.jumpHostId === existing.jumpHostId;
@@ -170,7 +197,7 @@ export async function createLanHostStore(directory) {
     }
     if (value.clearPassword === true) delete host.secret;
     if (value.password !== undefined && value.password !== '') {
-      if (host.mode === 'share' || host.auth === 'password' || host.keyPath || host.encryptedKey) host.secret = await encrypt(host, 'secret', value.password);
+      if (host.mode === 'share' || host.mode === 'ftp' || host.auth === 'password' || host.keyPath || host.encryptedKey) host.secret = await encrypt(host, 'secret', value.password);
       if (host.auth === 'password') delete host.previousFingerprint;
     }
     return host;
@@ -245,6 +272,7 @@ export async function createLanHostStore(directory) {
     remove: (value, web) => update(current => {
       const id = web ? value?.id : value;
       const host = current.find(item => item.id === id);
+      if (web && host?.mode === 'serial') throw new Error('串口档案仅在桌面端管理。');
       if (web && (!host || (host.revision || '') !== value.revision)) throw Object.assign(new Error('主机档案已更新，请刷新后重试。'), { status: 409 });
       return host ? current.filter(item => item !== host) : current;
     }, web?.ensureCurrent),

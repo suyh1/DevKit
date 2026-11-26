@@ -40,7 +40,7 @@ try {
     executableName: 'devkit', platform, arch, electronVersion: manifest.devDependencies.electron,
     ...(localZips ? { electronZipDir: localZips } : {}),
     ...(platform === 'win32' ? { icon: path.join(root, 'build', 'icons', 'icon.ico') } : {}),
-    asar: true, prune: false, overwrite: true,
+    asar: { unpack: '**/*.node' }, prune: false, overwrite: true,
   });
   const buildSha256 = await verifyRuntime(root, path.join(destination, 'resources', 'app.asar'), manifest.version);
   await copyReadme(destination, 'LICENSE-DevKit');

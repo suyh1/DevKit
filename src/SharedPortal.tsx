@@ -486,7 +486,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
         page === 'jar' && services.jar.control ? (services.logs.enabled && services.logs.jar ? '可管理运行与控制台输入' : '可管理运行') : '',
         page === 'monitor' && services.monitor.control ? '可启停与立即检测' : '',
-        page === 'lan-hosts' && services['lan-hosts'].terminal ? '可使用 SSH 终端' : '',
+        page === 'lan-hosts' && services['lan-hosts'].terminal ? '可使用 SSH / Telnet 终端' : '',
         page === 'lan-hosts' && services['lan-hosts'].rdp ? '可连接远程桌面' : '',
         page === 'lan-hosts' && services['lan-hosts'].files ? '可用 SFTP' : '',
         page === 'lan-hosts' && services['lan-hosts'].diagnose ? '可诊断连接' : '',

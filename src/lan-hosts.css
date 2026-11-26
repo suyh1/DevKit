@@ -186,7 +186,7 @@
 .lan-sftp li svg { flex-shrink:0; }
 .lan-sftp li span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lan-sftp-error { color:var(--error); font-size:11px; overflow-wrap:anywhere; }
-.lan-xterm { height: max(390px, min(60dvh, 680px)); padding: 10px; }
+.lan-xterm { height: max(360px, calc(100dvh - 250px)); padding: 10px; }
 /* xterm renders its scrollback thumb as a DOM element with its own hit area. */
 .lan-xterm .xterm .xterm-scrollable-element > .scrollbar > .slider {
   box-sizing: border-box;
@@ -318,5 +318,36 @@
 @media (min-width: 620px) {
   .lan-host-choices:has(.lan-protocol) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-.lan-vnc-session:fullscreen { display: flex; flex-direction: column; background: var(--surface); }
-.lan-vnc-session:fullscreen .lan-vnc-screen { flex: 1; min-height: 0; }
+
+.lan-device-picker, .lan-session-controls { display: flex; align-items: center; gap: 6px; }
+.lan-device-picker input { flex: 1; min-width: 0; }
+.lan-session-controls { justify-content: flex-end; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.lan-session-controls > :first-child { margin-inline-end: auto; }
+.lan-session-controls button { display: inline-flex; align-items: center; gap: 5px; }
+.lan-terminal-message { flex-wrap: wrap; }
+.lan-layout-expanded { grid-template-columns: minmax(0, 1fr); }
+.lan-layout-expanded .lan-connections { display: none; }
+.lan-center:has(.lan-layout-expanded) { max-width: none; }
+.lan-layout-expanded .lan-terminal-area, .lan-terminal-area:fullscreen {
+  display: flex; flex-direction: column; height: max(420px, calc(100dvh - 100px)); min-height: 0; overflow: auto;
+}
+.lan-terminal-area:fullscreen { height: 100%; width: 100%; border: 0; border-radius: 0; }
+:is(.lan-layout-expanded .lan-terminal-area, .lan-terminal-area:fullscreen) :is([role=tabpanel]:not([hidden]), .lan-ssh-session, .lan-vnc-session, .lan-file-session) {
+  display: flex; flex: 1; flex-direction: column; min-height: 0;
+}
+:is(.lan-layout-expanded, .lan-terminal-area:fullscreen) :is(.lan-terminal-content, .lan-vnc-screen, .lan-file-session .lan-sftp) { flex: 1; min-height: 0; }
+:is(.lan-layout-expanded, .lan-terminal-area:fullscreen) .lan-xterm { height: auto; min-height: 120px; }
+:is(.lan-layout-expanded, .lan-terminal-area:fullscreen) .lan-sftp { overflow: auto; }
+:is(.lan-layout-expanded, .lan-terminal-area:fullscreen) .lan-sftp ul { max-height: none; }
+@media (max-width: 760px) { .lan-terminal-content .lan-sftp { max-height: 38dvh; overflow: auto; } }
+.lan-session-clipboard { font-size: 12px; padding: 4px 14px; }
+.lan-session-clipboard summary { width: fit-content; cursor: pointer; }
+.lan-session-clipboard > div { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; max-height: 28dvh; overflow: auto; padding-block: 5px; }
+.lan-session-clipboard label { display: grid; flex: 1 1 145px; gap: 3px; }
+.lan-session-clipboard textarea { min-width: 0; width: 100%; resize: vertical; }
+.lan-rdp-view:fullscreen, .lan-rdp-view.lan-rdp-maximized { padding: 8px; display: flex; flex-direction: column; background: var(--surface); }
+.lan-rdp-view.lan-rdp-maximized { position: fixed; inset: 0; z-index: 2; }
+.lan-rdp-view:is(:fullscreen,.lan-rdp-maximized) .lan-rdp-viewport { flex: 1; min-height: 0; }
+
+.pc-dialog.lan-rdp-active:has(.lan-rdp-maximized) { inset: 0; margin: 0; padding: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; transform: none; border-radius: 0; }
+.pc-dialog:has(.lan-rdp-maximized) > header { display: none; }

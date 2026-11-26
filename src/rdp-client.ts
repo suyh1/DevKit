@@ -1,23 +1,40 @@
 import Guacamole from './vendor/guacamole.js';
+import { clipboardLimit } from './SessionClipboard';
 import { remoteRequest, remoteResponse } from './workspace-remote';
 
 export type RdpCredentials = { username: string; password: string; domain: string; trustCertificate: boolean };
 
-export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credentials: RdpCredentials, onConnect: () => void, onError: (message: string) => void) {
+export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credentials: RdpCredentials, {
+  resizeDesktop, onConnect, onError, onClipboard,
+}: { resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void }) {
   const controller = new AbortController(), tunnel = new Guacamole.Tunnel();
   const client = new Guacamole.Client(tunnel), parser = new Guacamole.Parser();
   const display = client.getDisplay(), screen = display.getElement();
   viewport.replaceChildren(screen);
   let sessionId = '', disposed = false, sending = false, timer: ReturnType<typeof setTimeout> | undefined;
   const messages: string[][] = [];
-  const resize = new ResizeObserver(fit);
+  let connected = false, resizeTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastWidth = 0, lastHeight = 0;
+  function resizeViewport() {
+    fit();
+    if (!resizeDesktop || !connected || !viewport.clientWidth || !viewport.clientHeight) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const width = Math.min(2560, Math.max(640, viewport.clientWidth));
+      const height = Math.min(1600, Math.max(480, viewport.clientHeight));
+      if (width !== lastWidth || height !== lastHeight) {
+        client.sendSize(width, height); lastWidth = width; lastHeight = height;
+      }
+    }, 120);
+  }
+  const resize = new ResizeObserver(resizeViewport);
   resize.observe(viewport);
   display.onresize = fit;
 
   function fit() {
     const width = display.getWidth(), height = display.getHeight();
     if (!width || !height || !viewport.clientWidth || !viewport.clientHeight) return;
-    display.scale(Math.min(viewport.clientWidth / width, viewport.clientHeight / height, 1));
+    display.scale(Math.min(viewport.clientWidth / width, viewport.clientHeight / height));
   }
 
   // Input is sent in order on one request at a time. Batching keeps mouse motion responsive.
@@ -39,6 +56,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
     disposed = true;
     controller.abort();
     clearTimeout(timer);
+    clearTimeout(resizeTimer);
     resize.disconnect();
     display.onresize = null;
     viewport.replaceChildren();
@@ -89,7 +107,21 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   };
   parser.oninstruction = (opcode, parameters) => tunnel.oninstruction?.(opcode, parameters);
   client.onstatechange = state => {
-    if (!disposed && state === Guacamole.Client.State.CONNECTED) { fit(); screen.focus({ preventScroll: true }); onConnect(); }
+    if (!disposed && state === Guacamole.Client.State.CONNECTED) { connected = true; resizeViewport(); screen.focus({ preventScroll: true }); onConnect(); }
+  };
+  client.onclipboard = (stream, mime) => {
+    if (mime.split(';')[0] !== 'text/plain') { stream.sendAck('Text only', 0x0100); return; }
+    let size = 0, overflow = false;
+    const decoder = new TextDecoder(), parts: string[] = [];
+    stream.onblob = data => {
+      if (overflow) return;
+      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+      size += bytes.length;
+      if (size > clipboardLimit) { overflow = true; stream.sendAck('Text too long', 0x030d); return; }
+      parts.push(decoder.decode(bytes, { stream: true }));
+      stream.sendAck('OK', 0);
+    };
+    stream.onend = () => { if (!disposed) onClipboard(overflow ? '' : parts.join('') + decoder.decode()); };
   };
   client.onerror = status => {
     const help = status.code === 0x0301 || status.code === 0x0303
@@ -112,6 +144,10 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   client.connect();
   return {
     close() { close(); client.disconnect(); },
+    async paste(text: string) {
+      if (disposed || !sessionId) throw new Error('会话已断开');
+      await remoteRequest('lan-hosts', 'rdp-clipboard', { id: sessionId, text }, controller.signal);
+    },
     secureAttention() {
       screen.focus({ preventScroll: true });
       const keys = [0xffe3, 0xffe9, 0xffff];

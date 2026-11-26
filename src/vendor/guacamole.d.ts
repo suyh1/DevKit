@@ -19,6 +19,12 @@ type Client = {
     scale(scale: number): void;
     onresize: (() => void) | null;
   };
+  onclipboard: ((stream: {
+    sendAck(message: string, code: number): void;
+    onblob: ((data: string) => void) | null;
+    onend: (() => void) | null;
+  }, mime: string) => void) | null;
+  sendSize(width: number, height: number): void;
   sendKeyEvent(pressed: number, keysym: number): void;
   sendMouseState(state: MouseState, applyDisplayScale: boolean): void;
   onstatechange: ((state: number) => void) | null;

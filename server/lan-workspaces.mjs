@@ -6,6 +6,8 @@ import { connectSsh, openSshShell, runSshCommand, sshCall } from './lan-ssh.mjs'
 import { requestSsh } from './ssh-management.mjs';
 import { shareTransport, sshTransport } from './lan-transports.mjs';
 import { diagnoseHost } from './lan-diagnostics.mjs';
+import { openFtp, useFtp } from './lan-ftp.mjs';
+import { openTelnet, openSerial, serialDevices } from './lan-console.mjs';
 import { useSftp } from './lan-sftp.mjs';
 import { discoverHosts, lanInterfaces } from './lan-discovery.mjs';
 import { hostTarget, withDeadline } from './lan-probe.mjs';
@@ -182,11 +184,11 @@ export async function createLanWorkspaces(directory, transports = { share: share
 
   function closeTerminal(id) {
     const entry = terminals.get(id);
-    if (entry) { terminals.delete(id); clearTimeout(entry.idle); entry.client.destroy(); }
+    if (entry) { terminals.delete(id); clearTimeout(entry.idle); entry.dispose(); }
   }
   function ownedTerminal(id, owner) {
     const entry = terminals.get(id);
-    if (!entry || entry.owner !== owner) throw Object.assign(new Error('SSH 会话已断开或不可用，请重新连接。'), { status: 404 });
+    if (!entry || entry.owner !== owner) throw Object.assign(new Error('会话已断开或不可用，请重新连接。'), { status: 404 });
     bumpIdle(id, entry);
     return entry;
   }
@@ -197,6 +199,10 @@ export async function createLanWorkspaces(directory, transports = { share: share
     entry.idle.unref();
   }
   function terminalCurrent(host, route) {
+    if (!['ssh','sftp'].includes(host.mode)) {
+      const current = find(host.id);
+      return current && ['mode','address','port','secret','user','ftpSecurity','startDirectory','terminalType','lineEnding','baudRate','dataBits','stopBits','parity','flowControl'].every(key => host[key] === current[key]);
+    }
     return sameSshHost(host) && routeCurrent(route);
   }
   const dimensions = value => ({ cols: Math.max(2, Math.min(500, Math.trunc(Number(value?.cols)) || 80)), rows: Math.max(2, Math.min(300, Math.trunc(Number(value?.rows)) || 24)) });
@@ -204,6 +210,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     const owner = web?.token || desktopSession;
     web?.ensureCurrent();
     if (action.startsWith('vnc-') && !web) return vnc.request(action, value);
+    if (action === 'serial-list' && !web) return serialDevices();
     if (action === 'list') return store.list().map(publicHost);
     if (action === 'routing-fingerprint' || action === 'routing-enroll') {
       if (web) throw Object.assign(new Error('请在 DevKit 桌面端补录管理档案。'), { status:403 });
@@ -246,14 +253,21 @@ export async function createLanWorkspaces(directory, transports = { share: share
     if (action === 'import-preview') return store.previewImport(value, !!web);
     if (action === 'import-connections') { const result = await store.importConnections(value, web); invalidate(); return result; }
     if (['save', 'import', 'remove'].includes(action)) { const result = await store[action](value, web); invalidate(); return result; }
-    if (action === 'file-status') return { closed: ownedTerminal(value?.id, owner).closed };
+    if (action === 'file-status') { const entry = ownedTerminal(value?.id, owner); return { closed: entry.closed || (entry.host.mode === 'ftp' && entry.client.closed) }; }
     if (action === 'terminal-close') {
       if (terminals.get(value?.id)?.owner === owner) closeTerminal(value.id);
       return true;
     }
     if (['file-list', 'file-upload', 'file-download'].includes(action)) {
       const terminal = ownedTerminal(value?.id, owner);
-      if (terminal.closed) throw new Error('SSH 会话已断开，请重新连接。');
+      if (terminal.closed) throw new Error('会话已断开，请重新连接。');
+      if (terminal.host.mode === 'ftp') {
+        if (terminal.fileBusy) throw new Error('FTP 会话正在处理文件操作。');
+        terminal.fileBusy = true;
+        try { return await useFtp(terminal, action, value, localFile); }
+        finally { terminal.fileBusy = false; }
+      }
+      if (!['sftp', 'ssh'].includes(terminal.host.mode)) throw new Error('此终端不提供文件服务。');
       if (action === 'file-list') return useSftp(terminal.client, action, value, terminal.host, localFile);
       if (terminal.fileBusy) throw new Error('当前会话正在传输文件。');
       terminal.fileBusy = true;
@@ -262,19 +276,20 @@ export async function createLanWorkspaces(directory, transports = { share: share
     }
     if (['terminal-read', 'terminal-input', 'terminal-resize'].includes(action)) {
       const terminal = ownedTerminal(value?.id, owner);
-      if (!terminal.stream) throw new Error('SFTP 会话仅支持文件操作。');
+      if (!terminal.stream) throw new Error('此会话仅支持文件操作。');
       if (action === 'terminal-read') {
         const data = Buffer.concat(terminal.output).toString('base64');
         terminal.output = []; terminal.bytes = 0; if (!terminal.closed) terminal.stream.resume();
         return { data, closed: terminal.closed };
       }
       if (terminal.closed) return false;
-      if (action === 'terminal-input' && typeof value.text === 'string' && Buffer.byteLength(value.text) <= 524288) terminal.stream.write(value.text);
-      if (action === 'terminal-resize') { const { rows, cols } = dimensions(value); terminal.stream.setWindow(rows, cols, 0, 0); }
+      if (action === 'terminal-input' && typeof value.text === 'string' && Buffer.byteLength(value.text) <= 524288) { if (terminal.input) await terminal.input(value.text); else terminal.stream.write(value.text); }
+      if (action === 'terminal-resize') { const size = dimensions(value); if (terminal.resize) terminal.resize(size); else terminal.stream.setWindow?.(size.rows, size.cols, 0, 0); }
       return true;
     }
     const host = find(value?.id);
     if (!host) throw new Error('找不到已保存的主机连接。');
+    if (host.mode === 'serial' && (web || action !== 'terminal-open')) throw new Error('请选择桌面端串口会话。');
     if (action === 'wake') return wakeHost(host);
     if (action === 'rdp-target') {
       if (host.mode === 'vnc') throw new Error('请选择 RDP 连接。');
@@ -329,27 +344,33 @@ export async function createLanWorkspaces(directory, transports = { share: share
         return { message: 'SSH 登录成功。' };
       } catch (error) { if (error.fingerprint) throw new Error(`${error.message} 当前指纹：${error.fingerprint}`); throw error; }
     }
-    if (action === 'terminal-open' && host.mode === 'ssh' || action === 'file-open' && host.mode === 'sftp') {
-      if (!host.fingerprint) throw new Error('请先测试连接并确认 SSH 主机指纹。');
+    if ((action === 'terminal-open' && ['ssh', 'telnet', 'serial'].includes(host.mode)) || (action === 'file-open' && ['sftp', 'ftp'].includes(host.mode))) {
+      if (['ssh','sftp'].includes(host.mode) && !host.fingerprint) throw new Error('请先测试连接并确认 SSH 主机指纹。');
       if (terminals.size + openingTerminals >= 16) throw new Error('最多同时打开 16 个终端。');
       const generation = terminalGeneration;
       const route = jumpRoute(host, find);
       openingTerminals++;
       let opened;
       try {
-        const client = await openHost(host, {}, route);
-        opened = action === 'file-open' ? { client } : await openSshShell(client, dimensions(value));
+        if (host.mode === 'telnet') opened = await openTelnet(host, dimensions(value));
+        else if (host.mode === 'serial') opened = await openSerial(host);
+        else if (host.mode === 'ftp') opened = await openFtp(host, await store.password(host));
+        else {
+          const client = await openHost(host, {}, route);
+          opened = action === 'file-open' ? { client } : await openSshShell(client, dimensions(value));
+        }
+        opened.dispose ??= () => opened.client.destroy();
         web?.ensureCurrent();
         if (closed || owner === desktopSession && terminalGeneration !== generation || !terminalCurrent(host, route)) throw new Error('终端已关闭或连接档案已更新。');
-      } catch (error) { opened?.client.destroy(); throw error; }
+      } catch (error) { opened?.dispose?.(); throw error; }
       finally { openingTerminals--; }
       const { client, stream } = opened;
-      const id = randomUUID(), terminal = { owner, host, route, client, stream, output: [], bytes: 0, closed: false };
+      const id = randomUUID(), terminal = { owner, host, route, ...opened, output: [], bytes: 0, closed: false };
       terminals.set(id, terminal);
       bumpIdle(id, terminal);
       stream?.on('data', data => { terminal.output.push(data); terminal.bytes += data.length; if (terminal.bytes >= 256000) stream.pause(); });
-      const onClosed = () => { terminal.closed = true; client.end(); };
-      stream?.on('error', onClosed); stream?.once('close', onClosed); client.once('close', onClosed);
+      const onClosed = () => { if (!terminal.closed) { terminal.closed = true; terminal.dispose(); } };
+      stream?.on('error', onClosed); stream?.once('close', onClosed); client.once?.('close', onClosed);
       return { id };
     }
     throw new Error('未知局域网主机操作。');
@@ -374,12 +395,12 @@ export async function createLanWorkspaces(directory, transports = { share: share
       client.once('close', () => relayClients.delete(client));
       return client;
     },
-    sharedHosts: (logAccess, access) => store.list().map(host => {
+    sharedHosts: (logAccess, access) => store.list().filter(host => host.mode !== 'serial').map(host => {
       const { id, name, address, mode, port, group, tags, pinned, modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, fingerprint, explicitKeyOnly } = host;
       return {
         id, name, address, mode, port, group, tags, pinned,
         hasLogs: logAccess.enabled && (logAccess.jar && modules.jar || logAccess.nginx && modules.nginx),
-        ...(access.edit ? { modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, explicitKeyOnly, revision: host.revision || '', hasStoredKey: !!(host.keyPath || host.encryptedKey), hasPassword: !!host.secret } : {}),
+        ...(access.edit ? { ftpSecurity: host.ftpSecurity, startDirectory: host.startDirectory, terminalType: host.terminalType, lineEnding: host.lineEnding, modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, explicitKeyOnly, revision: host.revision || '', hasStoredKey: !!(host.keyPath || host.encryptedKey), hasPassword: !!host.secret } : {}),
         ...(access.diagnose || access.terminal || access.edit ? { fingerprint } : {}),
         ...(access.wake ? { canWake: !!mac } : {}),
         ...(access.rdp ? { canRdp: mode === 'rdp' || mode === 'vnc' || !!rdpPort || mode === 'ssh' && platform === 'win32' } : {}),
@@ -410,7 +431,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       const permissions = { jar: host.modules.jar && access.jar !== false, nginx: host.modules.nginx && access.nginx !== false, export: access.export !== false, raw: access.raw === true };
       return remote(host, 'logs', action, { ...payload, logAccess: permissions }, permissions, session);
     },
-    monitorTargets: () => store.list().map(host => ({ id: host.id, name: host.name, ...hostTarget(host) })),
+    monitorTargets: () => store.list().filter(host => host.mode !== 'serial').map(host => ({ id: host.id, name: host.name, ...hostTarget(host) })),
     closeTerminals() { vnc.close(); terminalGeneration++; for (const [id, entry] of terminals) if (entry.owner === desktopSession) closeTerminal(id); },
     close() { vnc.close(); closed = true; for (const client of relayClients.keys()) client.destroy(); scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
   };

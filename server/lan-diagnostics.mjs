@@ -25,7 +25,7 @@ export async function diagnoseHost(host, { openSsh, openShare, openPort = probeP
     })) return { checks, checkedAt };
   }
 
-  if (host.mode === 'vnc' || host.mode === 'rdp') return { checks, checkedAt };
+  if (['vnc','rdp','telnet','ftp'].includes(host.mode)) return { checks, checkedAt };
   const modules = ['jar', 'nginx'].filter(module => host.modules[module]);
   if (host.mode === 'share') {
     let transport;
