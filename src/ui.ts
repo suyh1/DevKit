@@ -30,7 +30,7 @@ export const workspaceModuleNav = {
   'file-shares': { Icon: FolderUp, hint: '在浏览器下载本机文件' },
   transfer: { Icon: ArrowLeftRight, hint: '文件与文字互传' },
   mock: { Icon: Workflow, hint: '多场景响应与调用记录' },
-  wireguard: { Icon: Network, hint: 'WireGuard 三点组网' },
+  relay: { Icon: Network, hint: '服务转发与能力检测' },
   whiteboard: { Icon: Presentation, hint: '截图与多人标注' },
   nginx: { Icon: Server, hint: '配置与实例管理' },
   jar: { Icon: ServerCog, hint: '应用服务启停与控制台' },

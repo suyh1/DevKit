@@ -132,7 +132,7 @@
 | 团队知识库（`knowledge`） | Markdown 文档 |
 | 待办清单（`project-todos`） | Markdown 复选框或 ☐、✔、✘ 任务行 |
 | 本机文件共享管理（`file-shares`） | 本地绝对路径或 UNC 共享路径 |
-| 跨网互联（`wireguard`） | “异地组网”“B 通过 A 访问 C”打开拓扑。WireGuard 配置中的 `Endpoint` 带入 B 的中转入口，`ListenPort` 带入 A 的监听端口。只提取入口或端口。`wg show` 打开验证连接，`wg-quick up devkit-c` 定位 C 的设备参数。普通 SSH 命令仍进入局域网主机。 |
+| 跨网互联（`relay`） | “检测 A 的能力”“B 通过 A 访问 C”打开栏目；“跨网转发 c.example:8080”打开新规则并带入服务地址、端口。普通 SSH 命令仍匹配局域网主机。 |
 | 局域网快传（`transfer`） | 文件名、本地路径或 HTTP(S) 链接。输入“快速链接设置”或“快传链接设置”可进入该栏目，在标题栏管理快传端口。 |
 | 接口模拟服务（`mock`） | OpenAPI/Swagger 定义或 JSON Schema |
 | 截图协作白板（`whiteboard`） | 图片文件名，如 screenshot.png |

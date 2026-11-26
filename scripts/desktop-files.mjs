@@ -19,7 +19,10 @@ export async function prepareDesktop(platform, arch, stageRoot = path.join(root,
   const packages = JSON.parse(await readFile(new URL('./server-runtime.json', import.meta.url), 'utf8'));
   for (const name of packages) {
     const source = path.join(root, 'node_modules', name);
-    await cp(source, path.join(staging, 'node_modules', name), { recursive: true, filter: filename => !path.relative(source, filename).split(path.sep).some(part => ['node_modules', 'build', 'test', 'examples'].includes(part) || part.endsWith('.node')) });
+    const excluded = new Set(['node_modules', 'test', 'examples']);
+    const metadata = JSON.parse(await readFile(path.join(source, 'package.json'), 'utf8'));
+    if (!/^(?:\.\/)?build\//.test(metadata.main || '')) excluded.add('build');
+    await cp(source, path.join(staging, 'node_modules', name), { recursive: true, filter: filename => !path.relative(source, filename).split(path.sep).some(part => excluded.has(part) || part.endsWith('.node')) });
   }
   await cp(path.join(root, 'dist'), path.join(staging, 'dist'), { recursive: true });
   await (await import('./stage-ssh-node.mjs')).stageSshNode(path.join(staging, 'ssh-node'));

@@ -224,7 +224,7 @@ test("fresh defaults, migration and environment overrides never grant hidden ser
     'file-shares': { enabled: false },
     transfer: { enabled: false, edit: false },
     mock: { enabled: false, edit: false },
-    wireguard: { enabled: false, edit: false },
+    relay: { enabled: false, edit: false, control: false },
     whiteboard: { enabled: false, edit: false },
     nginx: { enabled: true, edit: true, control: true },
     http: { enabled: false, edit: false, send: false },
@@ -341,7 +341,7 @@ test("each service can be the only service and disabled routes remain inaccessib
       );
       for (const [service, route] of [
         ["projects", "state"],
-        ["wireguard", "list"],
+        ["relay", "list"],
         ["projects", "snapshots"],
         ["projects", "restore"],
         ["projects", "probe"],

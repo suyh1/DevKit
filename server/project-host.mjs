@@ -266,17 +266,19 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (!manager) return json(503, { error: '收件箱暂不可用。' });
             return await downloadTransfer(manager, { id: download[1], ticket: url.searchParams.get('ticket') }, { owner: token, authorize: ensureCurrentSession }, response, session.abort.signal);
           }
-          const collaboration = /^\/api\/(transfer|mock|whiteboard|wireguard)\/([a-z]+)$/.exec(url.pathname);
+          const collaboration = /^\/api\/(transfer|mock|whiteboard|relay)\/([a-z]+)$/.exec(url.pathname);
           if (collaboration) {
             const [, module, action] = collaboration;
             if (!services[module].enabled) return json(404, { error: '此栏目未开放。' });
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const readOnly = ['list', 'read'].includes(action) || module === 'whiteboard' && action === 'image' || module === 'transfer' && ['unlock', 'claim', 'answer'].includes(action);
-            if (!readOnly && !services[module].edit) return json(403, { error: '当前访客只有查看权限。' });
+            const operating = module === 'relay' && ['detect', 'start', 'stop'].includes(action);
+            if (operating && !services.relay.control) return json(403, { error: '需要检测与启停转发权限。' });
+            if (!readOnly && !operating && !services[module].edit) return json(403, { error: '当前访客只有查看权限。' });
             const manager = managers.collab?.();
             if (!manager) return json(503, { error: '共享工具暂不可用。' });
             const input = await body();
-            const data = await manager.request(module, action, input, { authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token, publisherSession: token });
+            const data = await manager.request(module, action, input, { sshAllowed: services['lan-hosts'].terminal, authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token, publisherSession: token });
             ensureCurrentSession();
             if (!readOnly && !['part', 'begin', 'cancel', 'sweep', 'presence', 'reply'].includes(action)) audit.record(session.visitor, module + '.' + action, 'ok');
             return json(200, data ?? null);

@@ -3,17 +3,17 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { atomicFile } from './atomic-file.mjs';
 import { createTransferService, openTransferFile } from './quick-transfer.mjs';
-import { wireguardRequest } from './wireguard.mjs';
+import { createRelay } from './relay.mjs';
 import { boardRequest } from './screenshot-board.mjs';
 import { createMockService, mutateDataset } from './mock-service.mjs';
 
 import { fail } from './collab-record.mjs';
 
-export async function createCollabStore(directory) {
+export async function createCollabStore(directory, lan) {
   const folder = path.join(directory, 'collaboration');
   await mkdir(folder, { recursive: true });
   const modules = new Map();
-  for (const name of ['transfer', 'mock', 'whiteboard', 'wireguard']) {
+  for (const name of ['transfer', 'mock', 'whiteboard', 'relay']) {
     const file = path.join(folder, name + '.json');
     let rows;
     try {
@@ -32,7 +32,8 @@ export async function createCollabStore(directory) {
   const transferState = modules.get('transfer');
   const transfer = await createTransferService(folder, transferState.rows, () => { transferState.version = randomUUID(); });
   const mock = createMockService(() => modules.get('mock').rows, (input, authorize) => request('mock', mutateDataset, input, { authorize }));
-  const handlers = { wireguard: wireguardRequest, transfer: transfer.request, whiteboard: boardRequest, mock: mock.request };
+  const relay = createRelay(lan, () => { modules.get('relay').version = randomUUID(); });
+  const handlers = { relay: relay.request, transfer: transfer.request, whiteboard: boardRequest, mock: mock.request };
   function request(name, action, input = {}, access = {}) {
     const state = modules.get(name);
     if (!state) fail(404, '栏目不存在。');
@@ -63,12 +64,13 @@ export async function createCollabStore(directory) {
   timer.unref();
   return {
     request,
-    releaseDirect: transfer.release,
+    releaseDirect(owner) { transfer.release(owner); relay.release(owner); },
     openTransfer: (input, access) => request('transfer', openTransferFile, input, access),
     serveMock: mock.serve,
     async close() {
       clearInterval(timer);
       await Promise.all([...modules.values()].map((state) => state.queue));
+      relay.close();
       await transfer.close();
     },
   };

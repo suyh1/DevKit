@@ -11,7 +11,7 @@ module.exports = async function collaborationSmoke(window, output) {
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   const { emptySharingServices } = await import('../shared/sharing.mjs');
   const services = emptySharingServices();
-  for (const id of ['mock', 'transfer', 'whiteboard', 'wireguard']) services[id] = { enabled: true, edit: true };
+  for (const id of ['mock', 'transfer', 'whiteboard', 'relay']) services[id] = { enabled: true, edit: true };
   services.http = { enabled:true, edit:true, send:true };
   const socket = net.createServer();
   await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
@@ -95,30 +95,31 @@ module.exports = async function collaborationSmoke(window, output) {
     await click(web, '.portal-login ', '登录');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden])")');
     await openWorkspace('跨网互联');
-    await web('location.hash="wireguard/B"');
-    await wait(desktop, 'document.querySelector(".wg-topology")?.innerText.includes("0 / 3")');
-    for (const [role, execute, scope] of [['A', desktop, main], ['B', web, current], ['C', web, current]]) {
-      if (role === 'C') await click(web, current, 'C 设备');
-      if (role !== 'A') await fill(execute, scope + 'input[placeholder]', 'relay-' + role.toLowerCase() + '.example.test:51820');
-      await fill(execute, scope + 'input[maxlength="44"]', require('node:crypto').randomBytes(32).toString('base64'));
-      await click(execute, scope, '保存 ' + role + ' 的参数');
-      await wait(execute, `document.body.innerText.includes("${role} 的参数已保存")`);
+    await web('location.hash="relay"');
+    await click(desktop, main, '新建规则');
+    await click(desktop, 'dialog ', '中转端 A');
+    for (const [label, value] of [['服务名称','本机 HTTP'], ['目标服务地址','127.0.0.1'], ['目标 TCP 端口',port], ['B 可达的 A 监听 IPv4','127.0.0.1']])
+      await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
+    await click(desktop, 'dialog ', '保存并检测');
+    await wait(desktop, 'document.body.innerText.includes("直达目标 · 可用")');
+    await wait(web, 'document.body.innerText.includes("本机 HTTP")');
+    await desktop(`(async () => {
+      for (let i=1;i<64;i++) {
+        const result = await window.devkitCollab.request('relay','save',{ name:'长名称'.repeat(25) + i, role:'A', target:'127.0.0.1', targetPort:80, bind:'127.0.0.1', listenPort:8080 });
+        if (result.error) throw Error(result.error);
+      }
+    })()`);
+    const chooseLast = `(() => { const el=document.querySelector('.relay-workspace select'); el.selectedIndex=63; el.dispatchEvent(new Event('change',{bubbles:true})); })()`;
+    for (const execute of [desktop, web]) {
+      await wait(execute, 'document.querySelector(".relay-workspace select")?.options.length===64');
+      await execute(chooseLast);
+      await wait(execute, 'document.querySelector(".relay-panels h3")?.textContent.endsWith("63")');
     }
-    await click(desktop, main, '下载 A 配置');
-    await wait(desktop, 'document.querySelector(".wg-workspace [role=status]")?.textContent.includes("saved.txt")');
-    assert.match(await fs.readFile(path.join(output, 'saved.txt'), 'utf8'), /AllowedIPs = 10\.77\.0\.3\/32/);
     const bounds = browser.getBounds();
     browser.setContentSize(390, 740);
-    await click(web, current, 'Windows');
-    await web('document.querySelector(".wg-workspace details").open=true');
-    await wait(web, 'document.body.innerText.includes("Endpoint = relay-c.example.test:51820")');
-    const overflow = await web(`(() => {
-      const panel = document.querySelector(".wg-workspace"), edge = panel.getBoundingClientRect().right;
-      return [...panel.querySelectorAll("*")].filter(el => el.getBoundingClientRect().right > edge + 1).map(el => el.tagName + "." + el.className);
-    })()`);
-    assert.deepEqual(overflow, []);
-    await click(web, current, '验证连接');
-    await wait(web, 'document.body.innerText.includes("sftp user@10.77.0.3")');
+    await web('document.querySelector(".relay-panels details").open=true');
+    await wait(web, 'document.body.innerText.includes("目标防火墙")');
+    assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);
     browser.setBounds(bounds);
     await openWorkspace('局域网快传');
     await web('location.hash="transfer"');

@@ -205,7 +205,7 @@ app.whenReady().then(async () => {
     catch (error) { developmentDocsError = error.message; }
     try { projectTodos = await (await import('./server/todo-lists.mjs')).createTodoLists(projectStorage.directory); }
     catch (error) { projectTodosError = error.message; }
-    try { collab = await (await import('./server/collab-store.mjs')).createCollabStore(projectStorage.directory); }
+    try { collab = await (await import('./server/collab-store.mjs')).createCollabStore(projectStorage.directory, lan); }
     catch (error) { collabError = error.message; }
     if (collab) {
       try {

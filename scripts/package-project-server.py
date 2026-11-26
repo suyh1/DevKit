@@ -58,9 +58,13 @@ def write_bundle(bundle):
         source_folder = root / 'node_modules' / name
         if not (source_folder / 'package.json').is_file():
             raise FileNotFoundError(f'Missing server dependency: {source_folder}')
+        excluded = {'node_modules', 'test', 'examples'}
+        entry = json.loads((source_folder / 'package.json').read_text(encoding='utf-8')).get('main', '')
+        if not entry.lstrip('./').startswith('build/'):
+            excluded.add('build')
         for source in sorted(source_folder.rglob('*')):
             parts = source.relative_to(source_folder).parts
-            if source.is_file() and not {'node_modules', 'build', 'test', 'examples'}.intersection(parts) and source.suffix != '.node':
+            if source.is_file() and not excluded.intersection(parts) and source.suffix != '.node':
                 bundle.write(source, source.relative_to(root).as_posix())
     bundle.writestr('package.json', json.dumps(package, indent=2))
     bundle.write(root / 'docs/project-center.md', 'GUIDE.zh-CN.md')

@@ -1,6 +1,9 @@
 [
   "@faker-js/faker",
   "ssh2",
+  "socks",
+  "smart-buffer",
+  "ip-address",
   "asn1",
   "bcrypt-pbkdf",
   "safer-buffer",

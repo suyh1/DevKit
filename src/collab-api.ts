@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { remoteRequest } from './workspace-remote';
 
-export type CollabModule = 'transfer' | 'mock' | 'whiteboard' | 'wireguard';
+export type CollabModule = 'transfer' | 'mock' | 'whiteboard' | 'relay';
 export type PageProps = { active: boolean; edit: boolean };
 declare global {
   interface Window {

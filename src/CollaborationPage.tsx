@@ -11,7 +11,7 @@ import { type CollabModule, type PageProps } from './collab-api';
 import { QuickTransfer } from './QuickTransfer';
 import { TransferLinkSettings } from './TransferLinkSettings';
 import { MockService } from './MockService';
-import { WireGuardWorkspace } from './WireGuardWorkspace';
+import { RelayWorkspace } from './RelayWorkspace';
 import { ScreenshotBoard } from './ScreenshotBoard';
 import { CreateRelated } from './related-workspaces';
 import './collaboration.css';
@@ -42,7 +42,7 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
     code.make();
     return code.createDataURL(4);
   }, [href, invite]);
-  const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine, wireguard: Network }[module];
+  const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine, relay: Network }[module];
   const title = workspaceModules.find((item) => item.id === module)?.name;
   const inviteButton = (
     <button
@@ -133,8 +133,8 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
         <QuickTransfer origin={origin} active={active} edit={edit} directory={window.devkitCollab ? status?.directory : undefined} />
       ) : module === 'mock' ? (
         <MockService active={active} edit={edit} origin={origin} />
-      ) : module === 'wireguard' ? (
-        <WireGuardWorkspace active={active} edit={edit} resource={resource} />
+      ) : module === 'relay' ? (
+        <RelayWorkspace active={active} edit={edit} resource={resource} />
       ) : (
         <ScreenshotBoard active={active} edit={edit} />
       )}

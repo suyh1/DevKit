@@ -7,7 +7,7 @@ const fields = {
   'file-shares': [],
   transfer: ['edit'],
   mock: ['edit'],
-  wireguard: ['edit'],
+  relay: ['edit', 'control'],
   whiteboard: ['edit'],
   nginx: ["edit", "control"],
   http: ["edit", "send"],
@@ -16,7 +16,7 @@ const fields = {
   logs: ["jar", "nginx", "export", "raw"],
   'lan-hosts': ['edit', 'diagnose', 'terminal', 'files', 'discover', 'wake', 'rdp'],
 };
-const retiredServices = new Set(['releases', 'snippets']);
+const retiredServices = new Set(['releases', 'snippets', 'wireguard']);
 const own = (value, key) => Object.hasOwn(value, key);
 export function emptySharingServices() {
   return Object.fromEntries(

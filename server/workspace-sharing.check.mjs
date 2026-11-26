@@ -45,7 +45,7 @@ test('standalone service exposes opt-in workspaces without installed npm depende
       DEVKIT_SHARE_LOGS: 'true', DEVKIT_LOGS_JAR: 'true', DEVKIT_LOGS_NGINX: 'true',
       DEVKIT_SHARE_MONITOR: 'true', DEVKIT_MONITOR_EDIT: 'true', DEVKIT_MONITOR_CONTROL: 'false',
       DEVKIT_JAR_EDIT: 'false', DEVKIT_JAR_CONTROL: 'false', DEVKIT_NGINX_CONTROL: 'false',
-      DEVKIT_SHARE_TRANSFER: 'true', DEVKIT_TRANSFER_EDIT: 'true', DEVKIT_SHARE_MOCK: 'true', DEVKIT_SHARE_WHITEBOARD: 'true', DEVKIT_SHARE_WIREGUARD: 'true',
+      DEVKIT_SHARE_TRANSFER: 'true', DEVKIT_TRANSFER_EDIT: 'true', DEVKIT_SHARE_MOCK: 'true', DEVKIT_SHARE_WHITEBOARD: 'true', DEVKIT_SHARE_RELAY: 'true',
       DEVKIT_SHARE_RELEASES: 'true', DEVKIT_RELEASES_EDIT: 'true', DEVKIT_SHARE_SNIPPETS: 'true', DEVKIT_SNIPPETS_EDIT: 'true',
     } });
     let output = ''; child.stdout.on('data', chunk => { output += chunk; }); child.stderr.on('data', chunk => { output += chunk; });
@@ -67,7 +67,7 @@ test('standalone service exposes opt-in workspaces without installed npm depende
       const response = await fetch(origin + '/api/' + retired + '/get', { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(response.status, 404);
     }
-    for (const route of ['/api/http/get-library', '/api/nginx/get', '/api/jar/get', '/api/monitor/get', '/api/logs/sources', '/api/transfer/list', '/api/mock/list', '/api/whiteboard/list', '/api/wireguard/list']) {
+    for (const route of ['/api/http/get-library', '/api/nginx/get', '/api/jar/get', '/api/monitor/get', '/api/logs/sources', '/api/transfer/list', '/api/mock/list', '/api/whiteboard/list', '/api/relay/list']) {
       const response = await fetch(origin + route, { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(response.status, 200, await response.text());
     }

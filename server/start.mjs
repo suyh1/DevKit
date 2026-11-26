@@ -30,13 +30,13 @@ try {
   const saved = await store.settings();
   const services = sharingFromEnvironment(process.env, saved);
   const publishWorkspaces = Object.values(services).some(service => service.enabled);
-  if (services.wireguard.enabled || services.transfer.enabled || services.whiteboard.enabled || services.mock.enabled) collab = await createCollabStore(directory);
+  if (services.relay.enabled || services.transfer.enabled || services.whiteboard.enabled || services.mock.enabled) collab = await createCollabStore(directory, lan);
   try {
     const configured = await stat(path.join(directory, transferLinksFile)).catch(error => {
       if (error.code !== 'ENOENT') throw error;
     });
     if (configured) {
-      collab ??= await createCollabStore(directory);
+      collab ??= await createCollabStore(directory, lan);
       transferLinks = await createTransferLinks(directory, path.join(root, 'dist'), collab);
       for (const link of transferLinks.status()) if (link.error) console.error(link.error);
     }

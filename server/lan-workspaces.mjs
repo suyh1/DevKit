@@ -25,6 +25,7 @@ function stateFor(module, state, hostId, access) {
 export async function createLanWorkspaces(directory, transports = { share: shareTransport, ssh: sshTransport }) {
   const store = await createLanHostStore(directory);
   const connections = new Map(), cache = new Map(), terminals = new Map();
+  const relayClients = new Map();
   const desktopSession = randomUUID();
   let terminalGeneration = 0, openingTerminals = 0, scan, closed = false;
   const find = id => store.list().find(item => item.id === id);
@@ -96,6 +97,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     }
   }
   function invalidate() {
+    for (const [client, route] of relayClients) if (!routeCurrent(route)) client.destroy();
     for (const [key, entry] of connections) if (find(entry.host.id) !== entry.host || !routeCurrent(entry.route)) { connections.delete(key); entry.transport?.close(); }
     for (const [key, entry] of cache) if (find(entry.host.id) !== entry.host) cache.delete(key);
     for (const [id, terminal] of terminals) if (!terminalCurrent(terminal.host, terminal.route)) closeTerminal(id);
@@ -317,6 +319,18 @@ export async function createLanWorkspaces(directory, transports = { share: share
   }
   return {
     request, hostRequest, release, rdpTarget,
+    async openRelay(hostname, port, user) {
+      const matches = store.list().filter(host => host.mode === 'ssh' && host.address.toLowerCase() === hostname.toLowerCase() && host.port === port && (!user || host.user === user));
+      if (matches.length !== 1) throw new Error(matches.length ? '多个档案匹配，请填写 A 的 SSH 用户名。' : '请在局域网主机登记 A 的 SSH 地址、账号并确认指纹。');
+      const host = matches[0], route = jumpRoute(host, find);
+      if (!host.fingerprint) throw new Error('请在局域网主机核对并确认 A 的 SSH 指纹。');
+      const client = await openHost(host, {}, route);
+      const chain = [...route, host];
+      if (closed || !routeCurrent(chain)) { client.destroy(); throw new Error('SSH 档案已更新。'); }
+      relayClients.set(client, chain);
+      client.once('close', () => relayClients.delete(client));
+      return client;
+    },
     sharedHosts: (logAccess, access) => store.list().map(host => {
       const { id, name, address, mode, port, group, tags, pinned, modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, fingerprint, explicitKeyOnly } = host;
       return {
@@ -355,6 +369,6 @@ export async function createLanWorkspaces(directory, transports = { share: share
     },
     monitorTargets: () => store.list().map(host => ({ id: host.id, name: host.name, ...hostTarget(host) })),
     closeTerminals() { terminalGeneration++; for (const [id, entry] of terminals) if (entry.owner === desktopSession) closeTerminal(id); },
-    close() { closed = true; scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
+    close() { closed = true; for (const client of relayClients.keys()) client.destroy(); scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
   };
 }

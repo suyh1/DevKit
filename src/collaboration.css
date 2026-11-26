@@ -1082,31 +1082,36 @@
   .mock-rule-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .mock-response-bar .segmented-control { max-width:100%; }
 }
-.wg-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
-.wg-topology {
+.relay-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.relay-topology {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 12px; padding: var(--panel-pad); border: 1px solid var(--line); border-radius: 12px;
   background: linear-gradient(100deg, var(--surface) 40%, color-mix(in srgb, var(--surface) 88%, transparent)),
               url('./assets/workbench-aurora.webp') center / cover;
 }
-.wg-topology span { color: var(--muted); font-size: 13px; }
-.wg-workspace .segmented-control { justify-self: start; max-width: 100%; }
-.wg-workspace .wg-panels {
+.relay-topology span { color: var(--muted); font-size: 13px; }
+.relay-workspace .segmented-control { justify-self: start; max-width: 100%; }
+.relay-workspace .relay-panels {
   display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
   align-items: start; gap: 14px; margin: 0;
 }
-.wg-workspace .wg-panels > section {
+.relay-workspace .relay-panels > section {
   display: grid; grid-template-columns: minmax(0, 1fr); grid-column: auto; gap: 14px; padding: var(--panel-pad);
   min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
 }
-.wg-panels form { display: grid; gap: 16px; }
-.wg-panels input { width: 100%; min-width: 0; }
-.wg-panels pre {
+.relay-panels form { display: grid; gap: 16px; }
+.relay-panels input { width: 100%; min-width: 0; }
+.relay-panels pre {
   max-height: 18rem; overflow: auto; margin: 0; padding: 12px;
   background: var(--soft); border-radius: 6px; font: 13px/1.6 var(--font-mono);
 }
-.wg-panels p { overflow-wrap: anywhere; }
-.wg-panels summary { cursor: pointer; }
+.relay-panels p, .relay-panels strong { overflow-wrap: anywhere; }
+.relay-workspace select { max-width: 100%; min-width: 0; }
+.relay-form .pc-modal-body, .relay-form label, .relay-form details[open], .relay-result { display: grid; gap: 8px; }
+.relay-form input { width: 100%; }
+.relay-result { border-top: 1px solid var(--line); padding-top: 12px; }
+.relay-panels details p, .relay-panels details pre { margin-top: 8px; }
+.relay-panels summary { cursor: pointer; }
 @container collaboration (max-width: 720px) {
-  .wg-workspace .wg-panels { grid-template-columns: minmax(0, 1fr); }
+  .relay-workspace .relay-panels { grid-template-columns: minmax(0, 1fr); }
 }

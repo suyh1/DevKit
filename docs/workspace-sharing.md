@@ -63,7 +63,7 @@ Linux x64 和 ARM64 使用官方 glibc 发行版，适用于满足官方系统�
 | [团队知识库](knowledge-base.md) | 阅读所有团队文档和历史版本、全文搜索、按权限打开资源链接 | 新建目录、编辑、恢复和删除文档 | — |
 | 待办清单 | 查看已发布清单、扩展语法和归档，下载 `.todo` 文件 | 新建或导入共享清单，编辑和删除已发布的清单，在任务或续做点下添加多层子任务，完成周期任务时生成下一期 | — |
 | 本机文件共享管理 | 已启动并发布的共享及其文件 | — | 下载单个文件或文件夹 ZIP |
-| [跨网互联](wireguard.md) | 三端地址、公钥、各系统部署配置 | 维护设备参数 | — |
+| [跨网互联](service-relay.md) | 单台 DevKit 的服务规则、监听和连接状态 | 维护已停止的服务规则 | 检测与启停，使用 SSH 档案另需局域网主机的终端权限 |
 | 局域网快传 | 浏览收件箱，凭取件密码读取受保护内容 | 发送与移除文件、文字、链接 | — |
 | 接口模拟服务 | 查看接口、场景、调用地址与近期调用 | 新建、编辑、发布、撤下、轮换地址及删除接口 | 已发布地址可供持有者直接调用 |
 | 截图协作白板 | 查看画板、标注和导出 PNG | 新建、标注、重命名、移除标注和删除画板 | — |
@@ -204,7 +204,7 @@ DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/s
 | `DEVKIT_SHARE_PROJECTS` / `DEVKIT_PROJECT_EDIT` / `DEVKIT_PROJECT_PROBE` | 项目中心开放 / 编辑 / 入口检测 |
 | `DEVKIT_SHARE_TRANSFER` / `DEVKIT_TRANSFER_EDIT` | 局域网快传开放 / 发送与移除 |
 | `DEVKIT_SHARE_MOCK` / `DEVKIT_MOCK_EDIT` | 接口模拟服务开放 / 编辑与发布 |
-| `DEVKIT_SHARE_WIREGUARD` / `DEVKIT_WIREGUARD_EDIT` | 跨网互联开放 / 维护组网参数 |
+| `DEVKIT_SHARE_RELAY` / `DEVKIT_RELAY_EDIT` / `DEVKIT_RELAY_CONTROL` | 跨网互联开放 / 维护规则 / 检测与启停 |
 | `DEVKIT_SHARE_WHITEBOARD` / `DEVKIT_WHITEBOARD_EDIT` | 截图协作白板开放 / 创建与标注 |
 | `DEVKIT_SHARE_DEV_DOCS` / `DEVKIT_DEV_DOCS_EDIT` | 开发文档管理开放 / 编辑 |
 | `DEVKIT_SHARE_KNOWLEDGE` / `DEVKIT_KNOWLEDGE_EDIT` | 团队知识库开放 / 编辑 |

@@ -7,7 +7,7 @@ export type SharingServices = {
   'file-shares': { enabled: boolean };
   transfer: { enabled: boolean; edit: boolean };
   mock: { enabled: boolean; edit: boolean };
-  wireguard: { enabled: boolean; edit: boolean };
+  relay: { enabled: boolean; edit: boolean; control: boolean };
   whiteboard: { enabled: boolean; edit: boolean };
   nginx: { enabled: boolean; edit: boolean; control: boolean };
   http: { enabled: boolean; edit: boolean; send: boolean };

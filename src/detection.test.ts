@@ -20,7 +20,7 @@ const workspaces: Record<WorkspaceModuleId, string> = {
   logs: '[WARN] cache unavailable', http: 'GET /hello HTTP/1.1', monitor: 'tcp://localhost:8080',
   'dev-docs': 'df -h', git: 'git status', projects: '{"format":"devkit-project-center"}', knowledge: '# 交接记录', 'project-todos': '- [ ] 核对订单',
   'file-shares': 'D:\\资料\\年度报告', transfer: 'report.xlsx', mock: '{"type":"object","properties":{}}',
-  wireguard: 'wg show', whiteboard: '设计稿.png', nginx: 'server { listen 80; }', jar: 'java -jar app.jar', 'lan-hosts': 'ssh dev@server',
+  relay: 'B 通过 A 访问 C', whiteboard: '设计稿.png', nginx: 'server { listen 80; }', jar: 'java -jar app.jar', 'lan-hosts': 'ssh dev@server',
 };
 
 describe('总览匹配清单', () => {
@@ -41,15 +41,10 @@ describe('总览匹配清单', () => {
 });
 
 describe('推荐顺序和打开方式', () => {
-  it('将组网参数、设备和验证命令带到对应位置', () => {
-    for (const [input, resourceId] of [
-      ['[Interface]\nPrivateKey = local-only\n[Peer]\nEndpoint = relay.example.org:51820', 'endpoint/relay.example.org:51820'],
-      ['[Interface]\nListenPort = 51821', 'listen/51821'],
-      ['Endpoint = [2001:db8::2]:4242', 'endpoint/[2001:db8::2]:4242'],
-      ['wg show', 'check'], ['sudo wg-quick up /etc/wireguard/devkit-b.conf', 'B'],
-    ]) expect(detectTools(input)[0]).toMatchObject({ kind: 'workspace', id: 'wireguard', resourceId });
-    for (const input of ['ssh dev@server', 'sftp://server', '10.77.0.3', 'https://example.org/', 'endpoint = something'])
-      expect(detectTools(input).map(s => s.id)).not.toContain('wireguard');
+  it('将服务地址带入单机转发，普通 SSH 命令继续匹配主机栏目', () => {
+    expect(detectTools('跨网转发 c.example:8080')[0]).toMatchObject({ kind: 'workspace', id: 'relay', resourceId: 'new/c.example/8080' });
+    for (const source of ['检测 A 的能力', 'B 通过 A 访问 C']) expect(detectTools(source)[0].id).toBe('relay');
+    for (const source of ['wg show','ssh dev@server','https://example.org/','转发 c:88888']) expect(detectTools(source).map(s => s.id)).not.toContain('relay');
   });
   it.each(['#36c', '#3366cc88', 'rgba(20, 70, 80, .5)', 'hsl(120 50% 50%)', 'rebeccapurple', '336699'])(
     '%s 带入六种颜色工具', value => {
