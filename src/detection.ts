@@ -320,14 +320,14 @@ export function detectTools(input: string): Suggestion[] {
     if (text === '快速链接设置' || text === '快传链接设置') rules.workspace('transfer', '进入局域网快传管理快速链接');
     if (matches.size) return [...matches.values()];
   }
-  if (/^(?:跨网转发|检测\s*A\s*的能力|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式');
+  if (/^(?:跨网转发|服务转发|检测\s*A\s*的能力|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式');
   if (/^(?:原\s*IP\s*(?:双向)?(?:整机)?互通|跨网互联\s*(?:补录|补全)\s*SSH\s*(?:管理)?档案|B\s*经\s*A\s*补录\s*C|C\s*经\s*A\s*补录\s*B|双向路由|整机互通|B\s*(?:与|和|、|↔)\s*C\s*(?:双向|双方)?互通)$/i.test(text))
     rules.workspace('relay', '按原 IPv4 配置两端路由', undefined, 'routing');
   const triple = /^A\s*[:=：]\s*([\d.]+)[,，\s]+B\s*[:=：]\s*([\d.]+)[,，\s]+C\s*[:=：]\s*([\d.]+)$/i.exec(text)?.slice(1);
   if (triple && new Set(triple).size === 3 && triple.every(ip => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&
       ip.split('.').every(n => Number(n) <= 255) && !/^(0|127)\./.test(ip) && Number(ip.split('.')[0]) < 224))
     rules.workspace('relay', '带入三台设备并识别 A 的接口', undefined, 'routing/new/' + triple.join('/'));
-  const relayTarget = /^(?:跨网互联|跨网转发|转发)\s+([a-z\d][\w.-]{0,200}):(\d{1,5})$/i.exec(text);
+  const relayTarget = /^(?:跨网互联|跨网转发|服务转发|转发)\s+([a-z\d][\w.-]{0,200}):(\d{1,5})$/i.exec(text);
   if (relayTarget && Number(relayTarget[2]) > 0 && Number(relayTarget[2]) <= 65535)
     rules.workspace('relay', '带入目标服务并选择安装位置', undefined, 'new/' + relayTarget[1] + '/' + relayTarget[2]);
   if (/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00a0]/.test(input)) rules.tool('invisible', '定位隐形字符与方向控制符');

@@ -6,6 +6,7 @@ import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { openWorkspaceLink } from './workspace-links';
 import RoutingWorkspace from './RoutingWorkspace';
+import { OverflowName } from './FileMeta';
 import { remoteAccess } from './workspace-remote';
 
 type Role = 'A' | 'B' | 'C';
@@ -40,14 +41,14 @@ function Editor({ initial, close, save, detect }: { initial: Rule; close: () => 
   }
   return <Modal title={data.id ? '编辑服务规则' : '新建服务规则'} close={close} busy={op.busy} closeLabel="关闭规则编辑">
     <ModalForm className="relay-form" onSubmit={event => { event.preventDefault(); void op.run(() => save(data)); }} footer={<footer className="pc-modal-actions"><ModalCancel /><button className="run-button" disabled={op.busy}>{detect ? '保存并检测' : '保存规则'}</button></footer>}>
-      <label>DevKit 安装位置</label><SegmentedControl label="DevKit 安装位置" value={data.role} options={[...roles]} onChange={role => set({ ...data, role, bind: role === 'B' ? '127.0.0.1' : '', source: '', target: role === 'C' ? '127.0.0.1' : '' })} />
+      <div className="relay-choice"><span>DevKit 安装位置</span><SegmentedControl label="DevKit 安装位置" value={data.role} options={[...roles]} onChange={role => set({ ...data, role, bind: role === 'B' ? '127.0.0.1' : '', source: '', target: role === 'C' ? '127.0.0.1' : '' })} /></div>
       <p>{data.role === 'A' ? 'B 连接 A 的入口，由 A 转发至 C 的服务。' : data.role === 'B' ? 'B 连接本机入口，DevKit 检测到 C 的直达路径及 A 上可用的转发方式。' : 'C 通过 SSH 在 A 建立入口，B 连接该入口访问 C。'}</p>
       {field('name', '服务名称')}
       {data.role !== 'A' && field('hub', 'A 的 SSH 或代理主机地址')}
-      {field('target', data.role === 'C' ? 'C 本机可达的服务地址' : '目标服务地址')}
-      {field('targetPort', '目标 TCP 端口', true)}
-      {field('bind', data.role === 'B' ? 'B 的本地监听 IPv4' : 'B 可达的 A 监听 IPv4')}
-      {field('listenPort', '入口 TCP 端口', true)}
+      <div className="relay-field-pair">{field('target', data.role === 'C' ? 'C 本机可达的服务地址' : '目标服务地址')}
+        {field('targetPort', '目标 TCP 端口', true)}</div>
+      <div className="relay-field-pair">{field('bind', data.role === 'B' ? 'B 的本地监听 IPv4' : 'B 可达的 A 监听 IPv4')}
+        {field('listenPort', '入口 TCP 端口', true)}</div>
       {field('source', '允许访问的来源 IPv4', false, !data.bind.startsWith('127.'))}
       {data.role !== 'A' && <details><summary>A 的检测入口与账号</summary>
         {field('sshPort', 'SSH 端口', true)}{field('user', '已登记的 SSH 用户名（可选）', false, false)}
@@ -61,7 +62,7 @@ function Editor({ initial, close, save, detect }: { initial: Rule; close: () => 
 
 export function RelayWorkspace(props: PageProps & { resource?: string }) {
   const routing = props.resource?.split('/')[0] === 'routing';
-  return <><SegmentedControl label="互联方式" value={routing ? 'routing' : 'services'}
+  return <><SegmentedControl className="relay-modes" label="互联方式" value={routing ? 'routing' : 'services'}
     options={[{ value: 'services', label: '服务转发' }, { value: 'routing', label: '原 IP 双向互通' }]}
     onChange={mode => openWorkspaceLink('relay', mode === 'routing' ? 'routing' : undefined)} />
     {routing ? <RoutingWorkspace {...props} /> : <ServiceWorkspace {...props} />}</>;
@@ -86,28 +87,32 @@ function ServiceWorkspace({ active, edit, resource }: PageProps & { resource?: s
   }
   const results = selected && report?.id === selected.id && report.revision === selected.revision ? report.results : [];
   return <div className="relay-workspace">
-    <div className="relay-topology"><div><h2>跨网服务转发</h2><p>选择唯一安装 DevKit 的设备。其他设备使用原有客户端，通过分配的地址和端口连接。</p></div>
-      {edit && <button onClick={() => setEditor({ ...empty })}>新建规则</button>}</div>
+    <div className="relay-topology"><div><h2>跨网服务转发</h2><p>为一个服务建立访问入口。客户端连接入口地址和端口，即可访问目标服务。</p></div>
+      {edit && <button className={rules?.length ? undefined : 'primary-button'} onClick={() => setEditor({ ...empty })}>新建规则</button>}</div>
     {list.error && <p role="alert">{list.error}</p>}
     {!list.value && !list.error && <Skeleton kind="projects" label="正在读取服务规则" />}
     {list.value && !selected && <p>暂无服务规则。{edit ? '新建规则后可检测现场支持的连接方式。' : '等待主机管理者添加规则。'}</p>}
     {selected && <><label>服务规则<select value={selected.id} onChange={e => { op.clear(); openWorkspaceLink('relay', e.target.value); }}>{rules?.map(rule => <option value={rule.id} key={rule.id}>{rule.name} · {rule.target}:{rule.targetPort}</option>)}</select></label>
-      <div className="devkit-bento relay-panels"><section><h3>{selected.name}</h3>
-        <p>DevKit 在 {selected.role}。{selected.role === 'C' ? 'A 监听' : selected.role + ' 监听'} <code>{selected.bind}:{selected.listenPort}</code> → <code>{selected.target}:{selected.targetPort}</code></p>
+      <div className="devkit-bento relay-panels"><section><h3><OverflowName name={selected.name} /></h3>
+        <dl className="relay-endpoints">
+          <div><dt>DevKit 安装位置</dt><dd>{roles.find(role => role.value === selected.role)?.label}</dd></div>
+          <div><dt>访问入口（{selected.role === 'C' ? 'A' : selected.role}）</dt><dd><code>{selected.bind}:{selected.listenPort}</code></dd></div>
+          <div><dt>目标服务</dt><dd><code>{selected.target}:{selected.targetPort}</code></dd></div>
+        </dl>
         {selected.hub && <p>A 的地址 <code>{selected.hub}</code>，SSH {selected.sshPort}{selected.role === 'B' && `，HTTP CONNECT ${selected.httpPort}，SOCKS5 ${selected.socksPort}`}。</p>}
         {selected.source && <p>允许来源 {selected.source}</p>}{selected.passive && <p>FTP 被动端口 {selected.passive}</p>}
         <strong>{selected.mode ? modes[selected.mode] + (selected.connected ? ' · 已接通过客户端' : ' · 已监听，等待客户端验证') : '已停止'}</strong>
         {selected.error && <p role="alert">{selected.error}</p>}
         <div className="collab-actions">{control && (selected.mode ? <button className="primary-button" disabled={op.busy} onClick={() => void op.run(async () => { await collab('relay','stop',selected); await list.refresh(); })}>停止转发</button>
-          : <button className="primary-button" disabled={op.busy} onClick={() => void op.run(() => check(selected))}>{op.busy ? '处理中…' : '检测可用能力'}</button>)}
+          : <button className={results.some(result => result.ok) ? undefined : 'primary-button'} disabled={op.busy} onClick={() => void op.run(() => check(selected))}>{op.busy ? '处理中…' : results.length ? '重新检测' : '检测可用能力'}</button>)}
           {edit && !selected.mode && <><button disabled={op.busy} onClick={() => setEditor({ ...empty, ...selected })}>编辑</button><button disabled={op.busy} onClick={() => void op.run(async () => {
             if (await confirm({ title: '移除服务规则', detail: selected.name, confirm: '移除' })) { await collab('relay','remove',selected); await list.refresh(); openWorkspaceLink('relay'); }
           })}>移除</button></>}</div>
         {selected.mode && <p>在访问端连接 {selected.bind === '0.0.0.0' ? 'A 的可达地址' : selected.bind}:{selected.listenPort}。Windows 可用 Test-NetConnection 测试端口，再用实际客户端登录或访问。</p>}
       </section><section><h3>能力检测与配置</h3>
         {!results.length && <p>{selected.mode ? '转发已启动，可在访问端验证实际服务。' : '检测会尝试连接指定目标。SSH 使用已确认指纹的 A 档案，反向检测会短暂申请并释放 A 的指定端口。'}</p>}
-        {results.map(result => <div key={result.mode} className="relay-result"><strong>{modes[result.mode]} · {result.ok ? '可用' : '未通过'}</strong><p>{result.message}</p>
-          {control && result.ok && !selected.mode && <button disabled={op.busy} onClick={() => void op.run(async () => { await collab('relay','start',{ id: selected.id, revision: selected.revision, mode: result.mode }); await list.refresh(); })}>使用{modes[result.mode]}</button>}
+        {results.map(result => <div key={result.mode} className="relay-result"><strong>{modes[result.mode]}<span className="relay-verdict" data-ok={result.ok}> · {result.ok ? '可用' : '未通过'}</span></strong><p>{result.message}</p>
+          {control && result.ok && !selected.mode && <button className="primary-button" aria-label={'启动转发（' + modes[result.mode] + '）'} disabled={op.busy} onClick={() => void op.run(async () => { await collab('relay','start',{ id: selected.id, revision: selected.revision, mode: result.mode }); await list.refresh(); })}>启动转发</button>}
           <Guidance rule={selected} mode={result.mode}/></div>)}
         {results.length > 0 && results.every(r => !r.ok) && <details open><summary>现场没有可用通道</summary>
           <p>若能管理 A 或其网关，可在 A 上将 B 可达的 A 地址和入口端口映射到 C 的服务，并允许 B 的来源通过防火墙。C 允许来自映射路径的连接；从 B 使用原客户端测试映射入口。</p>

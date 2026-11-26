@@ -41,6 +41,27 @@ module.exports = async function collaborationSmoke(window, output) {
   const web = (code) => browser.webContents.executeJavaScript(code, true);
   const current = '.portal-page:not([hidden]) .collab-page ';
   const main = '.workspace:not([hidden]) .collab-page ';
+  async function captureRelay(surface, name) {
+    await surface.webContents.executeJavaScript(`Promise.allSettled(document.getAnimations()
+      .filter(a => a.effect?.getComputedTiming().endTime < 1000).map(a => a.finished))`);
+    await surface.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    const snapshot = await surface.webContents.capturePage();
+    await fs.writeFile(path.join(output, name + '.png'), snapshot.toPNG());
+  }
+  async function checkRelayForm(js) {
+    const layout = await js(`(() => {
+      const form = document.querySelector('dialog[open] .relay-form');
+      const body = form.querySelector('.pc-modal-body');
+      body.scrollTop = body.scrollHeight;
+      const submit = form.querySelector('.run-button');
+      const r = submit.getBoundingClientRect();
+      const input = form.querySelector('input');
+      return { fits: body.scrollWidth <= body.clientWidth + 1,
+        readable: parseFloat(getComputedStyle(input).fontSize) >= 16,
+        visible: r.top >= 0 && r.bottom <= innerHeight && submit.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)) };
+    })()`);
+    assert.deepEqual(layout, { fits:true, readable:true, visible:true });
+  }
   async function wait(js, expr) {
     for (let i = 0; i < 180; i++) {
       if (await js(expr)) return;
@@ -98,6 +119,9 @@ module.exports = async function collaborationSmoke(window, output) {
     await web('location.hash="relay"');
     await click(desktop, main, '原 IP 双向互通');
     await click(desktop, main, '新建互通方案');
+    await wait(desktop, '!!document.querySelector("dialog[open] .relay-addresses input")');
+    await checkRelayForm(desktop);
+    await captureRelay(window, 'relay-plan-editor');
     assert.equal(await desktop(`!!document.querySelector('dialog input[aria-label="A 面向 B 的 IPv4"]')`),false);
     for (const [label,value] of [['方案名称','测试网络'],['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
       await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
@@ -116,7 +140,11 @@ module.exports = async function collaborationSmoke(window, output) {
     await desktop('document.querySelector(\'dialog button[aria-label="关闭路由配置"]\').click()');
     // Exercise the renderer's two missing-profile transitions with a deterministic desktop bridge.
     // The backend suite separately checks real SSH credentials, host keys and persistence.
+    const routingBounds = browser.getBounds();
+    const portalTheme = await web('document.documentElement.dataset.theme');
     for (const localRole of ['B','C']) {
+      browser.setContentSize(localRole === 'B' ? 390 : 320, 640);
+      await web('document.documentElement.dataset.theme=' + JSON.stringify(localRole === 'B' ? 'light' : 'dark'));
       const peerRole = localRole === 'B' ? 'C' : 'B';
       await web(`(() => {
         const local = ${JSON.stringify(localRole)}, peer = ${JSON.stringify(peerRole)};
@@ -145,15 +173,27 @@ module.exports = async function collaborationSmoke(window, output) {
       })()`);
       await click(web, current, '原 IP 双向互通');
       await click(web, current, '新建互通方案');
+      await wait(web, '!!document.querySelector("dialog[open] .relay-device-inputs")');
+      await checkRelayForm(web);
       for (const [label,value] of [['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
         await fill(web, 'dialog input[aria-label="' + label + '"]',value);
       await click(web,'dialog ','检测并配置');
       for (const role of ['A',peerRole]) {
         await wait(web, 'document.body.innerText.includes("补全 ' + role + ' 的 SSH 管理档案")');
+        await wait(web, '!!document.querySelector("dialog[open] input[type=password]")');
+        await checkRelayForm(web);
+        await wait(web, 'document.activeElement===document.querySelector("dialog[open] input[autocomplete=off]")');
+        browser.webContents.sendInputEvent({type:'keyDown',keyCode:'Tab'});
+        browser.webContents.sendInputEvent({type:'keyUp',keyCode:'Tab'});
+        await wait(web, 'document.activeElement.type==="password"');
         await fill(web,'dialog[open] input[autocomplete=off]','operator');
         await fill(web,'dialog[open] input[type=password]','fixture');
         await click(web,'dialog ','核对 SSH 指纹');
-        if (role===peerRole) await wait(web, 'document.querySelector(".confirm-dialog[open]")?.innerText.includes("（192.0.2.1）连接")');
+        if (role===peerRole) {
+          await wait(web, 'document.querySelector(".confirm-dialog[open]")?.innerText.includes("（192.0.2.1）连接")');
+          assert.equal(await web(`(() => { const key=document.querySelector('.relay-key'); return key.textContent.length===50 && key.scrollWidth<=key.clientWidth+1; })()`), true);
+          await captureRelay(browser, 'relay-fingerprint-' + localRole);
+        }
         if (role==='A') {
           await click(web,'.confirm-dialog ','返回核对');
           assert.equal(await web('window.routingTrace.length'),0);
@@ -164,10 +204,13 @@ module.exports = async function collaborationSmoke(window, output) {
       await wait(web, 'window.routingTrace.join(",")==="A,' + peerRole + ',apply"');
       await web('delete window.devkitDesktop; delete window.devkitCollab; delete window.routingTrace; location.hash="relay"');
     }
+    await web(portalTheme ? 'document.documentElement.dataset.theme=' + JSON.stringify(portalTheme) : 'delete document.documentElement.dataset.theme');
     await click(web, current, '原 IP 双向互通');
     await wait(web, 'document.body.innerText.includes("测试网络")');
     assert.equal(await web('document.body.innerText.includes("一键配置")'), false);
-    const routingBounds = browser.getBounds();
+    browser.setBounds(routingBounds);
+    await wait(web, '!document.querySelector("dialog[open]")');
+    await captureRelay(browser, 'relay-plan');
     browser.setContentSize(390,740);
     await web('document.querySelectorAll(".relay-panels details").forEach(el => el.open=true)');
     assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);
@@ -182,6 +225,12 @@ module.exports = async function collaborationSmoke(window, output) {
       await wait(execute, 'document.querySelector(".relay-workspace select")?.options.length===64');
       await execute(`(() => { const el=document.querySelector('.relay-workspace select'); el.selectedIndex=63; el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
       await wait(execute, 'document.querySelector(".relay-panels h3")?.textContent.endsWith("63")');
+      assert.equal(await execute('document.querySelector(".relay-panels h3 .file-name").tabIndex'),0);
+      await execute(`(() => { const button=[...document.querySelectorAll('.relay-panels button')].find(b=>b.textContent==='编辑'); button.focus(); button.click(); })()`);
+      await wait(execute, '!!document.querySelector("dialog[open] .relay-addresses")');
+      await checkRelayForm(execute);
+      await execute('document.querySelector(\'dialog[open] [aria-label="关闭路由配置"]\').click()');
+      await wait(execute, 'document.activeElement.textContent==="编辑" && !document.querySelector("dialog[open]")');
       assert.equal(await execute('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'),true);
     }
     browser.setBounds(routingBounds);
@@ -196,6 +245,8 @@ module.exports = async function collaborationSmoke(window, output) {
       await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
     await click(desktop, 'dialog ', '保存并检测');
     await wait(desktop, 'document.body.innerText.includes("直达目标 · 可用")');
+    assert.equal(await desktop('document.querySelector(".relay-result .primary-button")?.getAttribute("aria-label")'), '启动转发（直达目标）');
+    await captureRelay(window, 'relay-service-results');
     await wait(web, 'document.body.innerText.includes("本机 HTTP")');
     await desktop(`(async () => {
       for (let i=1;i<64;i++) {
@@ -211,6 +262,12 @@ module.exports = async function collaborationSmoke(window, output) {
     }
     const bounds = browser.getBounds();
     browser.setContentSize(390, 740);
+    await click(web, current, '编辑');
+    await wait(web, '!!document.querySelector("dialog[open] .relay-field-pair")');
+    await web('document.querySelectorAll("dialog[open] .relay-form details").forEach(el => el.open=true)');
+    await checkRelayForm(web);
+    await web('document.querySelector(\'dialog[open] [aria-label="关闭规则编辑"]\').click()');
+    await wait(web, '!document.querySelector("dialog[open]")');
     await web('document.querySelector(".relay-panels details").open=true');
     await wait(web, 'document.body.innerText.includes("目标防火墙")');
     assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);

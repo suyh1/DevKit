@@ -6,7 +6,7 @@ import { FileWarning, X } from 'lucide-react';
 import './confirmation.css';
 import { CloseChoice } from './DesktopClose';
 
-type Options = { title: string; detail: string; confirm: string; cancel?: string; slide?: boolean; context?: string };
+type Options = { title: string; detail: ReactNode; confirm: string; cancel?: string; slide?: boolean; context?: string };
 type Request = (options: Options) => Promise<boolean>;
 const ConfirmationContext = createContext<Request | null>(null);
 const ResetOverlayContext = createContext(() => {});

@@ -9,6 +9,7 @@ import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { routingProfiles } from '../shared/routing-profiles.mjs';
 import RoutingProfileDialog from './RoutingProfileDialog';
+import { OverflowName } from './FileMeta';
 
 type Role = 'A' | 'B' | 'C';
 type Draft = { kind: 'routing'; id?: string; revision?: number; name: string; role: Role; a?: string; b: string; c: string; ab: string; ac: string };
@@ -64,10 +65,15 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
       onSubmit={event => { event.preventDefault(); const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
         void op.run(() => submit(button?.value === 'configure')); }}>
       <fieldset disabled={op.busy} className="relay-addresses">
-        {([['a','A 的管理 IPv4'],['b','B 的原 IPv4'],['c','C 的原 IPv4']] as const).map(([key,label]) =>
-          <label key={key}>{label}<input required aria-label={label} value={draft[key]} onChange={e => changeAddress(key,e.target.value)}/></label>)}
+        <legend>设备地址</legend>
+        <div className="relay-device-inputs">
+          {([['a','管理 IPv4','192.0.2.1'],['b','原 IPv4','192.0.2.2'],['c','原 IPv4','198.51.100.2']] as const).map(([key,label,example]) =>
+            <label key={key}><span className="relay-device-label"><b>{key.toUpperCase()}</b>{label}</span>
+              <input className="relay-ip" required aria-label={key.toUpperCase() + ' 的' + label} placeholder={'如 ' + example} spellCheck={false}
+                value={draft[key]} onChange={e => changeAddress(key,e.target.value)}/></label>)}
+        </div>
         <label>方案名称（可选）<input aria-label="方案名称" maxLength={80} placeholder="默认使用 B、C 的 IP" value={draft.name} onChange={e => set({ ...draft, name:e.target.value })}/></label>
-        {manual && <><label>DevKit 安装位置</label><SegmentedControl label="DevKit 安装位置" value={draft.role} options={roles.map(value => ({ value, label:value }))} onChange={role => set({ ...draft, role })}/></>}
+        {manual && <div className="relay-choice"><span>DevKit 安装位置</span><SegmentedControl label="DevKit 安装位置" value={draft.role} options={roles.map(value => ({ value, label:value }))} onChange={role => set({ ...draft, role })}/></div>}
         {result?.reason && <label>{result.reason}<select aria-label="确认安装位置" required value={chosenRole || ''} onChange={e => chooseRole(e.target.value as Role)}>
           <option value="">选择安装位置</option>{roles.map(r => <option key={r}>{r}</option>)}</select></label>}
         {result?.candidates && <label>A 有多个已确认的管理档案<select required value={profileA} onChange={e => chooseProfile(e.target.value)}>
@@ -78,7 +84,7 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
           (manual || result?.[key]) && <label key={key}>{label}{result?.[key]?.reason && <small>{result[key]?.reason}</small>}
             <input required aria-label={label} value={draft[key]} onChange={e => set({ ...draft, [key]:e.target.value.trim() })}/></label>)}
       </fieldset>
-      {desktop && !draft.id && <p>检测并配置将读取 A 的选路，使用已确认的管理档案，在 A 开启接口转发，并在 B、C 写入互访路由。</p>}
+      {desktop && !draft.id && <p className="relay-note">DevKit 会识别安装位置和 A 的两侧地址，再在 A 开启转发，为 B、C 写入互访路由。缺少 SSH 档案时，可在这里补录。</p>}
       {op.message && <p role="alert">{op.message}</p>}
     </ModalForm></Modal>;
 }
@@ -122,7 +128,7 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
     event.preventDefault(); void apply(ids);
   }} footer={<footer className="pc-modal-actions"><ModalCancel /><button className="run-button" disabled={op.busy || roles.some(r => r !== plan.role && !ids[r])}>{op.busy ? '正在配置…' : '配置 A、B、C'}</button></footer>}>
     <p>在 A 的指定接口开启 IPv4 转发，在 B 和 C 各保存一条通往对方原 IP 的主机路由。A 将按照现有路由表和防火墙策略处理经过这两个接口的流量。</p>
-    {roles.map(role => <div key={role}><strong>{role} · {role === 'A' ? plan.ab + ' / ' + plan.ac : role === 'B' ? plan.b : plan.c}</strong>
+    {roles.map(role => <div className="relay-profile-row" key={role}><strong>设备 {role}</strong><code>{address(role)}</code>
       {role === plan.role ? <p>当前 DevKit 所在设备，使用本机系统权限。</p> : <label>管理档案<select required value={ids[role] || ''} onChange={e => selectProfiles(hosts,{ ...ids, [role]:e.target.value })}>
         <option value="">选择已确认指纹的 SSH 档案</option>{available[role].map(h => <option key={h.id} value={h.id}>{h.name} · {h.user}@{h.address}:{h.port}</option>)}</select></label>}
       {role !== plan.role && <button type="button" disabled={op.busy || (plan.role !== 'A' && role !== 'A' && !ids.A)} onClick={() => setEnroll(role)}>补全 {role} 的 SSH 档案</button>}</div>)}
@@ -142,14 +148,18 @@ export default function RoutingWorkspace({ active, edit, resource }: PageProps &
   const plans = list.value?.filter(p => p.kind === 'routing'), plan = plans?.find(p => p.id === resource?.split('/')[1]) || plans?.[0];
   const [report,setReport] = useState<{ id:string; revision:number; text:string }>();
   const desktop = !!window.devkitCollab, control = desktop || !!remoteAccess()?.services?.relay.control;
-  return <div className="relay-workspace"><div className="relay-topology"><div><h2>原 IP 双向互通</h2><p>B 与 C 通过 A 路由，可用对方原 IP 发起连接。新增服务沿用同一条路由。</p></div>
-    {edit && <button onClick={() => setEditor({ ...empty })}>新建互通方案</button>}</div>
+  return <div className="relay-workspace"><div className="relay-topology"><div><h2>原 IP 双向互通</h2><p>B 和 C 都能用原 IP 访问对方的服务。新增端口也沿用这条路由。</p></div>
+    {edit && <button className={plans?.length ? undefined : 'primary-button'} onClick={() => setEditor({ ...empty })}>新建互通方案</button>}</div>
     {list.error && <p role="alert">{list.error}</p>}{!list.value && !list.error && <Skeleton kind="projects" label="读取互通方案" />}
-    {plans && !plan && <p>暂无方案。准备 A 的管理 IPv4，以及 B、C 的原 IPv4。</p>}
+    {plans && !plan && <p className="relay-note">{edit ? '准备好 A 的管理 IPv4 和 B、C 的原 IPv4，即可新建第一份方案。' : '暂无互通方案。主机管理者添加后即可在这里查看。'}</p>}
     {plan && <><label>互通方案<select value={plan.id} onChange={e => openWorkspaceLink('relay','routing/' + e.target.value)}>
       {plans?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-      <div className="devkit-bento relay-panels"><section><h3>{plan.name}</h3>
-        <p>B <code>{plan.b}</code> ↔ A <code>{plan.ab} / {plan.ac}</code> ↔ C <code>{plan.c}</code></p>
+      <div className="devkit-bento relay-panels"><section><h3><OverflowName name={plan.name} /></h3>
+        <dl className="relay-path" aria-label="B 经 A 与 C 双向互通的地址">
+          <div><dt><b>B</b>互通端</dt><dd><code>{plan.b}</code></dd></div>
+          <div><dt><b>A</b>中转端</dt><dd><span>面向 B</span><code>{plan.ab}</code><span>面向 C</span><code>{plan.ac}</code></dd></div>
+          <div><dt><b>C</b>互通端</dt><dd><code>{plan.c}</code></dd></div>
+        </dl>
         <div className="collab-actions">{desktop && <button className="primary-button" disabled={op.busy} onClick={() => { setPreset({}); setApply(plan); }}>一键配置</button>}
           {control && <button disabled={op.busy} onClick={() => void op.run(async () => {
             const lines = await collab<string[]>('relay','detect',{ id:plan.id, revision:plan.revision });
@@ -161,7 +171,7 @@ export default function RoutingWorkspace({ active, edit, resource }: PageProps &
             }
           })}>移除</button></>}</div>
         {report?.id === plan.id && report.revision === plan.revision && <p role="status" style={{ whiteSpace:'pre-line' }}>{report.text}</p>}
-        <p>在 B 连接 {plan.c}，并从 C 主动连接 {plan.b} 的已开放服务。A 的转发策略以及两端的服务监听、防火墙均应允许该通信。</p>
+        <p className="relay-note">配置后，从 B、C 各访问一次对方已开放的服务，验证两个方向都能连接。</p>
       </section><section><h3>各设备配置与验证</h3>{roles.map(role => <details key={plan.id + role}><summary>{role} · {role === 'A' ? '开启 IPv4 转发' : '到 ' + (role === 'B' ? plan.c : plan.b) + ' 的主机路由'}</summary>
         <p>先核对现有设置，保留已有等效配置。</p><details><summary>Windows 管理员 PowerShell</summary><pre>{plan.steps[role].windows}</pre></details>
         <details><summary>Linux</summary><pre>{plan.steps[role].linux}</pre>

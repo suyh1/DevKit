@@ -1082,37 +1082,102 @@
   .mock-rule-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .mock-response-bar .segmented-control { max-width:100%; }
 }
-.relay-addresses { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.collab-page .relay-modes { margin-bottom: 14px; }
+.collab-page[data-module='relay'] .segmented-control > button {
+  min-height: 38px; padding-inline: 14px; font-size: 15px;
+}
 .relay-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .relay-topology {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 12px; padding: var(--panel-pad); border: 1px solid var(--line); border-radius: 12px;
+  gap: 12px 20px; padding: 16px var(--panel-pad); border: 1px solid var(--line); border-radius: 12px;
   background: linear-gradient(100deg, var(--surface) 40%, color-mix(in srgb, var(--surface) 88%, transparent)),
               url('./assets/workbench-aurora.webp') center / cover;
 }
-.relay-topology span { color: var(--muted); font-size: 13px; }
-.relay-workspace .segmented-control { justify-self: start; max-width: 100%; }
+.relay-topology > div { flex: 1 1 26rem; }
+.relay-topology h2 { font-size: clamp(20px, 2.4cqi, 25px); }
+.relay-topology p { margin-top: 4px; max-width: 36em; color: var(--muted); }
+.relay-workspace p, .pc-dialog .relay-form p { font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+.relay-workspace > label { width: min(100%, 38rem); }
+.relay-workspace select { max-width: 100%; min-width: 0; }
 .relay-workspace .relay-panels {
-  display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+  display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
   align-items: start; gap: 14px; margin: 0;
 }
-.relay-workspace .relay-panels > section {
+.relay-workspace .devkit-bento.relay-panels > section {
   display: grid; grid-template-columns: minmax(0, 1fr); grid-column: auto; gap: 14px; padding: var(--panel-pad);
   min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
 }
-.relay-panels form { display: grid; gap: 16px; }
-.relay-panels input { width: 100%; min-width: 0; }
+.relay-panels h3 { display: block; font-size: 18px; line-height: 1.45; overflow-wrap: anywhere; }
+.relay-panels h3 .file-name { display: block; max-width: 100%; }
+.relay-workspace .relay-note, .relay-form .relay-note { color: var(--muted); max-width: 42em; }
+.relay-path, .relay-endpoints {
+  display: grid; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--soft);
+}
+.relay-path > div, .relay-endpoints > div {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: 12px;
+}
+.relay-endpoints > div { grid-template-columns: 7.5em minmax(0, 1fr); }
+.relay-path dt, .relay-endpoints dt { color: var(--muted); font-size: 14px; }
+.relay-path dd, .relay-endpoints dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.relay-path dt { display: inline-flex; align-items: center; gap: 8px; }
+.relay-path b, .relay-device-label b {
+  display: inline-grid; place-items: center; width: 25px; height: 25px; border-radius: 6px;
+  background: var(--tint); color: var(--accent); font: 600 15px/1 var(--font-mono);
+}
+.relay-path dd:has(span) { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 8px; }
+.relay-path dd span { align-self: center; color: var(--muted); font-size: 14px; }
+.relay-path code, .relay-endpoints code, .relay-profile-row code { font: 500 15px/1.5 var(--font-mono); }
 .relay-panels pre {
   max-height: 18rem; overflow: auto; margin: 0; padding: 12px;
-  background: var(--soft); border-radius: 6px; font: 13px/1.6 var(--font-mono);
+  background: var(--soft); border-radius: 6px; font: 14px/1.6 var(--font-mono);
 }
-.relay-panels p, .relay-panels strong { overflow-wrap: anywhere; }
-.relay-workspace select { max-width: 100%; min-width: 0; }
-.relay-form .pc-modal-body, .relay-form label, .relay-form details[open], .relay-result { display: grid; gap: 8px; }
-.relay-form input { width: 100%; }
+.relay-panels details { min-width: 0; }
+.relay-panels section > details { border-top: 1px solid var(--line); }
+.relay-form .pc-modal-body, .relay-result, .relay-form details[open], .relay-profile-row {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start;
+}
+.collab-page[data-module='relay'] .pc-modal-content { display: contents; }
+.relay-form .pc-modal-body { container: relay-form / inline-size; gap: 16px; }
+.relay-form .relay-addresses { display: grid; gap: 16px; margin: 0; padding: 0; border: 0; }
+.relay-addresses legend { margin-bottom: 12px; padding: 0; font-size: 17px; font-weight: 600; }
+.relay-form label, .relay-choice { display: grid; gap: 6px; margin: 0; color: var(--text); font: 550 14px/1.45 var(--font-ui); }
+.relay-choice .segmented-control { justify-self: start; max-width: 100%; }
+.relay-form input, .relay-form select { width: 100%; min-width: 0; }
+.collab-page[data-module='relay'] .pc-dialog .relay-form :is(input, select),
+.relay-workspace > label > select { min-height: 42px; font-size: 16px; }
+.relay-form input.relay-ip { font-family: var(--font-mono); }
+.relay-device-inputs, .relay-field-pair { display: grid; gap: 12px; }
+.relay-device-inputs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.relay-field-pair { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.relay-profile-row { padding-top: 14px; border-top: 1px solid var(--line); gap: 6px; }
+.relay-profile-row button, .relay-result button { justify-self: start; }
+.pc-dialog .relay-form .pc-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.pc-dialog .relay-form .pc-modal-actions button, .relay-workspace button { min-height: 40px; font-size: 15px; }
+.collab-page .relay-form .run-button { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.collab-page .relay-form .run-button:not(:disabled):hover { background: var(--accent-hover); }
+.relay-fingerprint { display: grid; gap: 8px; font: 400 15px/1.6 var(--font-ui); overflow-wrap: anywhere; }
+.relay-fingerprint code { color: var(--text); font: 500 15px/1.6 var(--font-mono); }
+.relay-fingerprint .relay-key { background: var(--soft); padding: 10px; border-radius: 6px; user-select: all; }
+.confirm-dialog:has(.relay-fingerprint) { max-height: calc(100dvh - 24px); overflow: auto; }
+.confirm-dialog:has(.relay-fingerprint) footer button { min-height: 42px; font-size: 15px; }
+.confirm-dialog:has(.relay-fingerprint) .confirm-discard { background: var(--accent); color: var(--accent-ink); }
 .relay-result { border-top: 1px solid var(--line); padding-top: 12px; }
+.relay-verdict { color: var(--warning); font-size: 14px; }
+.relay-verdict[data-ok=true] { color: var(--success); }
 .relay-panels details p, .relay-panels details pre { margin-top: 8px; }
-.relay-panels summary { cursor: pointer; }
+.collab-page .relay-panels summary, .collab-page .relay-form summary { font-size: 15px; padding-block: 9px; overflow-wrap: anywhere; }
+@container relay-form (max-width: 540px) {
+  .relay-device-inputs { grid-template-columns: minmax(0, 1fr); }
+}
+@container relay-form (max-width: 380px) {
+  .relay-field-pair { grid-template-columns: minmax(0, 1fr); }
+  .collab-page[data-module='relay'] .relay-choice .segmented-control > button { padding-inline: 7px; }
+}
 @container collaboration (max-width: 720px) {
   .relay-workspace .relay-panels { grid-template-columns: minmax(0, 1fr); }
+}
+@container collaboration (max-width: 480px) {
+  .relay-topology { align-items: flex-start; }
+  .relay-workspace button, .pc-dialog .relay-form .pc-modal-actions button,
+  .collab-page[data-module='relay'] .segmented-control > button { min-height: 44px; }
 }
