@@ -23,7 +23,7 @@ function Guidance({ rule, mode }: { rule: Rule; mode: Mode }) {
     : <><p>在 A 确认系统已有的 SSH 服务正在监听 TCP {rule.sshPort}，防火墙允许安装 DevKit 的设备登录。在「局域网主机」登记 A 的账号，并核对指纹。在 A 的 sshd_config 中为专用账号配置下列选项，替换示例账号。</p>
       <p>若 A 已安装 OpenSSH Server 但服务未启动，Linux 可用 <code>systemctl start sshd</code>（Debian / Ubuntu 使用 <code>systemctl start ssh</code>），Windows 可在管理员 PowerShell 使用 <code>Start-Service sshd</code>。</p>
       <pre>{mode === 'reverse' ? `Match User 转发账号\n    AllowTcpForwarding remote\n    GatewayPorts clientspecified\n    PermitListen ${rule.bind}:${rule.listenPort}` : `Match User 转发账号\n    AllowTcpForwarding local\n    PermitOpen ${endpoint}`}</pre>
-      <p>检查该账号及其 authorized_keys 的转发限制。Linux 通常使用 /etc/ssh/sshd_config，以 sshd -t 校验后重载 sshd（部分发行版服务名为 ssh）。Windows 使用 %ProgramData%\\ssh\\sshd_config，以 sshd.exe -t 校验后在管理员 PowerShell 运行 Restart-Service sshd。</p>
+      <p>检查该账号及其 authorized_keys 的转发限制。Linux 通常使用 /etc/ssh/sshd_config，以 sshd -t 校验后重载 sshd（部分发行版服务名为 ssh）。Windows 使用 %ProgramData%\ssh\sshd_config，以 sshd.exe -t 校验后在管理员 PowerShell 运行 Restart-Service sshd。</p>
       {mode === 'reverse' ? <p>在 C 检查本地目标服务，从 B 连接 A 的监听地址和端口。在 A 的防火墙只对 B 的来源地址开放该入口，核对 NAT 后 A 实际看到的来源 IP。</p>
         : <p>在 C 放行来自 A 的目标端口。启动后 B 的客户端连接本机入口，仍使用 C 上原有的服务账号。</p>}
       {rule.passive && <p>将被动范围 {rule.passive} 的各个端口一并加入 A 的 {mode === 'reverse' ? 'PermitListen' : 'PermitOpen'} 配置。</p>}

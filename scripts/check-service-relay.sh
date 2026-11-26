@@ -39,7 +39,21 @@ for role in A C; do
     -o UsePAM=yes -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o 'Subsystem=sftp internal-sftp'
 done
 ip netns exec C /usr/bin/python3 -m http.server 8000 --directory "$scratch/files" > /dev/null 2>&1 &
-ip netns exec C /usr/bin/python3 -m pyftpdlib -i 192.0.2.6 -p 2121 -r 50000-50004 -d "$scratch/files" > /dev/null 2>&1 &
+ip netns exec C /usr/bin/python3 - "$scratch/files" <<'PY' &
+import sys
+from pyftpdlib.authorizers import DummyAuthorizer
+from pyftpdlib.handlers import FTPHandler
+from pyftpdlib.servers import FTPServer
+
+authorizer = DummyAuthorizer()
+authorizer.add_anonymous(sys.argv[1])
+FTPHandler.authorizer = authorizer
+FTPHandler.passive_ports = range(50000, 50005)
+FTPServer(("192.0.2.6", 2121), FTPHandler).serve_forever()
+PY
+for url in http://192.0.2.6:8000/probe ftp://192.0.2.6:2121/probe; do
+  ip netns exec A curl --noproxy '*' --retry 5 --retry-connrefused --retry-delay 1 --max-time 10 -fsS "$url" | cmp - "$scratch/files/probe"
+done
 for role in A B C; do
   echo "Testing DevKit installed only on $role"
   ip netns exec "$role" "$node_bin" scripts/relay-fixture.mjs "$role" "$scratch" "$ssh_user" &
