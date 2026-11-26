@@ -1147,6 +1147,11 @@
 .relay-workspace > label > select { min-height: 42px; font-size: 16px; }
 .relay-form input.relay-ip { font-family: var(--font-mono); }
 .relay-device-inputs, .relay-field-pair { display: grid; gap: 12px; }
+.relay-check, .relay-direction-results { display: grid; gap: 10px; min-width: 0; }
+.relay-check { padding-top: 12px; border-top: 1px solid var(--line); }
+.relay-check > button { justify-self: start; }
+.relay-check .relay-field-pair { grid-template-columns: repeat(auto-fit,minmax(min(100%, 10rem),1fr)); }
+.relay-direction-results code { display: block; overflow-wrap: anywhere; }
 .relay-device-inputs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .relay-field-pair { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
 .relay-profile-row { padding-top: 14px; border-top: 1px solid var(--line); gap: 6px; }

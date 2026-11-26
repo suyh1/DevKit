@@ -34,4 +34,9 @@ try {
   const apply = () => store.request('relay','apply',{ ...saved, profiles },{ desktopAdmin:true });
   assert.match(await apply(),/配置已应用/);
   assert.match(await apply(),/持久配置已就绪/);
+  // C serves HTTP on 8000; B runs no service there. Both directions must still answer ping.
+  const checks = await store.request('relay','verify',{ ...saved, ports:{ C:8000, B:8000 } },{ routingControl:true, sshAllowed:true });
+  assert.deepEqual(checks.map(row => [row.from,row.to,row.status,row.tcp?.status]),[
+    ['B','C','reply','connected'], ['C','B','reply','refused'],
+  ], JSON.stringify(checks));
 } finally { await store.close(); lan.close(); }

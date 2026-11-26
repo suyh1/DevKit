@@ -174,6 +174,37 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
   </ModalForm></Modal>;
 }
 
+type Endpoint = 'B' | 'C';
+type DirectionCheck = { from:Endpoint; to:Endpoint; status:'reply'|'no-reply'|'unverified'; message:string;
+  tcp?:{ port:number; status:string; message:string } };
+
+function VerifyConnections({ plan }: { plan:Plan }) {
+  const op = useOperation();
+  const [ports,setPorts] = useState({ B:'', C:'' });
+  const [report,setReport] = useState<{ rows:DirectionCheck[]; ports:Partial<Record<Endpoint,number>> }>();
+  async function check() {
+    setReport(undefined);
+    const requested = Object.fromEntries(Object.entries(ports).filter(([,v]) => v !== '').map(([to,v]) => [to,Number(v)]));
+    const rows = await collab<DirectionCheck[]>('relay','verify',{ id:plan.id, revision:plan.revision, ports:requested });
+    setReport({ rows, ports:requested });
+  }
+  return <form className="relay-check" onSubmit={event => { event.preventDefault(); void op.run(check); }}>
+    <p className="relay-note">从 B、C 各 ping 一次对方的原 IP。要确认 SSH 或网页能否连接，可加测服务端口。</p>
+    <details><summary>检测服务端口（可选）</summary><div className="relay-field-pair">
+      {(['C','B'] as const).map(to => <label key={to}>{to === 'C' ? 'B → C：C' : 'C → B：B'} 的 TCP 端口
+        <input type="number" min="1" max="65535" step="1" disabled={op.busy} placeholder="如 22 或 443" value={ports[to]}
+          onChange={e => setPorts({ ...ports, [to]:e.target.value })}/></label>)}
+    </div></details>
+    <button type="submit" disabled={op.busy}>{op.busy ? '正在检测两个方向…' : '检测双向互通'}</button>
+    {op.message && <p role="alert">{op.message}</p>}
+    {report && <div role="status" className="relay-direction-results">{report.rows.map(row => <div key={row.from}>
+      <strong>{row.from} → {row.to}</strong> <code>{row.from === 'B' ? plan.b : plan.c} → {row.to === 'C' ? plan.c : plan.b}</code>
+      <p>Ping · {row.message}</p>
+      {report.ports[row.to] && <p>TCP {report.ports[row.to]} · {row.tcp?.message || '未能在发起设备上执行检测。'}</p>}
+    </div>)}</div>}
+  </form>;
+}
+
 export default function RoutingWorkspace({ active, edit, resource }: PageProps & { resource?: string }) {
   const list = useCollabList<Plan | PendingPlan>('relay', active), op = useOperation(), confirm = useConfirmation();
   const [editor,setEditor] = useState<Draft | null>(null), [apply,setApply] = useState<Saved | null>(null), [preset,setPreset] = useState<Profiles>({});
@@ -219,7 +250,8 @@ export default function RoutingWorkspace({ active, edit, resource }: PageProps &
           })}>检测本机 {plan.role}</button>}
           {edit && <><button onClick={() => setEditor(plan)}>编辑</button><button onClick={() => void op.run(() => remove(plan))}>移除</button></>}</div>
         {report?.id === plan.id && report.revision === plan.revision && <p role="status" style={{ whiteSpace:'pre-line' }}>{report.text}</p>}
-        <p className="relay-note">配置后，从 B、C 各访问一次对方已开放的服务，验证两个方向都能连接。</p>
+        {control ? <VerifyConnections key={plan.id + '/' + plan.revision} plan={plan}/> :
+          <p className="relay-note">配置后，从 B、C 各访问一次对方已开放的服务，验证两个方向都能连接。</p>}
       </section><section><h3>各设备配置与验证</h3>{roles.map(role => <details key={plan.id + role}><summary>{role} · {role === 'A' ? '开启 IPv4 转发' : '到 ' + (role === 'B' ? plan.c : plan.b) + ' 的主机路由'}</summary>
         <p>先核对现有设置，保留已有等效配置。</p><details><summary>Windows 管理员 PowerShell</summary><pre>{plan.steps[role].windows}</pre></details>
         <details><summary>Linux</summary><pre>{plan.steps[role].linux}</pre>

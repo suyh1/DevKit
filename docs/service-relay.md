@@ -20,6 +20,14 @@ DevKit 先检查三台设备的接口、权限、路由冲突和持久化条件�
 
 完成后，B、C 分别用对方的原 IP 和原端口访问已开放服务。DevKit 退出后系统路由仍有效。配置后的新 TCP 或 UDP 服务沿用同一路由。可在 Linux 用 `ip route get 对端IP`、在 Windows 用 `Find-NetRoute -RemoteIPAddress 对端IP` 检查选路，再从双方分别访问实际服务。方案页提供本机检测和手工撤回说明，移除方案记录仅删除 DevKit 保存的数据。[Linux 内核转发选项](https://docs.kernel.org/networking/ip-sysctl.html) · [Windows 主机路由](https://learn.microsoft.com/en-us/powershell/module/nettcpip/new-netroute)
 
+### 检查 B 和 C 是否能互访
+
+在已完成的方案点「检测双向互通」。DevKit 在 B 上向 C 的原 IP 发起一次 ping，再单独从 C 检测 B，两行结果各自显示。远程设备使用已有的可信 SSH 管理档案；共享网页需要跨网互联的检测权限，使用远程档案还需要 SSH 终端权限。缺少权限、档案或管理连接时，对应方向会提示无法验证。此操作只做检测。
+
+要确认某个服务能否连接，展开「检测服务端口（可选）」。例如，B 要访问 C 的 SSH，就在「B → C」填写 C 实际监听的 TCP 端口（通常是 22）；C 要访问 B 的 HTTPS 则在「C → B」填写 B 的 HTTPS 端口。只填关心的方向即可。即使 ping 没有应答，也会单独尝试指定的 TCP 连接。TCP 连通后，用实际客户端确认登录或业务响应。
+
+如果双方 ping 都有应答，只有某个端口连不上，先核对目标设备上的服务是否启动、监听了正确的 IP 和端口，以及设备和中间防火墙是否允许该连接。新建互通方案只配置路由，不会启动服务或修改这些放行规则。
+
 ## 检测结果和处理
 
 - **直达目标**会从 DevKit 主机连接指定的目标端口。如已在网络设备配置静态端口映射，可把映射入口作为目标。失败时，在目标设备使用 Linux 的 `ss -lnt` 或 Windows 的 `Get-NetTCPConnection -State Listen` 核对服务绑定，再按实际来源放行服务端口。

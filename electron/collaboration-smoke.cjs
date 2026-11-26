@@ -12,6 +12,7 @@ module.exports = async function collaborationSmoke(window, output) {
   const { emptySharingServices } = await import('../shared/sharing.mjs');
   const services = emptySharingServices();
   for (const id of ['mock', 'transfer', 'whiteboard', 'relay']) services[id] = { enabled: true, edit: true };
+  services.relay.control = true;
   services.http = { enabled:true, edit:true, send:true };
   const socket = net.createServer();
   await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
@@ -141,6 +142,12 @@ module.exports = async function collaborationSmoke(window, output) {
       await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
     await click(desktop, 'dialog ', '仅保存');
     await wait(desktop, 'document.body.innerText.includes("测试网络")');
+    await wait(desktop, '!!document.querySelector(".relay-check details")');
+    await desktop('document.querySelector(".relay-check details").open=true');
+    await fill(desktop,'.relay-check input','8000');
+    await click(desktop,main,'检测双向互通');
+    await wait(desktop, 'document.querySelectorAll(".relay-direction-results > div").length===2');
+    assert.equal(await desktop('document.querySelector(".relay-direction-results").textContent.includes("TCP 8000")'),true);
     await click(desktop, main, '一键配置');
     await wait(desktop, 'document.querySelector("dialog")?.innerText.includes("补全 A 的 SSH 管理档案") && !!document.querySelector("dialog input[type=password]")');
     await desktop(`document.querySelector('dialog button[aria-label="返回互通方案"]').click()`);
@@ -222,6 +229,8 @@ module.exports = async function collaborationSmoke(window, output) {
     await captureRelay(browser, 'relay-plan');
     browser.setContentSize(390,740);
     await web('document.querySelectorAll(".relay-panels details").forEach(el => el.open=true)');
+    await click(web,current,'检测双向互通');
+    await wait(web,'document.querySelector(".relay-direction-results")?.textContent.includes("需要 SSH 终端权限")');
     assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);
     await desktop(`(async () => { const api=window.devkitCollab;
       const [first]=(await api.request('relay','list')).data;
@@ -234,6 +243,7 @@ module.exports = async function collaborationSmoke(window, output) {
       await wait(execute, 'document.querySelector(".relay-workspace select")?.options.length===64');
       await execute(`(() => { const el=document.querySelector('.relay-workspace select'); el.selectedIndex=63; el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
       await wait(execute, 'document.querySelector(".relay-panels h3")?.textContent.endsWith("63")');
+      assert.equal(await execute('!!document.querySelector(".relay-direction-results")'),false);
       assert.equal(await execute('document.querySelector(".relay-panels h3 .file-name").tabIndex'),0);
       await execute(`(() => { const button=[...document.querySelectorAll('.relay-panels button')].find(b=>b.textContent==='编辑'); button.focus(); button.click(); })()`);
       await wait(execute, '!!document.querySelector("dialog[open] .relay-addresses")');

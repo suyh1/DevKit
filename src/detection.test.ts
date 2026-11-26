@@ -47,7 +47,7 @@ describe('推荐顺序和打开方式', () => {
     expect(detectTools('服务转发 c.example:22')[0]).toMatchObject({ id:'relay', resourceId:'new/c.example/22' });
     expect(detectTools('A=192.0.2.1 B=192.0.2.2 C=192.0.2.6')[0]).toMatchObject({ id:'relay', resourceId:'routing/new/192.0.2.1/192.0.2.2/192.0.2.6' });
     expect(detectTools('A=999.0.2.1 B=192.0.2.2 C=192.0.2.6').map(item => item.id)).not.toContain('relay');
-    for (const source of ['B 和 C 想互相访问', 'B、C 双向互通', '原 IP 整机互通', '双向路由', '跨网互联补录 SSH 管理档案', 'B 经 A 补录 C', 'C 经 A 补录 B'])
+    for (const source of ['B 和 C 想互相访问', 'B、C 双向互通', '原 IP 整机互通', '检测双向互通', '双向路由', '跨网互联补录 SSH 管理档案', 'B 经 A 补录 C', 'C 经 A 补录 B'])
       expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'routing' });
     for (const source of ['检测 A 的能力', 'B 通过 A 访问 C']) expect(detectTools(source)[0].id).toBe('relay');
     for (const source of ['wg show','ssh dev@server','https://example.org/','转发 c:88888']) expect(detectTools(source).map(s => s.id)).not.toContain('relay');

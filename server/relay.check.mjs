@@ -14,6 +14,7 @@ import { createRelay } from './relay.mjs';
 import { tcp } from './relay-transport.mjs';
 import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting } from './relay-routing-apply.mjs';
+import { verifyRouting } from './relay-routing-verify.mjs';
 
 async function bind(server) {
   server.listen(0,'127.0.0.1');
@@ -42,8 +43,32 @@ test('routing plans validate endpoints, share both host routes and reserve write
   assert.match(saved.steps.B.linux,/192\.0\.2\.6\/32 via 192\.0\.2\.1/);
   assert.match(saved.steps.C.windows,/'192\.0\.2\.2\/32'.*'192\.0\.2\.5'/);
   await assert.rejects(relay.call('apply',{ ...ref, desktopAdmin:true }),/桌面/);
+  await assert.rejects(relay.call('verify',{ ...ref, routingControl:true, sshAllowed:true }),/权限/);
   await assert.rejects(relay.call('start',{ ...ref, mode:'direct' }));
   await relay.call('remove',ref);
+});
+
+test('directional checks validate ports, isolate missing credentials and test TCP even when ping has no reply', async () => {
+  const plan = { ...routingPlan, role:'B' };
+  const access = { routingControl:true, sshAllowed:false };
+  let closed = 0, opened = 0, calls = 0;
+  const connect = async (_lan,id,options) => {
+    assert.equal(id,undefined); assert.equal(options.elevated,false); opened++;
+    return { platform:'linux', close() { closed++; }, async run(script) {
+      calls++;
+      assert.ok(script.includes(plan.c));
+      if (script.includes('ping -n')) return 'no-reply';
+      assert.ok(script.includes('/dev/tcp/' + plan.c + '/443'));
+      return 'connected';
+    }};
+  };
+  for (const ports of [{ C:[22,80] }, { B:0 }, { C:65536 }, { A:22 }, { B:'22' }])
+    await assert.rejects(verifyRouting(plan,ports,null,access,connect), /端口/);
+  assert.equal(opened,0);
+  const [forward,reverse] = await verifyRouting(plan,{ C:443 },null,access,connect);
+  assert.equal(forward.status,'no-reply'); assert.equal(forward.tcp.status,'connected');
+  assert.equal(reverse.status,'unverified'); assert.match(reverse.message,/权限/);
+  assert.equal(calls,2); assert.equal(closed,1);
 });
 
 test('interface discovery keeps independent results and only uses the pinned profile for A', async () => {

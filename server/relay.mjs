@@ -6,7 +6,8 @@ import { listen, openDestination, sshBanner, tcp } from './relay-transport.mjs';
 
 import { normalizeRouting, inspectRouting, routingDraft, routingSteps } from './relay-routing.mjs';
 import { discoverRouting } from './relay-routing-discovery.mjs';
-import { applyRouting } from './relay-routing-apply.mjs';
+import { applyRouting, routingManagementSession } from './relay-routing-apply.mjs';
+import { verifyRouting } from './relay-routing-verify.mjs';
 
 const modes = { A: ['direct'], B: ['direct', 'ssh', 'http', 'socks'], C: ['reverse'] };
 function port(value) {
@@ -180,6 +181,11 @@ export function createRelay(lan, changed) {
       }
       const rule = requireRecord(rows, input.id);
       checkRevision(rule, input.revision);
+      if (action === 'verify') {
+        if (!access.desktopAdmin && !access.routingControl) fail(403, '需要跨网互联的检测权限。');
+        if (rule.kind !== 'routing' || rule.pending) fail(400, '请先选择已完成的互通方案。');
+        return verifyRouting(rule, input.ports, lan, access, routingManagementSession);
+      }
       if (rule.kind === 'routing' && action !== 'remove') {
         if (rule.pending) fail(409, '这是草稿，请先完成地址识别。');
         const plan = normalizeRouting(rule);

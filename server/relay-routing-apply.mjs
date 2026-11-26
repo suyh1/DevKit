@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { sshExec } from './ssh-exec.mjs';
 import { normalizeRouting } from './relay-routing.mjs';
+import { pingDirection } from './relay-routing-verify.mjs';
 
 const roles = ['A', 'B', 'C'];
 const limit = 15000;
@@ -140,13 +141,9 @@ export async function applyRouting(input, profiles, lan, connect = routingManage
       added.push(op);
       if (await op.run('state') !== 'present') throw new Error('应用后未读到预期配置。');
     }
-    const checks = await Promise.all(['B', 'C'].map(async (role, i) => {
-      const host = sessions[i + 1], peer = role === 'B' ? plan.c : plan.b, local = role === 'B' ? plan.b : plan.c;
-      const cmd = host.platform === 'win32' ? `$ping=New-Object System.Net.NetworkInformation.Ping; try { if ($ping.Send('${peer}',2000).Status -ne 'Success') { throw 'ICMP' } } finally { $ping.Dispose() }` : `ping -I ${local} -c 1 -W 2 ${peer} >/dev/null`;
-      try { await host.run(cmd); return role + ' → ' + peer + '：ICMP 已收到应答'; }
-      catch { return role + ' → ' + peer + '：未确认 ICMP，请用实际服务验证并检查防火墙'; }
-    }));
-    return [added.length ? '三台设备的路由配置已应用并复核。' : '三台设备的持久配置已就绪。', ...checks].join('\n');
+    const checks = await Promise.all(['B','C'].map((from,i) => pingDirection(plan, from, sessions[i+1])));
+    return [added.length ? '三台设备的路由配置已应用并复核。' : '三台设备的持久配置已就绪。',
+      ...checks.map(row => row.from + ' → ' + row.to + '（' + plan[row.to.toLowerCase()] + '）：' + row.message)].join('\n');
 
   } catch (error) {
     const failures = [];

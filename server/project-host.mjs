@@ -272,7 +272,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (!services[module].enabled) return json(404, { error: '此栏目未开放。' });
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const readOnly = ['list', 'read'].includes(action) || module === 'whiteboard' && action === 'image' || module === 'transfer' && ['unlock', 'claim', 'answer'].includes(action);
-            const operating = module === 'relay' && ['detect', 'start', 'stop'].includes(action);
+            const operating = module === 'relay' && ['detect', 'verify', 'start', 'stop'].includes(action);
             if (operating && !services.relay.control) return json(403, { error: '需要检测与启停转发权限。' });
             if (!readOnly && !operating && !services[module].edit) return json(403, { error: '当前访客只有查看权限。' });
             const manager = managers.collab?.();
@@ -280,6 +280,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             const input = await body();
             const data = await manager.request(module, action, input, {
               routingDiscovery: services.relay.edit && services.relay.control,
+              routingControl: services.relay.control,
               sshAllowed: services['lan-hosts'].enabled && services['lan-hosts'].terminal,
               authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token, publisherSession: token,
             });
