@@ -112,9 +112,23 @@ module.exports = async function collaborationSmoke(window, output) {
     browser.setContentSize(390,740);
     await web('document.querySelectorAll(".relay-panels details").forEach(el => el.open=true)');
     assert.equal(await web('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'), true);
+    await desktop(`(async () => { const api=window.devkitCollab;
+      const [first]=(await api.request('relay','list')).data;
+      for (let i=1;i<64;i++) {
+        const result=await api.request('relay','save',{ ...first, id:undefined, name:'跨网路由'.repeat(16) + i });
+        if (result.error) throw Error(result.error);
+      }
+    })()`);
+    for (const execute of [desktop,web]) {
+      await wait(execute, 'document.querySelector(".relay-workspace select")?.options.length===64');
+      await execute(`(() => { const el=document.querySelector('.relay-workspace select'); el.selectedIndex=63; el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+      await wait(execute, 'document.querySelector(".relay-panels h3")?.textContent.endsWith("63")');
+      assert.equal(await execute('document.querySelector(".relay-workspace").scrollWidth <= document.querySelector(".relay-workspace").clientWidth + 1'),true);
+    }
     browser.setBounds(routingBounds);
-    await desktop(`(async () => { const result = await window.devkitCollab.request('relay','list');
-      const plan = result.data.find(row => row.kind==='routing'); await window.devkitCollab.request('relay','remove',plan); })()`);
+    await desktop(`(async () => { const api=window.devkitCollab;
+      for (const plan of (await api.request('relay','list')).data.filter(p => p.kind==='routing')) await api.request('relay','remove',plan);
+    })()`);
     await click(web, current, '服务转发');
     await click(desktop, main, '服务转发');
     await click(desktop, main, '新建规则');

@@ -14,7 +14,7 @@ function localCommand(file, args, input) {
     child.stdin.end(input);
   });
 }
-async function session(lan, id) {
+export async function routingManagementSession(lan, id) {
   const remote = id ? await lan.routingSession(id) : null;
   const platform = remote?.platform || process.platform;
   if (!['linux', 'win32'].includes(platform)) { remote?.client.destroy(); throw new Error('自动配置支持 Windows 和 Linux。'); }
@@ -22,7 +22,7 @@ async function session(lan, id) {
     platform, close: () => remote?.client.destroy(),
     run(script) {
       if (platform === 'win32') {
-        const command = "$ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
+        const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
         const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command, 'utf16le').toString('base64')];
         return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout: limit }) : localCommand('powershell.exe', args);
       }
@@ -111,7 +111,7 @@ function windowsOperations(plan, role) {
 }
 
 // The caller selects every management identity. All three preflights complete before the first write.
-export async function applyRouting(input, profiles, lan, connect = session) {
+export async function applyRouting(input, profiles, lan, connect = routingManagementSession) {
   const plan = normalizeRouting(input), sessions = [], operations = [], added = [];
   let current = '', writing = false;
   try {
