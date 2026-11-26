@@ -58,7 +58,8 @@ export async function connectSsh(host, password, { verifyOnly = false, socket, p
         reject(Object.assign(new Error(message), { fingerprint: offered }));
       } else {
         const authenticationFailed = error.level === 'client-authentication';
-        reject(Object.assign(new Error(authenticationFailed ? 'SSH 身份验证失败，请检查用户名和登录凭据。' : `SSH 连接失败：${error.message}`), { sshStage: authenticationFailed ? 'auth' : 'handshake' }));
+        const reason = error.message?.trim() || error.code || '请检查目标地址、SSH 端口及服务状态。';
+        reject(Object.assign(new Error(authenticationFailed ? 'SSH 身份验证失败，请检查用户名和登录凭据。' : `SSH 连接失败：${reason}`), { sshStage: authenticationFailed ? 'auth' : 'handshake' }));
       }
     });
     client.once('close', () => reject(new Error('SSH 连接已关闭。')));

@@ -90,8 +90,13 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
       if (!document.activeElement?.closest('dialog, .lan-terminal-tabs')) controls.current?.focus();
     }
   }, [active]);
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(''), 4000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
   return <div className="lan-ssh-session">
-    <div className="lan-terminal-message"><span role="status">{message || feedback || '已连接'}</span>
+    <div className="lan-terminal-message"><span role="status">{message || feedback || <span className="lan-live-dot" title="已连接"><span className="sr-only">已连接</span></span>}</span>
       {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); setRunning(true); }}>重新连接</button>}
       {running && (connectionId || message === '正在连接…') && <button type="button" className="text-button" onClick={() => {
         setRunning(false); setConnectionId(''); setSelection(false); setMessage('会话已断开');

@@ -48,6 +48,7 @@ describe('推荐顺序和打开方式', () => {
     ['ftps://dev@nas/backups', { mode: 'ftp', address: 'nas', port: 990, ftpSecurity: 'implicit', user: 'dev', startDirectory: '/backups' }],
     ['COM3 9600', { mode: 'serial', address: 'COM3', port: 0, baudRate: 9600 }],
     ['/dev/ttyUSB0', { mode: 'serial', address: '/dev/ttyUSB0', port: 0, baudRate: 115200 }],
+    ['ssh://admin@localhost:22', { mode: 'ssh', address: 'localhost', user: 'admin', port: 22 }],
     ['vnc://desktop.local', { mode: 'vnc', address: 'desktop.local', port: 5900 }],
     ['rdp://desktop.local', { mode: 'rdp', address: 'desktop.local', port: 3389 }],
     ['新建 VNC 会话', { mode: 'vnc', port: 5900 }],

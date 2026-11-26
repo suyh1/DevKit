@@ -8,9 +8,10 @@ module.exports = async function inventoryNavigation(window, output) {
   const js = code => contents.executeJavaScript(code, true);
   const { openWorkspace } = require('./navigation-helpers.cjs')(window);
   const size = window.getSize(), minimum = window.getMinimumSize();
+  const previousTheme = await js('document.documentElement.getAttribute("data-theme")');
   const channels = [];
   let count = 2, terminalOpens = 0, pastedText = '';
-  let logRevision = 0;
+  let logRevision = 0, failNextConnection = true;
   const fixtures = make => Array.from({length: count}, (_, i) => make(i));
   const state = instances => ({ revision: 1, platform: process.platform, directory: '/fixture', instances });
   const hostCount = () => Math.min(50, count);
@@ -166,9 +167,14 @@ module.exports = async function inventoryNavigation(window, output) {
     });
     handle('devkit:lan-hosts', (action, payload) => {
       if (action === 'list') return Array.from({length: Math.min(50, count)}, (_, i) => ({
-        id: 'host-' + i, name: '主机 ' + i, mode: 'ssh', address: 'localhost', port: 22, user: 'test', platform: 'linux',
-        fingerprint: 'fixture', auth: 'key', modules: {}, group: '', tags: [],
+        id: 'host-' + i, name: i === 0 ? 'localhost' : i === 1 ? '开发服务器' : '生产应用服务器 ' + i, mode: 'ssh',
+        address: i === 0 ? 'localhost' : 'application-worker-' + i + '.internal.example.test', port: 22, user: i === 0 ? 'admin' : 'deploy', platform: 'linux',
+        fingerprint: i === 0 && count === 2 ? '' : 'fixture', auth: 'key', modules: {}, group: '', tags: [],
       }));
+      if (action === 'test') {
+        if (failNextConnection) { failNextConnection = false; throw Error('SSH 连接失败：目标端口拒绝连接'); }
+        return { message: 'SSH 已连接。' };
+      }
       if (action === 'terminal-open') return { id: 'fixture-session-' + ++terminalOpens };
       if (action === 'clipboard-read') return 'paste test';
       if (action === 'terminal-input') pastedText = payload.text;
@@ -245,12 +251,36 @@ module.exports = async function inventoryNavigation(window, output) {
         const list = element('.lan-host-list');
         assert.ok(await js(list + '.clientHeight') <= (width < 500 ? 240 : 360));
         assert.equal(await js(list + '.scrollHeight > ' + list + '.clientHeight'), count > 2);
+        const rowAddress = element('.lan-connection-select small');
+        assert.equal(await js(`getComputedStyle(${rowAddress}).whiteSpace`), 'nowrap');
+        assert.ok(await js(`${rowAddress}.clientWidth >= ${rowAddress}.scrollWidth`), 'A localhost SSH address fits on one line');
+        await js("document.documentElement.dataset.theme = " + JSON.stringify(count === 2 ? 'light' : 'dark'));
+        await painted();
+        const {x, y, width: w, height: h} = await js('document.querySelector(".lan-layout").getBoundingClientRect().toJSON()');
+        if (x >= 0 && y >= 0 && h > 0) {
+          const image = await contents.capturePage({ x: Math.floor(x), y: Math.floor(y), width: Math.floor(w), height: Math.floor(h) });
+          await fs.writeFile(path.join(output, 'lan-hosts-' + hostCount() + '-' + width + '.png'), image.toPNG());
+        }
         for (const id of [0, hostCount() - 1]) {
           const host = '[data-host-id="host-' + id + '"]', summary = host + ' summary';
           await hoverHost(summary);
           await click(summary);
           await wait(element(host + ' details') + '.open');
-          await js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
+          assert.equal(await js(element(host + ' .lan-detail-endpoint') + '.textContent'), await js(element(summary + ' small') + '.textContent'));
+          const connect = () => js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
+          await connect();
+          if (count === 2 && width === 1340 && id === 0) {
+            await wait('document.querySelector(".notice-stack")?.textContent.includes("目标端口拒绝连接")');
+            assert.equal(await js('!!document.querySelector(".lan-center > .pc-error")'), false);
+            await click('.notice-stack button[aria-label="关闭通知"]');
+            await wait('!document.querySelector(".notice-stack")');
+            await click(summary); await connect();
+            await wait('document.querySelector(".notice-stack")?.textContent.includes("SSH 已连接")');
+            // Notifications pause under the pointer; leave the stack before checking auto-dismiss.
+            contents.sendInputEvent({ type: 'mouseMove', x: 5, y: 5 });
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            await wait('!document.querySelector(".notice-stack")');
+          }
           await wait(visible('.lan-terminal-tabs [aria-selected=true]'));
           await wait('document.querySelector(".lan-ssh-session [role=status]")?.textContent === "已连接"');
           const opened = terminalOpens;
@@ -294,6 +324,7 @@ module.exports = async function inventoryNavigation(window, output) {
     console.log('Desktop and narrow list/detail navigation passed with 2 entries and 100 services, 300 log sources, 100 Nginx instances and 50 hosts.');
   } finally {
     for (const channel of channels) contents.ipc.removeHandler(channel);
+    await js(previousTheme ? 'document.documentElement.dataset.theme=' + JSON.stringify(previousTheme) : 'document.documentElement.removeAttribute("data-theme")');
     window.setSize(...size); window.setMinimumSize(...minimum);
   }
 };

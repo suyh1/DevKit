@@ -582,6 +582,8 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await js(window, 'document.querySelectorAll(".lan-module-settings input").forEach(field => field.click())');
     await click('保存连接', '.lan-host-form');
     await wait('document.querySelector(".lan-host-list")?.textContent.includes("远程测试主机")');
+    const selectRemoteHost = () => js(window, '[...document.querySelectorAll(".lan-connection-select")].find(row => row.querySelector("strong").textContent === "远程测试主机").click()');
+    await selectRemoteHost();
     await js(window, 'document.querySelector(\'.lan-host-list button[aria-label="编辑 远程测试主机"]\').click()');
     await wait('document.querySelector(".lan-host-dialog h2")?.textContent === "编辑主机连接"');
     assert.deepEqual(await js(window, `{
@@ -590,9 +592,11 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     }`), { value: '', placeholder: '已保存，留空沿用', methods: true });
     await click('取消', '.lan-host-footer');
     await wait('!document.querySelector(".lan-host-dialog[open]")');
+    await selectRemoteHost();
     await click('测试连接', '.lan-host-list');
     await when(window, 'document.querySelector(".lan-diagnostic")?.textContent.includes("共享口令有效")');
     await js(window, `document.querySelector('button[aria-label="关闭连接诊断"]').click()`);
+    await selectRemoteHost();
     await click('启用端口监控', '.lan-host-list');
     await when(window, 'document.querySelector(".workspace:not([hidden]) .monitor-detail h2")?.textContent === "远程测试主机"');
     await go('局域网主机');

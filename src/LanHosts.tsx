@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { ToastStack, type Notice, type NoticeKind, type Notify } from './ToastStack';
 import SessionProtocolFields, { SerialAddress } from './SessionProtocolFields';
 import FloatingDetails from './FloatingDetails';
 import { TextInput } from './TextControl';
@@ -5,7 +7,7 @@ import { navigateTabList } from './tab-navigation';
 import Skeleton from './Skeleton';
 import SegmentedControl from './SegmentedControl';
 import { Fragment, lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
-import { Cable, Maximize, Minimize, Check, ServerCog, ExternalLink, Eye, EyeOff, Globe, FolderOpen, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
+import { Cable, ChevronRight, Maximize, Minimize, Check, ServerCog, ExternalLink, Eye, EyeOff, Globe, FolderOpen, Monitor, Pencil, Pin, Plus, Power, Radar, Search, Server, ShieldCheck, Terminal, Trash2, Upload, X } from 'lucide-react';
 import { Modal, ModalCancel } from './project-components';
 import { useConfirmation } from './Confirmation';
 import LanHostImport from './LanHostImport';
@@ -198,7 +200,7 @@ function HostEditor({ active, host, seed, hosts, close, save, canConnect, busy, 
   </Modal>;
 }
 
-export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeDraft, portal = false }: { initialDraft?: Partial<HostDraft>; consumeDraft?: () => void; active: boolean; onOpenMonitor: (id: string) => void; portal?: boolean }) {
+export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft, consumeDraft, portal = false }: { onNotice?: Notify; initialDraft?: Partial<HostDraft>; consumeDraft?: () => void; active: boolean; onOpenMonitor: (id: string) => void; portal?: boolean }) {
   const services = remoteAccess()?.services;
   const available = portal ? !!services?.['lan-hosts'].enabled : !!window.devkitDesktop?.lanHosts;
   const allowed = (key: 'edit' | 'diagnose' | 'terminal' | 'files' | 'discover' | 'wake' | 'rdp') => !portal || services?.['lan-hosts'][key] === true;
@@ -222,7 +224,13 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
   const [diagnostic, setDiagnostic] = useState<{ host: LanHost; result: HostDiagnostic }>();
   const [rdpHost, setRdpHost] = useState<LanHost>();
   const [query, setQuery] = useState(''), [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState(''), [error, setError] = useState('');
+  const [notice, setToast] = useState<Notice | null>(null), nextNotice = useRef(0);
+  const [error, setError] = useState(''), [inventoryError, setInventoryError] = useState('');
+  function setNotice(message: string, kind: NoticeKind = 'success') {
+    if (onNotice && !document.fullscreenElement) onNotice(message, kind);
+    else setToast({ message, kind, id: ++nextNotice.current });
+  }
+  useEffect(() => { if (!active) setToast(null); }, [active]);
   const [focusedHost, setFocusedHost] = useState('');
   const linked = useWorkspaceResource('lan-hosts'), linkedRow = useRef<HTMLLIElement>(null);
   const linkedExists = hosts.some(host => host.id === linked);
@@ -249,7 +257,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
     setSeed(from === 'jar' || from === 'nginx' ? { modules: { jar: from === 'jar', nginx: from === 'nginx' } } : undefined);
     setEditing('new');
   });
-  function closeEditor() { setSelectJump(null); setEditing(null); setError(''); finishCreation(); }
+  function closeEditor() { if (editing && editing !== 'new') focusHost(editing.id); setSelectJump(null); setEditing(null); setError(''); finishCreation(); }
   async function load(signal?: AbortSignal) {
     const version = ++requestVersion.current;
     if (portal) {
@@ -258,7 +266,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
       setHosts(hosts.map(host => ({ ...empty, hasPassword: false, ...host })));
       setStatuses(statuses);
     } else setHosts(await lanRequest<LanHost[]>('list'));
-    setLoaded(true);
+    setInventoryError(''); setLoaded(true);
   }
   useEffect(() => {
     if (!available || !active) return;
@@ -268,7 +276,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
       try {
         if (!portal) await migrateLanHosts();
         if (initial || !document.hidden && !working.current) await load(controller.signal);
-      } catch (error) { if (!controller.signal.aborted && !working.current) setError((error as Error).message); }
+      } catch (error) { if (!controller.signal.aborted && !working.current) setInventoryError((error as Error).message); }
       finally { if (portal && !controller.signal.aborted) timer = setTimeout(() => void refresh(), statusSeconds * 1000); }
     }
     void refresh(true);
@@ -282,11 +290,14 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
     const timer = setInterval(() => { if (!document.hidden) refresh(); }, statusSeconds * 1000);
     return () => { mounted = false; clearInterval(timer); };
   }, [active, monitorAvailable, portal, statusSeconds]);
-  async function task(run: () => Promise<void>) {
+  async function task(run: () => Promise<void>, inlineError = false) {
     if (working.current) return;
     working.current = true; requestVersion.current++;
-    setBusy(true); setError(''); setNotice('');
-    try { await run(); } catch (failure) { setError((failure as Error).message); }
+    setBusy(true); setError('');
+    try { await run(); } catch (failure) {
+      const message = (failure as Error).message;
+      if (inlineError) setError(message); else setNotice(message, 'error');
+    }
     finally { working.current = false; setBusy(false); }
   }
   async function verify(host: LanHost) {
@@ -353,14 +364,16 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
     else { await lanRequest('open-rdp', { id: host.id }); setNotice('已打开 RDP 客户端。'); }
   }
   async function connectProfile(host: LanHost) {
-    if (host.mode === 'rdp' || host.mode === 'vnc') await openDesktop(host);
-    else if (!['ssh','sftp'].includes(host.mode) || host.fingerprint || await verify(host)) openTab(host);
+    try {
+      if (host.mode === 'rdp' || host.mode === 'vnc') await openDesktop(host);
+      else if (!['ssh','sftp'].includes(host.mode) || host.fingerprint || await verify(host)) openTab(host);
+    } catch (failure) { setNotice(`${host.name} · ${(failure as Error).message}`, 'error'); }
   }
   async function saveProfile(value: HostDraft, connect = false) {
     const original = editing && editing !== 'new' ? editing : undefined;
     const next = await lanRequest<LanHost[]>('save', { ...value, id: original?.id, revision: original?.revision });
-    setHosts(next); closeEditor(); setNotice('连接已保存。');
-    if (!connect) return;
+    setHosts(next); closeEditor();
+    if (!connect) { setNotice('连接已保存。'); return; }
     // Match the normalized endpoint even when editing an address assigns a new profile ID.
     const device = value.address.trim();
     const address = value.mode === 'serial' ? (/^com/i.test(device) ? device.toUpperCase() : device) : device.toLowerCase().replace(/^\[|\]$/g, '');
@@ -379,9 +392,11 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
     </div>}</header>
     {!available ? <p className="lan-note">局域网主机暂不可用。</p> : <div className={`lan-layout${expanded && tabs.length ? ' lan-layout-expanded' : ''}${allowed('terminal') ? '' : ' lan-layout-list'}`}>
       <aside ref={connections} className="lan-connections" aria-label="保存的主机连接">
-        <label className="lan-search"><Search size={16} /><TextInput embedded aria-label="搜索主机" placeholder="搜索名称、协议、地址或标签" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <div className="lan-directory-heading"><h2>保存的连接</h2><span aria-label={`${hosts.length} 个连接`}>{hosts.length}</span></div>
+        <label className="lan-search"><Search size={16} /><TextInput embedded aria-label="搜索主机" placeholder="搜索连接" title="按名称、协议、地址或标签搜索" value={query} onChange={event => setQuery(event.target.value)} /></label>
         {linked && loaded && !linkedExists && <p className="pc-notice" role="status">{missingResourceLink('主机')}</p>}
-        {!hosts.length && <p className="lan-note">{loaded || error ? '暂无已保存的连接。' : '正在读取主机清单…'}</p>}
+        {inventoryError && <p className="lan-note" role="alert">{inventoryError} <button className="text-button" disabled={busy} onClick={() => void task(() => load())}>重新加载</button></p>}
+        {!hosts.length && !inventoryError && <p className="lan-note">{loaded ? '暂无已保存的连接。' : '正在读取主机清单…'}</p>}
         {!!hosts.length && !grouped.length && <p className="lan-note">没有匹配的主机。</p>}
         <ul className="lan-host-list">{grouped.map(([key, entries]) => <Fragment key={key}>
           {key !== 'group:' || grouped.length > 1 ? <li className="lan-group-label">{key === 'pinned' ? '置顶' : entries[0].group || '未分组'}</li> : null}
@@ -391,13 +406,20 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
             const sshProfile = host.mode === 'ssh' || host.mode === 'sftp';
             const link = portal && host.mode === 'share' ? workbenchLink(host.address) : undefined;
             return <li key={host.id} data-host-id={host.id} ref={host.id === linked ? linkedRow : undefined}>
-          <header><FloatingDetails open={focusedHost === host.id} onToggle={event => {
+          <header><FloatingDetails panelTitle={host.name} open={focusedHost === host.id} onToggle={event => {
               if (event.currentTarget.open) setFocusedHost(host.id);
               else setFocusedHost(current => current === host.id ? '' : current);
             }}><summary className="lan-connection-select" aria-expanded={focusedHost === host.id}>
-            <Icon size={17} /><span><strong>{host.name}</strong><small>{protocolName[host.mode]} · {endpoint(host)}</small></span>
+            <span className="lan-protocol-glyph" aria-hidden="true"><Icon size={16} /></span>
+            <span className="lan-row-text">
+              <span className="lan-row-title"><strong title={host.name}>{host.name}</strong><span className="lan-protocol-label">{protocolName[host.mode]}</span></span>
+              <small title={endpoint(host)}>{endpoint(host)}</small>
+            </span>
+            <ChevronRight className="lan-row-chevron" size={15} aria-hidden="true" />
           </summary>
+          <code className="lan-detail-endpoint">{endpoint(host)}</code>
           <p className="lan-note">{sshProfile ? (!portal || allowed('edit') ? `${host.platform === 'win32' ? 'Windows' : 'Linux'} · ${host.auth === 'password' ? '密码' : '密钥'} · ${host.fingerprint ? '已信任' : '待验证指纹'}` : `${protocolName[host.mode]}${host.fingerprint ? ' · 已信任' : ''}`) : protocolName[host.mode]}{(Object.keys(titles) as ManagedModule[]).filter(module => host.modules[module]).map(module => ` · ${titles[module]}`).join('')}</p>
+          {!!host.tags?.length && <div className="lan-host-tags">{host.tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
           <div className="pc-actions" id={`lan-actions-${host.id}`} onClick={event => {
               if ((event.target as Element).closest('button, a')) setFocusedHost('');
             }}>
@@ -432,13 +454,14 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
                 setSelected(current => tabs.find(tab => tab.id === current)?.host.id === host.id ? tabs.filter(tab => tab.host.id !== host.id).at(-1)?.id : current);
               }
             })}><Trash2 size={15} /></button>}
-          </div></FloatingDetails>
-            {allowed('edit') && <><button className="icon-button" disabled={busy} aria-label={`${host.pinned ? '取消置顶' : '置顶'} ${host.name}`} aria-pressed={!!host.pinned} onClick={() => void task(async () => {
+          </div>
+            {allowed('edit') && <div className="lan-profile-actions"><button className="text-button" disabled={busy} aria-label={`${host.pinned ? '取消置顶' : '置顶'} ${host.name}`} aria-pressed={!!host.pinned} onClick={() => void task(async () => {
+              setFocusedHost('');
               setHosts(await lanRequest<LanHost[]>('save', { ...host, pinned: !host.pinned }));
-            })}><Pin size={14} /></button>
-            <button className="icon-button" disabled={busy} aria-label={`编辑 ${host.name}`} onClick={() => { setError(''); setEditing(host); }}><Pencil size={15} /></button></>}
-          </header>
-          {!!host.tags?.length && <div className="lan-host-tags">{host.tags.map(tag => <span key={tag}>{tag}</span>)}</div>}
+              focusHost(host.id);
+            })}><Pin size={14} />{host.pinned ? '取消置顶' : '置顶'}</button>
+            <button className="text-button" disabled={busy} aria-label={`编辑 ${host.name}`} onClick={() => { setFocusedHost(''); setError(''); setEditing(host); }}><Pencil size={14} />编辑连接</button></div>}
+          </FloatingDetails></header>
           {status && <p className="lan-monitor-status"><span className={`monitor-status ${status.state}`}>{lanMonitorLabels[status.state]}</span>{status.checkedAt && <small>最近检测 {new Date(status.checkedAt).toLocaleString()}{status.elapsed === undefined ? '' : ` · ${status.elapsed} ms`}</small>}</p>}
 
         </li>; })}</Fragment>)}</ul>
@@ -448,7 +471,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
           <button className="text-button" onClick={() => returnToList(tabs.find(item => item.id === selected)?.host.id)}>返回主机列表</button>
           {!fullscreen && <button className="text-button" aria-pressed={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? <Minimize size={14} /> : <Maximize size={14} />}{expanded ? '还原布局' : '展开工作区'}</button>}
           {document.fullscreenEnabled && <button className="secondary-button" onClick={() => {
-            void (fullscreen ? document.exitFullscreen() : terminalArea.current?.requestFullscreen())?.catch(() => { setExpanded(true); setNotice('已展开工作区。'); });
+            void (document.fullscreenElement === terminalArea.current ? document.exitFullscreen() : terminalArea.current?.requestFullscreen())?.catch(() => { setExpanded(true); setNotice('已展开工作区。'); });
           }}>{fullscreen ? '退出全屏' : '会话全屏'}</button>}
         </div>}
         {!!tabs.length ? <div role="tablist" onKeyDown={navigateTabList} aria-label="远程会话标签" className="lan-terminal-tabs">
@@ -459,7 +482,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
             </button>
             <button type="button" className="icon-button" aria-label={`关闭 ${tab.host.name} 的会话`} onClick={() => closeTab(tab.id)}><X size={14} /></button>
           </div>)}
-        </div> : <div className="lan-terminal-empty"><Monitor size={32} /><h2>远程会话</h2><p>从主机列表选择连接，打开终端、文件或远程桌面。</p></div>}
+        </div> : <div className="lan-terminal-empty"><Monitor size={24} aria-hidden="true" /><div><h2>远程会话</h2><p>选择已保存的连接，打开终端、文件或远程桌面。</p></div></div>}
         {tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}>
           <Suspense fallback={<Skeleton kind="editor" label="正在加载会话…" />}>
             {tab.host.mode === 'vnc' && <VncSession id={tab.host.id} />}
@@ -469,9 +492,8 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
         </div>)}
       </section>}
     </div>}
-    {notice && <p className="pc-feedback" role="status">{notice}</p>}
-    {error && !editing && <p className="pc-error" role="alert">{error}</p>}
-    {diagnostic && <Modal title={`连接诊断 · ${diagnostic.host.name}`} closeLabel="关闭连接诊断" close={() => setDiagnostic(undefined)} busy={busy}>
+    {active && notice && createPortal(<ToastStack items={[notice]} dismiss={id => setToast(current => current?.id === id ? null : current)} />, document.fullscreenElement || document.body)}
+    {diagnostic && <Modal title={`连接诊断 · ${diagnostic.host.name}`} closeLabel="关闭连接诊断" close={() => { focusHost(diagnostic.host.id); setDiagnostic(undefined); setError(''); }} busy={busy}>
       <p className="lan-note">检测时间 {new Date(diagnostic.result.checkedAt).toLocaleString()}</p>
       <ul className="lan-diagnostic" aria-label="诊断结果">{diagnostic.result.checks.map(check => <li key={check.name}>
         <strong>{check.name}</strong><span data-state={check.state}>{check.state === 'pass' ? '通过' : check.state === 'skip' ? '跳过' : check.detail === diagnostic.result.fingerprint ? '待核对' : '失败'}</span><small>{check.detail}</small>
@@ -479,9 +501,9 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
       {error && <p className="pc-error" role="alert">{error}</p>}
       <footer><ModalCancel />{diagnostic.result.fingerprint && allowed('edit') && <button className="run-button" disabled={busy} onClick={() => void task(async () => {
         if (await verify(diagnostic.host)) await diagnose(diagnostic.host);
-      })}>核对指纹并继续</button>}</footer>
+      }, true)}>核对指纹并继续</button>}</footer>
     </Modal>}
-    {editing && <HostEditor active={active} newJump={select => { setError(''); setSelectJump(() => select); }} portal={portal} host={editing === 'new' ? undefined : editing} seed={editing === 'new' ? seed : undefined} hosts={hosts} error={error} busy={busy} close={closeEditor} canConnect={mode => canConnect(mode) && (!portal || !['ssh','sftp'].includes(mode) || (allowed('edit') && allowed('diagnose')))} save={(value, connect) => void task(() => saveProfile(value, connect))} />}
+    {editing && <HostEditor active={active} newJump={select => { setError(''); setSelectJump(() => select); }} portal={portal} host={editing === 'new' ? undefined : editing} seed={editing === 'new' ? seed : undefined} hosts={hosts} error={error} busy={busy} close={closeEditor} canConnect={mode => canConnect(mode) && (!portal || !['ssh','sftp'].includes(mode) || (allowed('edit') && allowed('diagnose')))} save={(value, connect) => void task(() => saveProfile(value, connect), true)} />}
     {importing && <LanHostImport close={() => setImporting(false)} onImport={updated => { setHosts(updated); setImporting(false); setNotice('所选主机连接已导入。'); }} />}
     {editing && selectJump && <HostEditor active={active} portal={portal} hosts={hosts} busy={busy} error={error}
       close={() => { setSelectJump(null); setError(''); }}
@@ -491,7 +513,7 @@ export default function LanHosts({ active, onOpenMonitor, initialDraft, consumeD
         const added = next.find(host => host.mode === 'ssh' && host.address === value.address.trim() && host.port === value.port && host.user === value.user.trim() && host.jumpHostId === value.jumpHostId);
         if (added) selectJump(added.id);
         setSelectJump(null);
-      })} />}
+      }, true)} />}
     {discovering && <LanDiscovery close={() => setDiscovering(false)} onChoose={allowed('edit') ? draft => { setDiscovering(false); setSeed(draft); setError(''); setEditing('new'); } : undefined} />}
     {rdpHost && active && <Suspense fallback={<p className="lan-note" role="status">正在加载远程桌面…</p>}><RemoteDesktop host={rdpHost} close={() => setRdpHost(undefined)} /></Suspense>}
   </section>;

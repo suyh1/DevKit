@@ -19,8 +19,9 @@ export default function FloatingDetails({
   children,
   className = '',
   onToggle,
+  panelTitle,
   ...props
-}: DetailsHTMLAttributes<HTMLDetailsElement>) {
+}: DetailsHTMLAttributes<HTMLDetailsElement> & { panelTitle?: string }) {
   const details = useRef<HTMLDetailsElement>(null);
   const panel = useRef<HTMLElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -49,7 +50,7 @@ export default function FloatingDetails({
         stopWatching.current?.();
         if (host.open && !visible) {
           if (!surfaceHostVisible(host)) { host.open = false; return; }
-          if (title.current) title.current.textContent = host.querySelector('summary')?.textContent?.trim() || '详情';
+          if (title.current) title.current.textContent = panelTitle || host.querySelector('summary')?.textContent?.trim() || '详情';
           panel.current.showPopover();
           stopWatching.current = followSurfaceHost(host, active => { if (!active) host.open = false; });
           panel.current.querySelector<HTMLButtonElement>('.floating-details-close')?.focus({ preventScroll: true });

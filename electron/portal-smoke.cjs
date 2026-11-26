@@ -878,6 +878,7 @@ app
       await fill('.lan-host-form input[type=password]', 'ssh-portal-fixture');
       await button('保存连接', '.lan-host-form button');
       await wait('document.querySelector(".lan-host-list").textContent.includes("浏览器 SSH")');
+      await selectHost('浏览器 SSH');
       await selector('.lan-host-list button[aria-label="编辑 浏览器 SSH"]');
       assert.equal(await js('document.querySelector(".lan-host-form input[type=password]").value'), '');
       await fill('.lan-host-form .lan-host-name input', '网页 SSH 已编辑');

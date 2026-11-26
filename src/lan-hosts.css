@@ -2,14 +2,19 @@
 .lan-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
 .lan-heading h1 { margin: 0 0 7px; font-size: 28px; letter-spacing: -.6px; }
 .lan-heading p, .lan-note, .lan-terminal-empty p { font-size: 12px; line-height: 1.65; color: var(--muted); }
-.lan-layout { display: grid; grid-template-columns: minmax(250px, 305px) minmax(0, 1fr); align-items: start; gap: 18px; }
-.lan-connections { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.lan-search { display: flex; align-items: center; gap: 7px; }
-.lan-search { padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
+.lan-layout { display: grid; grid-template-columns: minmax(256px, 320px) minmax(0, 1fr); align-items: start; gap: 16px; }
+.lan-connections { min-width: 0; padding: 14px 8px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.lan-directory-heading { display: flex; align-items: baseline; gap: 8px; margin: 0 8px 10px; }
+.lan-directory-heading h2 { margin: 0; font: 600 14px/1.4 var(--font-ui); color: var(--text); }
+.lan-directory-heading > span { font: 12px/1 var(--font-mono); color: var(--muted); }
+.lan-search { display: flex; align-items: center; gap: 8px; margin: 0 4px 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--soft); }
+.lan-search:focus-within { border-color: var(--accent); }
+.lan-search > svg { flex: none; width: 15px; height: 15px; }
+.lan-connections > .lan-note { margin: 8px; }
 .lan-search input { border: 0; background: transparent; min-width: 0; width: 100%; }
 .lan-host-list, .host-directory-list { list-style: none; padding: 0; margin: 0; }
-.lan-host-list > li { padding: 5px 1px; border-bottom: 1px solid var(--line); }
-.lan-host-list > li:last-child { border-bottom: 0; padding-bottom: 1px; }
+.lan-host-list > li { padding: 2px 0; border-bottom: 1px solid var(--line); }
+.lan-host-list > li:last-child { border-bottom: 0; }
 .lan-host-list > li > header { display: flex; align-items: center; gap: 4px; }
 .lan-host-list header > details { flex: 1; min-width: 0; }
 .lan-host-list small { display: block; margin-top: 4px; color: var(--muted); }
@@ -163,7 +168,10 @@
 .pc-dialog.lan-host-dialog .lan-host-actions button { min-height: 34px; padding: 6px 13px; font-size: 12px; }
 .pc-dialog.lan-host-dialog .lan-host-actions .run-button { font-weight: 650; }
 .lan-terminal-area { min-width: 0; min-height: 440px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.lan-terminal-empty { min-height: 440px; display: grid; align-content: center; justify-items: center; gap: 8px; padding: 20px; text-align: center; }
+.lan-terminal-area:has(> .lan-terminal-empty) { min-height: 0; align-self: stretch; display: grid; }
+.lan-terminal-empty { min-height: 144px; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 24px; }
+.lan-terminal-empty > svg { flex: none; color: var(--muted); }
+.lan-terminal-empty h2 { font: 600 15px/1.6 var(--font-ui); }
 .lan-terminal-empty h2, .lan-terminal-empty p { margin: 0; }
 .lan-terminal-empty p { color: var(--muted); }
 .lan-terminal-tabs { display: flex; align-items: center; gap: 3px; padding: 6px; background: var(--soft); overflow: auto; }
@@ -286,13 +294,26 @@
 .host-progress li { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 .host-progress strong { color:var(--text); }
 
-.lan-host-list .lan-connection-select {
-  flex: 1; min-width: 0; display: flex; gap: 8px; align-items: baseline; text-align: start;
-  padding: 7px 8px; background: transparent; border-radius: 6px; overflow-wrap: anywhere;
+.lan-host-list details.floating-details > .lan-connection-select {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; align-items: center; gap: 10px;
+  padding: 9px 8px; color: var(--text); border-radius: 6px; text-align: start;
 }
-.lan-connection-select > svg { flex: none; align-self: start; }
-.lan-host-list .lan-connection-select:hover { background: var(--soft); }
-.lan-host-list .lan-connection-select[aria-expanded=true] { background: var(--tint); color: var(--accent); }
+.lan-connection-select .floating-details-icon { display: none; }
+.lan-protocol-glyph { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; color: var(--accent); background: var(--tint); }
+.lan-row-text { min-width: 0; }
+.lan-row-title { display: flex; align-items: baseline; gap: 7px; }
+.lan-row-title strong { min-width: 0; font-size: 14px; font-weight: 600; }
+.lan-protocol-label { flex: none; font: 11px/1.4 var(--font-mono); color: var(--muted); }
+.lan-host-list .lan-row-text small { margin-top: 2px; font: 11.5px/1.5 var(--font-mono); }
+.lan-row-text :is(strong, small) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lan-row-chevron { color: var(--muted); }
+.lan-detail-endpoint { font: 13px/1.5 var(--font-mono); user-select: all; overflow-wrap: anywhere; }
+.lan-profile-actions { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.lan-profile-actions button { display: inline-flex; align-items: center; gap: 5px; }
+.lan-connections .lan-monitor-status { margin: 0 8px 7px 50px; }
+.lan-terminal-message .lan-live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.lan-host-list details.floating-details > .lan-connection-select:hover { background: var(--soft); }
+.lan-host-list details.floating-details > .lan-connection-select[aria-expanded=true] { background: var(--tint); color: var(--accent); }
 .lan-host-list .pc-actions[hidden] { display: none; }
 .lan-terminal-tabs small { font-family: var(--font-mono); color: var(--muted); }
 .lan-rdp-viewport > div:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
@@ -302,7 +323,7 @@
 .host-directory-list .path-next { margin-inline-start:auto; color:var(--muted); }
 .host-directory-list button:is(:hover,:focus-visible) { background:var(--tint); }
 .host-directory footer { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
-.lan-connections .lan-host-list { max-height: min(42dvh, 360px); overflow: auto; scrollbar-gutter: stable; padding-inline: 2px; }
+.lan-connections .lan-host-list { max-height: min(42dvh, 360px); overflow-y: auto; overscroll-behavior: contain; padding-inline: 2px; }
 @media (max-width: 760px) {
   .lan-connections .lan-host-list { max-height: min(30dvh, 240px); }
 }
