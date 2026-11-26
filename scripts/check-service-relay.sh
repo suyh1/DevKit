@@ -7,7 +7,11 @@ ssh_user=${2:?Unprivileged SSH user required}
 mkdir -p /run/netns /run/sshd
 mount -t tmpfs tmpfs /run/netns
 scratch=$(mktemp -d /run/devkit-relay.XXXXXXXX)
-trap 'rm -rf -- "$scratch"' EXIT
+mount -t tmpfs -o exec tmpfs "$scratch"
+trap 'umount -l "$scratch"; rmdir "$scratch"' EXIT
+cp /etc/hosts "$scratch/hosts"
+printf '127.0.0.1 %s\n' "$(hostname)" >> "$scratch/hosts"
+mount --bind "$scratch/hosts" /etc/hosts
 chmod 711 "$scratch"
 for role in A B C; do
   ip netns add "$role"
@@ -43,6 +47,7 @@ echo 'Network File: /etc/systemd/network/10-fixture.network'
 PROFILE
 chmod 755 "$scratch/networkctl"
 mount --bind "$scratch/networkctl" "$(command -v networkctl)"
+ip netns exec B networkctl status --no-pager from-B | grep -q 'Network File: /etc/systemd/network/10-fixture.network'
 for role in A B C; do
   ip netns exec "$role" /usr/sbin/sshd -f /dev/null -h "$scratch/host" -p 2222 \
     -o ListenAddress=0.0.0.0 -o "AllowUsers=$ssh_user" -o "AuthorizedKeysFile=$scratch/client.pub" \

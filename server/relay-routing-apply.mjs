@@ -62,7 +62,9 @@ case " $hop " in *" dev $dev "*) ;; *) echo '下一跳与本机接口不匹配' 
   const nmRoute = `"${peer}/32 ${gateway}"`;
   const networkConfig = `
 uuid=
-if command -v nmcli >/dev/null; then uuid=$(nmcli -g GENERAL.CON-UUID device show "$dev" 2>/dev/null || true); fi
+if command -v nmcli >/dev/null; then
+  uuid=$(nmcli -t -f UUID,DEVICE connection show --active 2>/dev/null | awk -F: -v dev="$dev" '$2 == dev { print $1; exit }')
+fi
 if ! printf '%s' "$uuid" | grep -Eq '^[a-fA-F0-9-]{36}$'; then
   uuid=
   network=$(networkctl status --no-pager "$dev" 2>/dev/null | sed -n 's/^.*Network File: //p' | head -1)
@@ -78,8 +80,10 @@ fi`;
     { label:'保存主机路由', init: init + networkConfig,
       state: `if [ -n "$uuid" ]; then
   saved=$(nmcli -g ipv4.routes connection show uuid "$uuid")
-  if printf '%s\\n' "$saved" | tr ',' '\\n' | grep -Fxq '${peer}/32 ${gateway}'; then echo present
-  elif printf '%s' "$saved" | grep -Fq '${peer}/32'; then echo '已有持久路由，请核对下一跳' >&2; exit 1
+  entries=$(printf '%s\\n' "$saved" | sed -E 's/\\{ ip = ([^,]+), nh = ([^ }]+) \\}/\\1 \\2/g' | tr ',;' '\\n' | sed 's/^ *//; s/ *$//')
+  matches=$(printf '%s\\n' "$entries" | grep -F '${peer}/32' || true)
+  if [ "$matches" = '${peer}/32 ${gateway}' ]; then echo present
+  elif [ -n "$matches" ]; then echo '已有持久路由，请核对下一跳' >&2; exit 1
   else echo missing; fi
 else ${cfg.state}; fi`,
       add: `if [ -n "$uuid" ]; then nmcli connection modify uuid "$uuid" +ipv4.routes ${nmRoute}; else ${cfg.add}; fi`,
@@ -138,7 +142,7 @@ export async function applyRouting(input, profiles, lan, connect = session) {
     }
     const checks = await Promise.all(['B', 'C'].map(async (role, i) => {
       const host = sessions[i + 1], peer = role === 'B' ? plan.c : plan.b, local = role === 'B' ? plan.b : plan.c;
-      const cmd = host.platform === 'win32' ? `ping.exe -4 -n 1 -w 2000 ${peer} | Out-Null; if ($LASTEXITCODE) { throw 'ICMP' }` : `ping -I ${local} -c 1 -W 2 ${peer} >/dev/null`;
+      const cmd = host.platform === 'win32' ? `$ping=New-Object System.Net.NetworkInformation.Ping; try { if ($ping.Send('${peer}',2000).Status -ne 'Success') { throw 'ICMP' } } finally { $ping.Dispose() }` : `ping -I ${local} -c 1 -W 2 ${peer} >/dev/null`;
       try { await host.run(cmd); return role + ' → ' + peer + '：ICMP 已收到应答'; }
       catch { return role + ' → ' + peer + '：未确认 ICMP，请用实际服务验证并检查防火墙'; }
     }));
