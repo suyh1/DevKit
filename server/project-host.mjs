@@ -16,7 +16,7 @@ import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } f
 import { webTransferLimit } from './lan-sftp.mjs';
 
 const auditActions = new Set(['command', 'replace-begin', 'replace-finish', 'replace-restore', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
-const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'file-open', 'scan-start', 'wake', 'rdp-open', 'file-upload', 'file-download']);
+const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'file-open', 'scan-start', 'wake', 'rdp-open', 'rdp-file-upload', 'file-upload', 'file-download']);
 const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 const visitorsFor = settings => settings.visitors || [];
 const tlsFor = settings => settings.tls || null;
@@ -190,7 +190,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           });
         async function body() {
           const largeDocument = ['/api/http/save-library', '/api/project-todos/save', '/api/project-todos/create'].includes(url.pathname);
-          const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : ['/api/lan-hosts/rdp-input', '/api/lan-hosts/rdp-clipboard'].includes(url.pathname) ? 80_000 : 4_100_000;
+          const limit = largeDocument ? 16_100_000 : url.pathname === '/api/lan-hosts/rdp-open' ? 16_000 : url.pathname === '/api/lan-hosts/rdp-clipboard' ? 1_600_000 : url.pathname === '/api/lan-hosts/rdp-input' ? 80_000 : 4_100_000;
           return jsonBody(request, limit);
         }
         if (
@@ -364,16 +364,16 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
           if (workspaceRoute) {
             if (request.method !== 'POST') return json(405, { error: '需要 POST 请求。' });
             const [, module, action] = workspaceRoute;
-            const upload = module === 'lan-hosts' && action === 'file-upload';
+            const upload = module === 'lan-hosts' && ['file-upload', 'rdp-file-upload'].includes(action);
             const download = module === 'lan-hosts' && action === 'file-download';
             const rdp = module === 'lan-hosts' && action === 'rdp-open';
             let rdpStream;
             if (rdp) {
               const controller = new AbortController();
               response.once('close', () => { if (!response.writableFinished) controller.abort(); });
-              rdpStream = { signal: controller.signal, async write(id, stream, signal) {
+              rdpStream = { signal: controller.signal, async write(id, stream, signal, drive) {
                 ensureCurrentSession();
-                response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'X-DevKit-RDP-Session': id, 'X-Accel-Buffering': 'no' });
+                response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'X-DevKit-RDP-Session': id, 'X-DevKit-RDP-Drive': drive ? '1' : '0', 'X-Accel-Buffering': 'no' });
                 response.flushHeaders();
                 audit.record(session.visitor, 'lan-hosts.rdp-open', 'ok');
                 await pipeline(Readable.from(stream), response, { signal });

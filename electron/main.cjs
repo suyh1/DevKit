@@ -1,4 +1,4 @@
-const { app, clipboard, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
+const { app, clipboard, ClipboardItem, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
 const path = require('node:path');
@@ -414,8 +414,25 @@ app.whenReady().then(async () => {
     try {
       if (!lan) throw new Error(lanError || '局域网主机管理器尚未准备好。');
       if (action === 'clipboard-write') {
-        if (typeof value !== 'string' || Buffer.byteLength(value) > 16384) throw new Error('剪贴板文本超过限制。');
+        if (typeof value !== 'string' || Buffer.byteLength(value) > 4 * 1024 * 1024) throw new Error('剪贴板文本超过限制。');
         await clipboard.writeText(value); return { data: true };
+      }
+      if (action === 'clipboard-content') {
+        const items = await clipboard.read();
+        if (items.some(item => item.types.some(type => /hdrop|file(name|drop)|text\/uri-list/i.test(type)))) return { data: { kind: 'files' } };
+        const image = items.find(item => item.types.includes('image/png'));
+        if (image) {
+          const png = await image.getType('image/png');
+          if (png.size > 40 * 1024 * 1024) throw new Error('PNG 图片超过 40 MiB。');
+          return { data: { kind: 'png', bytes: await png.arrayBuffer() } };
+        }
+        return { data: { kind: 'text', text: await clipboard.readText() } };
+      }
+      if (action === 'clipboard-write-image') {
+        if (!(value instanceof ArrayBuffer) || value.byteLength < 24 || value.byteLength > 40 * 1024 * 1024 ||
+            Buffer.from(value).readUInt32BE() !== 0x89504e47) throw new Error('无效的 PNG 图片。');
+        await clipboard.write([new ClipboardItem({ 'image/png': new Blob([value], { type: 'image/png' }) })]);
+        return { data: true };
       }
       if (action === 'clipboard-read') return { data: await clipboard.readText() };
       if (action === 'pick-ssh-key') {

@@ -29,6 +29,7 @@
 .lan-rdp-form:not([hidden]) { display: grid; gap: 12px; }
 .lan-rdp-trust, .lan-rdp-toolbar { display: flex; align-items: center; gap: 8px; }
 .lan-rdp-toolbar { justify-content: space-between; flex-wrap: wrap; padding-bottom: 8px; }
+.lan-rdp-toolbar > [role=status] { min-width: 0; overflow-wrap: anywhere; }
 .lan-rdp-toolbar > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .lan-rdp-viewport { display: grid; place-items: center; height: min(72dvh, 920px); min-height: 180px; overflow: hidden; background: #101720; border-radius: 8px; touch-action: none; }
 .lan-rdp-viewport > div:focus { outline: none; }

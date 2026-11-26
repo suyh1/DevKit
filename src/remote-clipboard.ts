@@ -1,7 +1,32 @@
 import { lanRequest } from './lan-api';
 
-export const clipboardLimit = 16 * 1024;
-const textSize = (text: string) => new TextEncoder().encode(text).length;
+import { checkText, type ClipboardProtocol } from './clipboard-formats';
+
+type PasteContent = { kind: 'text'; text: string } | { kind: 'files'; files?: File[] } | { kind: 'png'; bytes: ArrayBuffer };
+
+export async function writeSessionImage(blob: Blob) {
+  if (window.devkitDesktop?.lanHosts) return lanRequest('clipboard-write-image', await blob.arrayBuffer());
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}
+
+export function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a'); link.href = url; link.download = name; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+export async function copyScreen(png: Promise<Blob>, notice: (message: string) => void) {
+  try {
+    if (!window.devkitDesktop?.lanHosts && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined')
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    else await writeSessionImage(await png);
+    notice('远端画面已复制到本机。');
+  } catch {
+    try { downloadBlob(await png, '远端画面.png'); notice('已下载远端画面的 PNG。'); }
+    catch { notice('无法读取当前画面。'); }
+  }
+}
+
 
 export async function readSessionClipboard(): Promise<string> {
   return window.devkitDesktop?.lanHosts ? lanRequest<string>('clipboard-read') : navigator.clipboard.readText();
@@ -22,18 +47,21 @@ function copyWithEvent(text: string) {
 }
 
 type Options = {
+  protocol: ClipboardProtocol;
+  sendLongText?: (text: string, usable: () => boolean) => Promise<void>;
+  sendFiles: (files: File[], usable: () => boolean) => Promise<boolean>;
   enabled: () => boolean;
-  sendText: (text: string) => void | Promise<void>;
+  sendText: (text: string, usable: () => boolean) => void | Promise<void>;
   key: (symbol: number, code: string, down: boolean) => void;
   notice: (message: string) => void;
 };
 
-export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, key, notice }: Options) {
+export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, sendText, sendFiles, sendLongText, key, notice }: Options) {
   const listeners = new AbortController(), capture = { capture: true, signal: listeners.signal };
   let leftControl = false, interacted = false, generation = 0;
   const consumed = new Set<string>();
   let lastSent: string | undefined;
-  let pasteQueue = Promise.resolve();
+  let pasteQueue = Promise.resolve(), copyRevision = 0;
   let pending: { deliver?: (text: string) => void; cancel: () => void; written?: Promise<boolean> } | undefined;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const focused = () => viewport.contains(document.activeElement) && viewport.getClientRects().length > 0;
@@ -48,6 +76,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
     if (!leftControl) key(0xffe3, 'ControlLeft', false);
   }
   function cancelCopy() {
+    copyRevision++;
     clearTimeout(timeout);
     pending?.cancel();
     pending = undefined;
@@ -68,23 +97,35 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
     }
     timeout = setTimeout(() => {
       cancelCopy();
-      if (active()) notice('未收到远端复制的文本，请确认目标允许剪贴板共享。');
+      if (active()) notice('未收到支持的剪贴板格式，请确认远端允许复制。');
     }, 5000);
     chord('c');
   }
-  function paste(read: Promise<string> | string) {
+  function paste(read: Promise<PasteContent> | PasteContent) {
     cancelCopy();
     const current = generation;
     const usable = () => current === generation && active() && document.hasFocus();
     // Capture each native paste once, then send clipboard data and its matching keystroke in order.
     pasteQueue = pasteQueue.then(async () => {
-      const text = await read;
-      if (!usable() || !text) return;
-      if (textSize(text) > clipboardLimit) { notice('每次最多粘贴 16 KiB 文本。'); return; }
+      const content = await read;
+      if (!usable()) return;
+      if (content.kind !== 'text') {
+        const files = content.kind === 'png' ? [new File([content.bytes], '截图.png', { type: 'image/png' })] : content.files || [];
+        if (await sendFiles(files, usable) && usable()) chord('v');
+        return;
+      }
+      const text = content.text;
+      if (!text) return;
+      const problem = checkText(text, protocol);
+      if (problem) {
+        if (sendLongText) await sendLongText(text, usable);
+        else notice(problem);
+        return;
+      }
       lastSent = text;
-      await sendText(text);
+      await sendText(text, usable);
       if (usable()) chord('v');
-    }).catch(() => { if (usable()) notice('粘贴失败，请检查会话的剪贴板权限。'); });
+    }).catch(error => { if (usable()) notice(error.message || '粘贴失败，请检查会话的剪贴板权限。'); });
   }
   viewport.addEventListener('pointerdown', () => { interacted = true; }, capture);
   viewport.addEventListener('keydown', event => {
@@ -98,7 +139,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
     if (event.repeat) { event.preventDefault(); return; }
     notice('');
     if (letter === 'c') { event.preventDefault(); beginCopy(); }
-    else if (window.devkitDesktop?.lanHosts) { event.preventDefault(); paste(readSessionClipboard()); }
+    else if (window.devkitDesktop?.lanHosts) { event.preventDefault(); paste(lanRequest<PasteContent>('clipboard-content')); }
     // In a browser let Ctrl+V dispatch its trusted paste event, including on ordinary LAN HTTP.
   }, capture);
   viewport.addEventListener('keyup', event => {
@@ -108,7 +149,9 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
   viewport.addEventListener('paste', event => {
     if (!event.isTrusted || !active()) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (event.clipboardData?.types.includes('text/plain')) paste(event.clipboardData.getData('text/plain'));
+    const data = event.clipboardData;
+    if (data?.files.length) paste({ kind: 'files', files: Array.from(data.files) });
+    else if (data?.types.includes('text/plain')) paste({ kind: 'text', text: data.getData('text/plain') });
   }, capture);
   function reset() {
     if (leftControl && enabled()) key(0xffe3, 'ControlLeft', false);
@@ -131,9 +174,11 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
       const echoed = text === lastSent;
       lastSent = undefined;
       if (echoed && !pending) return;
+      copyRevision++;
       const item = pending;
       pending = undefined; clearTimeout(timeout);
-      if (textSize(text) > clipboardLimit) { item?.cancel(); notice('远端剪贴板文本超过 16 KiB'); return; }
+      const problem = checkText(text, protocol === 'web-rdp' ? 'web-vnc' : protocol);
+      if (problem) { item?.cancel(); notice(problem); return; }
       try {
         if (window.devkitDesktop?.lanHosts) { await lanRequest('clipboard-write', text); return; }
         if (item?.deliver) {
@@ -144,6 +189,15 @@ export function bindRemoteClipboard(viewport: HTMLElement, { enabled, sendText, 
         if (copyWithEvent(text)) return;
         await navigator.clipboard.writeText(text);
       } catch { if (active()) notice('浏览器未允许写入本机剪贴板，可从「文本剪贴板」复制。'); }
+    },
+    async receiveImage(convert: () => Promise<Blob>) {
+      if (!enabled() || listeners.signal.aborted || !viewport.getClientRects().length || (!pending && !(interacted && focused() && document.hasFocus()))) return;
+      cancelCopy();
+      const revision = copyRevision;
+      try {
+        const png = await convert();
+        if (revision === copyRevision && enabled() && !listeners.signal.aborted) await writeSessionImage(png);
+      } catch (error) { if (enabled()) notice((error as Error).message || '无法复制远端位图。'); }
     },
     reset,
     dispose() { reset(); listeners.abort(); },

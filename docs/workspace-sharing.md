@@ -94,7 +94,11 @@ SSH、Telnet、串口、FTP、SFTP 和桌面 VNC 共用会话区。打开标签�
 
 Telnet 默认为 23 端口。FTP 支持被动传输，可选择明文（21）、显式 TLS（21）或隐式 TLS（990），配置用户名、密码与起始目录。串口可从桌面端枚举设备，按设备要求设置波特率、数据位、停止位、奇偶校验、流控和回车格式。
 
-点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。单次最多 16 KiB，需目标服务允许剪贴板传输。桌面内置 VNC 发送中文需要服务端支持扩展剪贴板，传统 VNC 剪贴板只支持 Latin-1。Windows 系统 RDP 客户端默认以全屏启动，剪贴板重定向遵循客户端和远端策略。
+点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。桌面 VNC 单次文本最多 4 MiB。中文和 emoji 需要服务端协商扩展文本，传统剪贴板使用 Latin-1。启用 DIB 位图的 VNC 服务支持双向复制截图（常见的 24/32 位 DIBv5，解码后含头部最多 40 MiB）。RFB 扩展中的文件格式仍为保留项，文件可用 SFTP 或 FTP 会话传输。网页 VNC 经网关传递文本。「复制画面」可复制当前整个远端屏幕；浏览器禁止写入图片时会下载 PNG。[RFB 扩展剪贴板规范](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding)
+
+网页 RDP 使用 guacd 1.6 的文本剪贴板。单次文本需放入 256 KiB 的 UTF-8 缓冲区，发往 Windows 时转换后的 UTF-16 也需放入 256 KiB（均计入结束符）。远端策略和网关也可能限制可复制的长度。[Guacamole RDP 剪贴板实现](https://github.com/apache/guacamole-server/blob/1.6.0/src/protocols/rdp/channels/cliprdr.c)
+
+Windows 系统 RDP 客户端默认以全屏启动，剪贴板重定向遵循客户端和远端策略。
 
 桌面端使用内置 [noVNC 1.7.0](https://github.com/novnc/noVNC/tree/v1.7.0) 显示 VNC，连接凭据只用于本次会话。默认端口为 5900，其他显示号请填写对应 TCP 端口，例如显示号 1 通常对应 5901。
 
@@ -104,6 +108,14 @@ Telnet 默认为 23 端口。FTP 支持被动传输，可选择明文（21）、
 2. 确认目标已启用远程桌面，并从 `guacd` 所在网络访问目标档案中的 RDP 或 VNC 端口。容器里的回环地址指容器本身，主机档案应填写从网关可达的地址。
 3. 在「局域网共享 → 局域网主机」勾选「远程桌面连接」。使用独立访客时，再为指定访客授予同一权限。独立 Node 服务可设置 `DEVKIT_SHARE_LAN_HOSTS=true` 与 `DEVKIT_LAN_HOSTS_RDP=true` 开放。
 4. 对于 VNC 会话，点「连接 VNC」，按目标要求填写用户名与密码。对于 RDP，访客从主机卡片点「连接远程桌面」，填写目标系统用户名、密码及可选域，即可在工作台内用键盘、鼠标或触控操作。登录凭据仅用于当前连接。目标使用自签名证书时，在确认目标身份后可选「首次信任目标证书」，网关会在后续连接核对证书，重新部署网关时需保留其证书信任记录。使用 HTTPS 可保护浏览器到共享主机的连接。
+
+#### 网页 RDP 文件与截图
+
+给运行 DevKit 的进程设置绝对路径 `DEVKIT_RDP_DRIVE_ROOT`，指向专用的本地目录。guacd 在容器或另一台机器时，将同一存储卷映射给 guacd，并设置 `DEVKIT_GUACD_DRIVE_ROOT` 为网关内的绝对路径。例如 DevKit 使用 `/srv/devkit-rdp`，容器使用 `-v /srv/devkit-rdp:/drive`，则网关路径填 `/drive`。两个服务需有读写权限；Linux 可使用同一服务用户，或在根目录设置共享组和 setgid。存储卷需支持硬链接。重新启动 DevKit，并向访客开放远程桌面、终端和文件传输权限。目标 Windows 需允许驱动器重定向。
+
+- 在电脑上复制截图或文件，聚焦网页 RDP 画面后按 Ctrl+V，工具栏会显示文件在 `\\tsclient\DevKit` 中的位置。截图保存为 PNG，超过网关文本容量的粘贴会保存为 UTF-8 的 `.txt` 文件。浏览器没有传入文件时可以点「发送文件」。单文件最多 128 MiB，已有同名文件会提示重命名。
+- 在远端文件资源管理器复制文件，粘贴到 `\\tsclient\DevKit\Download`，浏览器会下载该文件。远端应用中选中的图片可先保存为文件再放入 Download。
+- 每个连接使用独立临时目录，正常断开后清除。需要保留的文件请在断开前移出该盘。网页 RDP 的剪贴板通道只交换文本，图片和文件的目的地是中转盘。[Guacamole 驱动器重定向](https://guacamole.apache.org/doc/gug/configuring-guacamole.html#drive-redirection)
 
 远程桌面只连接已登记的目标，画面和输入通过当前登录会话传输。关闭窗口、退出登录或撤销权限会断开连接。浏览器内连接使用 Guacamole Common JS 和 `guacd`，部署资料见 [Apache Guacamole 文档](https://guacamole.apache.org/doc/gug/configuring-guacamole.html) 和 [组件许可证](apache-guacamole-license.md)。
 

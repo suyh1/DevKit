@@ -11,7 +11,7 @@ const lanActions = new Map([
   ['terminal-open', 'terminal'], ['terminal-read', 'terminal'], ['terminal-input', 'terminal'], ['terminal-resize', 'terminal'], ['terminal-close', 'terminal'],
   ['file-open', 'files'], ['file-status', 'files'], ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
   ['scan-interfaces', 'discover'], ['scan-start', 'discover'], ['scan-cancel', 'discover'], ['wake', 'wake'],
-  ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-clipboard', 'rdp'], ['rdp-close', 'rdp'],
+  ['rdp-file-upload', 'files'], ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-clipboard', 'rdp'], ['rdp-close', 'rdp'],
 ]);
 const lanChanges = new Set(['save', 'remove', 'import-connections', 'reset-trust']);
 
@@ -74,6 +74,10 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
           const statuses = services.monitor.enabled ? await monitor?.()?.request('lan-statuses', {}, { allowLan }) || [] : [];
           return { hosts: hosts(), statuses };
         }
+        if (action === 'rdp-file-upload') {
+          if (!access.rdp) fail(403, '未授予远程桌面权限。');
+          return rdpSessions.upload(payload, file, token);
+        }
         if (action === 'rdp-clipboard') return rdpSessions.clipboard(payload, token);
         if (action === 'rdp-input') return rdpSessions.input(payload, token);
         if (action === 'rdp-close') return rdpSessions.disconnect(payload, token);
@@ -81,7 +85,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
           if (!rdpStream) fail(400, '缺少远程桌面显示通道。');
           const target = coordinator.rdpTarget(payload?.id);
           const hostId = payload.id;
-          return manage(token, session => rdpSessions.open(target, payload, { token, stream: rdpStream, verify() {
+          return manage(token, session => rdpSessions.open(target, payload, { token, stream: rdpStream, allowFiles: access.files && access.terminal, verify() {
             if (session.closed) fail(401, '请先登录共享工作台。');
             ensureCurrentSession();
             const current = coordinator.rdpTarget(hostId);

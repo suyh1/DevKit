@@ -8,6 +8,8 @@ import type { LanHost } from './lan-api';
 
 export default function RemoteDesktop({ host, close }: { host: LanHost; close: () => void }) {
   const vnc = host.mode === 'vnc';
+  const picker = useRef<HTMLInputElement>(null);
+  const [drive, setDrive] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const screen = useRef<HTMLElement>(null);
   const [maximized, setMaximized] = useState(false), [full, setFull] = useState(false);
@@ -19,7 +21,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
   }, []);
   function resetScreen() {
     if (document.fullscreenElement === screen.current && screen.current) void document.exitFullscreen().catch(() => {});
-    setMaximized(false); setRemote(''); setNotice('');
+    setDrive(false); setMaximized(false); setRemote(''); setNotice('');
   }
   const session = useRef<ReturnType<typeof openRemoteDesktop> | null>(null);
   const [phase, setPhase] = useState<'idle' | 'connecting' | 'connected'>('idle');
@@ -44,7 +46,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
       }, { resizeDesktop: !vnc, onConnect: () => setPhase('connected'), onError: message => {
         session.current = null;
         resetScreen(); setError(message); setPhase('idle');
-      }, onClipboard: setRemote, onNotice: setNotice });
+      }, onDrive: setDrive, onClipboard: setRemote, onNotice: setNotice });
       password.value = '';
     }}>
       {error && <p className="pc-error" role="alert">{error}</p>}
@@ -62,10 +64,15 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
           else if (document.fullscreenEnabled && screen.current) void screen.current.requestFullscreen().catch(() => setMaximized(true));
           else setMaximized(true);
         }}>{full || maximized ? '退出全屏' : '会话全屏'}</button>
+        {phase === 'connected' && <button type="button" className="text-button" onClick={() => session.current?.capture()}>复制画面</button>}
+        {drive && phase === 'connected' && <><input type="file" ref={picker} multiple hidden onChange={event => {
+          const files = Array.from(event.target.files || []); event.target.value = '';
+          if (files.length) void session.current?.sendFiles(files).catch(error => setNotice(error.message));
+        }} /><button type="button" className="text-button" title="远端文件资源管理器中的 DevKit 磁盘；将文件放进 Download 可下载到本机" onClick={() => picker.current?.click()}>发送文件</button></>}
         <button type="button" className="text-button" disabled={phase !== 'connected'} onClick={() => session.current?.secureAttention()}>发送 Ctrl+Alt+Del</button>
         <button type="button" className="secondary-button" onClick={disconnect}>断开连接</button>
       </div></div>
-      {phase === 'connected' && <SessionClipboard remote={remote} send={text => session.current?.paste(text)} />}
+      {phase === 'connected' && <SessionClipboard protocol={vnc ? "web-vnc" : "web-rdp"} remote={remote} send={text => session.current?.paste(text)} />}
       <div className="lan-rdp-viewport" ref={viewport} />
     </section>
   </Modal>;

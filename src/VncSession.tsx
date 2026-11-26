@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import RFB from '@novnc/novnc';
+import RFB from './vnc-rfb';
+import { dibToPng, pngToDib } from './vnc-bitmap';
+import { checkText } from './clipboard-formats';
 import { VncChannel } from './vnc-channel';
 import SegmentedControl from './SegmentedControl';
 
 import SessionClipboard from './SessionClipboard';
-import { bindRemoteClipboard, clipboardLimit } from './remote-clipboard';
+import { bindRemoteClipboard, copyScreen } from './remote-clipboard';
 
 const fieldLabels: Record<string, string> = { username: '用户名', password: 'VNC 密码', target: '目标' };
 export default function VncSession({ id }: { id: string }) {
@@ -30,7 +32,15 @@ export default function VncSession({ id }: { id: string }) {
     let ready = false;
     const clipboard = bindRemoteClipboard(viewport.current, {
       enabled: () => ready && !disposed && !rfb.viewOnly,
-      sendText: text => rfb.clipboardPasteFrom(text),
+      protocol: 'desktop-vnc',
+      async sendFiles(files, usable) {
+        if (files.length !== 1 || files[0].type !== 'image/png') throw new Error('VNC 文件剪贴板未标准化，请使用 SFTP 或 FTP 会话传文件。');
+        const dib = await pngToDib(files[0]);
+        if (!usable()) return false;
+        await rfb.clipboardPasteDib(dib, usable);
+        return true;
+      },
+      sendText: (text, usable) => rfb.clipboardPasteFrom(text, usable),
       key: (symbol, code, down) => rfb.sendKey(symbol, code, down),
       notice: message => setMessage(message || 'VNC 已连接'),
     });
@@ -50,10 +60,13 @@ export default function VncSession({ id }: { id: string }) {
       const value = (event as CustomEvent).detail.text;
       if (!disposed && typeof value === 'string') {
         void clipboard.receive(value);
-        if (new TextEncoder().encode(value).length <= clipboardLimit) setRemote(value);
-        else { setRemote(''); setMessage('远端剪贴板文本超过 16 KiB'); }
+        const problem = checkText(value, 'desktop-vnc');
+        setRemote(problem ? '' : value);
+        if (problem) setMessage(problem);
       }
     });
+    rfb.addEventListener('clipboardimage', event => { void clipboard.receiveImage(() => dibToPng((event as CustomEvent).detail)); });
+    rfb.addEventListener('clipboarderror', event => { if (!disposed) setMessage((event as CustomEvent).detail); });
     rfb.addEventListener('credentialsrequired', event => {
       clearTimeout(timer);
       if (!disposed) { setFields((event as CustomEvent).detail.types); setMessage('目标要求登录'); }
@@ -82,6 +95,10 @@ export default function VncSession({ id }: { id: string }) {
       {running && connected && <>
         <SegmentedControl label="桌面缩放" value={scale ? 'fit' : 'original'} options={[{ value: 'fit', label: '适应窗口' }, { value: 'original', label: '原始大小' }]} onChange={value => setScale(value === 'fit')} />
         <label><input type="checkbox" checked={viewOnly} onChange={event => setViewOnly(event.target.checked)} />仅查看</label>
+        <button className="text-button" onClick={() => {
+          const rfb = client.current;
+          if (rfb) void copyScreen(new Promise((resolve, reject) => rfb.toBlob(blob => blob ? resolve(blob) : reject(), 'image/png')), setMessage);
+        }}>复制画面</button>
         <button disabled={viewOnly} className="text-button" onClick={() => { client.current?.sendCtrlAltDel(); client.current?.focus(); }}>发送 Ctrl+Alt+Del</button>
       </>}
     </div>
@@ -97,7 +114,7 @@ export default function VncSession({ id }: { id: string }) {
       <button className="run-button">登录</button>
     </form>}
     {running && fingerprint && <div className="lan-vnc-login"><code>{fingerprint}</code><button className="secondary-button" onClick={() => { resumeDeadline.current(); client.current?.approveServer(); setFingerprint(''); setMessage('正在验证…'); }}>信任本次连接</button></div>}
-    {running && connected && <SessionClipboard remote={remote} readOnly={viewOnly} send={text => client.current?.clipboardPasteFrom(text)} />}
+    {running && connected && <SessionClipboard protocol="desktop-vnc" remote={remote} readOnly={viewOnly} send={text => client.current?.clipboardPasteFrom(text)} />}
     <div ref={viewport} className="lan-vnc-screen" hidden={!running || !connected} />
   </div>;
 }

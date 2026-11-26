@@ -1,12 +1,13 @@
 import Guacamole from './vendor/guacamole.js';
-import { bindRemoteClipboard, clipboardLimit } from './remote-clipboard';
+import { bindRemoteClipboard, copyScreen, downloadBlob } from './remote-clipboard';
+import { checkText, gatewayTextLimit, transferLimit } from './clipboard-formats';
 import { remoteRequest, remoteResponse } from './workspace-remote';
 
 export type RdpCredentials = { username: string; password: string; domain: string; trustCertificate: boolean };
 
 export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credentials: RdpCredentials, {
-  resizeDesktop, onConnect, onError, onClipboard, onNotice,
-}: { resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void; onNotice: (message: string) => void }) {
+  resizeDesktop, onConnect, onError, onClipboard, onNotice, onDrive,
+}: { onDrive: (value: boolean) => void; resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void; onNotice: (message: string) => void }) {
   const controller = new AbortController(), tunnel = new Guacamole.Tunnel();
   const client = new Guacamole.Client(tunnel), parser = new Guacamole.Parser();
   const display = client.getDisplay(), screen = display.getElement();
@@ -22,8 +23,30 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
     if (disposed || !sessionId) throw new Error('会话已断开');
     await remoteRequest('lan-hosts', 'rdp-clipboard', { id: sessionId, text }, controller.signal);
   }
+  let drivePermitted = false, drive = false;
+  async function sendFiles(files: File[], usable = () => !disposed) {
+    if (!drive) throw new Error(resizeDesktop ? '需要管理员开启 RDP 中转盘和文件传输权限。' : '网页 VNC 支持文本剪贴板，文件请通过 SFTP 或 FTP 传输。');
+    if (!files.length) throw new Error('浏览器未提供文件，请使用「发送文件」。');
+    for (const file of files) {
+      if (!usable()) return false;
+      if (file.size > transferLimit) throw new Error('单个文件最多 128 MiB。');
+      const filename = file.type === 'image/png' && ['image.png', '截图.png'].includes(file.name) ? '截图-' + Date.now() + '.png' : file.name;
+      onNotice('正在上传 ' + filename);
+      const query = new URLSearchParams({ id: sessionId, name: filename });
+      await remoteResponse('/api/lan-hosts/rdp-file-upload?' + query, {
+        method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/octet-stream' }, body: file,
+      });
+      if (!disposed) onNotice('已发送到远端 \\\\tsclient\\DevKit\\' + filename);
+    }
+    return false; // Drive uploads must not trigger a second paste in the focused remote app.
+  }
   const clipboard = bindRemoteClipboard(viewport, {
     enabled: () => connected && !disposed,
+    protocol: resizeDesktop ? 'web-rdp' : 'web-vnc', sendFiles,
+    async sendLongText(text, usable) {
+      if (!drive) throw new Error(checkText(text, resizeDesktop ? 'web-rdp' : 'web-vnc'));
+      await sendFiles([new File([text], '剪贴板-' + Date.now() + '.txt', { type: 'text/plain;charset=utf-8' })], usable);
+    },
     sendText: paste, key: (symbol, _code, down) => client.sendKeyEvent(Number(down), symbol), notice: onNotice,
   });
   function resizeViewport() {
@@ -91,6 +114,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
         body: JSON.stringify({ id: hostId, ...credentials, width: viewport.clientWidth || window.innerWidth - 48, height: viewport.clientHeight || window.innerHeight - 170 }),
       });
       if (disposed) return;
+      drivePermitted = response.headers.get('X-DevKit-RDP-Drive') === '1';
       sessionId = response.headers.get('X-DevKit-RDP-Session') || '';
       if (!sessionId || !response.body) throw new Error('远程桌面显示通道不可用。');
       tunnel.setState(Guacamole.Tunnel.State.OPEN);
@@ -117,7 +141,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
     if (disposed || !sessionId || elements[0] === 'disconnect') return;
     if (messages.length >= 1024) { fail('远程桌面输入积压，请重新连接。'); return; }
     messages.push(elements.map(String));
-    if (!pendingInput && !timer) timer = setTimeout(() => void send(), 16);
+    if (!pendingInput && !timer) timer = setTimeout(() => void send(), elements[0] === 'ack' ? 0 : 16);
   };
   parser.oninstruction = (opcode, parameters) => tunnel.oninstruction?.(opcode, parameters);
   client.onstatechange = state => {
@@ -131,16 +155,60 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
       if (overflow) return;
       const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
       size += bytes.length;
-      if (size > clipboardLimit) { overflow = true; stream.sendAck('Text too long', 0x030d); return; }
+      if (size >= gatewayTextLimit) { overflow = true; stream.sendAck('Text too long', 0x030d); return; }
       parts.push(decoder.decode(bytes, { stream: true }));
       stream.sendAck('OK', 0);
     };
     stream.onend = () => {
       if (disposed) return;
-      if (overflow) { clipboard.reset(); onClipboard(''); onNotice('远端剪贴板文本超过 16 KiB'); return; }
+      if (overflow) { clipboard.reset(); onClipboard(''); onNotice('远端剪贴板文本超过网关的 256 KiB 缓冲区'); return; }
       const text = parts.join('') + decoder.decode();
       onClipboard(text); void clipboard.receive(text);
     };
+  };
+  client.onfilesystem = () => {
+    if (drivePermitted && !disposed) { drive = true; onDrive(true); }
+  };
+  // Only one stream buffers file contents at a time. Other downloads wait for their initial ACK.
+  const downloads = new Set<() => void>();
+  client.onfile = (stream, mime, filename) => {
+    if (!drive || downloads.size >= 64) { stream.sendAck('Drive unavailable or busy', 0x0308); onNotice('下载队列暂时无法接收新文件。'); return; }
+    let receiving = false;
+    const accept = () => { receiving = true; stream.sendAck('Ready', 0); };
+    const finish = () => {
+      downloads.delete(accept);
+      if (receiving && !disposed) downloads.values().next().value?.();
+      receiving = false;
+    };
+    const name = filename.split(/[\\/]/).pop()?.replace(/[<>:"|?*\x00-\x1f]/g, '_') || '远端文件';
+    let size = 0, failed = false;
+    const chunks: ArrayBuffer[] = [];
+    stream.onblob = data => {
+      if (failed || disposed) return;
+      try {
+        if (!receiving) throw new Error('远端提前发送了文件内容');
+        if (data.length > 4 * 1024 * 1024) throw new Error('文件分块过大');
+        const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+        size += bytes.length;
+        if (size > transferLimit) throw new Error('远端单个文件超过 128 MiB');
+        chunks.push(bytes.buffer); stream.sendAck('OK', 0);
+      } catch (error) {
+        chunks.length = 0; failed = true; finish();
+        stream.sendAck('File rejected', 0x030d); onNotice((error as Error).message);
+      }
+    };
+    stream.onend = () => {
+      if (failed) return;
+      finish();
+      if (!disposed) {
+        downloadBlob(new Blob(chunks, { type: mime || 'application/octet-stream' }), name);
+        onNotice('已向浏览器提交下载：' + name);
+      }
+      chunks.length = 0;
+    };
+    // guacd starts reading a redirected download only after the client accepts the file stream.
+    downloads.add(accept);
+    if (downloads.size === 1) accept();
   };
   client.onerror = status => {
     const help = status.code === 0x0301 || status.code === 0x0303
@@ -163,7 +231,11 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   client.connect();
   return {
     close() { close(); client.disconnect(); },
-    paste,
+    paste, sendFiles,
+    capture() {
+      const png = new Promise<Blob>((resolve, reject) => display.flatten().toBlob(blob => blob ? resolve(blob) : reject(), 'image/png'));
+      void copyScreen(png, onNotice);
+    },
     secureAttention() {
       screen.focus({ preventScroll: true });
       const keys = [0xffe3, 0xffe9, 0xffff];

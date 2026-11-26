@@ -1,4 +1,3 @@
-import { Client } from 'basic-ftp';
 import { createWriteStream } from 'node:fs';
 import { rename, rm, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -17,6 +16,7 @@ function limited() {
   } });
 }
 export async function openFtp(host, password) {
+  const { Client } = await import('basic-ftp');
   const client = new Client(15000);
   try {
     await client.access({ host: host.address, port: host.port, user: host.user, password: password || (host.user === 'anonymous' ? 'guest@' : ''),

@@ -1,5 +1,5 @@
 const { app, BrowserWindow, clipboard } = require("electron");
-const { checkClipboard, preserveClipboard } = require('./remote-clipboard-smoke.cjs');
+const { checkClipboard, preserveClipboard, pressClipboardKey } = require('./remote-clipboard-smoke.cjs');
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -913,7 +913,8 @@ app
       await wait('!document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑") && !document.querySelector(".lan-terminal-tabs")');
       console.log('Portal: validating the embedded remote desktop');
       const rdp = await (await import('./rdp-fixture.mjs')).rdpFixture();
-      const gateway = { DEVKIT_GUACD_HOST: '127.0.0.1', DEVKIT_GUACD_PORT: String(rdp.port), DEVKIT_GUACD_TLS: 'false' };
+      const driveRoot = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'devkit-portal-drive-'));
+      const gateway = { DEVKIT_RDP_DRIVE_ROOT: driveRoot, DEVKIT_GUACD_DRIVE_ROOT: '', DEVKIT_GUACD_HOST: '127.0.0.1', DEVKIT_GUACD_PORT: String(rdp.port), DEVKIT_GUACD_TLS: 'false' };
       const previousGateway = Object.fromEntries(Object.keys(gateway).map(key => [key, process.env[key]]));
       Object.assign(process.env, gateway);
       try {
@@ -929,10 +930,55 @@ app
         await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
         await wait(`Array.from(document.querySelectorAll('.lan-rdp-viewport canvas')).some(canvas=>canvas.width>=640&&Array.from(canvas.getContext('2d').getImageData(1,1,1,1).data).join(',')==='40,100,150,255')`);
         await checkClipboard(window, '.lan-rdp-viewport > div', {
-          pasted: () => rdp.pastes.length === 1 && rdp.pastes[0] === 'from-local',
+          text: '长文本🙂'.repeat(7000), selection: 'selected-remote'.repeat(3000),
+          pasted: () => rdp.pastes.length === 1 && rdp.pastes[0] === '长文本🙂'.repeat(7000),
         });
         await selector('.lan-session-clipboard summary');
-        await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote"');
+        await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote".repeat(3000)');
+        const drive = rdp.connections.at(-1)['drive-path'];
+        assert.ok(drive && drive.startsWith(driveRoot));
+        const { nativeImage, ClipboardItem } = require('electron');
+        const pixels = Buffer.from([9,15,214,255]), png = nativeImage.createFromBitmap(pixels, { width: 1, height: 1 }).toPNG();
+        await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+        await js('document.querySelector(".lan-rdp-viewport > div").focus()');
+        pressClipboardKey(window, 'V');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]").textContent.includes("已发送到远端")');
+        const [name] = await fs.readdir(drive);
+        assert.deepEqual(nativeImage.createFromBuffer(await fs.readFile(path.join(drive, name))).toBitmap(), pixels);
+        assert.equal(rdp.pastes.length, 1, 'drive paste must not type stale text into the remote application');
+        if (process.platform === 'win32') {
+          const local = path.join(driveRoot, 'from-explorer.bin');
+          const bytes = Buffer.from([34,0,8,67,0,255]);
+          await fs.writeFile(local, bytes);
+          const run = require('node:util').promisify(require('node:child_process').execFile);
+          await run('powershell.exe', ['-NoProfile', '-STA', '-Command',
+            'Add-Type -AssemblyName System.Windows.Forms; $list = New-Object System.Collections.Specialized.StringCollection; [void]$list.Add($env:DEVKIT_CLIPBOARD_TEST_FILE); [System.Windows.Forms.Clipboard]::SetFileDropList($list)'],
+            { windowsHide: true, env: { ...process.env, DEVKIT_CLIPBOARD_TEST_FILE: local } });
+          pressClipboardKey(window, 'V');
+          await wait('document.querySelector(".lan-rdp-toolbar [role=status]").textContent.includes("DevKit\\\\from-explorer.bin")');
+          assert.deepEqual(await fs.readFile(path.join(drive, 'from-explorer.bin')), bytes);
+        }
+        const oversized = '长文本🙂'.repeat(44000);
+        await clipboard.writeText(oversized);
+        pressClipboardKey(window, 'V');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]").textContent.endsWith(".txt")');
+        const textFile = (await fs.readdir(drive)).find(name => name.endsWith('.txt'));
+        assert.equal(await fs.readFile(path.join(drive, textFile), 'utf8'), oversized);
+        const downloaded = path.join(driveRoot, 'received.bin');
+        const received = new Promise((resolve, reject) => window.webContents.session.once('will-download', (_event, item) => {
+          item.setSavePath(downloaded);
+          item.once('done', (_event, state) => state === 'completed' ? resolve() : reject(Error(state)));
+        }));
+        const fileBytes = Buffer.from([0,255,8,42,0]);
+        rdp.sendFile('received.bin', fileBytes);
+        await received;
+        assert.deepEqual(await fs.readFile(downloaded), fileBytes);
+        const dimensions = window.getSize();
+        try {
+          window.setSize(520, 700);
+          await wait('window.innerWidth <= 520');
+          await wait('Array.from(document.querySelectorAll(".lan-rdp-toolbar button")).every(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; })');
+        } finally { window.setSize(...dimensions); }
         await fill('.lan-session-clipboard textarea:not([readonly])', '本地文本');
         await button('发送到远端', '.lan-session-clipboard button');
         await wait('document.querySelector(".lan-session-clipboard [role=status]").textContent.includes("已发送")');
@@ -962,6 +1008,7 @@ app
         await selector('button[aria-label="关闭远程桌面"]');
       } finally {
         await rdp.close();
+        await fs.rm(driveRoot, { recursive: true, force: true, maxRetries: 3 });
         for (const [key, value] of Object.entries(previousGateway)) {
           if (value === undefined) delete process.env[key]; else process.env[key] = value;
         }

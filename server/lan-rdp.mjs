@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { openDrive } from './rdp-drive.mjs';
 import { once } from 'node:events';
 import { createConnection, isIP } from 'node:net';
 import { connect as connectTls } from 'node:tls';
@@ -109,7 +110,7 @@ async function connectGateway(endpoint, options, signal, protocol) {
     options.password = '';
     const [ready] = await nextInstruction();
     if (ready !== 'ready') throw new Error('RDP handshake rejected');
-    return { socket, async *display() {
+    return { socket, driveEnabled: !!options['enable-drive'] && ['enable-drive', 'drive-name', 'drive-path'].every(key => args.includes(key)), async *display() {
       if (buffer) yield buffer;
       for await (const chunk of read) yield chunk;
     } };
@@ -156,24 +157,26 @@ export function createRdpSessions(env = process.env) {
     catch (error) { session.controller.abort(); throw error; }
     if (!session.socket?.writable) fail(404, '远程桌面会话已断开或不可用。');
     if (session.socket.writableLength > 256 * 1024) fail(429, '远程桌面暂时无法接收输入。');
-    return session.socket;
+    return session;
   }
   return {
-    async open(target, payload, { token, verify, stream }) {
+    async open(target, payload, { token, verify, stream, allowFiles }) {
       if (sessions.size >= 8 || [...sessions.values()].filter(session => session.token === token).length >= 2) fail(429, '远程桌面连接数已达上限。');
       const protocol = target.protocol === 'vnc' ? 'vnc' : 'rdp';
       const endpoint = gateway(env), options = optionsFor(target, payload);
       payload.password = '';
       const id = randomUUID(), controller = new AbortController();
       const signal = AbortSignal.any([stream.signal, controller.signal]);
-      const session = { token, controller, verify };
+      const session = { token, controller, verify, protocol, signal };
       sessions.set(id, session);
       const abort = () => session.socket?.destroy();
       signal.addEventListener('abort', abort, { once: true });
       let timer;
       try {
-        const { socket, display } = await connectGateway(endpoint, options, signal, protocol);
-        session.socket = socket;
+        if (allowFiles && protocol === 'rdp') session.drive = await openDrive(env);
+        Object.assign(options, session.drive?.options);
+        const { socket, display, driveEnabled } = await connectGateway(endpoint, options, signal, protocol);
+        session.socket = socket; session.driveEnabled = driveEnabled;
         signal.throwIfAborted();
         verify();
         timer = setInterval(() => {
@@ -181,28 +184,37 @@ export function createRdpSessions(env = process.env) {
           catch { controller.abort(); }
         }, 5000);
         timer.unref();
-        await stream.write(id, display(), signal);
+        await stream.write(id, display(), signal, driveEnabled);
       } finally {
         clearInterval(timer);
         signal.removeEventListener('abort', abort);
         sessions.delete(id);
-        session.socket?.destroy();
+        controller.abort(); session.socket?.destroy();
+        await session.drive?.close();
       }
     },
     input(payload, token) {
-      writable(payload, token).write(encodeInput(payload.messages));
+      writable(payload, token).socket.write(encodeInput(payload.messages));
       return true;
     },
-    clipboard(payload, token) {
-      const socket = writable(payload, token);
+    async upload(payload, file, token) {
+      const session = owned(payload?.id, token);
+      session.verify();
+      if (!session.driveEnabled) fail(403, '当前会话未启用 RDP 文件中转盘。');
+      return session.drive.upload(file, session.signal, session.verify);
+    },
+    async clipboard(payload, token) {
+      const { socket, protocol } = writable(payload, token);
       const text = payload.text;
-      if (typeof text !== 'string' || Buffer.byteLength(text) > 16384) fail(400, '剪贴板每次最多发送 16 KiB 文本。');
+      if (typeof text !== 'string' || Buffer.byteLength(text) + 1 > 262144 ||
+          (protocol === 'rdp' && (text.length + 1) * 2 > 262144)) fail(400, '剪贴板文本超过网关的 256 KiB 编码缓冲区。');
       const bytes = Buffer.from(text);
       // This channel is the only writer of Guacamole output streams.
       const index = 0;
       const parts = [instruction('clipboard', index, 'text/plain')];
       for (let i = 0; i < bytes.length; i += 4096) parts.push(instruction('blob', index, bytes.subarray(i, i + 4096).toString('base64')));
-      socket.write(parts.join('') + instruction('end', index));
+      const packet = parts.join('') + instruction('end', index);
+      await new Promise((resolve, reject) => socket.write(packet, error => error ? reject(error) : resolve()));
       return true;
     },
     disconnect(payload, token) { owned(payload?.id, token).controller.abort(); return true; },

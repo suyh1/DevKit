@@ -9,21 +9,25 @@ type Tunnel = {
   setState(state: number): void;
   oninstruction: InstructionHandler | null;
 };
+type InputStream = {
+  sendAck(message: string, code: number): void;
+  onblob: ((data: string) => void) | null;
+  onend: (() => void) | null;
+};
 type Client = {
   connect(): void;
   disconnect(): void;
   getDisplay(): {
+    flatten(): HTMLCanvasElement;
     getElement(): HTMLElement;
     getWidth(): number;
     getHeight(): number;
     scale(scale: number): void;
     onresize: (() => void) | null;
   };
-  onclipboard: ((stream: {
-    sendAck(message: string, code: number): void;
-    onblob: ((data: string) => void) | null;
-    onend: (() => void) | null;
-  }, mime: string) => void) | null;
+  onfilesystem: ((filesystem: unknown, name: string) => void) | null;
+  onfile: ((stream: InputStream, mime: string, name: string) => void) | null;
+  onclipboard: ((stream: InputStream, mime: string) => void) | null;
   sendSize(width: number, height: number): void;
   sendKeyEvent(pressed: number, keysym: number): void;
   sendMouseState(state: MouseState, applyDisplayScale: boolean): void;

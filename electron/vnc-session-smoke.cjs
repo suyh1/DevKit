@@ -1,13 +1,25 @@
 const assert = require('node:assert/strict');
 const { createServer } = require('node:net');
 const { once } = require('node:events');
+const { deflateSync, inflateSync } = require('node:zlib');
+const { clipboard, ClipboardItem, nativeImage } = require('electron');
+const { preserveClipboard, pressClipboardKey } = require('./remote-clipboard-smoke.cjs');
+
+function extendedCut(flags, body = Buffer.alloc(0)) {
+  const header = Buffer.alloc(12);
+  header[0] = 3; header.writeInt32BE(-4 - body.length, 4); header.writeUInt32BE(flags, 8);
+  return Buffer.concat([header, body]);
+}
 
 // Minimal RFB 3.8 peer, with a VNC authentication challenge and one raw red pixel.
 module.exports = async function checkVncSession(window, waitFor) {
   const wait = expression => waitFor('Boolean(' + expression + ')');
   const sockets = new Set(), keys = [], pasted = [];
   let connections = 0;
+  const longText = 'long-line '.repeat(64000), selection = 'selected-remote'.repeat(4000);
   const applications = [];
+  let offeredDib, remoteDib, bitmapPaste = false, supportsDib = false;
+  const imageNotify = (1 << 27) | 8, imageRequest = (1 << 25) | 8, imageProvide = (1 << 28) | 8;
   const server = createServer(socket => {
     connections++; sockets.add(socket);
     socket.on('error', () => {});
@@ -22,7 +34,7 @@ module.exports = async function checkVncSession(window, waitFor) {
         const type = buffer[0];
         if (step >= 4) {
           if (type === 2 && buffer.length < 4 || type === 6 && buffer.length < 8) return;
-          size = { 0: 20, 2: type === 2 ? 4 + 4 * buffer.readUInt16BE(2) : 0, 3: 10, 4: 8, 5: 6, 6: type === 6 ? 8 + buffer.readUInt32BE(4) : 0 }[type];
+          size = { 0: 20, 2: type === 2 ? 4 + 4 * buffer.readUInt16BE(2) : 0, 3: 10, 4: 8, 5: 6, 6: type === 6 ? 8 + Math.abs(buffer.readInt32BE(4)) : 0 }[type];
         }
         if (!size || buffer.length < size) return;
         const data = buffer.subarray(0, size);
@@ -43,11 +55,22 @@ module.exports = async function checkVncSession(window, waitFor) {
           const symbol = data.readUInt32BE(4), down = data[1] === 1;
           keys.push(symbol);
           if (symbol === 0xffe3) ctrl = down;
-          if (ctrl && down && symbol === 118) applications.push(clipboardText);
-          if (ctrl && down && symbol === 99) {
-            const selected = Buffer.from('selected-remote');
-            socket.write(Buffer.concat([Buffer.from([3,0,0,0,0,0,0,selected.length]), selected]));
+          if (ctrl && down && symbol === 118) {
+            if (supportsDib) bitmapPaste = true;
+            else applications.push(clipboardText);
           }
+          if (ctrl && down && symbol === 99 && remoteDib) socket.write(extendedCut(imageNotify));
+          else if (ctrl && down && symbol === 99) {
+            const selected = Buffer.from(selection), header = Buffer.alloc(8);
+            header[0] = 3; header.writeUInt32BE(selected.length, 4);
+            socket.write(Buffer.concat([header, selected]));
+          }
+        } else if (type === 6 && data.readInt32BE(4) < 0) {
+          const flags = data.readUInt32BE(8);
+          if (flags & (1 << 24)) supportsDib = !!(flags & 8);
+          else if (flags === imageNotify) socket.write(extendedCut(imageRequest));
+          else if (flags === imageProvide) offeredDib = inflateSync(data.subarray(12));
+          else if (flags === imageRequest && remoteDib) socket.write(extendedCut(imageProvide, deflateSync(remoteDib)));
         } else if (type === 6) { clipboardText = data.subarray(8).toString(); pasted.push(clipboardText); }
         step++;
       }
@@ -83,14 +106,40 @@ module.exports = async function checkVncSession(window, waitFor) {
     await wait('!document.querySelector(".lan-host-dialog[open]") && document.querySelector(".lan-connection-select")');
     await submitPassword();
     await require('./remote-clipboard-smoke.cjs').checkClipboard(window, '.lan-vnc-screen canvas', {
-      pasted: () => applications.length === 1 && applications[0] === 'from-local',
+      text: longText, selection,
+      pasted: () => applications.length === 1 && applications[0] === longText,
     });
     await js('document.querySelector(".lan-session-clipboard summary").click()');
-    await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote"');
+    await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote".repeat(4000)');
     await js('const field=document.querySelector(".lan-session-clipboard textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,"local"); field.dispatchEvent(new Event("input",{bubbles:true}))');
     await click('.lan-session-clipboard', '发送到远端');
     for (let i = 0; i < 40 && pasted.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 25));
-    assert.deepEqual(pasted, ['from-local', 'local']);
+    assert.deepEqual(pasted, [longText, 'local']);
+    // Real OS PNG -> negotiated DIBv5 -> a different remote selection -> OS PNG.
+    const restoreImage = await preserveClipboard();
+    try {
+      [...sockets][0].write(extendedCut(0x1f000009, Buffer.alloc(8)));
+      for (let i = 0; i < 80 && !supportsDib; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      assert.ok(supportsDib, 'peer should receive DIB capabilities');
+      const png = nativeImage.createFromBitmap(Buffer.from([11,22,33,255]), { width: 1, height: 1 }).toPNG();
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+      await js('document.querySelector(".lan-vnc-screen canvas").focus()');
+      pressClipboardKey(window, 'V');
+      for (let i = 0; i < 100 && !(offeredDib && bitmapPaste); i++) await new Promise(resolve => setTimeout(resolve, 25));
+      assert.ok(bitmapPaste && offeredDib, 'paste should transmit the PNG as DIB and deliver Ctrl+V');
+      assert.equal(offeredDib.readUInt32BE(), 128);
+      assert.deepEqual([...offeredDib.subarray(-4)], [11,22,33,255]);
+      remoteDib = Buffer.from(offeredDib);
+      Buffer.from([77,66,55,255]).copy(remoteDib, remoteDib.length - 4);
+      pressClipboardKey(window, 'C');
+      let pixel;
+      for (let i = 0; i < 100 && pixel?.[0] !== 77; i++) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+        const image = (await clipboard.read()).find(item => item.types.includes('image/png'));
+        if (image) pixel = nativeImage.createFromBuffer(Buffer.from(await (await image.getType('image/png')).arrayBuffer())).toBitmap();
+      }
+      assert.deepEqual([...pixel], [77,66,55,255]);
+    } finally { await restoreImage(); }
     await click('.lan-vnc-session', '发送 Ctrl+Alt+Del');
     for (let attempt = 0; attempt < 40 && !keys.includes(0xffff); attempt++) await new Promise(resolve => setTimeout(resolve, 25));
     assert.ok(keys.includes(0xffff));
@@ -103,13 +152,14 @@ module.exports = async function checkVncSession(window, waitFor) {
     }
     await new Promise(resolve => setTimeout(resolve, 80));
     assert.equal(keys.length, readOnlyKeys);
-    assert.deepEqual(pasted, ['from-local', 'local']);
+    assert.deepEqual(pasted, [longText, 'local']);
     await click('.lan-vnc-session', '断开连接');
     await click('.lan-vnc-session', '重新连接');
     await submitPassword();
     assert.equal(connections, 2);
     await js('document.querySelector(".lan-terminal-tabs .icon-button").click()');
-    await wait('document.activeElement.matches(".lan-connection-select")');
+    try { await wait('document.activeElement.matches(".lan-connection-select")'); }
+    catch (error) { throw new Error(error.message + ': ' + await js('JSON.stringify({ focused: document.activeElement.outerHTML.slice(0, 240), rows: document.querySelectorAll(".lan-connection-select").length, tabs: document.querySelectorAll(".lan-terminal-tabs [role=tab]").length })')); }
     await js('[...document.querySelectorAll(".lan-connection-select")].find(el => el.querySelector("strong").textContent === "VNC fixture").click()');
     await click('.lan-host-list', '打开 VNC');
     await submitPassword();

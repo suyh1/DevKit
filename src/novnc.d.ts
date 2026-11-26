@@ -3,6 +3,7 @@ declare module '@novnc/novnc' {
     constructor(viewport: HTMLElement, channel: import('./vnc-channel').VncChannel);
     scaleViewport: boolean;
     viewOnly: boolean;
+    toBlob(callback: BlobCallback, type: string): void;
     focus(): void;
     disconnect(): void;
     clipboardPasteFrom(text: string): void;

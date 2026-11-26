@@ -32,7 +32,7 @@ export class VncChannel {
 
   send(bytes: Uint8Array) {
     if (this.readyState !== 'open') return;
-    if (this.queued + bytes.length > 512 * 1024) { this.fail(new Error('VNC 输入积压，请重新连接。')); return; }
+    if (this.queued + bytes.length > 44 * 1024 * 1024) { this.fail(new Error('VNC 输入积压，请重新连接。')); return; }
     // noVNC reuses its 10 KiB send buffer as soon as send returns.
     const data = bytes.slice().buffer, size = bytes.byteLength;
     this.queued += size;
