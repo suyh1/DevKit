@@ -62,6 +62,7 @@ export default function App() {
 }
 function Workbench({ preferences, setPreferences }: { preferences: Preferences; setPreferences: React.Dispatch<React.SetStateAction<Preferences>> }) {
   const [gitSeed, setGitSeed] = useState<import('./git-api').GitSeed>();
+  const [hostDraft, setHostDraft] = useState<Partial<import('./lan-api').HostDraft>>();
   const [serviceSeed, setServiceSeed] = useState<ServiceDraft>();
   const [httpInitial, setHttpInitial] = useState<{ config: string; key: number } | null>(null);
   const [tasks, setTasks] = useState<Task[]>(() => preferences.startup !== 'home' ? [createTask(preferences.startup, preferences.indent)] : []);
@@ -285,10 +286,10 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} seed={serviceSeed} consumeSeed={() => setServiceSeed(undefined)} /></div>
-        <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
+        <div data-motion-page inert={page !== 'lan-hosts'} hidden={page !== 'lan-hosts'} className="workspace"><LanHosts initialDraft={hostDraft} consumeDraft={() => setHostDraft(undefined)} active={page === 'lan-hosts'} onOpenMonitor={id => { setMonitorFocus({ id }); navigate('monitor'); }} /></div>
         <div data-motion-page inert={page !== 'monitor'} hidden={page !== 'monitor'} className="workspace"><MonitorCenter active={page === 'monitor'} focus={monitorFocus} /></div>
         <div data-motion-page inert={!['home', 'favorites', 'recent'].includes(page)} hidden={!['home', 'favorites', 'recent'].includes(page)} className="workspace overview-workspace"><Overview onDetect={match => {
-          if (match.kind === 'workspace') { setServiceSeed(match.service); if (match.gitMode) setGitSeed(match.gitSeed??{ mode: match.gitMode }); if (match.resourceId) openWorkspaceLink(match.id, match.resourceId); else navigate(match.id); }
+          if (match.kind === 'workspace') { setServiceSeed(match.service); setHostDraft(match.hostDraft); if (match.gitMode) setGitSeed(match.gitSeed??{ mode: match.gitMode }); if (match.resourceId) openWorkspaceLink(match.id, match.resourceId); else navigate(match.id); }
           else openTool(match.id, true, match.input, match.options);
         }} key={page === 'task' || page === 'settings' ? 'home' : page} mode={page === 'favorites' ? 'favorites' : page === 'recent' ? 'recent' : 'home'} homeVisit={homeVisit} onBrowse={() => navigate('home', false, 'library')} onChoose={openTool} favorites={favorites} onFavorite={toggleFavorite} recent={recent} tasks={tasks} onResume={focusTask} library={preferences.library} onLibrary={library => setPreferences(current => ({ ...current, library }))} /></div>
         <div data-motion-page inert={page !== 'settings'} hidden={page !== 'settings'} className="workspace"><Settings preferences={preferences} onChange={setPreferences} favorites={favorites} onFavorites={setFavorites} onNotice={notice} /></div>

@@ -99,6 +99,12 @@ test('host import previews duplicates and invalid rows, stores metadata and uses
   await assert.rejects(lan.hostRequest('save', { ...host, mac: 'ff:ff:ff:ff:ff:ff' }), /MAC/);
   const [restored] = await lan.hostRequest('list');
   assert.equal(restored.mac, host.mac);
+  const remote = { name: 'Desktop', address: '[::1]', mode: 'rdp', port: 3391, modules: { jar: true } };
+  const desktop = (await lan.hostRequest('save', remote)).at(-1);
+  assert.deepEqual(desktop.modules, { jar: false, nginx: false });
+  assert.equal(await lan.hostRequest('rdp-target', { id: desktop.id }), '[::1]:3391');
+  assert.equal(lan.monitorTargets().at(-1).port, 3391);
+  assert.equal((await lan.hostRequest('import-preview', [{ ...remote, mode: 'vnc', port: 5900 }]))[0].error, undefined);
 });
 
 test('scanning stays on the selected interface and distinguishes TCP responses from neighbor cache; WOL uses the subnet broadcast', async () => {
@@ -455,6 +461,16 @@ test('shared host editing and SSH/SFTP use write-only credentials and private se
     if (!output.includes('echo-fixTURE')) await delay(30);
   }
   assert.match(output, /echo-fixTURE/);
+  const filesHost = (await data('save', { ...original, mode: 'sftp' })).at(-1);
+  const offered = await data('test', { id: filesHost.id });
+  await data('test', { id: filesHost.id, fingerprint: offered.fingerprint });
+  assert.equal((await request('file-open', { id: filesHost.id }, guest)).status, 403);
+  const filesOnly = await data('file-open', { id: filesHost.id });
+  assert.equal((await request('terminal-input', { ...filesOnly, text: 'unused' })).status, 400);
+  assert.ok(Array.isArray((await data('file-list', { ...filesOnly, path: '.' })).entries));
+  await data('terminal-close', filesOnly);
+  const savedFilesHost = (await data('list')).hosts.find(item => item.id === filesHost.id);
+  await data('remove', { id: filesHost.id, revision: savedFilesHost.revision });
   const desktopShell = await lan.hostRequest('terminal-open', { id: host.id });
   await lan.hostRequest('terminal-close', desktopShell);
   const bytes = Buffer.from([0, 1, 22, 255]);

@@ -18,7 +18,7 @@
 
 网页和桌面编辑同一份档案。网页可提交登录口令或上传 SSH 私钥，主机加密保存并用于两端连接。编辑已有档案时留空可沿用原凭据，网页响应只包含是否配置了凭据的状态。桌面端选用的私钥文件路径仅在桌面展示。新增网页 SSH 档案使用为该档案配置的凭据；修改连接目标时需为新目标配置凭据。通过不可信网络提交凭据时请使用 HTTPS。
 
-网页需同时拥有档案管理和连接诊断权限才能确认或重置 SSH 指纹。终端权限可连接已经确认指纹的主机。重置后网页确认不同指纹时，需为新指纹重新配置凭据。SSH 会话属于当前登录，退出、权限撤销或连接目标、凭据及指纹变更时会关闭对应会话。SFTP 在获得相应权限的终端内选择和下载文件，单文件限 128 MiB。
+网页需同时拥有档案管理和连接诊断权限才能确认或重置 SSH 指纹。终端权限可连接已经确认指纹的主机。重置后网页确认不同指纹时，需为新指纹重新配置凭据。SSH 会话属于当前登录，退出、权限撤销或连接目标、凭据及指纹变更时会关闭对应会话。获准使用终端和文件功能的访客，可打开独立 SFTP 会话或终端内的文件面板，单文件限 128 MiB。
 
 访客同时获准访问监控中心时，主机卡片显示已有端口监控的状态，并可打开检测历史。监控编辑和运行权限齐备时，还可从主机卡片启用端口监控。获得对应日志分类权限时，可从主机卡片跳到日志中心，筛选该主机的来源。
 
@@ -90,12 +90,14 @@ Linux x64 和 ARM64 使用官方 glibc 发行版，适用于满足官方系统�
 
 展开“HTTPS 与证书”，填写主机上的 PEM 证书和私钥绝对路径，并填写证书匹配的域名或 IPv4。访问者使用面板显示的 HTTPS 地址和客户端信任的证书，登录 Cookie 含 `Secure` 属性。可沿用可信局域网内的 HTTP 配置。口令以带盐 scrypt 哈希保存在 `configs/sharing/sharing.json`。
 
+桌面端使用内置 [noVNC 1.7.0](https://github.com/novnc/noVNC/tree/v1.7.0) 显示 VNC，连接凭据只用于本次会话。默认端口为 5900，其他显示号请填写对应 TCP 端口，例如显示号 1 通常对应 5901。
+
 ## 网页远程桌面
 
-1. 部署带 RDP 支持的 Apache Guacamole `guacd` 1.6。DevKit 桌面共享和独立 Node 服务默认连接本机的 `127.0.0.1:4822`。例如在已有 Docker 的共享主机上运行 `docker run -d --name devkit-guacd -p 127.0.0.1:4822:4822 guacamole/guacd:1.6.0`。使用单独的网关时，在启动 DevKit 前设置 `DEVKIT_GUACD_HOST` 和 `DEVKIT_GUACD_PORT`。启用网关 TLS 时设置 `DEVKIT_GUACD_TLS=true`，并让运行 DevKit 的 Node 或 Electron 信任网关的证书。将 `guacd` 端口限制在 DevKit 可访问的私有网络内。
-2. 确认目标已启用远程桌面，并从 `guacd` 所在网络访问目标的 RDP 端口。容器里的回环地址指容器本身，主机档案应填写从网关可达的地址。
+1. 部署带所需协议插件（RDP 或 VNC）的 Apache Guacamole `guacd` 1.6。DevKit 桌面共享和独立 Node 服务默认连接本机的 `127.0.0.1:4822`。例如在已有 Docker 的共享主机上运行 `docker run -d --name devkit-guacd -p 127.0.0.1:4822:4822 guacamole/guacd:1.6.0`。使用单独的网关时，在启动 DevKit 前设置 `DEVKIT_GUACD_HOST` 和 `DEVKIT_GUACD_PORT`。启用网关 TLS 时设置 `DEVKIT_GUACD_TLS=true`，并让运行 DevKit 的 Node 或 Electron 信任网关的证书。将 `guacd` 端口限制在 DevKit 可访问的私有网络内。
+2. 确认目标已启用远程桌面，并从 `guacd` 所在网络访问目标档案中的 RDP 或 VNC 端口。容器里的回环地址指容器本身，主机档案应填写从网关可达的地址。
 3. 在「局域网共享 → 局域网主机」勾选「远程桌面连接」。使用独立访客时，再为指定访客授予同一权限。独立 Node 服务可设置 `DEVKIT_SHARE_LAN_HOSTS=true` 与 `DEVKIT_LAN_HOSTS_RDP=true` 开放。
-4. 访客从主机卡片点「连接远程桌面」，填写目标系统用户名、密码及可选域，即可在工作台内用键盘、鼠标或触控操作。登录凭据仅用于当前连接。目标使用自签名证书时，在确认目标身份后可选「首次信任目标证书」，网关会在后续连接核对证书，重新部署网关时需保留其证书信任记录。使用 HTTPS 可保护浏览器到共享主机的连接。
+4. 对于 VNC 会话，点「连接 VNC」，按目标要求填写用户名与密码。对于 RDP，访客从主机卡片点「连接远程桌面」，填写目标系统用户名、密码及可选域，即可在工作台内用键盘、鼠标或触控操作。登录凭据仅用于当前连接。目标使用自签名证书时，在确认目标身份后可选「首次信任目标证书」，网关会在后续连接核对证书，重新部署网关时需保留其证书信任记录。使用 HTTPS 可保护浏览器到共享主机的连接。
 
 远程桌面只连接已登记的目标，画面和输入通过当前登录会话传输。关闭窗口、退出登录或撤销权限会断开连接。浏览器内连接使用 Guacamole Common JS 和 `guacd`，部署资料见 [Apache Guacamole 文档](https://guacamole.apache.org/doc/gug/configuring-guacamole.html) 和 [组件许可证](apache-guacamole-license.md)。
 
@@ -217,7 +219,7 @@ DEVKIT_SHARE_JAR=true DEVKIT_JAR_EDIT=true DEVKIT_JAR_CONTROL=true node server/s
 | `DEVKIT_SHARE_MONITOR` / `DEVKIT_MONITOR_EDIT` / `DEVKIT_MONITOR_CONTROL` | 监控中心开放 / 编辑 / 运行 |
 | `DEVKIT_SHARE_LAN_HOSTS` | 开放已保存的局域网主机清单 |
 | `DEVKIT_LAN_HOSTS_EDIT` / `DEVKIT_LAN_HOSTS_DIAGNOSE` | 管理主机档案 / 测试和诊断连接 |
-| `DEVKIT_LAN_HOSTS_TERMINAL` / `DEVKIT_LAN_HOSTS_FILES` | SSH 终端 / 终端内的 SFTP 文件功能 |
+| `DEVKIT_LAN_HOSTS_TERMINAL` / `DEVKIT_LAN_HOSTS_FILES` | SSH 终端 / SFTP 文件功能 |
 | `DEVKIT_LAN_HOSTS_DISCOVER` / `DEVKIT_LAN_HOSTS_WAKE` / `DEVKIT_LAN_HOSTS_RDP` | 发现主机 / 网络唤醒 / 网页远程桌面连接 |
 | `DEVKIT_GUACD_HOST` / `DEVKIT_GUACD_PORT` / `DEVKIT_GUACD_TLS` | 网页远程桌面网关地址 / 端口 / TLS，默认 `127.0.0.1` / `4822` / `false` |
 | `DEVKIT_SHARE_JAR` / `DEVKIT_JAR_EDIT` / `DEVKIT_JAR_CONTROL` | 服务管理开放 / 编辑 / 运行管理（含控制台输入与系统自启） |

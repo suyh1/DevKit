@@ -496,7 +496,7 @@ function SharingPanel({
                           { key: 'files', label: 'SFTP 文件', detail: '通过已打开的 SSH 终端浏览、上传和下载远程文件。' },
                           { key: 'discover', label: '发现主机', detail: '从共享主机选定的网卡检测直连网段。' },
                           { key: 'wake', label: '网络唤醒', detail: '从共享主机唤醒配置了 MAC 地址的设备。' },
-                          { key: 'rdp', label: '远程桌面连接', detail: '通过共享主机配置的 guacd，在工作台内连接已登记的远程桌面。' },
+                          { key: 'rdp', label: '远程桌面连接', detail: '通过共享主机配置的 guacd，连接已登记的 RDP 或 VNC 桌面。' },
                         ],
                       },
                     ] as const

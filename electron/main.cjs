@@ -418,12 +418,13 @@ app.whenReady().then(async () => {
         return { data: result.canceled ? null : result.filePaths[0] };
       }
       if (action === 'open-rdp') {
-        if (process.platform !== 'win32') throw new Error('在 Windows 桌面端可打开系统远程桌面。');
+        const linux = process.platform === 'linux';
+        if (!linux && process.platform !== 'win32') throw new Error('当前平台不支持打开系统 RDP 客户端。');
         const endpoint = await lan.hostRequest('rdp-target', value);
-        const executable = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
+        const executable = linux ? 'remmina' : path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
         await new Promise((resolve, reject) => {
-          const child = spawn(executable, [`/v:${endpoint}`], { detached: true, stdio: 'ignore' });
-          child.once('error', error => reject(new Error(`无法打开 Windows 远程桌面：${error.message}`)));
+          const child = spawn(executable, linux ? ['-c', `rdp://${endpoint}`] : [`/v:${endpoint}`], { detached: true, stdio: 'ignore' });
+          child.once('error', error => reject(new Error(linux ? '无法打开 Remmina，请安装 Remmina 及其 RDP 插件。' : `无法打开 Windows 远程桌面：${error.message}`)));
           child.once('spawn', () => { child.unref(); resolve(); });
         });
         return { data: true };

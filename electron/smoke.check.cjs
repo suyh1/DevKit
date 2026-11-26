@@ -95,6 +95,10 @@ app.on('browser-window-created', (_event, window) => {
         await require('./close-smoke.cjs')(window, output);
         clearTimeout(timeout); return;
       }
+      if (process.env.DEVKIT_TEST_VNC_ONLY === '1') {
+        await require('./vnc-session-smoke.cjs')(window, waitFor);
+        clearTimeout(timeout); app.exit(0); return;
+      }
       if (process.env.DEVKIT_TEST_INVENTORY_ONLY === '1') {
         await require('./inventory-navigation-smoke.cjs')(window, output);
         clearTimeout(timeout); app.exit(0); return;
@@ -263,6 +267,7 @@ app.on('browser-window-created', (_event, window) => {
       await require('./nginx-smoke.cjs')(window, output);
       await require('./jar-smoke.cjs')(window, output);
       await require('./features-smoke.cjs')(window, output);
+      await require('./vnc-session-smoke.cjs')(window, waitFor);
       await require('./inventory-navigation-smoke.cjs')(window, output);
       await require('./close-behavior-smoke.cjs')(window, output);
       console.log('Electron smoke passed: sandbox, secure origin, explicit recommendations with direction/data transfer, responsive home, all extended tool UIs/workers, local parsers, Web Crypto, native-save IPC and cancel.');

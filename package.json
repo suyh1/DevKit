@@ -68,6 +68,7 @@
     "@jridgewell/trace-mapping": "^0.3.31",
     "@lezer/highlight": "^1.2.5",
     "@noble/hashes": "2.4.0",
+    "@novnc/novnc": "1.7.0",
     "@oddbird/popover-polyfill": "^0.7.3",
     "@peculiar/x509": "^3.1.0",
     "@xterm/addon-fit": "^0.11.0",

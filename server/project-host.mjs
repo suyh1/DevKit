@@ -16,7 +16,7 @@ import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } f
 import { webTransferLimit } from './lan-sftp.mjs';
 
 const auditActions = new Set(['command', 'replace-begin', 'replace-finish', 'replace-restore', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
-const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'scan-start', 'wake', 'rdp-open', 'file-upload', 'file-download']);
+const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'file-open', 'scan-start', 'wake', 'rdp-open', 'file-upload', 'file-download']);
 const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 const visitorsFor = settings => settings.visitors || [];
 const tlsFor = settings => settings.tls || null;

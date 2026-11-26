@@ -12,9 +12,11 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
   const fitAddon = useRef<FitAddon | null>(null);
   const [message, setMessage] = useState('正在连接…');
   const [connectionId, setConnectionId] = useState(''), [filesOpen, setFilesOpen] = useState(false);
+  const [running, setRunning] = useState(true);
   const [generation, setGeneration] = useState(0);
   const [selection, setSelection] = useState(false), [feedback, setFeedback] = useState('');
   useEffect(() => {
+    if (!running) return;
     const node = container.current!;
     function appearance() {
       const style = getComputedStyle(node);
@@ -75,7 +77,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
       if (!disposed) { setConnectionId(session); if (node.offsetWidth && !document.activeElement?.closest('dialog, .lan-terminal-tabs')) terminal.focus(); void poll(); }
     }).catch(error => { if (!disposed) { setConnectionId(''); setMessage(error.message); } void close(); });
     return () => { disposed = true; clearTimeout(timer); void close(); controls.current = null; fitAddon.current = null; observer.disconnect(); themeObserver.disconnect(); resize.dispose(); input.dispose(); selected.dispose(); terminal.dispose(); };
-  }, [id, generation]);
+  }, [id, generation, running]);
   useEffect(() => {
     if (active) {
       fitAddon.current?.fit();
@@ -84,7 +86,10 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
   }, [active]);
   return <div className="lan-ssh-session">
     <div className="lan-terminal-message"><span role="status">{message || feedback || '已连接'}</span>
-      {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); }}>重新连接</button>}
+      {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); setRunning(true); }}>重新连接</button>}
+      {running && (connectionId || message === '正在连接…') && <button type="button" className="text-button" onClick={() => {
+        setRunning(false); setConnectionId(''); setSelection(false); setMessage('会话已断开');
+      }}>断开连接</button>}
       <button type="button" className="text-button" disabled={!selection} onClick={() => void copyText(controls.current?.getSelection() || '').then(() => setFeedback('已复制选区'), () => setFeedback('复制失败'))}>复制选区</button>
       <button type="button" className="text-button" onClick={() => { controls.current?.clear(); controls.current?.focus(); }}>清空显示</button>
       {allowFiles && <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => setFilesOpen(value => !value)}>SFTP 文件</button>}

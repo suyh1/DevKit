@@ -934,6 +934,19 @@ app
         await button('断开连接', '.lan-rdp-toolbar button');
         await wait('!document.querySelector(".lan-rdp-form").hidden && !document.querySelector(".lan-rdp-form input[name=password]").value');
         await selector('button[aria-label="关闭远程桌面"]');
+        await wait('!document.querySelector(".lan-rdp-dialog[open]")');
+        await button('添加主机', '.lan-heading-actions button');
+        await js('document.querySelector(".lan-host-form input[value=vnc]").click()');
+        await fill('.lan-address input', '192.0.2.46');
+        await fill('.lan-host-name input', '网页 VNC');
+        await button('保存并连接', '.lan-host-form button');
+        await wait('document.querySelector(".lan-rdp-dialog h2")?.textContent.includes("VNC")');
+        assert.equal(await js('document.querySelector(".lan-rdp-form input[name=username]").required'), false);
+        await button('连接', '.lan-rdp-form button');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
+        assert.deepEqual(rdp.messages.filter(([op]) => op === 'select').at(-1), ['select', 'vnc']);
+        assert.equal(rdp.connections.at(-1).port, '5900');
+        await selector('button[aria-label="关闭远程桌面"]');
       } finally {
         await rdp.close();
         for (const [key, value] of Object.entries(previousGateway)) {

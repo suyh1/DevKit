@@ -91,6 +91,12 @@ test('browser RDP selects only saved targets, relays display and input, and revo
   for (let attempt = 0; attempt < 25 && !fixture.messages.some(message => message[0] === 'mouse'); attempt++) await delay(20);
   assert.ok(fixture.messages.some(message => message.join(',') === 'key,65,1'));
   assert.ok(fixture.messages.some(message => message.join(',') === 'mouse,80,40,1'));
+  const vnc = (await lan.hostRequest('save', { mode: 'vnc', name: 'VNC', address: '192.0.2.44', port: 5901 })).at(-1);
+  const vncResponse = await post('lan-hosts/rdp-open', { id: vnc.id, password: 'test-vnc', protocol: 'rdp' }, allowed);
+  assert.equal(vncResponse.status, 200);
+  assert.deepEqual(fixture.messages.filter(([command]) => command === 'select').at(-1), ['select', 'vnc']);
+  assert.equal(fixture.connections.at(-1).port, '5901');
+  await vncResponse.body.cancel();
   await host.start({ ...settings, password: '', visitors: [{ name: 'rdp-visitor', services: unprivileged }, { name: 'viewer', services: unprivileged }] });
   assert.equal((await post('lan-hosts/rdp-input', { id, messages: [['key', '65', '0']] }, allowed)).status, 401);
   assert.equal((await post('lan-hosts/rdp-open', credentials, await login('rdp-visitor'))).status, 403);

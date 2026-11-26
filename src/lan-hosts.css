@@ -305,3 +305,18 @@
 @media (max-width: 760px) {
   .lan-connections .lan-host-list { max-height: min(30dvh, 240px); }
 }
+
+.lan-host-actions { flex-wrap: wrap; justify-content: flex-end; }
+.lan-vnc-screen { height: clamp(230px, 58dvh, 850px); overflow: auto; background: #202428; }
+.lan-vnc-login { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 12px 14px; }
+.lan-vnc-login code { overflow-wrap: anywhere; }
+.lan-vnc-session .lan-terminal-message, .lan-file-session .lan-terminal-message { flex-wrap: wrap; }
+.lan-vnc-session .lan-terminal-message label { display: inline-flex; align-items: center; gap: 5px; }
+.lan-file-session .lan-sftp { width: 100%; min-width: 0; }
+.lan-terminal-tabs [role=tab] span, .lan-terminal-tabs small { max-width: 18ch; overflow: hidden; text-overflow: ellipsis; }
+.lan-terminal-tabs [role=tab] strong { color: var(--accent); font-size: 11px; }
+@media (min-width: 620px) {
+  .lan-host-choices:has(.lan-protocol) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.lan-vnc-session:fullscreen { display: flex; flex-direction: column; background: var(--surface); }
+.lan-vnc-session:fullscreen .lan-vnc-screen { flex: 1; min-height: 0; }

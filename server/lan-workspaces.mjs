@@ -9,6 +9,7 @@ import { diagnoseHost } from './lan-diagnostics.mjs';
 import { useSftp } from './lan-sftp.mjs';
 import { discoverHosts, lanInterfaces } from './lan-discovery.mjs';
 import { hostTarget, withDeadline } from './lan-probe.mjs';
+import { createVncSockets } from './lan-vnc.mjs';
 import { wakeHost } from './lan-power.mjs';
 
 const identity = /^[a-f0-9-]{36}$/;
@@ -29,14 +30,16 @@ export async function createLanWorkspaces(directory, transports = { share: share
   const desktopSession = randomUUID();
   let terminalGeneration = 0, openingTerminals = 0, scan, closed = false;
   const find = id => store.list().find(item => item.id === id);
+  const vnc = createVncSockets(find);
   function sameSshHost(host) {
     const current = find(host.id);
-    return current?.mode === 'ssh' && ['address', 'port', 'user', 'platform', 'fingerprint', 'auth', 'keyPath', 'secret', 'encryptedKey', 'explicitKeyOnly', 'jumpHostId'].every(key => current[key] === host[key]);
+    return current?.mode === host.mode && ['ssh', 'sftp'].includes(host.mode) && ['address', 'port', 'user', 'platform', 'fingerprint', 'auth', 'keyPath', 'secret', 'encryptedKey', 'explicitKeyOnly', 'jumpHostId'].every(key => current[key] === host[key]);
   }
   const routeCurrent = route => route.every(sameSshHost);
   function rdpTarget(id) {
     const host = find(id);
-    const port = host?.rdpPort || (host?.platform === 'win32' ? 3389 : null);
+    if (host?.mode === 'vnc' || host?.mode === 'rdp') return { address: host.address, port: host.port, protocol: host.mode };
+    const port = host?.rdpPort || (host?.mode === 'ssh' && host.platform === 'win32' ? 3389 : null);
     if (!port) throw Object.assign(new Error('请选择已配置远程桌面的主机。'), { status: 404 });
     const { address } = hostTarget(host);
     return { address, port };
@@ -97,6 +100,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     }
   }
   function invalidate() {
+    vnc.invalidate();
     for (const [client, route] of relayClients) if (!routeCurrent(route)) client.destroy();
     for (const [key, entry] of connections) if (find(entry.host.id) !== entry.host || !routeCurrent(entry.route)) { connections.delete(key); entry.transport?.close(); }
     for (const [key, entry] of cache) if (find(entry.host.id) !== entry.host) cache.delete(key);
@@ -199,6 +203,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
   async function hostRequest(action, value, localFile, web) {
     const owner = web?.token || desktopSession;
     web?.ensureCurrent();
+    if (action.startsWith('vnc-') && !web) return vnc.request(action, value);
     if (action === 'list') return store.list().map(publicHost);
     if (action === 'routing-fingerprint' || action === 'routing-enroll') {
       if (web) throw Object.assign(new Error('请在 DevKit 桌面端补录管理档案。'), { status:403 });
@@ -241,6 +246,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     if (action === 'import-preview') return store.previewImport(value, !!web);
     if (action === 'import-connections') { const result = await store.importConnections(value, web); invalidate(); return result; }
     if (['save', 'import', 'remove'].includes(action)) { const result = await store[action](value, web); invalidate(); return result; }
+    if (action === 'file-status') return { closed: ownedTerminal(value?.id, owner).closed };
     if (action === 'terminal-close') {
       if (terminals.get(value?.id)?.owner === owner) closeTerminal(value.id);
       return true;
@@ -256,6 +262,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     }
     if (['terminal-read', 'terminal-input', 'terminal-resize'].includes(action)) {
       const terminal = ownedTerminal(value?.id, owner);
+      if (!terminal.stream) throw new Error('SFTP 会话仅支持文件操作。');
       if (action === 'terminal-read') {
         const data = Buffer.concat(terminal.output).toString('base64');
         terminal.output = []; terminal.bytes = 0; if (!terminal.closed) terminal.stream.resume();
@@ -270,6 +277,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
     if (!host) throw new Error('找不到已保存的主机连接。');
     if (action === 'wake') return wakeHost(host);
     if (action === 'rdp-target') {
+      if (host.mode === 'vnc') throw new Error('请选择 RDP 连接。');
       const { address, port } = rdpTarget(host.id);
       return `${address.includes(':') ? `[${address}]` : address}:${port}`;
     }
@@ -298,8 +306,8 @@ export async function createLanWorkspaces(directory, transports = { share: share
       await remote(host, module, 'upsert', { revision: state.revision, instance }, fullAccess, desktopSession);
       return true;
     }
-    if (action === 'reset-trust' && host.mode === 'ssh') { const result = await store.trust(host, '', true, web?.ensureCurrent); invalidate(); return result; }
-    if (action === 'test') {
+    if (action === 'reset-trust' && ['ssh', 'sftp'].includes(host.mode)) { const result = await store.trust(host, '', true, web?.ensureCurrent); invalidate(); return result; }
+    if (action === 'test' && ['ssh', 'sftp', 'share'].includes(host.mode)) {
       if (host.mode === 'share') {
         const transport = await connection(host, owner);
         const module = host.modules.jar ? 'jar' : host.modules.nginx ? 'nginx' : null;
@@ -321,7 +329,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
         return { message: 'SSH 登录成功。' };
       } catch (error) { if (error.fingerprint) throw new Error(`${error.message} 当前指纹：${error.fingerprint}`); throw error; }
     }
-    if (action === 'terminal-open' && host.mode === 'ssh') {
+    if (action === 'terminal-open' && host.mode === 'ssh' || action === 'file-open' && host.mode === 'sftp') {
       if (!host.fingerprint) throw new Error('请先测试连接并确认 SSH 主机指纹。');
       if (terminals.size + openingTerminals >= 16) throw new Error('最多同时打开 16 个终端。');
       const generation = terminalGeneration;
@@ -329,7 +337,8 @@ export async function createLanWorkspaces(directory, transports = { share: share
       openingTerminals++;
       let opened;
       try {
-        opened = await openSshShell(await openHost(host, {}, route), dimensions(value));
+        const client = await openHost(host, {}, route);
+        opened = action === 'file-open' ? { client } : await openSshShell(client, dimensions(value));
         web?.ensureCurrent();
         if (closed || owner === desktopSession && terminalGeneration !== generation || !terminalCurrent(host, route)) throw new Error('终端已关闭或连接档案已更新。');
       } catch (error) { opened?.client.destroy(); throw error; }
@@ -338,9 +347,9 @@ export async function createLanWorkspaces(directory, transports = { share: share
       const id = randomUUID(), terminal = { owner, host, route, client, stream, output: [], bytes: 0, closed: false };
       terminals.set(id, terminal);
       bumpIdle(id, terminal);
-      stream.on('data', data => { terminal.output.push(data); terminal.bytes += data.length; if (terminal.bytes >= 256000) stream.pause(); });
+      stream?.on('data', data => { terminal.output.push(data); terminal.bytes += data.length; if (terminal.bytes >= 256000) stream.pause(); });
       const onClosed = () => { terminal.closed = true; client.end(); };
-      stream.on('error', onClosed); stream.once('close', onClosed); client.once('close', onClosed);
+      stream?.on('error', onClosed); stream?.once('close', onClosed); client.once('close', onClosed);
       return { id };
     }
     throw new Error('未知局域网主机操作。');
@@ -373,7 +382,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
         ...(access.edit ? { modules, platform, auth, user, jumpHostId, visitor, mac, rdpPort, explicitKeyOnly, revision: host.revision || '', hasStoredKey: !!(host.keyPath || host.encryptedKey), hasPassword: !!host.secret } : {}),
         ...(access.diagnose || access.terminal || access.edit ? { fingerprint } : {}),
         ...(access.wake ? { canWake: !!mac } : {}),
-        ...(access.rdp ? { canRdp: !!rdpPort || platform === 'win32' } : {}),
+        ...(access.rdp ? { canRdp: mode === 'rdp' || mode === 'vnc' || !!rdpPort || mode === 'ssh' && platform === 'win32' } : {}),
       };
     }),
     async monitorJarSources(session = desktopSession, backend = true) {
@@ -402,7 +411,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
       return remote(host, 'logs', action, { ...payload, logAccess: permissions }, permissions, session);
     },
     monitorTargets: () => store.list().map(host => ({ id: host.id, name: host.name, ...hostTarget(host) })),
-    closeTerminals() { terminalGeneration++; for (const [id, entry] of terminals) if (entry.owner === desktopSession) closeTerminal(id); },
-    close() { closed = true; for (const client of relayClients.keys()) client.destroy(); scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
+    closeTerminals() { vnc.close(); terminalGeneration++; for (const [id, entry] of terminals) if (entry.owner === desktopSession) closeTerminal(id); },
+    close() { vnc.close(); closed = true; for (const client of relayClients.keys()) client.destroy(); scan?.controller.abort(); for (const id of terminals.keys()) closeTerminal(id); for (const entry of connections.values()) entry.transport?.close(); connections.clear(); cache.clear(); },
   };
 }

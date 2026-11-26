@@ -1,3 +1,4 @@
+import { defaultPort } from './lan-protocols';
 import { parseCsv } from './practical';
 import type { HostDraft } from './lan-api';
 
@@ -8,9 +9,10 @@ export function parseHostCsv(text: string): HostDraft[] {
   return rows.map(row => {
     const value = (key: string) => row[keys.indexOf(key)]?.trim() || '';
     const enabled = (key: string) => /^(true|1)$/i.test(value(key));
+    const mode = (value('mode').toLowerCase() || 'ssh') as HostDraft['mode'];
     return {
-      name: value('name'), address: value('address'), mode: (value('mode') || 'ssh') as HostDraft['mode'],
-      user: value('user'), port: Number(value('port') || '22'), platform: (value('platform') || 'linux') as HostDraft['platform'],
+      name: value('name'), address: value('address'), mode,
+      user: value('user'), port: Number(value('port') || defaultPort[mode]), platform: (value('platform') || 'linux') as HostDraft['platform'],
       auth: value('auth') === 'password' ? 'password' : 'key',
       group: value('group'), tags: value('tags').split('|').map(tag => tag.trim()).filter(Boolean), pinned: enabled('pinned'),
       modules: { jar: enabled('jar'), nginx: enabled('nginx') },

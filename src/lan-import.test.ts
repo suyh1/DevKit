@@ -9,6 +9,11 @@ describe('LAN host import', () => {
     expect(() => parseHostCsv('name,Address,address\nTest,first,second')).toThrow('唯一');
   });
 
+  it('uses each session protocol’s default port in CSV imports', () => {
+    const rows = parseHostCsv('mode,address,port\nVNC,screen,\nrdp,desktop,\nsftp,files,2222');
+    expect(rows.map(({ mode, port }) => [mode, port])).toEqual([['vnc', 5900], ['rdp', 3389], ['sftp', 2222]]);
+  });
+
   it('reads SSH aliases and first matching options without evaluating Match or command directives', () => {
     const hosts = parseSshHosts(`
       Host test\nHostName="test.internal" # comment\n  User tester\n  ProxyCommand ignored

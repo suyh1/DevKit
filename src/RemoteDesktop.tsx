@@ -6,6 +6,7 @@ import { openRemoteDesktop } from './rdp-client';
 import type { LanHost } from './lan-api';
 
 export default function RemoteDesktop({ host, close }: { host: LanHost; close: () => void }) {
+  const vnc = host.mode === 'vnc';
   const viewport = useRef<HTMLDivElement>(null);
   const session = useRef<ReturnType<typeof openRemoteDesktop> | null>(null);
   const [phase, setPhase] = useState<'idle' | 'connecting' | 'connected'>('idle');
@@ -18,7 +19,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
     setPhase('idle');
   }
 
-  return <Modal title={`远程桌面 · ${host.name}`} close={close} closeLabel="关闭远程桌面" icon={<Monitor size={18} />} className={phase === 'idle' ? 'lan-rdp-dialog' : 'lan-rdp-dialog lan-rdp-active'}>
+  return <Modal title={`${vnc ? 'VNC' : '远程桌面'} · ${host.name}`} close={close} closeLabel="关闭远程桌面" icon={<Monitor size={18} />} className={phase === 'idle' ? 'lan-rdp-dialog' : 'lan-rdp-dialog lan-rdp-active'}>
     <form hidden={phase !== 'idle'} className="lan-rdp-form" onSubmit={event => {
       event.preventDefault();
       if (session.current || !viewport.current) return;
@@ -34,10 +35,10 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
       password.value = '';
     }}>
       {error && <p className="pc-error" role="alert">{error}</p>}
-      <Field label="远程桌面用户名"><TextInput name="username" data-modal-focus autoComplete="username" required maxLength={256} /></Field>
+      <Field label={vnc ? "VNC 用户名（选填）" : "远程桌面用户名"}><TextInput name="username" data-modal-focus autoComplete="username" required={!vnc} maxLength={256} /></Field>
       <Field label="远程桌面密码"><TextInput name="password" type="password" autoComplete="current-password" maxLength={1024} /></Field>
-      <Field label="域（可选）"><TextInput name="domain" maxLength={256} /></Field>
-      <label className="lan-rdp-trust"><input name="trustCertificate" className="form-check" type="checkbox" />首次信任目标证书（用于自签名证书）</label>
+      {!vnc && <><Field label="域（可选）"><TextInput name="domain" maxLength={256} /></Field>
+      <label className="lan-rdp-trust"><input name="trustCertificate" className="form-check" type="checkbox" />首次信任目标证书（用于自签名证书）</label></>}
       <footer className="pc-form-footer"><ModalCancel /><button className="run-button">连接</button></footer>
     </form>
     <section hidden={phase === 'idle'} aria-label="远程桌面会话">

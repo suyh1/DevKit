@@ -4,13 +4,14 @@ import { parseColor } from './colors';
 import { parseCsv } from './practical';
 import { timestampDate } from './time-conversion';
 import { ipv4 } from './extended';
+import { sessionSeed } from './lan-protocols';
 import { parseWorkspaceLink } from './workspace-link-format';
 
 export type ServiceDraft = { kind: 'jar' | 'npm' | 'program' | 'script'; jar?: string; program?: string; script?: string; name?: string; jvm?: string; args?: string };
 
 export type Suggestion =
   | { kind: 'tool'; id: ToolId; name: string; reason: string; input?: string; options?: Options }
-  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; resourceId?: string; gitMode?: import('./git-api').GitMode;gitSeed?:import('./git-api').GitSeed; options?: never };
+  | { kind: 'workspace'; id: WorkspaceModuleId; name: string; reason: string; service?: ServiceDraft; hostDraft?: Partial<import('./lan-api').HostDraft>; resourceId?: string; gitMode?: import('./git-api').GitMode;gitSeed?:import('./git-api').GitSeed; options?: never };
 export const DETECTION_LIMIT = 200_000;
 
 const toolNames = new Map(tools.map(t => [t.id, t.name]));
@@ -185,7 +186,7 @@ function scalarRules(text: string, lines: string[], { tool, workspace }: Rules) 
     try {
       ipv4(cidr);
       tool('ipv4', '计算 IPv4 子网范围' + (text.includes('/') ? '' : '（单主机 /32）'), {}, cidr);
-      workspace('lan-hosts', '识别到 IPv4 主机地址');
+      if (!text.includes('/')) workspace('lan-hosts', '识别到 IPv4 主机地址');
     } catch { /* Version numbers can resemble an address. */ }
   }
   if (/^(?:ssh(?:\s+|:\/\/)|Host\s+\S+[\r\n]+\s*HostName\s+)/i.test(text)) workspace('lan-hosts', '识别到 SSH 主机信息');
@@ -307,7 +308,7 @@ export function detectTools(input: string): Suggestion[] {
   const rules: Rules = {
     tool: (id, reason, options, source = input) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason, options, input: source }),
     open: (id, reason) => add({ kind: 'tool', id, name: toolNames.get(id)!, reason }),
-    workspace: (id, reason, service, resourceId) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason, ...(service && { service }), ...(resourceId && { resourceId }) }),
+    workspace: (id, reason, service, resourceId) => add({ kind: 'workspace', id, name: workspaceNames.get(id)!, reason, ...(service && { service }), ...(resourceId && { resourceId }), ...(id === 'lan-hosts' && /^[\d.]+$/.test(text) && { hostDraft: { mode: 'ssh', address: text, port: 22 } }) }),
   };
   if (text.length <= 100) {
     const key = text.toLowerCase();
@@ -371,6 +372,8 @@ export function detectTools(input: string): Suggestion[] {
     };
     add({ kind: 'workspace', id: 'git', name: workspaceNames.get('git')!, reason: '进入对应的 Git 仓库视图', gitMode,gitSeed });
   }
+  const hostDraft = sessionSeed(text);
+  if (hostDraft) add({ kind: 'workspace', id: 'lan-hosts', name: workspaceNames.get('lan-hosts')!, hostDraft, reason: '带入协议和主机地址创建会话' });
   if (webAddressRules(text, rules)) return [...matches.values()];
   const lines = text.split(/\r?\n/);
   scalarRules(text, lines, rules);

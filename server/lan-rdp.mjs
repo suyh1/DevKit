@@ -53,16 +53,16 @@ function optionsFor(target, input) {
     if (typeof value !== 'string' || value.length > max || /[\x00-\x1f]/.test(value)) fail(400, '远程桌面登录资料无效。');
     credentials[key] = value;
   }
-  if (!credentials.username.trim()) fail(400, '请填写远程桌面用户名。');
+  if (target.protocol !== 'vnc' && !credentials.username.trim()) fail(400, '请填写远程桌面用户名。');
   return {
     hostname: target.address, port: target.port, ...credentials,
     width: bounded(input.width, 640, 2560, 1280), height: bounded(input.height, 480, 1600, 800), dpi: 96,
-    'cert-tofu': input.trustCertificate === true ? 'true' : '',
+    'cert-tofu': target.protocol !== 'vnc' && input.trustCertificate === true ? 'true' : '',
     'resize-method': 'display-update', 'disable-audio': 'true', 'disable-copy': 'true', 'disable-paste': 'true',
   };
 }
 
-async function connectGateway(endpoint, options, signal) {
+async function connectGateway(endpoint, options, signal, protocol) {
   // A fixed deadline covers TCP/TLS and the Guacamole handshake.
   const { host, port, tls } = endpoint;
   const socket = tls ? connectTls({ host, port, ...(isIP(host) ? {} : { servername: host }) }) : createConnection({ host, port });
@@ -89,7 +89,7 @@ async function connectGateway(endpoint, options, signal) {
         buffer += value;
       }
     }
-    socket.write(instruction('select', 'rdp'));
+    socket.write(instruction('select', protocol));
     const [opcode, ...args] = await nextInstruction();
     if (opcode !== 'args' || !args.includes('hostname') || !args.includes('port')) throw new Error('RDP arguments unavailable');
     if (options['cert-tofu'] && !args.includes('cert-tofu')) fail(502, '当前 guacd 不支持首次证书信任，请使用 guacd 1.6 或配置受信任的目标证书。');
@@ -117,7 +117,7 @@ async function connectGateway(endpoint, options, signal) {
     socket.destroy();
     if (signal.aborted || error.status) throw error;
     if (!connected) fail(502, '无法连接远程桌面网关，请确认 guacd 已运行并可从共享主机访问。');
-    fail(502, '远程桌面网关握手失败，请确认 guacd 已启用 RDP 支持。');
+    fail(502, `远程桌面网关握手失败，请确认 guacd 已启用 ${protocol.toUpperCase()} 支持。`);
   } finally {
     options.password = '';
     signal.removeEventListener('abort', abort);
@@ -153,6 +153,7 @@ export function createRdpSessions(env = process.env) {
   return {
     async open(target, payload, { token, verify, stream }) {
       if (sessions.size >= 8 || [...sessions.values()].filter(session => session.token === token).length >= 2) fail(429, '远程桌面连接数已达上限。');
+      const protocol = target.protocol === 'vnc' ? 'vnc' : 'rdp';
       const endpoint = gateway(env), options = optionsFor(target, payload);
       payload.password = '';
       const id = randomUUID(), controller = new AbortController();
@@ -163,7 +164,7 @@ export function createRdpSessions(env = process.env) {
       signal.addEventListener('abort', abort, { once: true });
       let timer;
       try {
-        const { socket, display } = await connectGateway(endpoint, options, signal);
+        const { socket, display } = await connectGateway(endpoint, options, signal, protocol);
         session.socket = socket;
         signal.throwIfAborted();
         verify();

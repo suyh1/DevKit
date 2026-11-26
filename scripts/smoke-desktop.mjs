@@ -22,6 +22,7 @@ environment.DEVKIT_TEST_GEOGRAPHY_ONLY = process.argv.includes('--geography-only
 environment.DEVKIT_TEST_FEATURES_ONLY = process.argv.includes('--features-only') ? '1' : '';
 
 environment.DEVKIT_TEST_NGINX_ONLY = process.argv.includes('--nginx-only') ? '1' : '';
+environment.DEVKIT_TEST_VNC_ONLY = process.argv.includes('--vnc-only') ? '1' : '';
 environment.DEVKIT_TEST_INVENTORY_ONLY = process.argv.includes('--inventory-only') ? '1' : '';
 environment.DEVKIT_TEST_JAR_ONLY = process.argv.includes('--jar-only') ? '1' : '';
 environment.DEVKIT_TEST_MONITOR_ONLY = process.argv.includes('--monitor-only') ? '1' : '';

@@ -14,8 +14,10 @@ function label(value, max) {
 }
 function normalize(value, existing) {
   const { mode, address, name, user, port, platform, auth } = value ?? {};
-  if (!['share', 'ssh'].includes(mode) || typeof name !== 'string' || name.length > 120 || typeof address !== 'string' || !address.trim() || address.length > 2048) throw new Error('请填写有效的主机名称和地址。');
+  if (!['share', 'ssh', 'sftp', 'vnc', 'rdp'].includes(mode) || typeof name !== 'string' || name.length > 120 || typeof address !== 'string' || !address.trim() || address.length > 2048) throw new Error('请填写有效的主机名称和地址。');
   const host = { id: existing?.id || randomUUID(), mode, name: name.trim(), modules: { jar: value.modules?.jar === true, nginx: value.modules?.nginx === true } };
+  const desktop = mode === 'rdp' || mode === 'vnc';
+  if (desktop || mode === 'sftp') host.modules = { jar: false, nginx: false };
   const group = label(value.group, 60);
   if (group) host.group = group;
   if (value.tags !== undefined) {
@@ -25,7 +27,7 @@ function normalize(value, existing) {
   }
   if (value.pinned === true) host.pinned = true;
   if (value.mac != null && value.mac !== '') host.mac = normalizeMac(value.mac);
-  if (value.rdpPort != null && value.rdpPort !== 0) {
+  if ((mode === 'ssh' || mode === 'share') && value.rdpPort != null && value.rdpPort !== 0) {
     if (!Number.isInteger(value.rdpPort) || value.rdpPort < 1 || value.rdpPort > 65535) throw new Error('远程桌面端口无效。');
     host.rdpPort = value.rdpPort;
   }
@@ -40,16 +42,20 @@ function normalize(value, existing) {
     }
   } else {
     host.address = address.trim().replace(/^\[([^\]]+)\]$/, '$1').toLowerCase();
-    if (host.address.length > 253 || (!isIP(host.address) && !/^[a-z0-9][a-z0-9.-]*$/i.test(host.address))) throw new Error('请输入 SSH 主机名或 IP 地址。');
-    if (typeof user !== 'string' || !/^[a-z0-9_.@\\-]{1,120}$/i.test(user.trim()) || !Number.isInteger(port) || port < 1 || port > 65535 || !['linux', 'win32'].includes(platform)) throw new Error('SSH 用户名、端口或目标系统无效。');
-    Object.assign(host, { user: user.trim(), port, platform, auth: auth === 'password' ? 'password' : 'key' });
-    if (host.auth === 'key' && value.keyPath) {
-      if (typeof value.keyPath !== 'string' || value.keyPath.length > 4096 || !path.isAbsolute(value.keyPath) || /[\x00-\x1f]/.test(value.keyPath)) throw new Error('请选择有效的本地 SSH 私钥文件。');
-      host.keyPath = value.keyPath;
-    }
-    if (value.jumpHostId) {
-      if (typeof value.jumpHostId !== 'string' || !/^[a-f0-9-]{36}$/.test(value.jumpHostId)) throw new Error('跳板机标识无效。');
-      host.jumpHostId = value.jumpHostId;
+    if (host.address.length > 253 || (!isIP(host.address) && !/^[a-z0-9][a-z0-9.-]*$/i.test(host.address))) throw new Error('请输入有效的主机名或 IP 地址。');
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('端口须为 1 至 65535 的整数。');
+    host.port = port;
+    if (!desktop) {
+      if (typeof user !== 'string' || !/^[a-z0-9_.@\\-]{1,120}$/i.test(user.trim()) || !['linux', 'win32'].includes(platform)) throw new Error('SSH 用户名、端口或目标系统无效。');
+      Object.assign(host, { user: user.trim(), port, platform, auth: auth === 'password' ? 'password' : 'key' });
+      if (host.auth === 'key' && value.keyPath) {
+        if (typeof value.keyPath !== 'string' || value.keyPath.length > 4096 || !path.isAbsolute(value.keyPath) || /[\x00-\x1f]/.test(value.keyPath)) throw new Error('请选择有效的本地 SSH 私钥文件。');
+        host.keyPath = value.keyPath;
+      }
+      if (value.jumpHostId) {
+        if (typeof value.jumpHostId !== 'string' || !/^[a-f0-9-]{36}$/.test(value.jumpHostId)) throw new Error('跳板机标识无效。');
+        host.jumpHostId = value.jumpHostId;
+      }
     }
   }
   host.name ||= host.address;
@@ -88,7 +94,7 @@ function planImport(current, values, web = false) {
   const rows = values.map((value, index) => {
     try {
       const host = normalize({ ...value, keyPath: undefined, jumpHostId: undefined, user: value?.user || userInfo().username });
-      if (web && host.mode === 'ssh') host.explicitKeyOnly = true;
+      if (web && ['ssh', 'sftp'].includes(host.mode)) host.explicitKeyOnly = true;
       if (next.some(item => sameServer(item, host) && item.user === host.user)) return { index, host: publicHost(host), error: '重复连接' };
       if (next.length >= 50) return { index, host: publicHost(host), error: '已达 50 台主机上限' };
       next.push(host);
@@ -144,8 +150,8 @@ export async function createLanHostStore(directory) {
     const sameIdentity = !!existing && host.id === existing.id && host.jumpHostId === existing.jumpHostId;
     if (web && existing && !sameIdentity && host.id === existing.id) host.id = randomUUID();
     if (web && !sameIdentity) { delete host.secret; delete host.previousFingerprint; }
-    if (host.mode === 'ssh' && (existing?.explicitKeyOnly || web && (!sameIdentity || existing.auth !== host.auth || value.clearKey || value.privateKey !== undefined))) host.explicitKeyOnly = true;
-    if (host.mode === 'ssh' && host.auth === 'key') {
+    if (['ssh', 'sftp'].includes(host.mode) && (existing?.explicitKeyOnly || web && (!sameIdentity || existing.auth !== host.auth || value.clearKey || value.privateKey !== undefined))) host.explicitKeyOnly = true;
+    if (['ssh', 'sftp'].includes(host.mode) && host.auth === 'key') {
       if (value.privateKey !== undefined) {
         if (typeof value.privateKey !== 'string' || Buffer.byteLength(value.privateKey) > 262144 || !value.privateKey.trim()) throw new Error('请选择有效的 SSH 私钥文件（最多 256 KiB）。');
         const { default: { utils } } = await import('ssh2');

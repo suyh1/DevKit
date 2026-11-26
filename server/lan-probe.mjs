@@ -8,7 +8,7 @@ export function withDeadline(promise, timeout, message = '操作超时') {
 }
 
 export function hostTarget(host) {
-  if (host.mode === 'ssh') return { address: host.address, port: host.port };
+  if (host.mode !== 'share') return { address: host.address, port: host.port };
   const url = new URL(host.address);
   return { address: url.hostname.replace(/^\[|\]$/g, ''), port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)) };
 }

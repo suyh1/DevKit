@@ -9,7 +9,7 @@ const lanActions = new Map([
   ['save', 'edit'], ['remove', 'edit'], ['import-preview', 'edit'], ['import-connections', 'edit'],
   ['diagnose', 'diagnose'], ['test', 'diagnose'], ['reset-trust', 'diagnose'],
   ['terminal-open', 'terminal'], ['terminal-read', 'terminal'], ['terminal-input', 'terminal'], ['terminal-resize', 'terminal'], ['terminal-close', 'terminal'],
-  ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
+  ['file-open', 'files'], ['file-status', 'files'], ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
   ['scan-interfaces', 'discover'], ['scan-start', 'discover'], ['scan-cancel', 'discover'], ['wake', 'wake'],
   ['rdp-open', 'rdp'], ['rdp-input', 'rdp'], ['rdp-close', 'rdp'],
 ]);
@@ -84,7 +84,7 @@ export function createSharedWorkspaces({ nginx, library, jar, monitor, logs, lan
             if (session.closed) fail(401, '请先登录共享工作台。');
             ensureCurrentSession();
             const current = coordinator.rdpTarget(hostId);
-            if (target.address !== current.address || target.port !== current.port) fail(409, '远程桌面目标已更新，请重新连接。');
+            if (target.address !== current.address || target.port !== current.port || target.protocol !== current.protocol) fail(409, '远程桌面目标已更新，请重新连接。');
           } }));
         }
         return manage(token, async session => {
