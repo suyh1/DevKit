@@ -138,4 +138,4 @@
 | 截图协作白板（`whiteboard`） | 图片文件名，如 screenshot.png |
 | Nginx 配置（`nginx`） | server、upstream 配置块或 proxy_pass 指令 |
 | 服务管理（`jar`） | JAR、可执行程序或脚本路径，java -jar、npm run、python3 main.py 或 node server.mjs 启动命令；打开相应登记表单并带入入口、JVM 参数、npm 脚本或应用参数。输入“替换服务文件”“替换 JAR”“恢复服务备份”或“恢复 JAR 备份”打开服务列表，从中选择已登记实例 |
-| 局域网主机（`lan-hosts`） | 单个 IPv4 地址可带入 SSH 档案；SSH、SFTP、VNC、RDP、Telnet、FTP 和 FTPS 连接 URI（如 `vnc://[::1]:5901`、`sftp://dev@host:2222`）、`新建 VNC 会话`、`ssh -p 2222 dev@host` 或 `sftp -P 2222 dev@host` 打开对应的新建表单并预填地址、端口及适用的用户名。例如 `telnet switch.local 2323` 带入终端端口，`ftps://dev@nas/backups` 带入隐式 TLS 和起始目录，`COM3 115200` 或 `/dev/ttyUSB0` 带入桌面串口设备及波特率。CIDR 进入子网计算。 |
+| 局域网主机（`lan-hosts`） | 单个 IPv4 地址可带入 SSH 档案；SSH、SFTP、VNC、RDP、Telnet、FTP 和 FTPS 连接 URI（如 `vnc://[::1]:5901`、`sftp://dev@host:2222`）、`新建 VNC 会话`、`ssh -p 2222 dev@host` 或 `sftp -P 2222 dev@host` 打开对应的新建表单并预填地址、端口及适用的用户名。`rdp://desk.local:3390` 可预填远程桌面的自定义端口。进入桌面后使用 Ctrl+C、Ctrl+V 传递文本。例如 `telnet switch.local 2323` 带入终端端口，`ftps://dev@nas/backups` 带入隐式 TLS 和起始目录，`COM3 115200` 或 `/dev/ttyUSB0` 带入桌面串口设备及波特率。CIDR 进入子网计算。 |

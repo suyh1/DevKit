@@ -5,13 +5,13 @@ const encode = (...values) => values.map(value => `${[...String(value)].length}.
 const parameters = ['VERSION_1_5_0', 'hostname', 'port', 'username', 'password', 'domain', 'cert-tofu', 'resize-method', 'disable-audio', 'disable-copy', 'disable-paste'];
 
 export async function rdpFixture() {
-  const messages = [], connections = [], sockets = new Set();
+  const pastes = [], messages = [], connections = [], sockets = new Set();
   const server = createServer(socket => {
     sockets.add(socket);
     socket.on('error', () => {});
     socket.on('close', () => sockets.delete(socket));
     socket.setEncoding('utf8');
-    let buffer = [];
+    let buffer = [], ctrl = false, clipboardText = '';
     socket.on('data', data => {
       buffer.push(...data);
       while (buffer.length) {
@@ -33,6 +33,14 @@ export async function rdpFixture() {
           const reply = encode('args', ...parameters);
           socket.write(reply.slice(0, 9));
           setImmediate(() => { if (socket.writable) socket.write(reply.slice(9)); });
+        } else if (command === 'clipboard') clipboardText = '';
+        else if (command === 'blob') clipboardText += Buffer.from(args[1], 'base64').toString();
+        else if (command === 'key') {
+          const down = args[1] === '1';
+          if (args[0] === '65507') ctrl = down;
+          if (ctrl && down && args[0] === '118') pastes.push(clipboardText);
+          if (ctrl && down && args[0] === '99') socket.write(encode('clipboard', 8, 'text/plain') +
+            encode('blob', 8, Buffer.from('selected-remote').toString('base64')) + encode('end', 8));
         } else if (command === 'connect') {
           connections.push(Object.fromEntries(parameters.map((parameter, index) => [parameter, args[index]])));
           socket.write([
@@ -45,7 +53,7 @@ export async function rdpFixture() {
     });
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
-  return { port: server.address().port, messages, connections, sockets, async close() {
+  return { port: server.address().port, pastes, messages, connections, sockets, async close() {
     for (const socket of sockets) socket.destroy();
     await new Promise(resolve => server.close(resolve));
   } };

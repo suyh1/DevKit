@@ -7,11 +7,13 @@ module.exports = async function checkVncSession(window, waitFor) {
   const wait = expression => waitFor('Boolean(' + expression + ')');
   const sockets = new Set(), keys = [], pasted = [];
   let connections = 0;
+  const applications = [];
   const server = createServer(socket => {
     connections++; sockets.add(socket);
     socket.on('error', () => {});
     socket.on('close', () => sockets.delete(socket));
     socket.write('RFB 003.008\n');
+    let ctrl = false, clipboardText = '';
     let buffer = Buffer.alloc(0), step = 0, painted = false;
     socket.on('data', chunk => {
       buffer = Buffer.concat([buffer, chunk]);
@@ -37,8 +39,16 @@ module.exports = async function checkVncSession(window, waitFor) {
           painted = true;
           socket.write(Buffer.from([0,0,0,1, 0,0,0,0, 0,1,0,1, 0,0,0,0, 220,80,50,255]));
           socket.write(Buffer.concat([Buffer.from([3,0,0,0,0,0,0,6]), Buffer.from('remote')]));
-        } else if (type === 4) keys.push(data.readUInt32BE(4));
-        else if (type === 6) pasted.push(data.subarray(8).toString());
+        } else if (type === 4) {
+          const symbol = data.readUInt32BE(4), down = data[1] === 1;
+          keys.push(symbol);
+          if (symbol === 0xffe3) ctrl = down;
+          if (ctrl && down && symbol === 118) applications.push(clipboardText);
+          if (ctrl && down && symbol === 99) {
+            const selected = Buffer.from('selected-remote');
+            socket.write(Buffer.concat([Buffer.from([3,0,0,0,0,0,0,selected.length]), selected]));
+          }
+        } else if (type === 6) { clipboardText = data.subarray(8).toString(); pasted.push(clipboardText); }
         step++;
       }
     });
@@ -72,17 +82,28 @@ module.exports = async function checkVncSession(window, waitFor) {
     await click('.lan-host-form', '保存并连接');
     await wait('!document.querySelector(".lan-host-dialog[open]") && document.querySelector(".lan-connection-select")');
     await submitPassword();
+    await require('./remote-clipboard-smoke.cjs').checkClipboard(window, '.lan-vnc-screen canvas', {
+      pasted: () => applications.length === 1 && applications[0] === 'from-local',
+    });
     await js('document.querySelector(".lan-session-clipboard summary").click()');
-    await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "remote"');
+    await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote"');
     await js('const field=document.querySelector(".lan-session-clipboard textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set.call(field,"local"); field.dispatchEvent(new Event("input",{bubbles:true}))');
     await click('.lan-session-clipboard', '发送到远端');
-    for (let i = 0; i < 40 && !pasted.length; i++) await new Promise(resolve => setTimeout(resolve, 25));
-    assert.deepEqual(pasted, ['local']);
+    for (let i = 0; i < 40 && pasted.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 25));
+    assert.deepEqual(pasted, ['from-local', 'local']);
     await click('.lan-vnc-session', '发送 Ctrl+Alt+Del');
     for (let attempt = 0; attempt < 40 && !keys.includes(0xffff); attempt++) await new Promise(resolve => setTimeout(resolve, 25));
     assert.ok(keys.includes(0xffff));
     await js('document.querySelector(".lan-vnc-session input[type=checkbox]").click()');
     assert.ok(await js(button('.lan-vnc-session', '发送 Ctrl+Alt+Del') + '.disabled'));
+    await js('document.querySelector(".lan-vnc-screen canvas").focus()');
+    const readOnlyKeys = keys.length;
+    for (const keyCode of ['C','V']) for (const type of ['keyDown','keyUp']) {
+      window.webContents.sendInputEvent({ type, keyCode, modifiers: ['control'] });
+    }
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(keys.length, readOnlyKeys);
+    assert.deepEqual(pasted, ['from-local', 'local']);
     await click('.lan-vnc-session', '断开连接');
     await click('.lan-vnc-session', '重新连接');
     await submitPassword();

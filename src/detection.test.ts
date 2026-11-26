@@ -50,6 +50,7 @@ describe('推荐顺序和打开方式', () => {
     ['/dev/ttyUSB0', { mode: 'serial', address: '/dev/ttyUSB0', port: 0, baudRate: 115200 }],
     ['新建 VNC 会话', { mode: 'vnc', port: 5900 }],
     ['sftp -P 2222 dev@server', { mode: 'sftp', address: 'server', user: 'dev', port: 2222 }],
+    ['rdp://desk.local:3390', { mode: 'rdp', address: 'desk.local', port: 3390 }],
     ['rdp://desk.local', { mode: 'rdp', address: 'desk.local', port: 3389 }],
     ['sftp://dev@nas:2222', { mode: 'sftp', address: 'nas', user: 'dev', port: 2222 }],
     ['ssh -p 2222 dev@server', { mode: 'ssh', address: 'server', user: 'dev', port: 2222 }],

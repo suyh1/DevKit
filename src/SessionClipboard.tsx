@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { copyText } from './motion-primitives';
-import { lanRequest } from './lan-api';
-
-export const clipboardLimit = 16 * 1024;
-export async function readSessionClipboard(): Promise<string> {
-  return window.devkitDesktop?.lanHosts ? lanRequest<string>('clipboard-read') : navigator.clipboard.readText();
-}
+import { clipboardLimit, readSessionClipboard } from './remote-clipboard';
 
 export default function SessionClipboard({ remote, send, readOnly = false }: {
   remote: string; send: (text: string) => Promise<void> | void; readOnly?: boolean;

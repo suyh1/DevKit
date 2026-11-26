@@ -3,7 +3,8 @@ import RFB from '@novnc/novnc';
 import { VncChannel } from './vnc-channel';
 import SegmentedControl from './SegmentedControl';
 
-import SessionClipboard, { clipboardLimit } from './SessionClipboard';
+import SessionClipboard from './SessionClipboard';
+import { bindRemoteClipboard, clipboardLimit } from './remote-clipboard';
 
 const fieldLabels: Record<string, string> = { username: '用户名', password: 'VNC 密码', target: '目标' };
 export default function VncSession({ id }: { id: string }) {
@@ -14,6 +15,7 @@ export default function VncSession({ id }: { id: string }) {
   const [connected, setConnected] = useState(false), [message, setMessage] = useState('');
   const [fields, setFields] = useState<string[]>([]), [fingerprint, setFingerprint] = useState('');
   const [scale, setScale] = useState(true), [viewOnly, setViewOnly] = useState(false);
+  const shortcuts = useRef<ReturnType<typeof bindRemoteClipboard> | undefined>(undefined);
   const options = useRef({ scale, viewOnly });
   options.current = { scale, viewOnly };
   useEffect(() => {
@@ -25,6 +27,14 @@ export default function VncSession({ id }: { id: string }) {
     client.current = rfb;
     rfb.scaleViewport = options.current.scale;
     rfb.viewOnly = options.current.viewOnly;
+    let ready = false;
+    const clipboard = bindRemoteClipboard(viewport.current, {
+      enabled: () => ready && !disposed && !rfb.viewOnly,
+      sendText: text => rfb.clipboardPasteFrom(text),
+      key: (symbol, code, down) => rfb.sendKey(symbol, code, down),
+      notice: message => setMessage(message || 'VNC 已连接'),
+    });
+    shortcuts.current = clipboard;
     let timer: ReturnType<typeof setTimeout>;
     function deadline() {
       clearTimeout(timer);
@@ -34,11 +44,12 @@ export default function VncSession({ id }: { id: string }) {
     deadline();
     rfb.addEventListener('connect', () => {
       clearTimeout(timer);
-      if (!disposed) { setConnected(true); setMessage('VNC 已连接'); }
+      if (!disposed) { ready = true; setConnected(true); setMessage('VNC 已连接'); }
     });
     rfb.addEventListener('clipboard', event => {
       const value = (event as CustomEvent).detail.text;
       if (!disposed && typeof value === 'string') {
+        void clipboard.receive(value);
         if (new TextEncoder().encode(value).length <= clipboardLimit) setRemote(value);
         else { setRemote(''); setMessage('远端剪贴板文本超过 16 KiB'); }
       }
@@ -57,12 +68,13 @@ export default function VncSession({ id }: { id: string }) {
     });
     rfb.addEventListener('securityfailure', event => { failure = (event as CustomEvent).detail.reason || 'VNC 认证失败，请检查凭据。'; });
     rfb.addEventListener('disconnect', event => {
+      ready = false; clipboard.reset();
       if (!disposed) { setMessage(failure || ((event as CustomEvent).detail.clean ? 'VNC 会话已断开' : 'VNC 连接失败，请检查目标端口、认证方式和服务状态。')); setRunning(false); }
     });
     void channel.connect();
-    return () => { disposed = true; clearTimeout(timer); rfb.disconnect(); channel.close(); client.current = undefined; };
+    return () => { disposed = true; clipboard.dispose(); shortcuts.current = undefined; clearTimeout(timer); rfb.disconnect(); channel.close(); client.current = undefined; };
   }, [id, running]);
-  useEffect(() => { if (client.current) { client.current.scaleViewport = scale; client.current.viewOnly = viewOnly; } }, [scale, viewOnly]);
+  useEffect(() => { if (client.current) { client.current.scaleViewport = scale; client.current.viewOnly = viewOnly; if (viewOnly) shortcuts.current?.reset(); } }, [scale, viewOnly]);
   return <div className="lan-vnc-session">
     <div className="lan-terminal-message"><span role="status">{message}</span>
       {running ? <button className="text-button" onClick={() => { setRunning(false); setMessage('已断开连接'); }}>断开连接</button> :

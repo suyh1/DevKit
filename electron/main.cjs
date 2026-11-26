@@ -413,7 +413,11 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的局域网主机请求。');
     try {
       if (!lan) throw new Error(lanError || '局域网主机管理器尚未准备好。');
-      if (action === 'clipboard-read') return { data: clipboard.readText() };
+      if (action === 'clipboard-write') {
+        if (typeof value !== 'string' || Buffer.byteLength(value) > 16384) throw new Error('剪贴板文本超过限制。');
+        await clipboard.writeText(value); return { data: true };
+      }
+      if (action === 'clipboard-read') return { data: await clipboard.readText() };
       if (action === 'pick-ssh-key') {
         const result = await dialog.showOpenDialog(window, { title: '选择 SSH 私钥', properties: ['openFile', 'showHiddenFiles'] });
         return { data: result.canceled ? null : result.filePaths[0] };

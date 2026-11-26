@@ -1,20 +1,31 @@
 import Guacamole from './vendor/guacamole.js';
-import { clipboardLimit } from './SessionClipboard';
+import { bindRemoteClipboard, clipboardLimit } from './remote-clipboard';
 import { remoteRequest, remoteResponse } from './workspace-remote';
 
 export type RdpCredentials = { username: string; password: string; domain: string; trustCertificate: boolean };
 
 export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credentials: RdpCredentials, {
-  resizeDesktop, onConnect, onError, onClipboard,
-}: { resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void }) {
+  resizeDesktop, onConnect, onError, onClipboard, onNotice,
+}: { resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void; onNotice: (message: string) => void }) {
   const controller = new AbortController(), tunnel = new Guacamole.Tunnel();
   const client = new Guacamole.Client(tunnel), parser = new Guacamole.Parser();
   const display = client.getDisplay(), screen = display.getElement();
   viewport.replaceChildren(screen);
-  let sessionId = '', disposed = false, sending = false, timer: ReturnType<typeof setTimeout> | undefined;
+  let sessionId = '', disposed = false, timer: ReturnType<typeof setTimeout> | undefined;
   const messages: string[][] = [];
+  let pendingInput: Promise<void> | undefined;
   let connected = false, resizeTimer: ReturnType<typeof setTimeout> | undefined;
   let lastWidth = 0, lastHeight = 0;
+  async function paste(text: string) {
+    // Deliver the previous paste keystroke before replacing the remote clipboard again.
+    await send();
+    if (disposed || !sessionId) throw new Error('会话已断开');
+    await remoteRequest('lan-hosts', 'rdp-clipboard', { id: sessionId, text }, controller.signal);
+  }
+  const clipboard = bindRemoteClipboard(viewport, {
+    enabled: () => connected && !disposed,
+    sendText: paste, key: (symbol, _code, down) => client.sendKeyEvent(Number(down), symbol), notice: onNotice,
+  });
   function resizeViewport() {
     fit();
     if (!resizeDesktop || !connected || !viewport.clientWidth || !viewport.clientHeight) return;
@@ -38,22 +49,25 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   }
 
   // Input is sent in order on one request at a time. Batching keeps mouse motion responsive.
-  async function send() {
-    timer = undefined;
-    if (disposed || sending || !sessionId || !messages.length) return;
-    sending = true;
-    try {
-      await remoteRequest('lan-hosts', 'rdp-input', { id: sessionId, messages: messages.splice(0, 256) }, controller.signal);
-    } catch (error) { if (!disposed) fail((error as Error).message); }
-    finally {
-      sending = false;
-      if (!disposed && messages.length) void send();
-    }
+  function send(): Promise<void> {
+    clearTimeout(timer); timer = undefined;
+    if (pendingInput) return pendingInput;
+    if (disposed || !sessionId || !messages.length) return Promise.resolve();
+    pendingInput = (async () => {
+      while (!disposed && messages.length) {
+        await remoteRequest('lan-hosts', 'rdp-input', { id: sessionId, messages: messages.splice(0, 256) }, controller.signal);
+      }
+    })().catch(error => { if (!disposed) fail(error.message); })
+      .finally(() => {
+        pendingInput = undefined;
+        if (!disposed && messages.length) void send();
+      });
+    return pendingInput;
   }
 
   function close() {
     if (disposed) return;
-    disposed = true;
+    disposed = true; clipboard.dispose();
     controller.abort();
     clearTimeout(timer);
     clearTimeout(resizeTimer);
@@ -103,7 +117,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
     if (disposed || !sessionId || elements[0] === 'disconnect') return;
     if (messages.length >= 1024) { fail('远程桌面输入积压，请重新连接。'); return; }
     messages.push(elements.map(String));
-    if (!sending && !timer) timer = setTimeout(() => void send(), 16);
+    if (!pendingInput && !timer) timer = setTimeout(() => void send(), 16);
   };
   parser.oninstruction = (opcode, parameters) => tunnel.oninstruction?.(opcode, parameters);
   client.onstatechange = state => {
@@ -121,7 +135,12 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
       parts.push(decoder.decode(bytes, { stream: true }));
       stream.sendAck('OK', 0);
     };
-    stream.onend = () => { if (!disposed) onClipboard(overflow ? '' : parts.join('') + decoder.decode()); };
+    stream.onend = () => {
+      if (disposed) return;
+      if (overflow) { clipboard.reset(); onClipboard(''); onNotice('远端剪贴板文本超过 16 KiB'); return; }
+      const text = parts.join('') + decoder.decode();
+      onClipboard(text); void clipboard.receive(text);
+    };
   };
   client.onerror = status => {
     const help = status.code === 0x0301 || status.code === 0x0303
@@ -144,10 +163,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   client.connect();
   return {
     close() { close(); client.disconnect(); },
-    async paste(text: string) {
-      if (disposed || !sessionId) throw new Error('会话已断开');
-      await remoteRequest('lan-hosts', 'rdp-clipboard', { id: sessionId, text }, controller.signal);
-    },
+    paste,
     secureAttention() {
       screen.focus({ preventScroll: true });
       const keys = [0xffe3, 0xffe9, 0xffff];

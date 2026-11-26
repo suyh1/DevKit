@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { lanRequest } from './lan-api';
 import { copyText } from './motion-primitives';
-import { readSessionClipboard } from './SessionClipboard';
+import { readSessionClipboard } from './remote-clipboard';
 import SftpPanel from './SftpPanel';
 import '@xterm/xterm/css/xterm.css';
 

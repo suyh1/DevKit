@@ -1,4 +1,5 @@
 const { app, BrowserWindow, clipboard } = require("electron");
+const { checkClipboard, preserveClipboard } = require('./remote-clipboard-smoke.cjs');
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -7,6 +8,7 @@ let window, fixture;
 app
   .whenReady()
   .then(async () => {
+    const restoreClipboard = await preserveClipboard();
     const timeout = setTimeout(() => {
       console.error("Portal interaction check timed out");
       app.exit(1);
@@ -926,8 +928,11 @@ app
         await button('连接', '.lan-rdp-form button');
         await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
         await wait(`Array.from(document.querySelectorAll('.lan-rdp-viewport canvas')).some(canvas=>canvas.width>=640&&Array.from(canvas.getContext('2d').getImageData(1,1,1,1).data).join(',')==='40,100,150,255')`);
+        await checkClipboard(window, '.lan-rdp-viewport > div', {
+          pasted: () => rdp.pastes.length === 1 && rdp.pastes[0] === 'from-local',
+        });
         await selector('.lan-session-clipboard summary');
-        await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "远端文本"');
+        await wait('document.querySelector(".lan-session-clipboard textarea[readonly]").value === "selected-remote"');
         await fill('.lan-session-clipboard textarea:not([readonly])', '本地文本');
         await button('发送到远端', '.lan-session-clipboard button');
         await wait('document.querySelector(".lan-session-clipboard [role=status]").textContent.includes("已发送")');
@@ -998,6 +1003,7 @@ app
       );
     } finally {
       clearTimeout(timeout);
+      await restoreClipboard();
       window?.destroy();
       await fixture?.close();
     }

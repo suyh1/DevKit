@@ -6,6 +6,7 @@ declare module '@novnc/novnc' {
     focus(): void;
     disconnect(): void;
     clipboardPasteFrom(text: string): void;
+    sendKey(keysym: number, code: string, down: boolean): void;
     sendCtrlAltDel(): void;
     approveServer(): void;
     sendCredentials(credentials: Record<string, string>): void;

@@ -11,7 +11,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
   const viewport = useRef<HTMLDivElement>(null);
   const screen = useRef<HTMLElement>(null);
   const [maximized, setMaximized] = useState(false), [full, setFull] = useState(false);
-  const [remote, setRemote] = useState('');
+  const [remote, setRemote] = useState(''), [notice, setNotice] = useState('');
   useEffect(() => {
     const update = () => setFull(!!screen.current && document.fullscreenElement === screen.current);
     document.addEventListener('fullscreenchange', update);
@@ -19,7 +19,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
   }, []);
   function resetScreen() {
     if (document.fullscreenElement === screen.current && screen.current) void document.exitFullscreen().catch(() => {});
-    setMaximized(false); setRemote('');
+    setMaximized(false); setRemote(''); setNotice('');
   }
   const session = useRef<ReturnType<typeof openRemoteDesktop> | null>(null);
   const [phase, setPhase] = useState<'idle' | 'connecting' | 'connected'>('idle');
@@ -44,7 +44,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
       }, { resizeDesktop: !vnc, onConnect: () => setPhase('connected'), onError: message => {
         session.current = null;
         resetScreen(); setError(message); setPhase('idle');
-      }, onClipboard: setRemote });
+      }, onClipboard: setRemote, onNotice: setNotice });
       password.value = '';
     }}>
       {error && <p className="pc-error" role="alert">{error}</p>}
@@ -55,7 +55,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
       <footer className="pc-form-footer"><ModalCancel /><button className="run-button">连接</button></footer>
     </form>
     <section ref={screen} className={maximized ? 'lan-rdp-view lan-rdp-maximized' : 'lan-rdp-view'} hidden={phase === 'idle'} aria-label="远程桌面会话">
-      <div className="lan-rdp-toolbar"><span role="status">{phase === 'connecting' ? '正在连接目标远程桌面…' : '远程桌面已连接'}</span><div>
+      <div className="lan-rdp-toolbar"><span role="status">{phase === 'connecting' ? '正在连接目标远程桌面…' : notice || '远程桌面已连接'}</span><div>
         <button type="button" className="text-button" onClick={() => {
           if (full) void document.exitFullscreen();
           else if (maximized) setMaximized(false);
