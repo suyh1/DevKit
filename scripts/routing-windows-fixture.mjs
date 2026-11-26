@@ -8,7 +8,7 @@ const config = JSON.parse(await host.run(`
   $addr=Get-NetIPAddress -InterfaceIndex $r.InterfaceIndex -AddressFamily IPv4 | Where-Object AddressState -eq 'Preferred' | Select-Object -First 1
   @{ local=$addr.IPAddress; gateway=$r.NextHop; idx=$r.InterfaceIndex } | ConvertTo-Json -Compress`));
 const plan = { role:'B', name:'CI', ab:config.gateway, b:config.local, ac:'192.0.2.201', c:'192.0.2.205' };
-const read = `@(Get-NetRoute -AddressFamily IPv4 -PolicyStore PersistentStore | Where-Object DestinationPrefix -eq '${plan.c}/32').Count`;
+const read = `@(Get-NetRoute -PolicyStore PersistentStore | Where-Object DestinationPrefix -eq '${plan.c}/32').Count`;
 assert.equal(await host.run(read),'0');
 const profiles = { A:'a'.repeat(36), C:'c'.repeat(36) };
 const connect = async (_lan, id) => id ? { platform:'win32', close() {}, run:async () => 'present' }

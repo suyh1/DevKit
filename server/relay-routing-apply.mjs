@@ -22,7 +22,7 @@ export async function routingManagementSession(lan, id) {
     platform, close: () => remote?.client.destroy(),
     run(script) {
       if (platform === 'win32') {
-        const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
+        const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
         const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command, 'utf16le').toString('base64')];
         return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout: limit }) : localCommand('powershell.exe', args);
       }
@@ -99,14 +99,14 @@ function windowsOperations(plan, role) {
   if (role === 'A') return [...new Set([plan.ab, plan.ac])].map(ip => {
     const args = '-InterfaceIndex $idx -AddressFamily IPv4';
     return { label: ip + ' IPv4 转发', init:index(ip),
-      state: `$a=(Get-NetIPInterface ${args} -PolicyStore ActiveStore).Forwarding; $p=(Get-NetIPInterface ${args} -PolicyStore PersistentStore).Forwarding; if ($a -ne $p) { throw '活动和持久转发状态不同，请核对接口配置' }; if ($a -eq 'Enabled') { 'present' } else { 'missing' }`,
+      state: `$a=(Get-NetIPInterface ${args} -PolicyStore ActiveStore).Forwarding; $p=(Get-NetIPInterface -PolicyStore PersistentStore | Where-Object { $_.InterfaceIndex -eq $idx -and $_.AddressFamily -eq 'IPv4' }).Forwarding; if ($null -eq $p) { $p='Disabled' }; if ($a -ne $p) { throw '活动和持久转发状态不同，请核对接口配置' }; if ($a -eq 'Enabled') { 'present' } else { 'missing' }`,
       add:'Set-NetIPInterface ' + args + ' -Forwarding Enabled', undo:'Set-NetIPInterface ' + args + ' -Forwarding Disabled' };
   });
   const local = role === 'B' ? plan.b : plan.c, peer = role === 'B' ? plan.c : plan.b, via = role === 'B' ? plan.ab : plan.ac;
   const args = `-DestinationPrefix '${peer}/32' -InterfaceIndex $idx -NextHop '${via}'`;
   const init = index(local) + `\n$hop=Find-NetRoute -LocalIPAddress '${local}' -RemoteIPAddress '${via}' | Where-Object { $_.PSObject.Properties['NextHop'] }; if ($hop.NextHop -ne '0.0.0.0' -or $hop.InterfaceIndex -ne $idx) { throw 'A 必须是本链路可达的下一跳' }`;
   return [{ label:'持久主机路由', init,
-    state: `$states = foreach ($store in 'ActiveStore','PersistentStore') { $r=@(Get-NetRoute -PolicyStore $store -AddressFamily IPv4 | Where-Object DestinationPrefix -eq '${peer}/32'); if (!$r.Count) { 'missing' } elseif ($r.Count -eq 1 -and $r[0].NextHop -eq '${via}' -and $r[0].InterfaceIndex -eq $idx) { 'present' } else { throw '现有主机路由与方案冲突' } }; if ($states[0] -ne $states[1]) { throw '活动和持久路由不一致' }; $states[0]`,
+    state: `$states = foreach ($store in 'ActiveStore','PersistentStore') { $r=@(Get-NetRoute -PolicyStore $store | Where-Object DestinationPrefix -eq '${peer}/32'); if (!$r.Count) { 'missing' } elseif ($r.Count -eq 1 -and $r[0].NextHop -eq '${via}' -and $r[0].InterfaceIndex -eq $idx) { 'present' } else { throw '现有主机路由与方案冲突' } }; if ($states[0] -ne $states[1]) { throw '活动和持久路由不一致' }; $states[0]`,
     add: 'New-NetRoute ' + args + ' | Out-Null', undo:'Remove-NetRoute ' + args + ' -Confirm:$false' }];
 }
 
