@@ -1082,6 +1082,7 @@
   .mock-rule-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .mock-response-bar .segmented-control { max-width:100%; }
 }
+.relay-addresses { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .relay-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .relay-topology {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;

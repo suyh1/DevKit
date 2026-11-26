@@ -323,6 +323,10 @@ export function detectTools(input: string): Suggestion[] {
   if (/^(?:跨网转发|检测\s*A\s*的能力|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式');
   if (/^(?:原\s*IP\s*(?:双向)?(?:整机)?互通|双向路由|整机互通|B\s*(?:与|和|、|↔)\s*C\s*(?:双向|双方)?互通)$/i.test(text))
     rules.workspace('relay', '按原 IPv4 配置两端路由', undefined, 'routing');
+  const triple = /^A\s*[:=：]\s*([\d.]+)[,，\s]+B\s*[:=：]\s*([\d.]+)[,，\s]+C\s*[:=：]\s*([\d.]+)$/i.exec(text)?.slice(1);
+  if (triple && new Set(triple).size === 3 && triple.every(ip => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&
+      ip.split('.').every(n => Number(n) <= 255) && !/^(0|127)\./.test(ip) && Number(ip.split('.')[0]) < 224))
+    rules.workspace('relay', '带入三台设备并识别 A 的接口', undefined, 'routing/new/' + triple.join('/'));
   const relayTarget = /^(?:跨网互联|跨网转发|转发)\s+([a-z\d][\w.-]{0,200}):(\d{1,5})$/i.exec(text);
   if (relayTarget && Number(relayTarget[2]) > 0 && Number(relayTarget[2]) <= 65535)
     rules.workspace('relay', '带入目标服务并选择安装位置', undefined, 'new/' + relayTarget[1] + '/' + relayTarget[2]);

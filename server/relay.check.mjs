@@ -5,6 +5,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { createRelay } from './relay.mjs';
 import { tcp } from './relay-transport.mjs';
+import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting } from './relay-routing-apply.mjs';
 
 async function bind(server) {
@@ -36,6 +37,31 @@ test('routing plans validate endpoints, share both host routes and reserve write
   await assert.rejects(relay.call('apply',{ ...ref, desktopAdmin:true }),/桌面/);
   await assert.rejects(relay.call('start',{ ...ref, mode:'direct' }));
   await relay.call('remove',ref);
+});
+
+test('interface discovery keeps independent results and only uses the pinned profile for A', async () => {
+  const ips = { a:'10.9.0.1', b:'10.1.0.2', c:'10.2.0.2' };
+  const local = { eth0:[{ address:ips.b }] }, profile = { id:'a'.repeat(36), mode:'ssh', address:ips.a, fingerprint:'trusted' };
+  const lan = { hostRequest:async () => [profile, { ...profile, fingerprint:'' }] };
+  let closed = false;
+  const connect = async (_lan, id, options) => {
+    assert.equal(id,profile.id); assert.equal(options.elevated,false);
+    return { platform:'linux', close:() => { closed = true; }, run:async script => {
+      if (script.endsWith(ips.c)) return JSON.stringify([{ dev:'eth1', gateway:'10.1.0.9', prefsrc:'10.1.0.1' }]);
+      if (script.includes('fibmatch')) return '[{"dev":"eth1"}]';
+      if (script.includes('addr show')) return '2: eth1@if4 inet 10.1.0.1/24 scope global eth1';
+      return '[{"dev":"eth1","prefsrc":"10.1.0.1"}]';
+    } };
+  };
+  const found = await discoverRouting(ips,lan,local,connect);
+  assert.equal(found.role,'B'); assert.equal(found.ab.ip,'10.1.0.1'); assert.ok(found.ac.reason); assert.ok(closed);
+  assert.ok((await discoverRouting(ips,lan,{})).reason);
+  assert.ok((await discoverRouting(ips,null,local)).ab.reason);
+  const duplicates = { hostRequest:async () => [profile, { ...profile, id:'d'.repeat(36) }] };
+  assert.equal((await discoverRouting(ips,duplicates,local)).candidates.length,2);
+  assert.equal((await discoverRouting({ ...ips, profileA:profile.id },duplicates,local,connect)).ab.ip,'10.1.0.1');
+  await assert.rejects(discoverRouting({ ...ips, b:'10.1.0.2; echo' },lan,local));
+  await assert.rejects(fixture().call('discover',ips),/桌面/);
 });
 
 test('routing runs every preflight before writing and rolls back only its successful changes', async () => {

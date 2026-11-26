@@ -5,6 +5,7 @@ import { withDeadline } from './lan-probe.mjs';
 import { listen, openDestination, sshBanner, tcp } from './relay-transport.mjs';
 
 import { normalizeRouting, inspectRouting, routingSteps } from './relay-routing.mjs';
+import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting } from './relay-routing-apply.mjs';
 
 const modes = { A: ['direct'], B: ['direct', 'ssh', 'http', 'socks'], C: ['reverse'] };
@@ -147,6 +148,10 @@ export function createRelay(lan, changed) {
   }
   return {
     async request({ rows, commit, action, input, access }) {
+      if (action === 'discover') {
+        if (!access.desktopAdmin) fail(403, '地址识别仅限桌面端。');
+        return discoverRouting(input, lan);
+      }
       if (action === 'list') return rows.map(row => {
         if (row.kind === 'routing') return { ...row, steps: routingSteps(row) };
         const run = runs.get(row.id);

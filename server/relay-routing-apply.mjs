@@ -14,7 +14,7 @@ function localCommand(file, args, input) {
     child.stdin.end(input);
   });
 }
-export async function routingManagementSession(lan, id) {
+export async function routingManagementSession(lan, id, { elevated = true } = {}) {
   const remote = id ? await lan.routingSession(id) : null;
   const platform = remote?.platform || process.platform;
   if (!['linux', 'win32'].includes(platform)) { remote?.client.destroy(); throw new Error('自动配置支持 Windows 和 Linux。'); }
@@ -28,7 +28,7 @@ export async function routingManagementSession(lan, id) {
       }
       const input = 'set -eu\nexport LC_ALL=C\n' + script + '\n';
       // Elevation must already be available to this explicitly selected management identity.
-      const command = 'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi';
+      const command = elevated ? 'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi' : 'exec sh -s';
       return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout: limit }) : localCommand('sh', ['-c', command], input);
     },
   };

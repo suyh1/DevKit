@@ -98,9 +98,16 @@ module.exports = async function collaborationSmoke(window, output) {
     await web('location.hash="relay"');
     await click(desktop, main, '原 IP 双向互通');
     await click(desktop, main, '新建互通方案');
-    for (const [label,value] of [['方案名称','测试网络'],['B 的原 IPv4','192.0.2.2'],['A 面向 B 的 IPv4','192.0.2.1'],['C 的原 IPv4','192.0.2.6'],['A 面向 C 的 IPv4','192.0.2.5']])
+    assert.equal(await desktop(`!!document.querySelector('dialog input[aria-label="A 面向 B 的 IPv4"]')`),false);
+    for (const [label,value] of [['方案名称','测试网络'],['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
       await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
-    await click(desktop, 'dialog ', '保存方案');
+    await click(desktop, 'dialog ', '仅保存');
+    await wait(desktop, `!!document.querySelector('dialog select[aria-label="确认安装位置"]')`);
+    await desktop(`(() => { const s=document.querySelector('dialog select[aria-label="确认安装位置"]'); s.value='B'; s.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+    await click(desktop, 'dialog ', '仅保存');
+    for (const [label,value] of [['A 面向 B 的 IPv4','192.0.2.1'],['A 面向 C 的 IPv4','192.0.2.5']])
+      await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
+    await click(desktop, 'dialog ', '仅保存');
     await wait(desktop, 'document.body.innerText.includes("测试网络")');
     await click(desktop, main, '一键配置');
     await wait(desktop, 'Array.from(document.querySelectorAll("dialog button")).some(b => b.textContent==="配置 A、B、C" && b.disabled)');

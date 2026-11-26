@@ -6,13 +6,19 @@ import { promisify } from 'node:util';
 import { fail, shortText } from './collab-record.mjs';
 
 const exec = promisify(execFile);
+export function routingAddress(ip) {
+  if (!net.isIPv4(ip) || /^(0|127)\./.test(ip) || Number(ip.split('.')[0]) >= 224) fail(400, '请填写有效的单播 IPv4 地址。');
+  return ip;
+}
 export function normalizeRouting(input) {
   if (!['A', 'B', 'C'].includes(input.role)) fail(400, '请选择 DevKit 的安装位置。');
   const plan = { kind: 'routing', name: shortText(input.name, 80, '方案名称'), role: input.role };
   for (const key of ['b', 'c', 'ab', 'ac']) {
-    const ip = input[key];
-    if (!net.isIPv4(ip) || /^(0|127)\./.test(ip) || Number(ip.split('.')[0]) >= 224) fail(400, '请填写四个实际使用的单播 IPv4 地址。');
-    plan[key] = ip;
+    plan[key] = routingAddress(input[key]);
+  }
+  if (input.a) {
+    plan.a = routingAddress(input.a);
+    if ([plan.b, plan.c].includes(plan.a)) fail(400, 'A、B、C 须使用不同地址。');
   }
   if (plan.b === plan.c || [plan.b, plan.c].some(ip => ip === plan.ab || ip === plan.ac)) fail(400, 'B、C 和网关必须使用不同地址。');
   return plan;
