@@ -117,19 +117,27 @@ module.exports = async function collaborationSmoke(window, output) {
     await wait(web, '!!document.querySelector(".portal-page:not([hidden])")');
     await openWorkspace('跨网互联');
     await web('location.hash="relay"');
+    await click(web, current, '原 IP 双向互通');
+    await click(web, current, '新建互通方案');
+    await wait(web, '!!document.querySelector("dialog[open] .relay-device-inputs")');
+    assert.equal(await web('document.querySelectorAll("dialog[open] .relay-ip").length'),3);
+    for (const [label,value] of [['方案名称','测试网络'],['A 中间这台设备的 IP','192.0.2.1'],['B 要互通的第一台设备的 IP','192.0.2.2'],['C 要互通的第二台设备的 IP','192.0.2.6']])
+      await fill(web, 'dialog input[aria-label="' + label + '"]',value);
+    await click(web,'dialog ','保存草稿');
+    await wait(web, 'document.body.innerText.includes("三个 IP 已保存为草稿")');
     await click(desktop, main, '原 IP 双向互通');
-    await click(desktop, main, '新建互通方案');
+    await click(desktop, main, '继续填写');
     await wait(desktop, '!!document.querySelector("dialog[open] .relay-addresses input")');
     await checkRelayForm(desktop);
     await captureRelay(window, 'relay-plan-editor');
-    assert.equal(await desktop(`!!document.querySelector('dialog input[aria-label="A 面向 B 的 IPv4"]')`),false);
-    for (const [label,value] of [['方案名称','测试网络'],['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
-      await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
+    assert.equal(await desktop(`!!document.querySelector('dialog input[aria-label="从 B 直接连接 A 时用的 IP"]')`),false);
+    for (const [label,value] of [['方案名称','测试网络'],['A 中间这台设备的 IP','192.0.2.1'],['B 要互通的第一台设备的 IP','192.0.2.2'],['C 要互通的第二台设备的 IP','192.0.2.6']])
+      assert.equal(await desktop('document.querySelector(\'dialog input[aria-label="' + label + '"]\').value'),value);
     await click(desktop, 'dialog ', '仅保存');
     await wait(desktop, `!!document.querySelector('dialog select[aria-label="确认安装位置"]')`);
     await desktop(`(() => { const s=document.querySelector('dialog select[aria-label="确认安装位置"]'); s.value='B'; s.dispatchEvent(new Event('change',{bubbles:true})); })()`);
     await click(desktop, 'dialog ', '仅保存');
-    for (const [label,value] of [['A 面向 B 的 IPv4','192.0.2.1'],['A 面向 C 的 IPv4','192.0.2.5']])
+    for (const [label,value] of [['从 B 直接连接 A 时用的 IP','192.0.2.1'],['从 C 直接连接 A 时用的 IP','192.0.2.5']])
       await fill(desktop, 'dialog input[aria-label="' + label + '"]', value);
     await click(desktop, 'dialog ', '仅保存');
     await wait(desktop, 'document.body.innerText.includes("测试网络")');
@@ -140,6 +148,7 @@ module.exports = async function collaborationSmoke(window, output) {
     await desktop('document.querySelector(\'dialog button[aria-label="关闭路由配置"]\').click()');
     // Exercise the renderer's two missing-profile transitions with a deterministic desktop bridge.
     // The backend suite separately checks real SSH credentials, host keys and persistence.
+    await click(web, current, '服务转发');
     const routingBounds = browser.getBounds();
     const portalTheme = await web('document.documentElement.dataset.theme');
     for (const localRole of ['B','C']) {
@@ -175,7 +184,7 @@ module.exports = async function collaborationSmoke(window, output) {
       await click(web, current, '新建互通方案');
       await wait(web, '!!document.querySelector("dialog[open] .relay-device-inputs")');
       await checkRelayForm(web);
-      for (const [label,value] of [['A 的管理 IPv4','192.0.2.1'],['B 的原 IPv4','192.0.2.2'],['C 的原 IPv4','192.0.2.6']])
+      for (const [label,value] of [['A 中间这台设备的 IP','192.0.2.1'],['B 要互通的第一台设备的 IP','192.0.2.2'],['C 要互通的第二台设备的 IP','192.0.2.6']])
         await fill(web, 'dialog input[aria-label="' + label + '"]',value);
       await click(web,'dialog ','检测并配置');
       for (const role of ['A',peerRole]) {

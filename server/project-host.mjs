@@ -278,7 +278,11 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             const manager = managers.collab?.();
             if (!manager) return json(503, { error: '共享工具暂不可用。' });
             const input = await body();
-            const data = await manager.request(module, action, input, { sshAllowed: services['lan-hosts'].terminal, authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token, publisherSession: token });
+            const data = await manager.request(module, action, input, {
+              routingDiscovery: services.relay.edit && services.relay.control,
+              sshAllowed: services['lan-hosts'].enabled && services['lan-hosts'].terminal,
+              authorize: ensureCurrentSession, actor: session.visitor || '共享访客', owner: token, publisherSession: token,
+            });
             ensureCurrentSession();
             if (!readOnly && !['part', 'begin', 'cancel', 'sweep', 'presence', 'reply'].includes(action)) audit.record(session.visitor, module + '.' + action, 'ok');
             return json(200, data ?? null);

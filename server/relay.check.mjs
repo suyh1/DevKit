@@ -68,7 +68,31 @@ test('interface discovery keeps independent results and only uses the pinned pro
   assert.equal((await discoverRouting(ips,duplicates,local)).candidates.length,2);
   assert.equal((await discoverRouting({ ...ips, profileA:profile.id },duplicates,local,connect)).ab.ip,'10.1.0.1');
   await assert.rejects(discoverRouting({ ...ips, b:'10.1.0.2; echo' },lan,local));
-  await assert.rejects(fixture().call('discover',ips),/桌面/);
+  await assert.rejects(fixture().call('discover',ips),/权限/);
+});
+
+test('three-address drafts can be resumed without publishing incomplete routes', async () => {
+  const relay = fixture();
+  const draft = { kind:'routing', pending:true, name:'两台电脑互访', a:routingPlan.ab, b:routingPlan.b, c:routingPlan.c };
+  await assert.rejects(relay.call('save',{ ...draft, b:draft.a }), /不同/);
+  await assert.rejects(relay.call('save',{ ...draft, c:'abc' }), /设备 C/);
+  const ref = await relay.call('save',draft);
+  const [{ created, ...pending }] = await relay.call('list');
+  assert.ok(created);
+  assert.deepEqual(pending, { ...draft, ...ref });
+  for (const operation of ['apply','detect','start']) await assert.rejects(relay.call(operation,ref),/草稿/);
+  const saved = await relay.call('save',{ ...routingPlan, ...ref });
+  assert.equal(saved.id,ref.id);
+  assert.ok((await relay.call('list'))[0].steps.A);
+  await assert.rejects(relay.call('save',{ ...draft, ...saved }),/草稿/);
+});
+
+test('shared discovery ignores caller-supplied installation and account overrides and hides host profiles', async () => {
+  const relay = createRelay({ hostRequest:() => { throw Error('unexpected host access'); } }, () => {});
+  const input = { a:'192.0.2.1', b:'192.0.2.2', c:'192.0.2.3', role:'A', profileA:'chosen', desktopAdmin:true };
+  const request = access => relay.request({ rows:[], action:'discover', input, access });
+  await assert.rejects(request({}), /权限/);
+  assert.deepEqual(await request({ routingDiscovery:true, sshAllowed:false }), { role:undefined, ab:{}, ac:{} });
 });
 
 test('peer management profiles follow the chosen hub for either endpoint installation', () => {

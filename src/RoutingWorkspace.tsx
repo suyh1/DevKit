@@ -5,16 +5,16 @@ import { openWorkspaceLink } from './workspace-links';
 import { remoteAccess } from './workspace-remote';
 import { Modal, ModalCancel, ModalForm } from './project-components';
 import { useConfirmation } from './Confirmation';
-import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { routingProfiles } from '../shared/routing-profiles.mjs';
 import RoutingProfileDialog from './RoutingProfileDialog';
 import { OverflowName } from './FileMeta';
 
 type Role = 'A' | 'B' | 'C';
-type Draft = { kind: 'routing'; id?: string; revision?: number; name: string; role: Role; a?: string; b: string; c: string; ab: string; ac: string };
+type Draft = { kind: 'routing'; pending?:boolean; id?: string; revision?: number; name: string; role: Role; a?: string; b: string; c: string; ab: string; ac: string };
 type Steps = { linux: string; windows: string; persist: string; nm?: string; undoLinux?: string; undoWindows?: string };
-type Plan = Draft & { id: string; revision: number; steps: Record<Role, Steps> };
+type Plan = Draft & { pending?:false; id: string; revision: number; steps: Record<Role, Steps> };
+type PendingPlan = Pick<Plan, 'kind'|'id'|'revision'|'name'|'b'|'c'> & { pending:true; a:string };
 const roles: Role[] = ['A', 'B', 'C'];
 const empty: Draft = { kind: 'routing', name: '', role: 'A', b: '', c: '', ab: '', ac: '' };
 type Profiles = Partial<Record<Role,string>>;
@@ -23,17 +23,30 @@ type Discovery = {
   role?:Role; profiles?:Profiles; reason?:string; candidates?:{ id:string; label:string }[];
   ab?:{ ip?:string; reason?:string }; ac?:{ ip?:string; reason?:string };
 };
-const sides = [['ab','A 面向 B 的 IPv4'], ['ac','A 面向 C 的 IPv4']] as const;
+const sides = [['ab','B'], ['ac','C']] as const;
+const devices = [
+  ['a','中间这台设备','192.168.1.10'],
+  ['b','要互通的第一台设备','192.168.1.20'],
+  ['c','要互通的第二台设备','10.0.0.30'],
+] as const;
 function Editor({ initial, close, saved }: { initial: Draft; close: () => void; saved: (plan:Saved, configure:boolean, profiles:Profiles) => Promise<void> }) {
   const desktop = !!window.devkitCollab;
   const [draft, set] = useState({ ...initial, a:initial.a || (initial.role === 'C' ? initial.ac : initial.ab) }), op = useOperation();
   const [result, setResult] = useState<Discovery>(), [chosenRole, chooseRole] = useState<Role>(), [profileA, chooseProfile] = useState('');
   const [continueConfig,setContinueConfig] = useState(false);
   const [enrollA,setEnrollA] = useState<boolean | null>(null);
-  const [manual, setManual] = useState(!desktop || !!initial.id);
+  const incomplete = !initial.id || initial.pending;
+  const canDiscover = desktop || !!remoteAccess()?.services?.relay.control;
+  const [manual, setManual] = useState(!incomplete);
+  const name = draft.name.trim() || draft.b + ' ↔ ' + draft.c;
+  async function saveDraft() {
+    const { a,b,c,id,revision } = draft;
+    const ref = await collab<{id:string;revision:number}>('relay','save',{ kind:'routing', pending:true, a,b,c,id,revision,name });
+    await saved({ ...draft, ...ref, name, pending:true }, false, {});
+  }
   function changeAddress(key:'a'|'b'|'c', value:string) {
     set({ ...draft, [key]:value.trim(), ab:'', ac:'' });
-    setResult(undefined); chooseRole(undefined); chooseProfile(''); setManual(!desktop); op.clear();
+    setResult(undefined); chooseRole(undefined); chooseProfile(''); setManual(!incomplete); op.clear();
   }
   async function submit(configure:boolean, newA?:string) {
     setContinueConfig(configure);
@@ -41,12 +54,13 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
     if (!manual && (!found?.ab || !found.ac)) {
       found = await collab<Discovery>('relay','discover',{ a:draft.a, b:draft.b, c:draft.c, role:chosenRole || result?.role, profileA:newA || profileA });
       setResult(found);
+      if (!desktop && !found.role) { setManual(true); return; }
       if (!found.role || !found.ab || !found.ac) return;
     }
     if (configure && found?.role && found.role !== 'A' && !found.profiles?.A && !found.candidates && !newA) {
       setEnrollA(true); return;
     }
-    const settings = { ...draft, name:draft.name.trim() || draft.b + ' ↔ ' + draft.c,
+    const settings = { ...draft, pending:false, name,
       role:found?.role || draft.role, ab:found?.ab?.ip || draft.ab, ac:found?.ac?.ip || draft.ac };
     if (!settings.ab || !settings.ac) return;
     const ref = await collab<{ id:string; revision:number }>('relay','save',settings);
@@ -57,34 +71,57 @@ function Editor({ initial, close, saved }: { initial: Draft; close: () => void; 
     setEnrollA(null); chooseProfile(host.id);
     await op.run(() => submit(configure,host.id));
   }}/>;
-  return <Modal title={draft.id ? '编辑互通方案' : '新建互通方案'} close={close} busy={op.busy} closeLabel="关闭路由配置">
+  const action = desktop && incomplete ? 'configure' : !desktop && !canDiscover && !manual ? 'draft' : 'save';
+  return <Modal title={draft.pending ? '继续互通方案' : draft.id ? '编辑互通方案' : '新建互通方案'} close={close} busy={op.busy} closeLabel="关闭路由配置">
     <ModalForm className="relay-form" footer={<footer className="pc-modal-actions"><ModalCancel />
-      {desktop && !draft.id && <button type="submit" value="save" disabled={op.busy}>仅保存</button>}
-      <button type="submit" value={desktop && !draft.id ? 'configure' : 'save'} className="run-button" disabled={op.busy}>
-        {op.busy ? '处理中…' : desktop && !draft.id ? '检测并配置' : '保存方案'}</button></footer>}
+      {desktop && incomplete && <button type="submit" value="save" disabled={op.busy}>仅保存</button>}
+      {incomplete && (!desktop || result || op.message) && action !== 'draft' &&
+        <button type="button" disabled={op.busy} onClick={() => void op.run(saveDraft)}>保存草稿</button>}
+      <button type="submit" value={action} className="run-button" disabled={op.busy}>
+        {op.busy ? '处理中…' : action === 'draft' ? '保存草稿' : action === 'configure' ? '检测并配置' : incomplete && !manual && !result ? '识别并保存' : '保存方案'}</button></footer>}
       onSubmit={event => { event.preventDefault(); const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-        void op.run(() => submit(button?.value === 'configure')); }}>
+        const intent = button?.value || action;
+        void op.run(() => intent === 'draft' ? saveDraft() : submit(intent === 'configure')); }}>
       <fieldset disabled={op.busy} className="relay-addresses">
-        <legend>设备地址</legend>
+        <legend>哪两台设备需要通过 A 互相访问？</legend>
+        <p className="relay-note">把两边都能连上的那台设备叫作 A，另外两台叫作 B 和 C。填写 A 的登录 IP，以及你希望用来访问 B、C 的 IP。</p>
         <div className="relay-device-inputs">
-          {([['a','管理 IPv4','192.0.2.1'],['b','原 IPv4','192.0.2.2'],['c','原 IPv4','198.51.100.2']] as const).map(([key,label,example]) =>
+          {devices.map(([key,label,example]) =>
             <label key={key}><span className="relay-device-label"><b>{key.toUpperCase()}</b>{label}</span>
-              <input className="relay-ip" required aria-label={key.toUpperCase() + ' 的' + label} placeholder={'如 ' + example} spellCheck={false}
+              <input className="relay-ip" required aria-label={key.toUpperCase() + ' ' + label + '的 IP'} placeholder={'如 ' + example} spellCheck={false}
                 value={draft[key]} onChange={e => changeAddress(key,e.target.value)}/></label>)}
         </div>
+        <details><summary>不知道设备的 IP？</summary>
+          <p>在设备上打开网络设置，查看正在使用的有线或无线连接，找到「IPv4 地址」。B、C 各填自己的地址。A 如果有多个地址，先填平时登录 A 用的那个。</p>
+        </details>
         <label>方案名称（可选）<input aria-label="方案名称" maxLength={80} placeholder="默认使用 B、C 的 IP" value={draft.name} onChange={e => set({ ...draft, name:e.target.value })}/></label>
-        {manual && <div className="relay-choice"><span>DevKit 安装位置</span><SegmentedControl label="DevKit 安装位置" value={draft.role} options={roles.map(value => ({ value, label:value }))} onChange={role => set({ ...draft, role })}/></div>}
-        {result?.reason && <label>{result.reason}<select aria-label="确认安装位置" required value={chosenRole || ''} onChange={e => chooseRole(e.target.value as Role)}>
+        {manual && <label>哪台设备装了 DevKit？<select required value={chosenRole || (incomplete ? '' : draft.role)} onChange={e => {
+          const role = e.target.value as Role; chooseRole(role); set({ ...draft, role });
+        }}><option value="">请选择设备</option>{devices.map(([key,label]) => <option key={key} value={key.toUpperCase()}>{key.toUpperCase()} · {label}</option>)}</select></label>}
+        {result?.reason && !manual && <label>哪台设备装了 DevKit？<select aria-label="确认安装位置" required value={chosenRole || ''} onChange={e => chooseRole(e.target.value as Role)}>
           <option value="">选择安装位置</option>{roles.map(r => <option key={r}>{r}</option>)}</select></label>}
         {result?.candidates && <label>A 有多个已确认的管理档案<select required value={profileA} onChange={e => chooseProfile(e.target.value)}>
           <option value="">选择 A 的档案</option>{result.candidates.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>}
         {desktop && result?.role && result.role !== 'A' && result.ab && !result.profiles?.A &&
           <button type="button" onClick={() => setEnrollA(continueConfig)}>补全 A 的 SSH 管理档案并重新检测</button>}
-        {sides.map(([key,label]) => result?.[key]?.ip ? <p key={key}>{label} · {result[key]?.ip}（已识别）</p> :
-          (manual || result?.[key]) && <label key={key}>{label}{result?.[key]?.reason && <small>{result[key]?.reason}</small>}
-            <input required aria-label={label} value={draft[key]} onChange={e => set({ ...draft, [key]:e.target.value.trim() })}/></label>)}
+        {!desktop && !result?.role && result && <p className="relay-note">DevKit 没能确定安装在哪台设备上。可以保存草稿，也可以手动补充下面的信息。</p>}
+        {!desktop && incomplete && !canDiscover && !manual && <button type="button" onClick={() => setManual(true)}>我知道连接地址，手动填写</button>}
+        {sides.map(([key,peer]) => {
+          const label = '从 ' + peer + ' 直接连接 A 时用的 IP';
+          if (result?.[key]?.ip) return <p key={key}>{label}（已识别）<code>{result[key]?.ip}</code></p>;
+          if (!manual && !result?.[key]) return null;
+          return <label key={key}>{label}
+            <input className="relay-ip" spellCheck={false} required aria-label={label} value={draft[key]} onChange={e => set({ ...draft, [key]:e.target.value.trim() })}/>
+            <small>例如，在 {peer} 上用 {peer === 'B' ? '192.168.1.10' : '10.0.0.10'} 直接打开 A 的共享文件夹，就填 {peer === 'B' ? '192.168.1.10' : '10.0.0.10'}。两边用同一个地址连 A 时，两项可以相同。</small>
+          </label>;
+        })}
+        {(result?.ab?.reason || result?.ac?.reason) && <details><summary>查看未能识别的原因</summary>
+          {sides.map(([key,peer]) => result[key]?.reason && <p key={key}>{peer} 连接 A：{result[key]?.reason}</p>)}
+        </details>}
       </fieldset>
-      {desktop && !draft.id && <p className="relay-note">DevKit 会识别安装位置和 A 的两侧地址，再在 A 开启转发，为 B、C 写入互访路由。缺少 SSH 档案时，可在这里补录。</p>}
+      {incomplete && <p className="relay-note">{desktop ? '选择「检测并配置」后，DevKit 会查找连接地址，再为三台设备设置互通。' : canDiscover ? '网页可以识别地址并保存方案。实际配置请在 DevKit 桌面端完成。' : '此网页没有自动检测权限。可以先保存这三个 IP，再到运行 DevKit 的设备上打开草稿继续。'}</p>}
+      {incomplete && (manual || result?.ab && !result.ab.ip || result?.ac && !result.ac.ip) &&
+        <p className="relay-note">不知道该填什么时，可以先保存草稿，请管理 A 的人打开同一份方案确认。</p>}
       {op.message && <p role="alert">{op.message}</p>}
     </ModalForm></Modal>;
 }
@@ -138,26 +175,41 @@ function ApplyDialog({ plan, preset, close, done }: { plan: Saved; preset:Profil
 }
 
 export default function RoutingWorkspace({ active, edit, resource }: PageProps & { resource?: string }) {
-  const list = useCollabList<Plan>('relay', active), op = useOperation(), confirm = useConfirmation();
+  const list = useCollabList<Plan | PendingPlan>('relay', active), op = useOperation(), confirm = useConfirmation();
   const [editor,setEditor] = useState<Draft | null>(null), [apply,setApply] = useState<Saved | null>(null), [preset,setPreset] = useState<Profiles>({});
   useEffect(() => {
     if (!active || !edit || !resource?.startsWith('routing/new/')) return;
     const [, , a, b, c] = resource.split('/');
     setEditor({ ...empty, a, b, c });
   }, [active, edit, resource]);
-  const plans = list.value?.filter(p => p.kind === 'routing'), plan = plans?.find(p => p.id === resource?.split('/')[1]) || plans?.[0];
+  const plans = list.value?.filter(p => p.kind === 'routing'), selected = plans?.find(p => p.id === resource?.split('/')[1]) || plans?.[0];
+  const plan = selected?.pending ? undefined : selected;
   const [report,setReport] = useState<{ id:string; revision:number; text:string }>();
   const desktop = !!window.devkitCollab, control = desktop || !!remoteAccess()?.services?.relay.control;
+  async function remove(row: Plan | PendingPlan) {
+    const detail = row.pending ? '将删除这份草稿。' : '将删除 DevKit 中的记录。已写入各设备的系统路由继续生效。';
+    if (await confirm({ title:'移除互通方案', detail, confirm:'移除' })) {
+      await collab('relay','remove',row); await list.refresh(); openWorkspaceLink('relay','routing');
+    }
+  }
   return <div className="relay-workspace"><div className="relay-topology"><div><h2>原 IP 双向互通</h2><p>B 和 C 都能用原 IP 访问对方的服务。新增端口也沿用这条路由。</p></div>
     {edit && <button className={plans?.length ? undefined : 'primary-button'} onClick={() => setEditor({ ...empty })}>新建互通方案</button>}</div>
     {list.error && <p role="alert">{list.error}</p>}{!list.value && !list.error && <Skeleton kind="projects" label="读取互通方案" />}
-    {plans && !plan && <p className="relay-note">{edit ? '准备好 A 的管理 IPv4 和 B、C 的原 IPv4，即可新建第一份方案。' : '暂无互通方案。主机管理者添加后即可在这里查看。'}</p>}
-    {plan && <><label>互通方案<select value={plan.id} onChange={e => openWorkspaceLink('relay','routing/' + e.target.value)}>
-      {plans?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+    {plans && !selected && <p className="relay-note">{edit ? '准备好三台设备的 IP，就可以新建第一份方案。' : '暂无互通方案。主机管理者添加后即可在这里查看。'}</p>}
+    {selected && <label>互通方案<select value={selected.id} onChange={e => { op.clear(); openWorkspaceLink('relay','routing/' + e.target.value); }}>
+      {plans?.map(p => <option key={p.id} value={p.id}>{p.name}{p.pending ? '（草稿）' : ''}</option>)}</select></label>}
+    {selected?.pending && <div className="devkit-bento relay-panels"><section>
+      <h3><OverflowName name={selected.name} /></h3>
+      <p>三个 IP 已保存为草稿。{desktop ? '继续后，DevKit 会尝试识别连接地址。' : '可以在 DevKit 桌面端打开这份草稿继续配置。'}</p>
+      <dl className="relay-endpoints">{devices.map(([key,label]) => <div key={key}><dt>{key.toUpperCase()} · {label}</dt><dd><code>{selected[key]}</code></dd></div>)}</dl>
+      {edit && <div className="collab-actions"><button className="primary-button" onClick={() => setEditor({ ...empty, ...selected })}>继续填写</button>
+        <button disabled={op.busy} onClick={() => void op.run(() => remove(selected))}>移除</button></div>}
+    </section></div>}
+    {plan && <>
       <div className="devkit-bento relay-panels"><section><h3><OverflowName name={plan.name} /></h3>
         <dl className="relay-path" aria-label="B 经 A 与 C 双向互通的地址">
           <div><dt><b>B</b>互通端</dt><dd><code>{plan.b}</code></dd></div>
-          <div><dt><b>A</b>中转端</dt><dd><span>面向 B</span><code>{plan.ab}</code><span>面向 C</span><code>{plan.ac}</code></dd></div>
+          <div><dt><b>A</b>中转端</dt><dd><span>B 连接 A</span><code>{plan.ab}</code><span>C 连接 A</span><code>{plan.ac}</code></dd></div>
           <div><dt><b>C</b>互通端</dt><dd><code>{plan.c}</code></dd></div>
         </dl>
         <div className="collab-actions">{desktop && <button className="primary-button" disabled={op.busy} onClick={() => { setPreset({}); setApply(plan); }}>一键配置</button>}
@@ -165,11 +217,7 @@ export default function RoutingWorkspace({ active, edit, resource }: PageProps &
             const lines = await collab<string[]>('relay','detect',{ id:plan.id, revision:plan.revision });
             setReport({ ...plan, text:lines.join('\n') });
           })}>检测本机 {plan.role}</button>}
-          {edit && <><button onClick={() => setEditor(plan)}>编辑</button><button onClick={() => void op.run(async () => {
-            if (await confirm({ title:'移除互通方案', detail:'将删除 DevKit 中的记录。已写入各设备的系统路由继续生效。', confirm:'移除' })) {
-              await collab('relay','remove',plan); await list.refresh(); openWorkspaceLink('relay','routing');
-            }
-          })}>移除</button></>}</div>
+          {edit && <><button onClick={() => setEditor(plan)}>编辑</button><button onClick={() => void op.run(() => remove(plan))}>移除</button></>}</div>
         {report?.id === plan.id && report.revision === plan.revision && <p role="status" style={{ whiteSpace:'pre-line' }}>{report.text}</p>}
         <p className="relay-note">配置后，从 B、C 各访问一次对方已开放的服务，验证两个方向都能连接。</p>
       </section><section><h3>各设备配置与验证</h3>{roles.map(role => <details key={plan.id + role}><summary>{role} · {role === 'A' ? '开启 IPv4 转发' : '到 ' + (role === 'B' ? plan.c : plan.b) + ' 的主机路由'}</summary>

@@ -45,7 +45,7 @@ async function interfaceToward(host, peer, endpoints) {
 }
 
 export async function discoverRouting(input, lan, localInterfaces = networkInterfaces(), connect = routingManagementSession) {
-  const ips = { A:routingAddress(input.a), B:routingAddress(input.b), C:routingAddress(input.c) };
+  const ips = { A:routingAddress(input.a,'设备 A '), B:routingAddress(input.b,'设备 B '), C:routingAddress(input.c,'设备 C ') };
   if (new Set(Object.values(ips)).size !== 3) fail(400, 'A、B、C 须使用不同地址。');
   if (input.role && !roles.includes(input.role)) fail(400, '安装位置无效。');
   const local = new Set(Object.values(localInterfaces).flat().map(item => item?.address));

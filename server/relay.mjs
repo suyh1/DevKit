@@ -4,7 +4,7 @@ import { sshCall } from './ssh-exec.mjs';
 import { withDeadline } from './lan-probe.mjs';
 import { listen, openDestination, sshBanner, tcp } from './relay-transport.mjs';
 
-import { normalizeRouting, inspectRouting, routingSteps } from './relay-routing.mjs';
+import { normalizeRouting, inspectRouting, routingDraft, routingSteps } from './relay-routing.mjs';
 import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting } from './relay-routing-apply.mjs';
 
@@ -149,11 +149,17 @@ export function createRelay(lan, changed) {
   return {
     async request({ rows, commit, action, input, access }) {
       if (action === 'discover') {
-        if (!access.desktopAdmin) fail(403, '地址识别仅限桌面端。');
-        return discoverRouting(input, lan);
+        if (access.desktopAdmin) return discoverRouting(input, lan);
+        if (!access.routingDiscovery) fail(403, '此网页没有识别地址的权限。');
+        access.authorize?.();
+        const found = await discoverRouting({ a:input.a, b:input.b, c:input.c }, access.sshAllowed ? lan : undefined);
+        access.authorize?.();
+        // The portal only needs addresses. Keep account choices and SSH diagnostics on the host.
+        const side = value => value?.ip ? { ip:value.ip } : {};
+        return { role:found.role, ab:side(found.ab), ac:side(found.ac) };
       }
       if (action === 'list') return rows.map(row => {
-        if (row.kind === 'routing') return { ...row, steps: routingSteps(row) };
+        if (row.kind === 'routing') return row.pending ? row : { ...row, steps: routingSteps(row) };
         const run = runs.get(row.id);
         return { ...row, mode: run?.mode, connected: !!run?.connected, error: lastError.get(row.id) || '' };
       });
@@ -163,7 +169,11 @@ export function createRelay(lan, changed) {
         if (before && runs.has(before.id)) fail(409, '请先停止转发再修改规则。');
         if (!before && rows.length >= 64) fail(400, '最多保存 64 项服务规则。');
         if (before && (before.kind === 'routing') !== (input.kind === 'routing')) fail(400, '请保留原方案类型。');
-        const settings = input.kind === 'routing' ? normalizeRouting(input) : normalize(input);
+        let settings;
+        if (input.kind === 'routing' && input.pending === true) {
+          if (before && !before.pending) fail(409, '已完成的方案不能改为草稿。');
+          settings = routingDraft(input);
+        } else settings = input.kind === 'routing' ? normalizeRouting(input) : normalize(input);
         const row = { ...(before ? { id: before.id, revision: before.revision + 1 } : newRecord()), ...settings };
         await commit(before ? rows.map(item => item.id === row.id ? row : item) : [...rows, row]);
         lastError.delete(row.id); return { id: row.id, revision: row.revision };
@@ -171,6 +181,7 @@ export function createRelay(lan, changed) {
       const rule = requireRecord(rows, input.id);
       checkRevision(rule, input.revision);
       if (rule.kind === 'routing' && action !== 'remove') {
+        if (rule.pending) fail(409, '这是草稿，请先完成地址识别。');
         const plan = normalizeRouting(rule);
         if (action === 'detect') return inspectRouting(plan);
         if (action !== 'apply' || !access.desktopAdmin) fail(403, '一键配置仅限 DevKit 桌面主机。');

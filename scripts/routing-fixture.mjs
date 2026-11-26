@@ -28,6 +28,8 @@ try {
   assert.deepEqual(found.profiles, profiles);
   assert.equal(found.ab?.ip, plan.ab, JSON.stringify(found));
   assert.equal(found.ac?.ip, plan.ac, JSON.stringify(found));
+  const shared = await store.request('relay','discover',{ a, b:plan.b, c:plan.c },{ routingDiscovery:true, sshAllowed:true });
+  assert.deepEqual(shared,{ role, ab:{ip:plan.ab}, ac:{ip:plan.ac} });
   const saved = await store.request('relay','save',{ kind:'routing', name:'互通', role:found.role, a, b:plan.b, c:plan.c, ab:found.ab.ip, ac:found.ac.ip });
   const apply = () => store.request('relay','apply',{ ...saved, profiles },{ desktopAdmin:true });
   assert.match(await apply(),/配置已应用/);

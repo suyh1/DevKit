@@ -6,9 +6,14 @@ import { promisify } from 'node:util';
 import { fail, shortText } from './collab-record.mjs';
 
 const exec = promisify(execFile);
-export function routingAddress(ip) {
-  if (!net.isIPv4(ip) || /^(0|127)\./.test(ip) || Number(ip.split('.')[0]) >= 224) fail(400, '请填写有效的单播 IPv4 地址。');
+export function routingAddress(ip, device = '设备') {
+  if (!net.isIPv4(ip) || /^(0|127)\./.test(ip) || Number(ip.split('.')[0]) >= 224) fail(400, '请填写' + device + '自己的 IPv4 地址，例如 192.168.1.20。');
   return ip;
+}
+export function routingDraft(input) {
+  const a = routingAddress(input.a,'设备 A '), b = routingAddress(input.b,'设备 B '), c = routingAddress(input.c,'设备 C ');
+  if (new Set([a, b, c]).size !== 3) fail(400, '三台设备的 IP 地址必须不同。');
+  return { kind:'routing', pending:true, name:shortText(input.name, 80, '方案名称'), a, b, c };
 }
 export function normalizeRouting(input) {
   if (!['A', 'B', 'C'].includes(input.role)) fail(400, '请选择 DevKit 的安装位置。');
