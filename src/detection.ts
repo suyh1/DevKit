@@ -320,6 +320,19 @@ export function detectTools(input: string): Suggestion[] {
     if (text === '快速链接设置' || text === '快传链接设置') rules.workspace('transfer', '进入局域网快传管理快速链接');
     if (matches.size) return [...matches.values()];
   }
+  const tunnel = /^(?:sudo\s+)?wg-quick\s+(?:up|down)\s+(?:\/etc\/wireguard\/)?devkit-([abc])(?:\.conf)?$/i.exec(text);
+  if (tunnel) rules.workspace('wireguard', '查看对应设备的隧道配置', undefined, tunnel[1].toUpperCase());
+  if (/^(?:sudo\s+)?wg\s+show(?:\s+[\w-]+)?$/i.test(text)) rules.workspace('wireguard', '查看握手与服务验证步骤', undefined, 'check');
+  if (/^(?:WireGuard\s*组网|异地组网|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text))
+    rules.workspace('wireguard', '通过 A 连接两个端点');
+  if (/^\[(?:Peer|Interface)\]\s*$/im.test(text) || /^Endpoint\s*=\s*[^\n]+$/i.test(text)) {
+    const relay = /^Endpoint[ \t]*=[ \t]*(\[[\da-f:.]+\]:\d{1,5}|[\w.-]+:\d{1,5})[ \t]*\r?$/im.exec(text);
+    if (relay) rules.workspace('wireguard', '将 A 的入口带入 B 设备参数', undefined, 'endpoint/' + relay[1]);
+    else {
+      const listener = /^ListenPort[ \t]*=[ \t]*([1-9]\d{0,4})[ \t]*\r?$/im.exec(text);
+      if (listener && Number(listener[1]) <= 65535) rules.workspace('wireguard', '将监听端口带入 A 中转参数', undefined, 'listen/' + listener[1]);
+    }
+  }
   if (/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u00a0]/.test(input)) rules.tool('invisible', '定位隐形字符与方向控制符');
   if (/^[[{]/.test(text)) {
     let data: unknown;

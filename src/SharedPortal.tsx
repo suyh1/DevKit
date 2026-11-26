@@ -45,7 +45,7 @@ import { saveText } from "./files";
 import { DisplayModeProvider } from './DisplayMode';
 import type { DisplayMode } from './DisplayMode';
 
-const portalOrder = ['projects', 'git', 'knowledge', 'dev-docs', 'project-todos', 'file-shares', 'nginx', 'http', 'jar', 'monitor', 'logs', 'lan-hosts', 'transfer', 'mock', 'whiteboard'] as const satisfies readonly Page[];
+const portalOrder = ['projects', 'git', 'knowledge', 'dev-docs', 'project-todos', 'file-shares', 'nginx', 'http', 'jar', 'monitor', 'logs', 'lan-hosts', 'transfer', 'mock', 'whiteboard', 'wireguard'] as const satisfies readonly Page[];
 const modules = portalOrder.map(id => workspaceModules.find(item => item.id === id)!);
 type Page = keyof SharingServices;
 type Theme = "system" | "light" | "dark";
@@ -479,7 +479,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
     : [
         page === 'git' ? '按仓库授权' : ('edit' in active && active.edit)
           ? "可编辑"
-          : { 'dev-docs': '开发文档只读', knowledge: '文档只读', projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', transfer: '可复制和下载', mock: '可查看接口', whiteboard: '可查看和导出', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
+          : { 'dev-docs': '开发文档只读', knowledge: '文档只读', projects: "项目只读", 'project-todos': '清单只读', 'file-shares': '可下载', transfer: '可复制和下载', mock: '可查看接口', wireguard: '可查看组网配置', whiteboard: '可查看和导出', nginx: "配置只读", http: "接口定义只读", jar: '实例设置只读', monitor: '监控只读', logs: '日志只读', 'lan-hosts': '主机清单只读' }[
               page
             ],
         page === "nginx" && services.nginx.control ? "可管理运行" : "",
@@ -611,6 +611,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
                 'project-todos': '清单保存在共享主机。',
                 transfer: '文件、文字和链接经共享收件箱传送，受保护内容需输入取件密码。',
                 mock: '从共享主机查看模拟接口、调用地址和近期记录。',
+                wireguard: '三端公钥与地址保存在共享主机，隧道在各设备上启动。',
                 whiteboard: '从共享主机查看白板、截图和全部标注。',
                 'file-shares': '从共享主机下载已发布的文件。',
                 'lan-hosts': '连接由共享主机发起，目标地址见各连接。',
@@ -653,7 +654,7 @@ function Portal({ mode, setMode }: { mode: DisplayMode; setMode: (value: Display
             {services.knowledge?.enabled && <div className="portal-page" hidden={page !== 'knowledge'} inert={page !== 'knowledge'}><KnowledgeBase active={page === 'knowledge'} portal visitor={session?.visitor || ''} canEdit={services.knowledge.edit} /></div>}
             {services.git.enabled && <div className="portal-page" hidden={page !== 'git'} inert={page !== 'git'}><GitWorkspace active={page === 'git'} portal edit={services.git.edit} sync={services.git.sync} /></div>}
             {services['project-todos'].enabled && <div className="portal-page" hidden={page !== 'project-todos'} inert={page !== 'project-todos'}><TodoLists portal active={page === 'project-todos'} canEdit={services['project-todos'].edit} /></div>}
-            {(['transfer', 'mock', 'whiteboard'] as const).map(id => services[id].enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} portalActions={collaborationActions} /></div>)}
+            {(['transfer', 'mock', 'whiteboard', 'wireguard'] as const).map(id => services[id]?.enabled && <div key={id} className="portal-page" hidden={page !== id} inert={page !== id}><CollaborationPage module={id} active={page === id} edit={services[id].edit} portalActions={collaborationActions} /></div>)}
             {services['file-shares'].enabled && <div className="portal-page" hidden={page !== 'file-shares'} inert={page !== 'file-shares'}><PublishedFileShares active={page === 'file-shares'} /></div>}
             {services.nginx.enabled && (
               <div

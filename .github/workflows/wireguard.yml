@@ -1,0 +1,28 @@
+name: WireGuard connectivity
+on:
+  push:
+    branches: [main]
+    paths: ['server/wireguard.mjs', 'scripts/check-wireguard.sh', '.github/workflows/wireguard.yml']
+  pull_request:
+    paths: ['server/wireguard.mjs', 'scripts/check-wireguard.sh', '.github/workflows/wireguard.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  three-hosts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install tunnel and file transfer tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends wireguard-tools openssh-server python3-pyftpdlib
+      - name: Verify exported Linux configurations with isolated A, B and C hosts
+        run: sudo unshare --mount --propagation private --net --pid --fork --mount-proc bash scripts/check-wireguard.sh "$(command -v node)" "$(id -un)"

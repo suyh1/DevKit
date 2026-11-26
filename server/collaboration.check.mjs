@@ -37,7 +37,7 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
     host = await createProjectHost(store, dist, { collab: () => manager });
     const services = emptySharingServices(),
       viewer = emptySharingServices();
-    for (const module of ['transfer', 'mock', 'whiteboard']) {
+    for (const module of ['transfer', 'mock', 'whiteboard', 'wireguard']) {
       services[module] = { enabled: true, edit: true };
       viewer[module].enabled = true;
     }
@@ -76,7 +76,32 @@ test('two LAN sessions exchange protected files in both directions, switch Mock 
       assert.equal(res.status, 200, JSON.stringify(body));
       return body;
     };
-    for (const name of ['transfer', 'mock', 'whiteboard']) assert.equal((await post(name + '/list')).status, 401);
+    for (const name of ['transfer', 'mock', 'whiteboard', 'wireguard']) assert.equal((await post(name + '/list')).status, 401);
+    const devices = await ok('wireguard/list', {}, reader);
+    const [hub, b, c] = devices.map(device => ({ ...device, publicKey: randomBytes(32).toString('base64') }));
+    b.endpoint = 'relay-b.example.org:12345';
+    c.endpoint = '[2001:db8::1]:51820';
+    assert.equal((await post('wireguard/save', hub, reader)).status, 403);
+    await ok('wireguard/save', hub);
+    assert.equal((await post('wireguard/save', hub, second)).status, 409);
+    for (const invalid of [
+      { endpoint: '10.77.0.1:51820' }, { endpoint: 'relay.test:65536' }, { endpoint: 'relay:51820\nPostUp = false' },
+      { publicKey: 'not-a-key' }, { publicKey: hub.publicKey }, { address: c.address },
+    ]) assert.equal((await post('wireguard/save', { ...b, ...invalid }, second)).status, 400);
+    assert.ok((await ok('wireguard/list')).every(node => !node.config));
+    await Promise.all([ok('wireguard/save', b), ok('wireguard/save', c, second)]);
+    const [hubResult, bResult, cResult] = await ok('wireguard/list', {}, reader);
+    assert.deepEqual(hubResult.config.match(/^AllowedIPs = .+$/gm), ['AllowedIPs = 10.77.0.2/32', 'AllowedIPs = 10.77.0.3/32']);
+    for (const peer of [b, c]) assert.ok(hubResult.config.includes('PublicKey = ' + peer.publicKey));
+    for (const [node, other] of [[bResult, c], [cResult, b]]) {
+      assert.ok(node.config.includes('PublicKey = ' + hub.publicKey));
+      assert.ok(node.config.includes('Endpoint = ' + node.endpoint));
+      assert.ok(node.config.includes('AllowedIPs = ' + hub.address + '/32, ' + other.address + '/32'));
+      assert.ok(node.linuxConfig.includes('private-key /etc/wireguard/%i.key'));
+      assert.doesNotMatch(node.config, /PostUp|0\.0\.0\.0\/0/);
+    }
+    assert.match(hubResult.linuxConfig, /net\.ipv4\.conf\.%i\.forwarding=1/);
+    assert.doesNotMatch(await readFile(path.join(folder, 'collaboration/wireguard.json'), 'utf8'), /PrivateKey|PostUp/);
     assert.equal((await post('transfer/send', { text: 'blocked', hours: 1 }, reader)).status, 403);
     const initial = await ok('transfer/list', { sync: true }, reader);
     assert.deepEqual(initial.items, []);

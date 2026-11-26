@@ -30,7 +30,7 @@ try {
   const saved = await store.settings();
   const services = sharingFromEnvironment(process.env, saved);
   const publishWorkspaces = Object.values(services).some(service => service.enabled);
-  if (services.transfer.enabled || services.whiteboard.enabled || services.mock.enabled) collab = await createCollabStore(directory);
+  if (services.wireguard.enabled || services.transfer.enabled || services.whiteboard.enabled || services.mock.enabled) collab = await createCollabStore(directory);
   try {
     const configured = await stat(path.join(directory, transferLinksFile)).catch(error => {
       if (error.code !== 'ENOENT') throw error;

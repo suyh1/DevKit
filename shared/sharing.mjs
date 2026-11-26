@@ -7,6 +7,7 @@ const fields = {
   'file-shares': [],
   transfer: ['edit'],
   mock: ['edit'],
+  wireguard: ['edit'],
   whiteboard: ['edit'],
   nginx: ["edit", "control"],
   http: ["edit", "send"],

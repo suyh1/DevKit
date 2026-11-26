@@ -281,7 +281,7 @@ function Workbench({ preferences, setPreferences }: { preferences: Preferences; 
         {page === 'dev-docs' && <div data-motion-page className="workspace"><KnowledgeBase active section="dev-docs" /></div>}
         <div data-motion-page inert={page !== 'knowledge'} hidden={page !== 'knowledge'} className="workspace"><KnowledgeBase active={page === 'knowledge'} /></div>
         <div data-motion-page inert={page !== 'project-todos'} hidden={page !== 'project-todos'} className="workspace"><TodoLists active={page === 'project-todos'} onOpenTool={id => openTool(id)} /></div>
-        {(['transfer', 'mock', 'whiteboard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
+        {(['transfer', 'mock', 'whiteboard', 'wireguard'] as const).map(id => <div key={id} data-motion-page inert={page !== id} hidden={page !== id} className="workspace"><CollaborationPage module={id} active={page === id} edit /></div>)}
         <div data-motion-page inert={page !== 'file-shares'} hidden={page !== 'file-shares'} className="workspace"><FileShares active={page === 'file-shares'} /></div>
         <div data-motion-page inert={page !== 'nginx'} hidden={page !== 'nginx'} className="workspace nginx-workspace"><NginxCenter active={page === 'nginx'} /></div>
         <div data-motion-page inert={page !== 'jar'} hidden={page !== 'jar'} className="workspace"><JarCenter active={page === 'jar'} seed={serviceSeed} consumeSeed={() => setServiceSeed(undefined)} /></div>

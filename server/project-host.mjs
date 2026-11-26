@@ -266,7 +266,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
             if (!manager) return json(503, { error: '收件箱暂不可用。' });
             return await downloadTransfer(manager, { id: download[1], ticket: url.searchParams.get('ticket') }, { owner: token, authorize: ensureCurrentSession }, response, session.abort.signal);
           }
-          const collaboration = /^\/api\/(transfer|mock|whiteboard)\/([a-z]+)$/.exec(url.pathname);
+          const collaboration = /^\/api\/(transfer|mock|whiteboard|wireguard)\/([a-z]+)$/.exec(url.pathname);
           if (collaboration) {
             const [, module, action] = collaboration;
             if (!services[module].enabled) return json(404, { error: '此栏目未开放。' });

@@ -416,6 +416,8 @@ function SharingPanel({
                         permissions: [{ key: 'edit', label: '编辑开发文档', detail: '新建目录、编辑或删除开发文档、恢复历史版本。' }] },
                       { id: 'knowledge', name: '团队知识库', description: '查看共享主机上的全部手册与版本历史',
                         permissions: [{ key: 'edit', label: '编辑团队文档', detail: '可创建、编辑、恢复历史版本和删除文档。' }] },
+                      { id: 'wireguard', name: '跨网互联', description: '通过 A 中转连接 B 和 C',
+                        permissions: [{ key: 'edit', label: '维护组网配置', detail: '修改三端公钥、隧道 IP 和中转入口。' }] },
                       { id: 'whiteboard', name: '截图协作白板', description: '截图与多人标注',
                         permissions: [{ key: 'edit', label: '创建与编辑白板', detail: '可上传截图、添加与移除标注，以及重命名或删除画板。' }] },
                       {
@@ -546,6 +548,7 @@ function SharingPanel({
                                 : service.id === 'lan-hosts' ? '主机名称、地址、分组与标签'
                                 : service.id === 'transfer' ? '收件箱中的条目，受保护内容须凭取件密码领取'
                                 : service.id === 'mock' ? '模拟接口、调用地址和近期记录'
+                                : service.id === 'wireguard' ? '三端地址、公钥与部署配置'
                                 : service.id === 'whiteboard' ? '白板、截图和全部标注'
                                 : service.id === 'file-shares' ? '和下载已发布的文件与文件夹'
                                 : service.id === 'git' ? '已发布仓库的代码差异、分支、标签与提交历史'

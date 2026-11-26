@@ -2,7 +2,7 @@ import { Modal as WorkspaceDialog } from './project-components';
 import { createPortal } from 'react-dom';
 import { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { QrCode, ArrowLeftRight, Braces, ScanLine } from 'lucide-react';
+import { QrCode, ArrowLeftRight, Braces, Network, ScanLine } from 'lucide-react';
 import { workspaceModules } from './catalog';
 import { useSharingStatus } from './Sharing';
 import { copyText } from './motion-primitives';
@@ -11,6 +11,7 @@ import { type CollabModule, type PageProps } from './collab-api';
 import { QuickTransfer } from './QuickTransfer';
 import { TransferLinkSettings } from './TransferLinkSettings';
 import { MockService } from './MockService';
+import { WireGuardWorkspace } from './WireGuardWorkspace';
 import { ScreenshotBoard } from './ScreenshotBoard';
 import { CreateRelated } from './related-workspaces';
 import './collaboration.css';
@@ -24,7 +25,7 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
   const [invite, setInvite] = useState(false),
     [copyStatus, setCopyStatus] = useState(''),
     [address, setAddress] = useState('');
-  const addresses = status?.running && status.services[module].enabled ? status.addresses : [];
+  const addresses = status?.running && status.services[module]?.enabled ? status.addresses : [];
   const origin = window.devkitCollab
     ? addresses.find((item) => item === address) ||
       addresses.find((item) => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(new URL(item).hostname)) ||
@@ -41,7 +42,7 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
     code.make();
     return code.createDataURL(4);
   }, [href, invite]);
-  const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine }[module];
+  const PageIcon = { transfer: ArrowLeftRight, mock: Braces, whiteboard: ScanLine, wireguard: Network }[module];
   const title = workspaceModules.find((item) => item.id === module)?.name;
   const inviteButton = (
     <button
@@ -132,6 +133,8 @@ export function CollaborationPage({ module, active, edit, portalActions }: PageP
         <QuickTransfer origin={origin} active={active} edit={edit} directory={window.devkitCollab ? status?.directory : undefined} />
       ) : module === 'mock' ? (
         <MockService active={active} edit={edit} origin={origin} />
+      ) : module === 'wireguard' ? (
+        <WireGuardWorkspace active={active} edit={edit} resource={resource} />
       ) : (
         <ScreenshotBoard active={active} edit={edit} />
       )}

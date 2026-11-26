@@ -17,6 +17,7 @@ export function sharingFromEnvironment(env, saved = {}) {
     'file-shares': { enabled: 'DEVKIT_SHARE_FILE_SHARES' },
     transfer: { enabled: 'DEVKIT_SHARE_TRANSFER', edit: 'DEVKIT_TRANSFER_EDIT' },
     mock: { enabled: 'DEVKIT_SHARE_MOCK', edit: 'DEVKIT_MOCK_EDIT' },
+    wireguard: { enabled: 'DEVKIT_SHARE_WIREGUARD', edit: 'DEVKIT_WIREGUARD_EDIT' },
     whiteboard: { enabled: 'DEVKIT_SHARE_WHITEBOARD', edit: 'DEVKIT_WHITEBOARD_EDIT' },
     projects: {
       enabled: "DEVKIT_SHARE_PROJECTS",
