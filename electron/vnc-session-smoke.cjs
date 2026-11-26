@@ -160,8 +160,10 @@ module.exports = async function checkVncSession(window, waitFor) {
     await js('document.querySelector(".lan-terminal-tabs .icon-button").click()');
     try { await wait('document.activeElement.matches(".lan-connection-select")'); }
     catch (error) { throw new Error(error.message + ': ' + await js('JSON.stringify({ focused: document.activeElement.outerHTML.slice(0, 240), rows: document.querySelectorAll(".lan-connection-select").length, tabs: document.querySelectorAll(".lan-terminal-tabs [role=tab]").length })')); }
-    await js('[...document.querySelectorAll(".lan-connection-select")].find(el => el.querySelector("strong").textContent === "VNC fixture").click()');
-    await click('.lan-host-list', '打开 VNC');
+    await js('[...document.querySelectorAll(".lan-connection-select")].find(el => el.querySelector("strong").textContent === "VNC fixture").focus()');
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+    window.webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
     await submitPassword();
     await js('document.querySelector(".lan-terminal-tabs .icon-button").click()');
     const records = await js('window.devkitDesktop.lanHosts("list")');

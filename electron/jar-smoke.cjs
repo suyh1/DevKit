@@ -582,7 +582,7 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await js(window, 'document.querySelectorAll(".lan-module-settings input").forEach(field => field.click())');
     await click('保存连接', '.lan-host-form');
     await wait('document.querySelector(".lan-host-list")?.textContent.includes("远程测试主机")');
-    const selectRemoteHost = () => js(window, '[...document.querySelectorAll(".lan-connection-select")].find(row => row.querySelector("strong").textContent === "远程测试主机").click()');
+    const selectRemoteHost = () => js(window, '[...document.querySelectorAll(".lan-host-more")].find(button => button.getAttribute("aria-label") === "管理 远程测试主机").click()');
     await selectRemoteHost();
     await js(window, 'document.querySelector(\'.lan-host-list button[aria-label="编辑 远程测试主机"]\').click()');
     await wait('document.querySelector(".lan-host-dialog h2")?.textContent === "编辑主机连接"');
@@ -608,6 +608,8 @@ async function verifyLanHost(window, folder, jar, executable, click, wait) {
     await click('预览导入', 'dialog[open]');
     await when(window, 'document.querySelector(".lan-import-results")?.textContent.includes("重复连接")');
     await click('导入选中的 1 条', 'dialog[open]');
+    await when(window, '!!document.querySelector(\'[aria-label="管理 测试档案"]\')');
+    await js(window, `document.querySelector('[aria-label="管理 测试档案"]').click()`);
     await when(window, 'document.querySelector(".lan-host-tags")?.textContent.includes("demo")');
     await js(window, `document.querySelector('[aria-label="置顶 测试档案"]').click()`);
     await when(window, 'document.querySelector(".lan-group-label")?.textContent === "置顶"');

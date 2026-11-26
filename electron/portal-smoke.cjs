@@ -77,7 +77,7 @@ app
         await delay(140);
       };
       // Only geometry is read through JS. Actions use native mouse/keyboard input.
-      const pointer = async (expression) => {
+      const pointer = async (expression, clicks = 1) => {
         for (let i = 0; i < 45; i++) {
           const hit = await js(
             `(()=>{const e=${expression};if(!e||!e.getClientRects().length)return null;const r=e.getBoundingClientRect(),p={x:r.x+r.width/2,y:r.y+r.height/2};return {...p,disabled:!!e.disabled,above:p.y<(e.closest('.portal-bar')?0:document.querySelector('.portal-bar').getBoundingClientRect().bottom),hit:p.y>0&&p.y<innerHeight-12&&e.contains(document.elementFromPoint(p.x,p.y)),sidebar:!!e.closest('.api-sidebar')};})()`,
@@ -88,20 +88,11 @@ app
           }
           if (hit.disabled) throw Error("Disabled target: " + expression);
           if (hit.hit) {
-            window.webContents.sendInputEvent({
-              type: "mouseDown",
-              button: "left",
-              x: Math.round(hit.x * window.webContents.getZoomFactor()),
-              y: Math.round(hit.y * window.webContents.getZoomFactor()),
-              clickCount: 1,
-            });
-            window.webContents.sendInputEvent({
-              type: "mouseUp",
-              button: "left",
-              x: Math.round(hit.x * window.webContents.getZoomFactor()),
-              y: Math.round(hit.y * window.webContents.getZoomFactor()),
-              clickCount: 1,
-            });
+            const x = Math.round(hit.x * window.webContents.getZoomFactor());
+            const y = Math.round(hit.y * window.webContents.getZoomFactor());
+            for (let clickCount = 1; clickCount <= clicks; clickCount++) {
+              for (const type of ['mouseDown', 'mouseUp']) window.webContents.sendInputEvent({type, button: 'left', x, y, clickCount});
+            }
             await delay(60);
             return;
           }
@@ -837,7 +828,7 @@ app
       await button('放弃更改', '.pc-discard button');
       await button('局域网主机', '.portal-navigation button');
       const inventory = '.lan-host-list';
-      const selectHost = name => pointer(`[...document.querySelectorAll('.lan-connection-select')].find(button => button.querySelector('strong').textContent === ${JSON.stringify(name)})`);
+      const selectHost = name => pointer(`[...document.querySelectorAll('.lan-host-more')].find(button => button.getAttribute('aria-label') === ${JSON.stringify('管理 ' + name)})`);
       await wait(`document.querySelector('${inventory}')?.textContent.includes('慢速目标')`);
       await fill('.lan-search input', '找不到的主机');
       await wait('document.querySelector(".lan-center")?.textContent.includes("没有匹配的主机")');
@@ -849,7 +840,7 @@ app
       await button('立即检测', '.monitor-detail button');
       await wait('document.querySelector(".monitor-detail")?.textContent.includes("TCP test fixture")');
       await button('查看来源主机', '.monitor-detail button');
-      await wait('location.hash.startsWith("#lan-hosts/") && document.querySelector(".lan-connection-select[aria-expanded=true] strong")?.textContent === "慢速目标"');
+      await wait('location.hash.startsWith("#lan-hosts/") && document.querySelector(".lan-connection-select[aria-current=true] strong")?.textContent === "慢速目标"');
       await wait(`document.querySelector('${inventory}')?.textContent.includes('端口可达')`);
       await button('监控历史', `${inventory} button`);
       await wait('location.hash.startsWith("#monitor/lan-")');
@@ -884,8 +875,7 @@ app
       await fill('.lan-host-form .lan-host-name input', '网页 SSH 已编辑');
       await button('保存连接', '.lan-host-form button');
       await wait('document.querySelector(".lan-host-list").textContent.includes("网页 SSH 已编辑")');
-      await selectHost('网页 SSH 已编辑');
-      await button('打开终端', '.lan-host-list button');
+      await pointer('[...document.querySelectorAll(".lan-connection-select")].find(row => row.querySelector("strong").textContent === "网页 SSH 已编辑")', 2);
       await button('信任并连接', 'dialog[open] button');
       await wait('document.querySelector(".lan-terminal-message [role=status]")?.textContent==="已连接"');
       await wait('document.querySelector(".xterm-rows")?.textContent.includes("portal ssh ready")');

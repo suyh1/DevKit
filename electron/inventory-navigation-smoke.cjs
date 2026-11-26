@@ -108,7 +108,8 @@ module.exports = async function inventoryNavigation(window, output) {
     await wait(element(summary) + '.matches(":hover")');
     await painted();
     assert.deepEqual(await layout(), before, 'Hover keeps host content, height and scroll position stable');
-    assert.equal(await js(element(summary) + '.parentElement.open'), false);
+    assert.equal(await js('!!document.querySelector(".lan-host-menu:popover-open")'), false);
+    return rect;
   }
   async function serviceOutput(index) {
     const trigger = '[data-service-output="service-' + index + '"]';
@@ -262,19 +263,39 @@ module.exports = async function inventoryNavigation(window, output) {
           await fs.writeFile(path.join(output, 'lan-hosts-' + hostCount() + '-' + width + '.png'), image.toPNG());
         }
         for (const id of [0, hostCount() - 1]) {
-          const host = '[data-host-id="host-' + id + '"]', summary = host + ' summary';
-          await hoverHost(summary);
-          await click(summary);
-          await wait(element(host + ' details') + '.open');
+          const host = '[data-host-id="host-' + id + '"]', summary = host + ' .lan-connection-select';
+          const point = await hoverHost(summary);
+          const press = (button, clickCount = 1) => {
+            for (const type of ['mouseDown', 'mouseUp']) contents.sendInputEvent({ type, button, clickCount, ...point });
+          };
+          const beforeOpen = terminalOpens;
+          press('left');
+          await wait(element(summary) + '.getAttribute("aria-current") === "true"');
+          assert.equal(terminalOpens, beforeOpen);
+          press('right');
+          await wait(element(host + ' .lan-host-menu') + '?.matches(":popover-open")');
           assert.equal(await js(element(host + ' .lan-detail-endpoint') + '.textContent'), await js(element(summary + ' small') + '.textContent'));
-          const connect = () => js(`[...${element(host)}.querySelectorAll('button')].find(b => b.textContent === '打开终端').click()`);
-          await connect();
+          assert.ok(await js(element(host + ' [aria-label^="编辑 "]') + '.checkVisibility()'));
+          for (const type of ['keyDown', 'keyUp']) contents.sendInputEvent({ type, keyCode: 'Escape' });
+          await wait('!document.querySelector(".lan-host-menu") && document.activeElement === ' + element(summary));
+          if (id === hostCount() - 1) {
+            for (const type of ['keyDown', 'keyUp']) contents.sendInputEvent({ type, keyCode: 'F10', modifiers: ['shift'] });
+            await wait(element(host + ' .lan-host-menu') + '?.matches(":popover-open")');
+            await click(host + ' [aria-label^="编辑 "]');
+            await wait(element('.lan-host-dialog[open] .lan-host-name input') + '?.value === ' + element(summary + ' strong') + '.textContent');
+            await click('.lan-host-dialog [aria-label="关闭主机设置"]');
+            await wait('document.activeElement === ' + element(summary));
+          }
+          press('left'); press('left', 2);
           if (count === 2 && width === 1340 && id === 0) {
             await wait('document.querySelector(".notice-stack")?.textContent.includes("目标端口拒绝连接")');
             assert.equal(await js('!!document.querySelector(".lan-center > .pc-error")'), false);
             await click('.notice-stack button[aria-label="关闭通知"]');
             await wait('!document.querySelector(".notice-stack")');
-            await click(summary); await connect();
+            await js(element(summary) + '.focus()');
+            contents.sendInputEvent({ type: 'keyDown', keyCode: 'Enter' });
+            contents.sendInputEvent({ type: 'char', keyCode: '\r' });
+            contents.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' });
             await wait('document.querySelector(".notice-stack")?.textContent.includes("SSH 已连接")');
             // Notifications pause under the pointer; leave the stack before checking auto-dismiss.
             contents.sendInputEvent({ type: 'mouseMove', x: 5, y: 5 });
@@ -283,6 +304,7 @@ module.exports = async function inventoryNavigation(window, output) {
           }
           await wait(visible('.lan-terminal-tabs [aria-selected=true]'));
           await wait('document.querySelector(".lan-ssh-session [role=status]")?.textContent === "已连接"');
+          assert.equal(terminalOpens, beforeOpen + 1, 'One activation opens one session');
           const opened = terminalOpens;
           await click('.lan-session-controls button[aria-pressed=false]');
           await wait('!document.querySelector(".lan-connections").checkVisibility() && document.querySelector(".lan-xterm")?.clientHeight > innerHeight / 2');

@@ -16,10 +16,11 @@
 .lan-host-list > li { padding: 2px 0; border-bottom: 1px solid var(--line); }
 .lan-host-list > li:last-child { border-bottom: 0; }
 .lan-host-list > li > header { display: flex; align-items: center; gap: 4px; }
-.lan-host-list header > details { flex: 1; min-width: 0; }
+.lan-host-list > li > header { border-radius: 6px; }
+.lan-host-list > li > header:is(:hover, :focus-within) { background: var(--soft); }
+.lan-host-list > li > header[data-selected=true] { background: var(--tint); }
 .lan-host-list small { display: block; margin-top: 4px; color: var(--muted); }
-.lan-host-list .pc-actions { gap: 4px; }
-.lan-host-list .pc-actions button, .lan-heading .run-button { display: inline-flex; gap: 5px; align-items: center; }
+.lan-heading .run-button { display: inline-flex; gap: 5px; align-items: center; }
 .lan-heading-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; }
 .lan-heading-actions button { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
 .lan-host-list > .lan-group-label { padding:12px 1px 4px; border:0; color:var(--muted); font-size:11px; font-weight:650; }
@@ -38,7 +39,6 @@
 .lan-rdp-toolbar > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .lan-rdp-viewport { display: grid; place-items: center; height: min(72dvh, 920px); min-height: 180px; overflow: hidden; background: #101720; border-radius: 8px; touch-action: none; }
 .lan-rdp-viewport > div:focus { outline: none; }
-.lan-host-list .pc-actions a { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .lan-key-picker { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .lan-key-picker > span { flex:1; min-width:100px; overflow-wrap:anywhere; }
 .lan-key-picker > small { flex-basis:100%; color:var(--error); }
@@ -294,11 +294,11 @@
 .host-progress li { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 .host-progress strong { color:var(--text); }
 
-.lan-host-list details.floating-details > .lan-connection-select {
-  display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; align-items: center; gap: 10px;
-  padding: 9px 8px; color: var(--text); border-radius: 6px; text-align: start;
+.lan-host-list .lan-connection-select {
+  display: grid; flex: 1; min-width: 0; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 9px 4px 9px 8px; color: var(--text); background: transparent; border: 0; border-radius: 6px; text-align: start; cursor: pointer; touch-action: manipulation;
 }
-.lan-connection-select .floating-details-icon { display: none; }
+.lan-host-more { flex: none; margin-inline-end: 4px; }
 .lan-protocol-glyph { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; color: var(--accent); background: var(--tint); }
 .lan-row-text { min-width: 0; }
 .lan-row-title { display: flex; align-items: baseline; gap: 7px; }
@@ -306,15 +306,19 @@
 .lan-protocol-label { flex: none; font: 11px/1.4 var(--font-mono); color: var(--muted); }
 .lan-host-list .lan-row-text small { margin-top: 2px; font: 11.5px/1.5 var(--font-mono); }
 .lan-row-text :is(strong, small) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lan-row-chevron { color: var(--muted); }
+
 .lan-detail-endpoint { font: 13px/1.5 var(--font-mono); user-select: all; overflow-wrap: anywhere; }
-.lan-profile-actions { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
-.lan-profile-actions button { display: inline-flex; align-items: center; gap: 5px; }
+.lan-host-menu { width: min(256px, calc(100vw - 12px)); max-height: calc(100dvh - 12px); overflow-y: auto; overscroll-behavior: contain; }
+.lan-menu-heading { padding: 6px 8px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.lan-menu-heading strong, .lan-menu-heading code { display: block; }
+.lan-menu-heading .lan-note { margin: 4px 0 0; }
+.lan-menu-actions, .lan-profile-actions { display: grid; }
+.lan-profile-actions { border-block: 1px solid var(--line); margin-block: 4px; padding-block: 4px; }
+.lan-host-menu [role=menuitem] { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; justify-content: flex-start; }
+.lan-host-menu .lan-menu-remove { color: var(--error); }
 .lan-connections .lan-monitor-status { margin: 0 8px 7px 50px; }
 .lan-terminal-message .lan-live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
-.lan-host-list details.floating-details > .lan-connection-select:hover { background: var(--soft); }
-.lan-host-list details.floating-details > .lan-connection-select[aria-expanded=true] { background: var(--tint); color: var(--accent); }
-.lan-host-list .pc-actions[hidden] { display: none; }
+
 .lan-terminal-tabs small { font-family: var(--font-mono); color: var(--muted); }
 .lan-rdp-viewport > div:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
 
