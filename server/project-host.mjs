@@ -16,7 +16,7 @@ import { createSharingAudit, matchesPassword, passwordRecord, updateVisitors } f
 import { webTransferLimit } from './lan-sftp.mjs';
 
 const auditActions = new Set(['command', 'replace-begin', 'replace-finish', 'replace-restore', 'apply-draft', 'restore-backup', 'restore-disk', 'reload-restored', 'save-files', 'config-save', 'create', 'upsert', 'remove', 'start', 'stop', 'send', 'save-library', 'restore-library', 'startup-install', 'startup-remove', 'console-claim', 'toggle', 'export']);
-const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'file-open', 'scan-start', 'wake', 'vnc-open', 'rdp-open', 'rdp-file-upload', 'file-upload', 'file-download']);
+const lanAuditActions = new Set(['save', 'remove', 'import-connections', 'test', 'diagnose', 'reset-trust', 'terminal-open', 'file-open', 'file-rename', 'file-remove', 'file-mkdir', 'scan-start', 'wake', 'vnc-open', 'rdp-open', 'rdp-file-upload', 'file-upload', 'file-download']);
 const sessionCookie = (token, maxAge, secure) => `devkit_project_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 const visitorsFor = settings => settings.visitors || [];
 const tlsFor = settings => settings.tls || null;
@@ -400,7 +400,7 @@ export async function createProjectHost(store, dist, managers = { nginx: () => n
                 else response.end();
               };
             }
-            const payload = upload ? { id: url.searchParams.get('id'), path: url.searchParams.get('path') } : await body();
+            const payload = upload ? { id: url.searchParams.get('id'), path: url.searchParams.get('path'), transferId: url.searchParams.get('transferId'), overwrite: url.searchParams.get('overwrite') === 'true' } : await body();
             ensureCurrentSession();
             if (module === 'http' && action === 'send')
               response.once('close', () => { if (!response.writableFinished) workspaces.cancel(token, payload?.id); });

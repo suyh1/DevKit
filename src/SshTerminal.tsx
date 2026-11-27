@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { lanRequest } from './lan-api';
 import { copyText } from './motion-primitives';
 import { readSessionClipboard } from './remote-clipboard';
-import SftpPanel from './SftpPanel';
+import SftpWorkbench from './SftpWorkbench';
 import '@xterm/xterm/css/xterm.css';
 
 export default function SshTerminal({ id, active, allowFiles, portal }: { id: string; active: boolean; allowFiles: boolean; portal: boolean }) {
@@ -95,6 +95,7 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
     const timer = setTimeout(() => setFeedback(''), 4000);
     return () => clearTimeout(timer);
   }, [feedback]);
+  const [filesOpened, setFilesOpened] = useState(false);
   return <div className="lan-ssh-session">
     <div className="lan-terminal-message"><span role="status">{message || feedback || <span className="lan-live-dot" title="已连接"><span className="sr-only">已连接</span></span>}</span>
       {message && message !== '正在连接…' && <button type="button" className="text-button" onClick={() => { setFeedback(''); setSelection(false); setMessage('正在连接…'); setGeneration(value => value + 1); setRunning(true); }}>重新连接</button>}
@@ -110,11 +111,11 @@ export default function SshTerminal({ id, active, allowFiles, portal }: { id: st
         } catch { setFeedback('请在终端内按 Ctrl+V 或 ⌘V 粘贴'); controls.current?.focus(); }
       }}>粘贴</button>
       <button type="button" className="text-button" onClick={() => { controls.current?.clear(); controls.current?.focus(); }}>清空显示</button>
-      {allowFiles && <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => setFilesOpen(value => !value)}>SFTP 文件</button>}
+      {allowFiles && <button type="button" className="text-button" aria-pressed={filesOpen} disabled={!connectionId} onClick={() => { setFilesOpened(true); setFilesOpen(value => !value); }}>SFTP 文件</button>}
     </div>
     <div className="lan-terminal-content">
       <div className="lan-xterm" ref={container} />
-      {allowFiles && filesOpen && connectionId && <SftpPanel key={connectionId} session={connectionId} portal={portal} />}
     </div>
+    {allowFiles && filesOpened && connectionId && <div hidden={!filesOpen}><SftpWorkbench key={connectionId} session={connectionId} portal={portal}/></div>}
   </div>;
 }

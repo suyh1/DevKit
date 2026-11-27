@@ -9,6 +9,7 @@ const lanActions = new Map([
   ['save', 'edit'], ['remove', 'edit'], ['import-preview', 'edit'], ['import-connections', 'edit'],
   ['diagnose', 'diagnose'], ['test', 'diagnose'], ['reset-trust', 'diagnose'],
   ['terminal-open', 'terminal'], ['terminal-read', 'terminal'], ['terminal-input', 'terminal'], ['terminal-resize', 'terminal'], ['terminal-close', 'terminal'],
+  ['file-mkdir', 'files'], ['file-rename', 'files'], ['file-remove', 'files'], ['file-cancel', 'files'],
   ['file-open', 'files'], ['file-status', 'files'], ['file-list', 'files'], ['file-upload', 'files'], ['file-download', 'files'],
   ['scan-interfaces', 'discover'], ['scan-start', 'discover'], ['scan-cancel', 'discover'], ['wake', 'wake'],
   ['vnc-open', 'rdp'], ['vnc-input', 'rdp'],

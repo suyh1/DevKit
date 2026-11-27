@@ -3,11 +3,11 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 export type HostMenuPosition = { id: string; x?: number; y?: number };
 
-export default function LanHostMenu({ position, label, close, children }: {
-  position: HostMenuPosition; label: string; close: () => void; children: ReactNode;
+export default function LanHostMenu({ position, label, close, children, anchorElement }: {
+  anchorElement?: HTMLElement; position: HostMenuPosition; label: string; close: () => void; children: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  const row = () => panel.current?.closest('li')?.querySelector<HTMLButtonElement>('.lan-connection-select');
+  const row = () => anchorElement || panel.current?.closest('li')?.querySelector<HTMLButtonElement>('.lan-connection-select');
   const items = () => Array.from(panel.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') || []);
   useLayoutEffect(() => {
     const menu = panel.current!, anchor = row()!;

@@ -19,7 +19,7 @@ export const workspaceModules = [
   { id: 'whiteboard', name: '截图协作白板', description: '在共享截图或空白画布上同步绘制、圈选、连箭头和文字标注，可导出 PNG。', category: '工作台', badge: '共享' },
   { id: 'nginx', name: 'Nginx 配置', description: '按主机分组管理本机和远程 Windows / Linux 实例，支持配置草稿检查、影响确认、备份、应用及失败恢复。', category: '工作台', badge: '共享' },
   { id: 'jar', name: '服务管理', description: '按主机管理 Java JAR、npm 项目、可执行程序和解释器脚本，关联项目中心入口，替换服务文件并管理启停、日志、健康检查和系统自启。', category: '工作台', badge: '共享' },
-  { id: 'lan-hosts', name: '局域网主机', description: '创建 SSH、Telnet、串口、FTP/FTPS、SFTP、VNC、RDP 和 DevKit 共享会话，支持内嵌远程桌面、文件传输、主机发现、端口监控与网络唤醒。', category: '工作台', badge: '共享' },
+  { id: 'lan-hosts', name: '局域网主机', description: '创建 SSH、Telnet、串口、FTP/FTPS、SFTP、VNC、RDP 和 DevKit 共享会话，支持内嵌远程桌面、SFTP 双栏文件传输与队列、主机发现、端口监控与网络唤醒。', category: '工作台', badge: '共享' },
 ] as const;
 
 export type WorkspaceModule = typeof workspaceModules[number];

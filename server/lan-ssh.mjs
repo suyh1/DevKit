@@ -50,7 +50,7 @@ export async function connectSsh(host, password, { verifyOnly = false, socket, p
   return new Promise((resolve, reject) => {
     const client = new Client();
     let offered;
-    client.once('ready', () => resolve(client));
+    client.once('ready', () => { client.setNoDelay(true); resolve(client); });
     client.on('error', error => {
       client.destroy();
       if (offered && (verifyOnly || offered !== host.fingerprint)) {

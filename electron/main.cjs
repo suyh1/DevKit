@@ -435,6 +435,10 @@ app.whenReady().then(async () => {
         return { data: true };
       }
       if (action === 'clipboard-read') return { data: await clipboard.readText() };
+      if (action === 'pick-sftp-directory') {
+        const result = await dialog.showOpenDialog(window, { title: '选择本机目录', properties: ['openDirectory'] });
+        return { data: result.canceled ? null : result.filePaths[0] };
+      }
       if (action === 'pick-ssh-key') {
         const result = await dialog.showOpenDialog(window, { title: '选择 SSH 私钥', properties: ['openFile', 'showHiddenFiles'] });
         return { data: result.canceled ? null : result.filePaths[0] };

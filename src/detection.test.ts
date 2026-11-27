@@ -42,6 +42,8 @@ describe('总览匹配清单', () => {
 
 describe('推荐顺序和打开方式', () => {
   it.each([
+    ['SFTP 上传文件夹', { mode: 'sftp', port: 22 }],
+    ['FileZilla', { mode: 'sftp', port: 22 }],
     ['vnc 10.190.11.17:1', { mode: 'vnc', address: '10.190.11.17', port: 5901 }],
     ['vnc [::1]:0', { mode: 'vnc', address: '::1', port: 5900 }],
     ['vnc example.org:6100', { mode: 'vnc', address: 'example.org', port: 6100 }],

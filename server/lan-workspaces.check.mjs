@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
-import { lstat, mkdtemp, mkdir, open, readFile, readdir, realpath, rename, rm, stat, symlink, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdtemp, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -359,6 +359,7 @@ function sftpFixture(stream, folder, onWrite) {
       return { filename, attrs: { mode: info.mode, size: info.size } };
     }))).then(entries => stream.name(id, entries), () => stream.status(id, STATUS_CODE.FAILURE));
   });
+  stream.on('RMDIR', (id, file) => void status(id, rmdir(target(file))));
   stream.on('MKDIR', (id, file) => void status(id, mkdir(target(file))));
   stream.on('RENAME', (id, from, to) => void status(id, rename(target(from), target(to))));
   stream.on('REMOVE', (id, file) => void status(id, unlink(target(file))));
@@ -468,6 +469,32 @@ test('shared host editing and SSH/SFTP use write-only credentials and private se
   const filesOnly = await data('file-open', { id: filesHost.id });
   assert.equal((await request('terminal-input', { ...filesOnly, text: 'unused' })).status, 400);
   assert.ok(Array.isArray((await data('file-list', { ...filesOnly, path: '.' })).entries));
+  assert.equal((await request('local-list', { ...filesOnly, path: directory })).status, 404);
+  assert.equal((await request('sftp-download', { ...filesOnly, localDirectory: directory, localName: 'spill' })).status, 404);
+  assert.equal((await request('file-remove', { ...guestShell, path: '.', name: 'x' }, guest)).status, 403);
+  assert.equal((await request('file-mkdir', { ...filesOnly, path: '.', name: '..' })).status, 400);
+  await data('file-mkdir', { ...filesOnly, path: '.', name: 'tree' });
+  await data('file-rename', { ...filesOnly, path: '.', name: 'tree', newName: 'renamed' });
+  const desktop = await lan.hostRequest('file-open', { id: filesHost.id });
+  const call = (action, value) => lan.hostRequest(action, { ...desktop, ...value });
+  const local = await call('local-mkdir', { path: directory, name: 'local' });
+  const content = Buffer.from([0, 1, 40, 255]);
+  await writeFile(path.join(local, 'up.bin'), content);
+  assert.ok((await call('local-list', { path: local })).entries.some(e => e.name === 'up.bin' && e.size === content.length));
+  const copy = { localDirectory: local, localName: 'up.bin', path: '/files/renamed', name: 'remote.bin', transferId: '1' };
+  await call('sftp-upload', copy);
+  await assert.rejects(call('sftp-upload', copy), /同名/);
+  await call('sftp-upload', { ...copy, overwrite: true });
+  const down = { ...copy, path: '/files/renamed/remote.bin', localName: 'down.bin' };
+  await call('sftp-download', down);
+  assert.deepEqual(await readFile(path.join(local, 'down.bin')), content);
+  await assert.rejects(call('sftp-download', down), /同名/);
+  await assert.rejects(call('sftp-download', { ...down, localName: '../outside' }), /文件名/);
+  await call('local-rename', { path: local, name: 'down.bin', newName: 'renamed.bin' });
+  await call('local-remove', { path: directory, name: 'local' });
+  await data('file-remove', { ...filesOnly, path: '.', name: 'renamed' });
+  assert.deepEqual(await readdir(path.join(directory, 'files')), []);
+  await call('terminal-close', {});
   await data('terminal-close', filesOnly);
   const savedFilesHost = (await data('list')).hosts.find(item => item.id === filesHost.id);
   await data('remove', { id: filesHost.id, revision: savedFilesHost.revision });
@@ -514,6 +541,8 @@ test('SSH verifies host identity, runs a PTY, and deploys portable Node through 
   const key = ssh.utils.parseKey(privateKey, keyPassphrase), keyPath = path.join(folder, 'test-key');
   await writeFile(keyPath, privateKey);
   const server = new ssh.Server({ hostKeys: [hostKey] }, client => {
+    // The loopback SFTP fixture acknowledges each runtime chunk individually.
+    client.setNoDelay(true);
     let execOnly = false;
     clients.add(client);
     client.on('error', () => {});

@@ -1,0 +1,182 @@
+.sftp-workbench {
+  container-type: inline-size;
+  padding: 10px;
+  min-width: 0;
+  overflow: auto;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+}
+.sftp-sites {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sftp-site,
+.sftp-queue {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.sftp-workbench h3 {
+  margin: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sftp-site > header,
+.sftp-queue > header,
+.sftp-filter,
+.sftp-queue-nav,
+.sftp-site > form,
+.sftp-site > footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+}
+.sftp-site > header,
+.sftp-queue > header,
+.sftp-queue-nav,
+.sftp-site > footer {
+  flex-wrap: wrap;
+}
+.sftp-workbench header h3 {
+  margin-inline-end: auto;
+}
+.sftp-workbench button {
+  color: inherit;
+}
+.sftp-site > form input,
+.sftp-filter input {
+  min-width: 0;
+  flex: 1;
+  padding: 5px;
+}
+.sftp-site > form button,
+.sftp-filter button {
+  flex-shrink: 0;
+}
+.sftp-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 76px;
+  align-items: center;
+  gap: 4px;
+}
+.sftp-head {
+  padding: 4px 8px;
+  border-block: 1px solid var(--line);
+  background: var(--tint);
+}
+.sftp-head button,
+.sftp-entry {
+  text-align: start;
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+.sftp-entries {
+  height: clamp(160px, 30dvh, 360px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.sftp-entry {
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+.sftp-entry > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sftp-entry > span > span,
+.sftp-jobs small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sftp-entry svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.sftp-entry small,
+.sftp-site footer,
+.sftp-jobs small,
+.sftp-queue > header span {
+  color: var(--muted);
+}
+.sftp-entry:hover,
+.sftp-entry[aria-selected='true'] {
+  background: var(--tint);
+}
+.sftp-entry[aria-selected='true'] {
+  box-shadow: inset 3px 0 var(--accent);
+}
+.sftp-site > footer {
+  border-top: 1px solid var(--line);
+  min-height: 26px;
+}
+.sftp-workbench .lan-note,
+.sftp-workbench .pc-error {
+  padding-inline: 8px;
+  overflow-wrap: anywhere;
+}
+.sftp-queue {
+  margin-top: 8px;
+}
+.sftp-queue header > span {
+  margin-inline-end: auto;
+}
+.sftp-queue-nav .segmented-control {
+  max-width: 100%;
+}
+.sftp-jobs {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+}
+.sftp-jobs li {
+  border-top: 1px solid var(--line);
+  padding: 6px 8px;
+}
+.sftp-jobs li > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sftp-jobs strong {
+  overflow-wrap: anywhere;
+  margin-inline-end: auto;
+}
+.sftp-jobs small,
+.sftp-jobs progress {
+  display: block;
+  width: 100%;
+}
+.sftp-jobs progress {
+  height: 6px;
+  accent-color: var(--accent);
+  margin: 5px 0;
+}
+@container (max-width:720px) {
+  .sftp-cols {
+    grid-template-columns: minmax(0, 1fr) 60px;
+  }
+  .sftp-cols > :nth-child(3) {
+    display: none;
+  }
+}
+@container (max-width:440px) {
+  .sftp-sites {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sftp-entries {
+    height: 145px;
+  }
+}

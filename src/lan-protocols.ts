@@ -17,6 +17,7 @@ export function vncEndpoint(text: string) {
 }
 
 export function sessionSeed(text: string): Partial<HostDraft> | undefined {
+  if (/^(?:FileZilla|SFTP\s*(?:文件传输|上传文件夹?|下载文件夹?))$/i.test(text)) return { mode: 'sftp', port: defaultPort.sftp };
   const viewer = /^vnc\s+(.+)$/i.exec(text);
   const endpoint = viewer && vncEndpoint(viewer[1]);
   if (endpoint) return { mode: 'vnc', ...endpoint };

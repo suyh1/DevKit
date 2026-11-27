@@ -8,6 +8,7 @@ import { shareTransport, sshTransport } from './lan-transports.mjs';
 import { diagnoseHost } from './lan-diagnostics.mjs';
 import { openFtp, useFtp } from './lan-ftp.mjs';
 import { openTelnet, openSerial, serialDevices } from './lan-console.mjs';
+import { localChild, localFiles } from './sftp-local.mjs';
 import { useSftp } from './lan-sftp.mjs';
 import { discoverHosts, lanInterfaces } from './lan-discovery.mjs';
 import { hostTarget, withDeadline } from './lan-probe.mjs';
@@ -184,7 +185,7 @@ export async function createLanWorkspaces(directory, transports = { share: share
 
   function closeTerminal(id) {
     const entry = terminals.get(id);
-    if (entry) { terminals.delete(id); clearTimeout(entry.idle); entry.dispose(); }
+    if (entry) { terminals.delete(id); clearTimeout(entry.idle); entry.transfer?.controller.abort(); entry.dispose(); }
   }
   function ownedTerminal(id, owner) {
     const entry = terminals.get(id);
@@ -253,26 +254,43 @@ export async function createLanWorkspaces(directory, transports = { share: share
     if (action === 'import-preview') return store.previewImport(value, !!web);
     if (action === 'import-connections') { const result = await store.importConnections(value, web); invalidate(); return result; }
     if (['save', 'import', 'remove'].includes(action)) { const result = await store[action](value, web); invalidate(); return result; }
-    if (action === 'file-status') { const entry = ownedTerminal(value?.id, owner); return { closed: entry.closed || (entry.host.mode === 'ftp' && entry.client.closed) }; }
+    if (action === 'file-status') { const entry = ownedTerminal(value?.id, owner); return { closed: entry.closed || (entry.host.mode === 'ftp' && entry.client.closed), transfer: entry.transfer && { id: entry.transfer.id, bytes: entry.transfer.bytes } }; }
     if (action === 'terminal-close') {
       if (terminals.get(value?.id)?.owner === owner) closeTerminal(value.id);
       return true;
     }
-    if (['file-list', 'file-upload', 'file-download'].includes(action)) {
+    if (!web && action.startsWith('local-')) {
+      const entry = ownedTerminal(value?.id, owner);
+      if (!['ssh', 'sftp'].includes(entry.host.mode) || entry.closed) throw new Error('SFTP 会话已断开。');
+      return localFiles(action, value);
+    }
+    const nativeCopy = !web && ['sftp-upload', 'sftp-download'].includes(action);
+    if (nativeCopy || ['file-list', 'file-upload', 'file-download', 'file-mkdir', 'file-remove', 'file-rename', 'file-cancel'].includes(action)) {
       const terminal = ownedTerminal(value?.id, owner);
       if (terminal.closed) throw new Error('会话已断开，请重新连接。');
+      if (action === 'file-cancel') {
+        if (terminal.transfer?.id && terminal.transfer.id === value.transferId) terminal.transfer.controller.abort();
+        return true;
+      }
       if (terminal.host.mode === 'ftp') {
+        if (!['file-list', 'file-upload', 'file-download'].includes(action)) throw new Error('请选择 SFTP 会话。');
         if (terminal.fileBusy) throw new Error('FTP 会话正在处理文件操作。');
         terminal.fileBusy = true;
         try { return await useFtp(terminal, action, value, localFile); }
         finally { terminal.fileBusy = false; }
       }
       if (!['sftp', 'ssh'].includes(terminal.host.mode)) throw new Error('此终端不提供文件服务。');
-      if (action === 'file-list') return useSftp(terminal.client, action, value, terminal.host, localFile);
+      if (nativeCopy) {
+        localFile = localChild(value.localDirectory, value.localName);
+        action = action === 'sftp-upload' ? 'file-upload' : 'file-download';
+      }
+      if (['file-list', 'file-rename', 'file-remove', 'file-mkdir'].includes(action)) return useSftp(terminal.client, action, value, terminal.host, localFile);
       if (terminal.fileBusy) throw new Error('当前会话正在传输文件。');
       terminal.fileBusy = true;
-      try { return await useSftp(terminal.client, action, value, terminal.host, localFile); }
-      finally { terminal.fileBusy = false; }
+      const transfer = nativeCopy || value.transferId ? { id: value.transferId || randomUUID(), bytes: 0, controller: new AbortController() } : undefined;
+      terminal.transfer = transfer;
+      try { return await useSftp(terminal.client, action, value, terminal.host, localFile, transfer); }
+      finally { terminal.fileBusy = false; terminal.transfer = undefined; }
     }
     if (['terminal-read', 'terminal-input', 'terminal-resize'].includes(action)) {
       const terminal = ownedTerminal(value?.id, owner);
