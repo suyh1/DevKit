@@ -143,18 +143,30 @@ for router in B C; do ip netns exec "$router" sysctl -qw net.ipv4.ip_forward=1; 
 ip netns exec A "$node_bin" scripts/gateway-fixture.mjs "$scratch"
 for host in LB LC; do
   ip netns exec "$host" /usr/bin/python3 -m http.server 18084 --directory "$scratch/files" >/dev/null 2>&1 &
-  ip netns exec "$host" /usr/bin/python3 -c '
-import socket
-s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("",18085))
-while True:
- data, addr=s.recvfrom(1024); s.sendto(data,addr)' &
 done
+udp_echo() {
+  ip netns exec "$1" /usr/bin/python3 -c '
+import pathlib, socket, sys
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind((sys.argv[1],18085))
+pathlib.Path(sys.argv[2]).touch()
+while True:
+ data, addr=s.recvfrom(1024); s.sendto(data,addr)' "$2" "$scratch/udp-$2" &
+  local pid=$!
+  for ((i=0; i<50; i++)); do
+    [[ -e "$scratch/udp-$2" ]] && return
+    kill -0 "$pid" || return 1
+    sleep .1
+  done
+  return 1
+}
+udp_echo LB 198.51.100.42
+udp_echo LC 203.0.113.42
 service_check() {
   ip netns exec "$1" curl --noproxy '*' --retry 2 --retry-connrefused --max-time 5 -fsS "http://$2:18084/probe" | cmp - "$scratch/files/probe"
   ip netns exec "$1" /usr/bin/python3 -c '
 import socket, sys
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(3)
-s.sendto(b"subnet",(sys.argv[1],18085)); assert s.recv(64)==b"subnet"' "$2"
+s.connect((sys.argv[1],18085)); s.send(b"subnet"); assert s.recv(64)==b"subnet"' "$2"
 }
 ip netns exec A sh "$scratch/direct/A/forward.sh"
 for pass in 1 2; do
@@ -186,6 +198,7 @@ ip netns exec TC sh "$scratch/tunnel/C/prepare.sh"
 ip -n A addr add 172.16.0.10/12 dev to-B
 ip -n B addr add 172.16.0.2/12 dev from-B
 ip -n LC addr add 172.20.0.42/32 dev lo
+udp_echo LC 172.20.0.42
 ip -n C route add 172.20.0.0/15 via 203.0.113.42
 ip -n C route add 172.16.0.0/12 via 192.0.2.5
 ip -n C route add 192.0.2.0/30 via 192.0.2.5

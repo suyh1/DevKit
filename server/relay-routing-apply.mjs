@@ -5,11 +5,12 @@ import { normalizeRouting } from './relay-routing.mjs';
 import { pingDirection } from './relay-routing-verify.mjs';
 
 const roles = ['A', 'B', 'C'];
-const limit = 15000;
-function localCommand(file, args, input, maxBuffer = 65536) {
+function localCommand(file, args, { input, timeout, maxBuffer = 65536 }) {
   return new Promise((resolve, reject) => {
-    const child = execFile(file, args, { windowsHide: true, timeout: limit, maxBuffer }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr.trim() || err.message)); else resolve(stdout.trim());
+    const child = execFile(file, args, { windowsHide: true, timeout, maxBuffer }, (err, stdout, stderr) => {
+      if (err?.killed) reject(new Error('系统路由命令超时（' + timeout / 1000 + ' 秒）。'));
+      else if (err) reject(new Error(stderr.trim() || err.message));
+      else resolve(stdout.trim());
     });
     child.stdin.on('error', () => {});
     child.stdin.end(input);
@@ -18,6 +19,8 @@ function localCommand(file, args, input, maxBuffer = 65536) {
 export async function routingManagementSession(lan, id, { elevated = true, maxOutput } = {}) {
   const remote = id ? await lan.routingSession(id) : null;
   const platform = remote?.platform || process.platform;
+  // Windows can spend the first query starting the NetTCPIP CIM provider.
+  const timeout = platform === 'win32' ? 45000 : 15000;
   if (!['linux', 'win32'].includes(platform)) { remote?.client.destroy(); throw new Error('自动配置支持 Windows 和 Linux。'); }
   return {
     platform, close: () => remote?.client.destroy(),
@@ -25,12 +28,12 @@ export async function routingManagementSession(lan, id, { elevated = true, maxOu
       if (platform === 'win32') {
         const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
         const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command, 'utf16le').toString('base64')];
-        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout: limit, maxOutput }) : localCommand('powershell.exe', args, undefined, maxOutput);
+        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout, maxOutput }) : localCommand('powershell.exe', args, { timeout, maxBuffer:maxOutput });
       }
       const input = 'set -eu\nexport LC_ALL=C\n' + script + '\n';
       // Elevation must already be available to this explicitly selected management identity.
       const command = elevated ? 'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi' : 'exec sh -s';
-      return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout: limit, maxOutput }) : localCommand('sh', ['-c', command], input, maxOutput);
+      return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout, maxOutput }) : localCommand('sh', ['-c', command], { input, timeout, maxBuffer:maxOutput });
     },
   };
 }
