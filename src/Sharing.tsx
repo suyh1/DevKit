@@ -496,7 +496,7 @@ function SharingPanel({
                           { key: 'files', label: 'SFTP / FTP 文件', detail: '配合终端权限浏览、上传和下载远程文件，支持 SFTP 和 FTP/FTPS。' },
                           { key: 'discover', label: '发现主机', detail: '从共享主机选定的网卡检测直连网段。' },
                           { key: 'wake', label: '网络唤醒', detail: '从共享主机唤醒配置了 MAC 地址的设备。' },
-                          { key: 'rdp', label: '远程桌面连接', detail: '通过共享主机配置的 guacd，连接已登记的 RDP 或 VNC 桌面。' },
+                          { key: 'rdp', label: '远程桌面连接', detail: '从共享主机直连已登记的 VNC 桌面，或通过 guacd 网关连接 RDP、VNC。' },
                         ],
                       },
                     ] as const

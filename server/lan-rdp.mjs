@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { openVncDisplay } from './lan-vnc.mjs';
 import { openDrive } from './rdp-drive.mjs';
 import { once } from 'node:events';
 import { createConnection, isIP } from 'node:net';
@@ -151,8 +152,9 @@ export function createRdpSessions(env = process.env) {
     if (!session || session.token !== token) fail(404, '远程桌面会话已断开或不可用。');
     return session;
   };
-  function writable(payload, token) {
+  function writable(payload, token, direct = false) {
     const session = owned(payload?.id, token);
+    if (session.direct !== direct) fail(400, '远程桌面输入协议不匹配。');
     try { session.verify(); }
     catch (error) { session.controller.abort(); throw error; }
     if (!session.socket?.writable) fail(404, '远程桌面会话已断开或不可用。');
@@ -160,14 +162,15 @@ export function createRdpSessions(env = process.env) {
     return session;
   }
   return {
-    async open(target, payload, { token, verify, stream, allowFiles }) {
+    async open(target, payload, { token, verify, stream, allowFiles, direct = false }) {
       if (sessions.size >= 8 || [...sessions.values()].filter(session => session.token === token).length >= 2) fail(429, '远程桌面连接数已达上限。');
       const protocol = target.protocol === 'vnc' ? 'vnc' : 'rdp';
-      const endpoint = gateway(env), options = optionsFor(target, payload);
+      if (direct && protocol !== 'vnc') fail(400, '直连仅适用于已登记的 VNC 主机。');
+      const options = direct ? {} : optionsFor(target, payload);
       payload.password = '';
       const id = randomUUID(), controller = new AbortController();
       const signal = AbortSignal.any([stream.signal, controller.signal]);
-      const session = { token, controller, verify, protocol, signal };
+      const session = { token, controller, verify, protocol, signal, direct };
       sessions.set(id, session);
       const abort = () => session.socket?.destroy();
       signal.addEventListener('abort', abort, { once: true });
@@ -175,7 +178,9 @@ export function createRdpSessions(env = process.env) {
       try {
         if (allowFiles && protocol === 'rdp') session.drive = await openDrive(env);
         Object.assign(options, session.drive?.options);
-        const { socket, display, driveEnabled } = await connectGateway(endpoint, options, signal, protocol);
+        const { socket, display, driveEnabled } = direct
+          ? await openVncDisplay(target, signal)
+          : await connectGateway(gateway(env), options, signal, protocol);
         session.socket = socket; session.driveEnabled = driveEnabled;
         signal.throwIfAborted();
         verify();
@@ -192,6 +197,15 @@ export function createRdpSessions(env = process.env) {
         controller.abort(); session.socket?.destroy();
         await session.drive?.close();
       }
+    },
+    async vncInput(payload, token) {
+      const { socket } = writable(payload, token, true);
+      const data = payload.data;
+      if (typeof data !== 'string' || !data.length || data.length > 87_384) fail(400, 'VNC 输入无效。');
+      const bytes = Buffer.from(data, 'base64');
+      if (!bytes.length || bytes.length > 65536 || bytes.toString('base64') !== data) fail(400, 'VNC 输入无效。');
+      await new Promise((resolve, reject) => socket.write(bytes, error => error ? reject(error) : resolve()));
+      return true;
     },
     input(payload, token) {
       writable(payload, token).socket.write(encodeInput(payload.messages));

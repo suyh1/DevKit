@@ -2,7 +2,24 @@ import type { HostDraft } from './lan-api';
 export const defaultPort = { ssh: 22, sftp: 22, vnc: 5900, rdp: 3389, ftp: 21, telnet: 23, serial: 0, share: 80 };
 export const protocolName = { ssh: 'SSH', sftp: 'SFTP', vnc: 'VNC', rdp: 'RDP', telnet: 'Telnet', ftp: 'FTP', serial: '串口', share: 'DevKit 共享' };
 
+// VNC viewers interpret :0 through :99 as display numbers. IPv6 endpoints use brackets.
+export function vncEndpoint(text: string) {
+  const match = /^(\[[a-f\d:.]+\]|[a-z\d][a-z\d.-]*):(\d{1,5})$/i.exec(text.trim());
+  if (!match) return;
+  const address = match[1].replace(/^\[|\]$/g, '').toLowerCase();
+  const number = Number(match[2]);
+  const port = number < 100 ? defaultPort.vnc + number : number;
+  if (port < 1 || port > 65535) return;
+  if (match[1].startsWith('[')) {
+    try { new URL('http://' + match[1]); } catch { return; }
+  }
+  return { address, port };
+}
+
 export function sessionSeed(text: string): Partial<HostDraft> | undefined {
+  const viewer = /^vnc\s+(.+)$/i.exec(text);
+  const endpoint = viewer && vncEndpoint(viewer[1]);
+  if (endpoint) return { mode: 'vnc', ...endpoint };
   const device = /^(?:serial:\/\/)?(COM[1-9]\d{0,4}|\/dev\/tty(?:USB|ACM|S)\d+)(?:\s+(\d{1,7}))?$/i.exec(text);
   if (device && (!device[2] || (+device[2] > 0 && +device[2] <= 4000000))) return { mode: 'serial', address: device[1], baudRate: Number(device[2] || 115200), port: 0 };
   const telnet = /^telnet\s+([a-z\d.:[\]-]+)(?:\s+(\d+))?$/i.exec(text);

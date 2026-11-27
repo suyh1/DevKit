@@ -38,7 +38,7 @@ SSH 终端支持多会话标签、调整尺寸、交互式命令和断线重连�
 - **发现主机**按所选网卡直连的 IPv4 网段输入 CIDR 或起止地址，一次最多 256 个地址。通过 TCP 响应及系统邻居缓存发现设备，尝试反向 DNS，显示可取得的 MAC。可把结果填入新建主机表单。MAC 缓存结果表示设备曾被记录。
 - **SFTP 文件**在已连接的终端旁打开。从远程目录浏览文件，可输入绝对路径、上传本地文件、下载远程文件。上传遇到同名文件时提示，下载由本机保存对话框选择去向。
 - **端口监控**在主机卡片点“启用端口监控”，使用已保存的 SSH 或共享端口，从运行 DevKit 的主机发起直接 TCP 检测。卡片显示最近状态、时间和耗时，“监控历史”打开同一监控的记录。
-- **远程桌面和网络唤醒**支持在 Windows 桌面端启动 `mstsc`，共享网页通过 `guacd` 在页面内连接。Windows SSH 档案默认目标端口为 3389，可自行指定。填写设备 MAC 后，可向设备所在直连 IPv4 网段发出唤醒包，目标设备需在硬件和系统设置中启用 Wake-on-LAN。
+- **远程桌面和网络唤醒**支持在 Windows 桌面端启动 `mstsc`，共享网页可从共享主机直连 VNC，或通过 `guacd` 连接远程桌面。Windows SSH 档案默认目标端口为 3389，可自行指定。填写设备 MAC 后，可向设备所在直连 IPv4 网段发出唤醒包，目标设备需在硬件和系统设置中启用 Wake-on-LAN。
 
 发行包内置 Windows x64、Linux x64 和 Linux ARM64 的 Node.js 24 LTS。自动识别以远端的实际系统和架构为准，优先用 SFTP 传输，也可通过 SSH 命令的二进制标准输入传输。目标机可离线部署。Node 按版本缓存在目标用户的 `~/.devkit-ssh/runtimes/`，脚本位于 `~/.devkit-ssh/workspaces/`，注册表和备份位于 `~/.devkit-ssh/managed/`。旧运行时保留给已启动的守护进程及自启项。
 
@@ -94,20 +94,24 @@ SSH、Telnet、串口、FTP、SFTP 和桌面 VNC 共用会话区。「保存的�
 
 Telnet 默认为 23 端口。FTP 支持被动传输，可选择明文（21）、显式 TLS（21）或隐式 TLS（990），配置用户名、密码与起始目录。串口可从桌面端枚举设备，按设备要求设置波特率、数据位、停止位、奇偶校验、流控和回车格式。
 
-点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。桌面 VNC 单次文本最多 4 MiB。中文和 emoji 需要服务端协商扩展文本，传统剪贴板使用 Latin-1。启用 DIB 位图的 VNC 服务支持双向复制截图（常见的 24/32 位 DIBv5，解码后含头部最多 40 MiB）。RFB 扩展中的文件格式仍为保留项，文件可用 SFTP 或 FTP 会话传输。网页 VNC 经网关传递文本。「复制画面」可复制当前整个远端屏幕；浏览器禁止写入图片时会下载 PNG。[RFB 扩展剪贴板规范](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding)
+点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。桌面 VNC 单次文本最多 4 MiB。中文和 emoji 需要服务端协商扩展文本，传统剪贴板使用 Latin-1。启用 DIB 位图的 VNC 服务支持双向复制截图（常见的 24/32 位 DIBv5，解码后含头部最多 40 MiB）。RFB 扩展中的文件格式仍为保留项，文件可用 SFTP 或 FTP 会话传输。网页 VNC 直连使用相同的剪贴板协商，经网关连接时可传递文本。「复制画面」可复制当前整个远端屏幕；浏览器禁止写入图片时会下载 PNG。[RFB 扩展剪贴板规范](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding)
 
 网页 RDP 使用 guacd 1.6 的文本剪贴板。单次文本需放入 256 KiB 的 UTF-8 缓冲区，发往 Windows 时转换后的 UTF-16 也需放入 256 KiB（均计入结束符）。远端策略和网关也可能限制可复制的长度。[Guacamole RDP 剪贴板实现](https://github.com/apache/guacamole-server/blob/1.6.0/src/protocols/rdp/channels/cliprdr.c)
 
 Windows 系统 RDP 客户端默认以全屏启动，剪贴板重定向遵循客户端和远端策略。
 
-桌面端使用内置 [noVNC 1.7.0](https://github.com/novnc/noVNC/tree/v1.7.0) 显示 VNC，连接凭据只用于本次会话。默认端口为 5900，其他显示号请填写对应 TCP 端口，例如显示号 1 通常对应 5901。
+桌面端使用内置 [noVNC 1.7.0](https://github.com/novnc/noVNC/tree/v1.7.0) 显示 VNC，连接凭据只用于本次会话。默认端口为 5900。可在主机名栏粘贴 `192.168.1.20:1` 或 `[::1]:1`，末尾的 0–99 按显示号换算为 TCP 端口。显示号 1 对应 5901。已保存为端口 1 的档案可在编辑时点「改用端口 5901」。单独填写的端口按实际 TCP 端口保存。
 
 ## 网页远程桌面
+
+VNC 可选「从共享主机直连 VNC」。共享主机需要能访问档案里的 TCP 端口，访客需要「远程桌面连接」权限。目标要求凭据时，在会话标签内输入。使用需要 Web Crypto 的认证方式时，请通过 HTTPS 访问共享页。
+
+通过网关连接 RDP 或 VNC 时：
 
 1. 部署带所需协议插件（RDP 或 VNC）的 Apache Guacamole `guacd` 1.6。DevKit 桌面共享和独立 Node 服务默认连接本机的 `127.0.0.1:4822`。例如在已有 Docker 的共享主机上运行 `docker run -d --name devkit-guacd -p 127.0.0.1:4822:4822 guacamole/guacd:1.6.0`。使用单独的网关时，在启动 DevKit 前设置 `DEVKIT_GUACD_HOST` 和 `DEVKIT_GUACD_PORT`。启用网关 TLS 时设置 `DEVKIT_GUACD_TLS=true`，并让运行 DevKit 的 Node 或 Electron 信任网关的证书。将 `guacd` 端口限制在 DevKit 可访问的私有网络内。
 2. 确认目标已启用远程桌面，并从 `guacd` 所在网络访问目标档案中的 RDP 或 VNC 端口。容器里的回环地址指容器本身，主机档案应填写从网关可达的地址。
 3. 在「局域网共享 → 局域网主机」勾选「远程桌面连接」。使用独立访客时，再为指定访客授予同一权限。独立 Node 服务可设置 `DEVKIT_SHARE_LAN_HOSTS=true` 与 `DEVKIT_LAN_HOSTS_RDP=true` 开放。
-4. 对于 VNC 会话，点「连接 VNC」，按目标要求填写用户名与密码。对于 RDP，访客从主机卡片点「连接远程桌面」，填写目标系统用户名、密码及可选域，即可在工作台内用键盘、鼠标或触控操作。登录凭据仅用于当前连接。目标使用自签名证书时，在确认目标身份后可选「首次信任目标证书」，网关会在后续连接核对证书，重新部署网关时需保留其证书信任记录。使用 HTTPS 可保护浏览器到共享主机的连接。
+4. 对于 VNC 会话，先选「guacd 网关」，按目标要求填写用户名与密码并点「通过网关连接」。对于 RDP，访客从主机卡片点「连接远程桌面」，填写目标系统用户名、密码及可选域，即可在工作台内用键盘、鼠标或触控操作。登录凭据仅用于当前连接。目标使用自签名证书时，在确认目标身份后可选「首次信任目标证书」，网关会在后续连接核对证书，重新部署网关时需保留其证书信任记录。使用 HTTPS 可保护浏览器到共享主机的连接。
 
 #### 网页 RDP 文件与截图
 
@@ -117,7 +121,7 @@ Windows 系统 RDP 客户端默认以全屏启动，剪贴板重定向遵循客�
 - 在远端文件资源管理器复制文件，粘贴到 `\\tsclient\DevKit\Download`，浏览器会下载该文件。远端应用中选中的图片可先保存为文件再放入 Download。
 - 每个连接使用独立临时目录，正常断开后清除。需要保留的文件请在断开前移出该盘。网页 RDP 的剪贴板通道只交换文本，图片和文件的目的地是中转盘。[Guacamole 驱动器重定向](https://guacamole.apache.org/doc/gug/configuring-guacamole.html#drive-redirection)
 
-远程桌面只连接已登记的目标，画面和输入通过当前登录会话传输。关闭窗口、退出登录或撤销权限会断开连接。浏览器内连接使用 Guacamole Common JS 和 `guacd`，部署资料见 [Apache Guacamole 文档](https://guacamole.apache.org/doc/gug/configuring-guacamole.html) 和 [组件许可证](apache-guacamole-license.md)。
+远程桌面只连接已登记的目标，画面和输入通过当前登录会话传输。关闭窗口、退出登录或撤销权限会断开连接。网关连接使用 Guacamole Common JS 和 `guacd`，部署资料见 [Apache Guacamole 文档](https://guacamole.apache.org/doc/gug/configuring-guacamole.html) 和 [组件许可证](apache-guacamole-license.md)。
 
 ## 数据与操作
 

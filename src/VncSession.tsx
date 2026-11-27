@@ -9,7 +9,7 @@ import SessionClipboard from './SessionClipboard';
 import { bindRemoteClipboard, copyScreen } from './remote-clipboard';
 
 const fieldLabels: Record<string, string> = { username: '用户名', password: 'VNC 密码', target: '目标' };
-export default function VncSession({ id }: { id: string }) {
+export default function VncSession({ id, portal = false }: { id: string; portal?: boolean }) {
   const [remote, setRemote] = useState('');
   const viewport = useRef<HTMLDivElement>(null), client = useRef<RFB | undefined>(undefined);
   const [running, setRunning] = useState(true);
@@ -24,7 +24,7 @@ export default function VncSession({ id }: { id: string }) {
     if (!running || !viewport.current) return;
     let disposed = false, failure = '';
     setRemote(''); setMessage('正在连接 VNC…'); setFields([]); setFingerprint(''); setConnected(false);
-    const channel = new VncChannel(id, message => { failure = message; });
+    const channel = new VncChannel(id, message => { failure = message; }, portal);
     const rfb = new RFB(viewport.current, channel);
     client.current = rfb;
     rfb.scaleViewport = options.current.scale;
@@ -73,6 +73,11 @@ export default function VncSession({ id }: { id: string }) {
     });
     rfb.addEventListener('serververification', async event => {
       clearTimeout(timer);
+      if (!window.crypto.subtle) {
+        failure = '此 VNC 认证需要通过 HTTPS 访问共享页，请使用 HTTPS 地址或选择 guacd 网关。';
+        rfb.disconnect();
+        return;
+      }
       const hash = await crypto.subtle.digest('SHA-256', (event as CustomEvent).detail.publickey);
       if (!disposed) {
         setFingerprint(Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join(':'));
@@ -86,7 +91,7 @@ export default function VncSession({ id }: { id: string }) {
     });
     void channel.connect();
     return () => { disposed = true; clipboard.dispose(); shortcuts.current = undefined; clearTimeout(timer); rfb.disconnect(); channel.close(); client.current = undefined; };
-  }, [id, running]);
+  }, [id, running, portal]);
   useEffect(() => { if (client.current) { client.current.scaleViewport = scale; client.current.viewOnly = viewOnly; if (viewOnly) shortcuts.current?.reset(); } }, [scale, viewOnly]);
   return <div className="lan-vnc-session">
     <div className="lan-terminal-message"><span role="status">{message}</span>

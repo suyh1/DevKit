@@ -42,6 +42,10 @@ describe('总览匹配清单', () => {
 
 describe('推荐顺序和打开方式', () => {
   it.each([
+    ['vnc 10.190.11.17:1', { mode: 'vnc', address: '10.190.11.17', port: 5901 }],
+    ['vnc [::1]:0', { mode: 'vnc', address: '::1', port: 5900 }],
+    ['vnc example.org:6100', { mode: 'vnc', address: 'example.org', port: 6100 }],
+    ['vnc://desk:1', { mode: 'vnc', address: 'desk', port: 1 }],
     ['vnc://[::1]:5901', { mode: 'vnc', address: '::1', port: 5901 }],
     ['telnet switch.local 2323', { mode: 'telnet', address: 'switch.local', port: 2323 }],
     ['ftp://nas', { mode: 'ftp', address: 'nas', port: 21 }],
@@ -62,7 +66,7 @@ describe('推荐顺序和打开方式', () => {
   ])('预填远程会话 %s', (source, hostDraft) => {
     expect(detectTools(String(source))).toContainEqual(expect.objectContaining({ id: 'lan-hosts', hostDraft }));
   });
-  it.each(['vnc://host:99999', 'rdp://desk/logs', 'COM3 9999999', 'ftp://dev:secret@nas', 'vnc://user:secret@desk', '192.0.2.0/24'])('忽略非主机会话输入 %s', source => {
+  it.each(['vnc://host:99999', 'vnc [::1]:66000', 'rdp://desk/logs', 'COM3 9999999', 'ftp://dev:secret@nas', 'vnc://user:secret@desk', '192.0.2.0/24'])('忽略非主机会话输入 %s', source => {
     expect(detectTools(source).map(match => match.id)).not.toContain('lan-hosts');
   });
   it('将服务地址带入单机转发，普通 SSH 命令继续匹配主机栏目', () => {

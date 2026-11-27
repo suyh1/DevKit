@@ -25,7 +25,7 @@ import { useRelatedCreation, useWorkspaceFeedback, useWorkspaceGuard } from './r
 import { missingResourceLink, openWorkspaceLink, useWorkspaceResource } from './workspace-links';
 import './lan-hosts.css';
 
-import { defaultPort, protocolName } from './lan-protocols';
+import { defaultPort, protocolName, vncEndpoint } from './lan-protocols';
 const VncSession = lazy(() => import('./VncSession'));
 const SftpSession = lazy(() => import('./SftpSession'));
 const protocolIcon = { ssh: Terminal, telnet: Terminal, serial: Cable, ftp: FolderOpen, sftp: FolderOpen, vnc: Monitor, rdp: Monitor, share: Globe };
@@ -57,6 +57,8 @@ function HostEditor({ active, host, seed, hosts, close, save, canConnect, busy, 
   const modeName = useId(), formError = useRef<HTMLParagraphElement>(null);
   const patch = (values: Partial<HostDraft>) => setDraft(current => ({ ...current, ...values }));
   const ssh = draft.mode === 'ssh' || draft.mode === 'sftp';
+  const vnc = draft.mode === 'vnc';
+  const vncTarget = vnc ? vncEndpoint(draft.address) : undefined;
   const ftp = draft.mode === 'ftp', serial = draft.mode === 'serial';
   const share = draft.mode === 'share', management = share || draft.mode === 'ssh';
   const ProtocolIcon = protocolIcon[draft.mode];
@@ -73,7 +75,7 @@ function HostEditor({ active, host, seed, hosts, close, save, canConnect, busy, 
 
   return <Modal active={active} title={host ? '编辑主机连接' : newJump ? '添加主机连接' : '新建跳板机'} closeLabel="关闭主机设置" close={close} busy={busy} draft={{ ...draft, tags }}
     className="lan-host-dialog" icon={<ProtocolIcon size={19} />}>
-    <form className="lan-host-form" onSubmit={event => { event.preventDefault(); if (!readingKey) save({ ...draft, tags: tags.split(/[,，]/).map(tag => tag.trim()).filter(Boolean) }, ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === 'connect'); }}>
+    <form className="lan-host-form" onSubmit={event => { event.preventDefault(); if (!readingKey) save({ ...draft, ...vncTarget, tags: tags.split(/[,，]/).map(tag => tag.trim()).filter(Boolean) }, ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === 'connect'); }}>
       <div className="lan-host-body">
         <fieldset className="lan-host-section">
           <legend>连接方式</legend>
@@ -97,14 +99,15 @@ function HostEditor({ active, host, seed, hosts, close, save, canConnect, busy, 
           <div className={`lan-host-fields ${!share ? 'lan-host-fields-ssh' : ''}`}>
             {serial ? <SerialAddress draft={draft} patch={patch} /> : <label className="lan-field lan-address"><span>{!share ? '主机名或 IP' : '共享地址'}</span>
               <TextInput data-modal-focus required autoComplete="off" spellCheck={false} value={draft.address} onChange={event => patch({ address: event.target.value })}
-                placeholder={!share ? '192.168.1.20' : 'http://192.168.1.20:8765'} />
+                placeholder={vnc ? '192.168.1.20 或 192.168.1.20:1' : !share ? '192.168.1.20' : 'http://192.168.1.20:8765'} />
             </label>}
-            {!share && !serial && <label className="lan-field lan-port"><span>端口</span><input required type="number" min={1} max={65535} value={draft.port || ''} onChange={event => patch({ port: Number(event.target.value) })} /></label>}
+            {!share && !serial && <label className="lan-field lan-port"><span>{vnc ? 'TCP 端口' : '端口'}</span><input required type="number" min={1} max={65535} readOnly={!!vncTarget} value={vncTarget?.port ?? (draft.port || '')} onChange={event => patch({ port: Number(event.target.value) })} /></label>}
             <label className="lan-field lan-host-name"><span>显示名称 <small>选填</small></span><TextInput value={draft.name} onChange={event => patch({ name: event.target.value })} maxLength={120} placeholder="例如：测试服务器" /></label>
             {ssh && <div className="lan-field lan-platform"><span>目标系统</span><SegmentedControl label="目标系统" value={draft.platform} options={[{ value: 'linux', label: 'Linux' }, { value: 'win32', label: 'Windows' }]} onChange={platform => patch({ platform })} /></div>}
           </div>
         </fieldset>
 
+        {vnc && !vncTarget && draft.port > 0 && draft.port < 100 && <p className="lan-note">当前将连接 TCP 端口 {draft.port}。如果系统客户端填写的是显示号 :{draft.port}，<button type="button" className="text-button" onClick={() => patch({ port: defaultPort.vnc + draft.port })}>改用端口 {defaultPort.vnc + draft.port}</button>。</p>}
         <SessionProtocolFields draft={draft} patch={patch} />
         {(ssh || share || ftp) && <fieldset className="lan-host-section">
           <legend>登录凭据</legend>
@@ -398,6 +401,7 @@ export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft
       (host.mode !== 'ssh' && host.mode !== 'sftp' || host.user === value.user.trim() && host.jumpHostId === value.jumpHostId));
     if (saved) await connectProfile(saved);
   }
+  const showSessions = allowed('terminal') || tabs.some(tab => tab.host.mode === 'vnc' && allowed('rdp'));
   const grouped = groupLanHosts(hosts, query, host => protocolName[host.mode] + ' ' + endpoint(host));
   return <section className="lan-center">
     <header className="lan-heading workspace-banner"><div><h1>局域网主机</h1></div>{available && <div className="lan-heading-actions">
@@ -406,7 +410,7 @@ export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft
       {allowed('edit') && <><button className="secondary-button" disabled={busy} onClick={() => setImporting(true)}><Upload size={15} />导入主机</button>
       <button className="run-button" disabled={busy || !loaded} onClick={() => { setError(''); setSeed(undefined); setEditing('new'); }}><Plus size={16} />添加主机</button></>}
     </div>}</header>
-    {!available ? <p className="lan-note">局域网主机暂不可用。</p> : <div className={`lan-layout${expanded && tabs.length ? ' lan-layout-expanded' : ''}${allowed('terminal') ? '' : ' lan-layout-list'}`}>
+    {!available ? <p className="lan-note">局域网主机暂不可用。</p> : <div className={`lan-layout${expanded && tabs.length ? ' lan-layout-expanded' : ''}${showSessions ? '' : ' lan-layout-list'}`}>
       <aside ref={connections} className="lan-connections" aria-label="保存的主机连接">
         <div className="lan-directory-heading"><h2>保存的连接</h2><span aria-label={`${hosts.length} 个连接`}>{hosts.length}</span></div>
         <label className="lan-search"><Search size={16} /><TextInput embedded aria-label="搜索主机" placeholder="搜索连接" title="按名称、协议、地址或标签搜索" value={query} onChange={event => { setMenu(null); setQuery(event.target.value); }} /></label>
@@ -495,7 +499,7 @@ export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft
 
         </li>; })}</Fragment>)}</ul>
       </aside>
-      {allowed('terminal') && <section ref={terminalArea} className="lan-terminal-area" aria-label="远程会话">
+      {showSessions && <section ref={terminalArea} className="lan-terminal-area" aria-label="远程会话">
         {!!tabs.length && <div className="lan-session-controls">
           <button className="text-button" onClick={() => returnToList(tabs.find(item => item.id === selected)?.host.id)}>返回主机列表</button>
           {!fullscreen && <button className="text-button" aria-pressed={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? <Minimize size={14} /> : <Maximize size={14} />}{expanded ? '还原布局' : '展开工作区'}</button>}
@@ -514,9 +518,9 @@ export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft
         </div> : <div className="lan-terminal-empty"><Monitor size={24} aria-hidden="true" /><div><h2>远程会话</h2><p>双击主机打开会话，或使用行末菜单。</p></div></div>}
         {tabs.map(tab => <div key={tab.id} id={`lan-tab-${tab.id}`} role="tabpanel" aria-label={tab.host.name} hidden={selected !== tab.id}>
           <Suspense fallback={<Skeleton kind="editor" label="正在加载会话…" />}>
-            {tab.host.mode === 'vnc' && <VncSession id={tab.host.id} />}
+            {tab.host.mode === 'vnc' && allowed('rdp') && <VncSession id={tab.host.id} portal={portal} />}
             {['ftp','sftp'].includes(tab.host.mode) && allowed('files') && <SftpSession label={protocolName[tab.host.mode]} id={tab.host.id} portal={portal} />}
-            {['ssh','telnet','serial'].includes(tab.host.mode) && <SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={tab.host.mode === 'ssh' && allowed('files')} portal={portal} />}
+            {['ssh','telnet','serial'].includes(tab.host.mode) && allowed('terminal') && <SshTerminal id={tab.host.id} active={active && selected === tab.id} allowFiles={tab.host.mode === 'ssh' && allowed('files')} portal={portal} />}
           </Suspense>
         </div>)}
       </section>}
@@ -544,6 +548,6 @@ export default function LanHosts({ active, onOpenMonitor, onNotice, initialDraft
         setSelectJump(null);
       }, true)} />}
     {discovering && <LanDiscovery close={() => setDiscovering(false)} onChoose={allowed('edit') ? draft => { setDiscovering(false); setSeed(draft); setError(''); setEditing('new'); } : undefined} />}
-    {rdpHost && active && <Suspense fallback={<p className="lan-note" role="status">正在加载远程桌面…</p>}><RemoteDesktop host={rdpHost} close={() => setRdpHost(undefined)} /></Suspense>}
+    {rdpHost && active && <Suspense fallback={<p className="lan-note" role="status">正在加载远程桌面…</p>}><RemoteDesktop host={rdpHost} direct={() => { openTab(rdpHost); setRdpHost(undefined); }} close={() => setRdpHost(undefined)} /></Suspense>}
   </section>;
 }

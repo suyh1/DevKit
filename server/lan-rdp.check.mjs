@@ -121,11 +121,49 @@ test('browser RDP selects only saved targets, relays display and input, and revo
   assert.deepEqual(fixture.messages.filter(([command]) => command === 'select').at(-1), ['select', 'vnc']);
   assert.equal(fixture.connections.at(-1).port, '5901');
   await vncResponse.body.cancel();
+
+  const hello = 'RFB 003.008\n';
+  let peer;
+  const listener = net.createServer(socket => {
+    peer = socket;
+    socket.on('error', () => {});
+    socket.write(hello.slice(0, 3));
+    setImmediate(() => socket.write(hello.slice(3)));
+  }).listen(0, '127.0.0.1');
+  await once(listener, 'listening');
+  cleanup.push(() => { peer?.destroy(); return new Promise(resolve => listener.close(resolve)); });
+  const directHost = (await lan.hostRequest('save', { mode: 'vnc', name: 'VNC direct', address: '127.0.0.1', port: listener.address().port })).at(-1);
+  const directLogin = await login('rdp-visitor');
+  const openDirect = (hostId, cookie) => post('lan-hosts/vnc-open', { id: hostId, port: 1, address: '192.0.2.99' }, cookie);
+  assert.equal((await openDirect(directHost.id, denied)).status, 403);
+  assert.equal((await openDirect(target.id, directLogin)).status, 400);
+  const direct = await openDirect(directHost.id, directLogin);
+  assert.equal(direct.status, 200);
+  assert.equal(direct.headers.get('content-type'), 'application/octet-stream');
+  const directId = direct.headers.get('x-devkit-rdp-session');
+  const directReader = direct.body.getReader();
+  cleanup.push(() => directReader.cancel().catch(() => {}));
+  let greeting = '';
+  while (greeting.length < hello.length) {
+    const { done, value } = await directReader.read();
+    assert.equal(done, false);
+    greeting += Buffer.from(value).toString();
+  }
+  assert.equal(greeting, hello);
+  const input = { id: directId, data: Buffer.from(hello).toString('base64') };
+  assert.equal((await post('lan-hosts/vnc-input', input, other)).status, 404);
+  assert.equal((await post('lan-hosts/vnc-input', { ...input, data: '!!!!' }, directLogin)).status, 400);
+  assert.equal((await post('lan-hosts/rdp-clipboard', { id: directId, text: 'hello' }, directLogin)).status, 400);
+  const inputReceived = once(peer, 'data');
+  assert.equal((await post('lan-hosts/vnc-input', input, directLogin)).status, 200);
+  assert.equal((await inputReceived)[0].toString(), hello);
+  const peerClosed = once(peer, 'close');
   await host.start({ ...settings, password: '', visitors: [{ name: 'rdp-visitor', services: unprivileged }, { name: 'viewer', services: unprivileged }] });
   assert.equal((await post('lan-hosts/rdp-input', { id, messages: [['key', '65', '0']] }, allowed)).status, 401);
   assert.equal((await post('lan-hosts/rdp-open', credentials, await login('rdp-visitor'))).status, 403);
   for (let attempt = 0; attempt < 25 && fixture.sockets.size; attempt++) await delay(20);
   assert.equal(fixture.sockets.size, 0);
+  await peerClosed;
   // Revocation closes the transport before asynchronous drive cleanup completes.
   for (let attempt = 0; attempt < 60; attempt++) {
     const exists = await readFile(path.join(drive, '传输.bin')).then(() => true, error => {

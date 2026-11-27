@@ -1,3 +1,4 @@
+import SegmentedControl from './SegmentedControl';
 import SessionClipboard from './SessionClipboard';
 import { TextInput } from './TextControl';
 import { useEffect, useRef, useState } from 'react';
@@ -6,8 +7,9 @@ import { Field, Modal, ModalCancel } from './project-components';
 import { openRemoteDesktop } from './rdp-client';
 import type { LanHost } from './lan-api';
 
-export default function RemoteDesktop({ host, close }: { host: LanHost; close: () => void }) {
+export default function RemoteDesktop({ host, close, direct }: { host: LanHost; close: () => void; direct: () => void }) {
   const vnc = host.mode === 'vnc';
+  const [route, setRoute] = useState<'direct' | 'gateway'>(vnc ? 'direct' : 'gateway');
   const picker = useRef<HTMLInputElement>(null);
   const [drive, setDrive] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -37,6 +39,7 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
   return <Modal title={`${vnc ? 'VNC' : '远程桌面'} · ${host.name}`} close={close} closeLabel="关闭远程桌面" icon={<Monitor size={18} />} className={phase === 'idle' ? 'lan-rdp-dialog' : 'lan-rdp-dialog lan-rdp-active'}>
     <form hidden={phase !== 'idle'} className="lan-rdp-form" onSubmit={event => {
       event.preventDefault();
+      if (vnc && route === 'direct') { direct(); return; }
       if (session.current || !viewport.current) return;
       const form = event.currentTarget, data = new FormData(form);
       const password = form.elements.namedItem('password') as HTMLInputElement;
@@ -50,11 +53,14 @@ export default function RemoteDesktop({ host, close }: { host: LanHost; close: (
       password.value = '';
     }}>
       {error && <p className="pc-error" role="alert">{error}</p>}
-      <Field label={vnc ? "VNC 用户名（选填）" : "远程桌面用户名"}><TextInput name="username" data-modal-focus autoComplete="username" required={!vnc} maxLength={256} /></Field>
-      <Field label="远程桌面密码"><TextInput name="password" type="password" autoComplete="current-password" maxLength={1024} /></Field>
+      {vnc && <SegmentedControl label="VNC 连接方式" value={route} options={[{ value: 'direct', label: '共享主机直连' }, { value: 'gateway', label: 'guacd 网关' }]} onChange={value => { setRoute(value); setError(''); }} />}
+      {route === 'gateway' && <>
+        <Field label={vnc ? "VNC 用户名（选填）" : "远程桌面用户名"}><TextInput name="username" data-modal-focus autoComplete="username" required={!vnc} maxLength={256} /></Field>
+        <Field label="远程桌面密码"><TextInput name="password" type="password" autoComplete="current-password" maxLength={1024} /></Field>
+      </>}
       {!vnc && <><Field label="域（可选）"><TextInput name="domain" maxLength={256} /></Field>
       <label className="lan-rdp-trust"><input name="trustCertificate" className="form-check" type="checkbox" />首次信任目标证书（用于自签名证书）</label></>}
-      <footer className="pc-form-footer"><ModalCancel /><button className="run-button">连接</button></footer>
+      <footer className="pc-form-footer"><ModalCancel /><button className="run-button">{vnc ? (route === 'direct' ? '从共享主机直连 VNC' : '通过网关连接') : '连接'}</button></footer>
     </form>
     <section ref={screen} className={maximized ? 'lan-rdp-view lan-rdp-maximized' : 'lan-rdp-view'} hidden={phase === 'idle'} aria-label="远程桌面会话">
       <div className="lan-rdp-toolbar"><span role="status">{phase === 'connecting' ? '正在连接目标远程桌面…' : notice || '远程桌面已连接'}</span><div>

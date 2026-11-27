@@ -2,6 +2,33 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
 
+// Only expose the browser input channel after the saved target sends an RFB greeting.
+export async function openVncDisplay(target, signal) {
+  const socket = createConnection({ host: target.address, port: target.port, signal });
+  const timeout = setTimeout(() => socket.destroy(new Error('等待 VNC 服务响应超时')), 12000);
+  try {
+    socket.setNoDelay(true);
+    const reader = socket[Symbol.asyncIterator]();
+    let prefix = Buffer.alloc(0);
+    while (prefix.length < 12) {
+      const chunk = await reader.next();
+      if (chunk.done) throw new Error('服务在握手前断开');
+      prefix = Buffer.concat([prefix, chunk.value]);
+    }
+    if (!/^RFB \d{3}\.\d{3}\n$/.test(prefix.toString('latin1', 0, 12))) throw new Error('目标端口未返回 VNC 协议标识');
+    return { socket, async *display() {
+      yield prefix;
+      yield* reader;
+    } };
+  } catch (error) {
+    socket.destroy();
+    if (signal.aborted) throw error;
+    throw Object.assign(new Error(`共享主机无法连接 VNC 服务（TCP ${target.port}）：${error.code || error.message}`), { status: 502 });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // A pull-based desktop IPC channel. The socket's high-water mark bounds unread frames.
 export function createVncSockets(find) {
   const sessions = new Map();

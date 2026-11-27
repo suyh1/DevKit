@@ -20,7 +20,10 @@ export async function diagnoseHost(host, { openSsh, openShare, openPort = probeP
     if (!await check('地址解析', async () => (await resolve(address)).join('、'))) return { checks, checkedAt };
     if (!await check('TCP 端口', async () => {
       const result = await openPort(address, port);
-      if (!result.ok) throw new Error(`${port} · ${portDetails[result.code] || result.code}`);
+      if (!result.ok) {
+        const hint = host.mode === 'vnc' && port < 100 ? `。如果 :${port} 是 VNC 显示号，请将档案的 TCP 端口改为 ${5900 + port}。` : '';
+        throw new Error(`${port} · ${portDetails[result.code] || result.code}${hint}`);
+      }
       return `${port} · ${result.elapsed} ms`;
     })) return { checks, checkedAt };
   }
