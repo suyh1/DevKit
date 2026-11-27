@@ -6,16 +6,16 @@ import { pingDirection } from './relay-routing-verify.mjs';
 
 const roles = ['A', 'B', 'C'];
 const limit = 15000;
-function localCommand(file, args, input) {
+function localCommand(file, args, input, maxBuffer = 65536) {
   return new Promise((resolve, reject) => {
-    const child = execFile(file, args, { windowsHide: true, timeout: limit, maxBuffer: 65536 }, (err, stdout, stderr) => {
+    const child = execFile(file, args, { windowsHide: true, timeout: limit, maxBuffer }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr.trim() || err.message)); else resolve(stdout.trim());
     });
     child.stdin.on('error', () => {});
     child.stdin.end(input);
   });
 }
-export async function routingManagementSession(lan, id, { elevated = true } = {}) {
+export async function routingManagementSession(lan, id, { elevated = true, maxOutput } = {}) {
   const remote = id ? await lan.routingSession(id) : null;
   const platform = remote?.platform || process.platform;
   if (!['linux', 'win32'].includes(platform)) { remote?.client.destroy(); throw new Error('自动配置支持 Windows 和 Linux。'); }
@@ -25,12 +25,12 @@ export async function routingManagementSession(lan, id, { elevated = true } = {}
       if (platform === 'win32') {
         const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
         const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command, 'utf16le').toString('base64')];
-        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout: limit }) : localCommand('powershell.exe', args);
+        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout: limit, maxOutput }) : localCommand('powershell.exe', args, undefined, maxOutput);
       }
       const input = 'set -eu\nexport LC_ALL=C\n' + script + '\n';
       // Elevation must already be available to this explicitly selected management identity.
       const command = elevated ? 'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi' : 'exec sh -s';
-      return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout: limit }) : localCommand('sh', ['-c', command], input);
+      return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout: limit, maxOutput }) : localCommand('sh', ['-c', command], input, maxOutput);
     },
   };
 }

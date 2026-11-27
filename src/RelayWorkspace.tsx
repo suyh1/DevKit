@@ -6,6 +6,7 @@ import SegmentedControl from './SegmentedControl';
 import Skeleton from './Skeleton';
 import { openWorkspaceLink } from './workspace-links';
 import RoutingWorkspace from './RoutingWorkspace';
+import GatewayWorkspace from './GatewayWorkspace';
 import { OverflowName } from './FileMeta';
 import { remoteAccess } from './workspace-remote';
 
@@ -61,11 +62,13 @@ function Editor({ initial, close, save, detect }: { initial: Rule; close: () => 
 }
 
 export function RelayWorkspace(props: PageProps & { resource?: string }) {
-  const routing = props.resource?.split('/')[0] === 'routing';
-  return <><SegmentedControl className="relay-modes" label="互联方式" value={routing ? 'routing' : 'services'}
-    options={[{ value: 'services', label: '服务转发' }, { value: 'routing', label: '原 IP 双向互通' }]}
-    onChange={mode => openWorkspaceLink('relay', mode === 'routing' ? 'routing' : undefined)} />
-    {routing ? <RoutingWorkspace {...props} /> : <ServiceWorkspace {...props} />}</>;
+  const prefix = props.resource?.split('/')[0];
+  const mode = !prefix || prefix === 'gateway' ? 'gateway' : prefix === 'routing' ? 'routing' : 'services';
+  return <><SegmentedControl className="relay-modes" label="互联方式" value={mode}
+    options={[{ value: 'gateway', label: '网段互联' }, { value: 'routing', label: '原 IP 双向互通' }, { value: 'services', label: '服务转发' }]}
+    onChange={value => openWorkspaceLink('relay', value)} />
+    {mode === 'gateway' ? <GatewayWorkspace key={props.resource} initial={props.resource?.split('/')[1] || ''} />
+      : mode === 'routing' ? <RoutingWorkspace {...props} /> : <ServiceWorkspace {...props} />}</>;
 }
 
 function ServiceWorkspace({ active, edit, resource }: PageProps & { resource?: string }) {
@@ -106,7 +109,7 @@ function ServiceWorkspace({ active, edit, resource }: PageProps & { resource?: s
         <div className="collab-actions">{control && (selected.mode ? <button className="primary-button" disabled={op.busy} onClick={() => void op.run(async () => { await collab('relay','stop',selected); await list.refresh(); })}>停止转发</button>
           : <button className={results.some(result => result.ok) ? undefined : 'primary-button'} disabled={op.busy} onClick={() => void op.run(() => check(selected))}>{op.busy ? '处理中…' : results.length ? '重新检测' : '检测可用能力'}</button>)}
           {edit && !selected.mode && <><button disabled={op.busy} onClick={() => setEditor({ ...empty, ...selected })}>编辑</button><button disabled={op.busy} onClick={() => void op.run(async () => {
-            if (await confirm({ title: '移除服务规则', detail: selected.name, confirm: '移除' })) { await collab('relay','remove',selected); await list.refresh(); openWorkspaceLink('relay'); }
+            if (await confirm({ title: '移除服务规则', detail: selected.name, confirm: '移除' })) { await collab('relay','remove',selected); await list.refresh(); openWorkspaceLink('relay','services'); }
           })}>移除</button></>}</div>
         {selected.mode && <p>在访问端连接 {selected.bind === '0.0.0.0' ? 'A 的可达地址' : selected.bind}:{selected.listenPort}。Windows 可用 Test-NetConnection 测试端口，再用实际客户端登录或访问。</p>}
       </section><section><h3>能力检测与配置</h3>

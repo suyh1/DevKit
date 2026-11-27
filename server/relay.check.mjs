@@ -15,6 +15,9 @@ import { tcp } from './relay-transport.mjs';
 import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting } from './relay-routing-apply.mjs';
 import { verifyRouting } from './relay-routing-verify.mjs';
+import { block, discoverGateway, overlaps } from './relay-gateway.mjs';
+import { gatewayFiles, gatewayArchive } from './relay-gateway-config.mjs';
+import JSZip from 'jszip';
 
 async function bind(server) {
   server.listen(0,'127.0.0.1');
@@ -33,6 +36,65 @@ function fixture() {
   return { ...relay, call(action, input) { return relay.request({ rows, action, input, access: { owner:'test' }, commit: async next => { rows = next; } }); } };
 }
 const routingPlan = { kind:'routing', name:'互通', role:'A', ab:'192.0.2.1', b:'192.0.2.2', ac:'192.0.2.5', c:'192.0.2.6' };
+
+test('one hub address discovers connected and routed LANs without probing hosts or trusting a guest profile override', async () => {
+  const a = '192.0.2.1';
+  const profile = { mode:'ssh', address:a, fingerprint:'verified', id:'trusted' };
+  const lan = { hostRequest:async () => [profile, { ...profile, id:'unverified', fingerprint:'' }] };
+  const calls = [];
+  const connect = async (_lan, id, { elevated }) => {
+    assert.equal(id, 'trusted'); assert.equal(elevated,false);
+    return { platform:'linux', close() {}, async run(command) {
+      calls.push(command);
+      return command.includes('address show') ? JSON.stringify([{ addr_info:[{ family:'inet',scope:'global', local:a,prefixlen:24 }] }]) :
+        JSON.stringify([{ dst:'default' },{ dst:'192.0.2.0/24' },{ dst:'198.51.100.0/24', gateway:'192.0.2.5' },{ dst:'10.5.0.6' },
+          { dst:'239.0.0.0/8' },{ dst:'10.0.0.0/8',type:'blackhole' }]);
+    }};
+  };
+  const request = access => discoverGateway({ a,profile:'unverified', desktopAdmin:true },lan,access,{},connect);
+  await assert.rejects(request({}),/权限/);
+  await assert.rejects(request({ routingDiscovery:true }),/终端权限/);
+  assert.equal(calls.length,0);
+  assert.deepEqual(await request({ routingDiscovery:true, sshAllowed:true }),{
+    a, links:[{ address:a, network:'192.0.2.0/24' }], networks:['192.0.2.0/24','198.51.100.0/24','10.5.0.6/32'],
+  });
+  assert.equal(calls.length,2);
+});
+
+test('gateway packages route whole prefixes and keep WireGuard endpoint, private keys and local exceptions separate', async () => {
+  const a = '192.0.2.1', first = '192.0.2.0/24', second = '198.51.100.0/24';
+  const plan = { a, links:[{ address:a,network:first },{ address:'198.51.100.2',network:second }], networks:[first,second,'10.77.0.0/16'] };
+  const direct = gatewayFiles({ ...plan, mode:'direct' });
+  assert.ok(direct['via-' + a + '/routes.sh'].includes(second));
+  assert.ok(!direct['via-' + a + '/routes.sh'].includes(first));
+  assert.ok(direct['via-198.51.100.2/routes.ps1'].includes(first));
+  const args = { ...plan,mode:'tunnel',local:{ B:[second] } };
+  const files = gatewayFiles(args);
+  const [hub,b,c] = ['A','B','C'].map(role => files[role + '/devkit-' + role.toLowerCase() + '.conf']);
+  const privateKeys = [hub,b,c].map(conf => conf.match(/PrivateKey = (\S+)/)[1]);
+  assert.equal(new Set(privateKeys).size,3);
+  for (const [i,conf] of [hub,b,c].entries()) {
+    assert.equal(Buffer.from(privateKeys[i],'base64').length,32);
+    assert.ok(!privateKeys.some((k,j) => j !== i && conf.includes(k)));
+  }
+  for (const [i,conf] of [b,c].entries()) {
+    const ranges = conf.match(/AllowedIPs = (.*)/)[1].split(', ').map(block);
+    const covers = ip => ranges.some(r => overlaps(r,block(ip + '/32')));
+    assert.equal(covers(a),false); assert.equal(covers('192.0.2.50'),true);
+    assert.equal(covers('198.51.100.203'),i===1); assert.equal(covers('10.77.252.19'),true);
+    assert.equal(covers('8.8.8.8'),false);
+    assert.match(conf,/Endpoint = 192\.0\.2\.1:51820/);
+  }
+  assert.doesNotMatch(hub,/Address = 10\.77\./);
+  assert.match(files['A/forward.sh'],/MASQUERADE/);
+  assert.match(files['A/forward.ps1'],/New-NetNat/);
+  const chunks = [];
+  for await (const chunk of await gatewayArchive(args)) chunks.push(chunk);
+  const zip = await JSZip.loadAsync(Buffer.concat(chunks));
+  assert.deepEqual(Object.keys(zip.files).sort(),Object.keys(files).sort());
+  for (const networks of [['0.0.0.0/0'],['192.0.2.4/24'],['192.0.2.0/24; id'],[]])
+    assert.throws(() => gatewayFiles({ ...args, networks }));
+});
 
 test('routing plans validate endpoints, share both host routes and reserve writes for the trusted desktop', async () => {
   const relay = fixture();

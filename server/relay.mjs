@@ -8,6 +8,7 @@ import { normalizeRouting, inspectRouting, routingDraft, routingSteps } from './
 import { discoverRouting } from './relay-routing-discovery.mjs';
 import { applyRouting, routingManagementSession } from './relay-routing-apply.mjs';
 import { verifyRouting } from './relay-routing-verify.mjs';
+import { discoverGateway } from './relay-gateway.mjs';
 
 const modes = { A: ['direct'], B: ['direct', 'ssh', 'http', 'socks'], C: ['reverse'] };
 function port(value) {
@@ -149,6 +150,7 @@ export function createRelay(lan, changed) {
   }
   return {
     async request({ rows, commit, action, input, access }) {
+      if (action === 'gateway') return discoverGateway(input, lan, access);
       if (action === 'discover') {
         if (access.desktopAdmin) return discoverRouting(input, lan);
         if (!access.routingDiscovery) fail(403, '此网页没有识别地址的权限。');

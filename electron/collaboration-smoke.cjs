@@ -118,6 +118,52 @@ module.exports = async function collaborationSmoke(window, output) {
     await wait(web, '!!document.querySelector(".portal-page:not([hidden])")');
     await openWorkspace('跨网互联');
     await web('location.hash="relay"');
+    // Use the real desktop reader and exporter, without changing any OS networking.
+    const hostIp = Object.values(require('node:os').networkInterfaces()).flat().find(ip => ip.family === 'IPv4' && !ip.internal && !ip.address.startsWith('169.254.'))?.address;
+    if (hostIp) {
+      await fill(desktop, main + '.gateway-address input',hostIp);
+      await click(desktop, main, '读取 A 的网段');
+      await wait(desktop, '!!document.querySelector(".gateway-workspace textarea")');
+      const originalDialog = dialog.showSaveDialog;
+      const file = path.join(output,'gateway-smoke.zip');
+      dialog.showSaveDialog = async () => ({ canceled:false, filePath:file });
+      try {
+        await fill(desktop, main + '.gateway-workspace textarea','198.51.100.0/24\n203.0.113.0/24');
+        await click(desktop,main,'导出网关路由');
+        await wait(desktop,'document.querySelector(".gateway-workspace [role=status]")?.textContent.includes("配置已保存到")');
+        const JSZip = require('jszip');
+        assert.ok((await JSZip.loadAsync(await fs.readFile(file))).file('A/forward.sh'));
+        await click(desktop,main,'三层隧道');
+        await click(desktop,main,'导出 A、B、C 隧道配置');
+        await wait(desktop,'document.querySelector(".gateway-workspace [role=status]")?.textContent.includes("配置已保存到")');
+        const archive = await JSZip.loadAsync(await fs.readFile(file));
+        assert.ok(archive.file('B/devkit-b.conf') && archive.file('C/prepare.ps1'));
+      } finally { dialog.showSaveDialog = originalDialog; await fs.rm(file,{force:true}); }
+      const desktopBounds = window.getBounds();
+      const prefixes = Array.from({length:4096},(_,i) => '10.' + (i >> 8) + '.' + (i & 255) + '.0/24').join('\n');
+      for (const width of [desktopBounds.width,390]) {
+        window.setContentSize(width,740);
+        for (const targets of ['198.51.100.0/24',prefixes]) {
+          await fill(desktop, main + '.gateway-workspace textarea',targets);
+          assert.ok(await desktop(`(() => {
+            const area=document.querySelector('.gateway-workspace textarea'), button=document.querySelector('.gateway-workspace section > button.primary-button');
+            button.focus(); return document.activeElement===button && (button.compareDocumentPosition(area)&Node.DOCUMENT_POSITION_FOLLOWING) &&
+              area.offsetHeight<=innerHeight/3 && button.getBoundingClientRect().bottom<=innerHeight+1;
+          })()`));
+        }
+      }
+      window.setBounds(desktopBounds);
+      const bounds = browser.getBounds();
+      for (const width of [390,320]) {
+        browser.setContentSize(width,740);
+        await fill(web,current + '.gateway-address input',hostIp);
+        await click(web,current,(await web('!!document.querySelector(".gateway-workspace textarea")')) ? '重新读取网段' : '读取 A 的网段');
+        await wait(web,'!!document.querySelector(".gateway-workspace textarea")');
+        assert.equal(await web('document.querySelector(".gateway-workspace textarea").readOnly'),true);
+        assert.equal(await web('document.querySelector(".gateway-workspace").scrollWidth <= document.querySelector(".gateway-workspace").clientWidth + 1'),true);
+      }
+      browser.setBounds(bounds);
+    }
     await click(web, current, '原 IP 双向互通');
     await click(web, current, '新建互通方案');
     await wait(web, '!!document.querySelector("dialog[open] .relay-device-inputs")');

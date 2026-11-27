@@ -3,19 +3,26 @@ import { withDeadline } from './lan-probe.mjs';
 
 export const sshCall = (receiver, method, ...args) => new Promise((resolve, reject) => receiver[method](...args, (error, result) => error ? reject(error) : resolve(result)));
 
-export async function sshExec(client, command, { input, timeout = 12000, includeStderr = false } = {}) {
+export async function sshExec(client, command, { input, timeout = 12000, includeStderr = false, maxOutput } = {}) {
   let expired = false, stream;
   try {
     return await withDeadline((async () => {
       stream = await sshCall(client, 'exec', command);
       if (expired) { stream.destroy(); return; }
-      let stdout = '', stderr = '';
-      stream.on('data', chunk => { stdout = (stdout + chunk.toString()).slice(-8192); });
+      let stdout = '', stderr = '', truncated = false;
+      stream.on('data', chunk => {
+        stdout += chunk.toString();
+        if (stdout.length > (maxOutput ?? 8192)) {
+          truncated = true;
+          stdout = stdout.slice(-(maxOutput ?? 8192));
+        }
+      });
       stream.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-8192); });
       const complete = new Promise((resolve, reject) => {
         stream.once('error', reject);
         stream.once('close', code => {
-          if (code === 0) resolve((includeStderr ? `${stdout}\n${stderr}` : stdout).trim());
+          if (code === 0 && truncated && maxOutput) reject(new Error('远程命令输出超过读取上限。'));
+          else if (code === 0) resolve((includeStderr ? `${stdout}\n${stderr}` : stdout).trim());
           else reject(new Error(stderr.trim() || stdout.trim() || `远程命令退出码 ${code ?? '未知'}`));
         });
       });

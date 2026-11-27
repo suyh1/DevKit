@@ -2,9 +2,9 @@ name: Single-installation relay
 on:
   push:
     branches: [main]
-    paths: ['server/relay*.mjs', 'shared/routing-profiles.mjs', 'server/lan-workspaces.mjs', 'scripts/relay-fixture.mjs', 'scripts/routing-fixture.mjs', 'scripts/routing-windows-fixture.mjs', 'scripts/check-service-relay.sh', '.github/workflows/service-relay.yml']
+    paths: ['server/relay*.mjs', 'shared/routing-profiles.mjs', 'server/lan-workspaces.mjs', 'scripts/gateway-fixture.mjs', 'scripts/relay-fixture.mjs', 'scripts/routing-fixture.mjs', 'scripts/routing-windows-fixture.mjs', 'scripts/check-service-relay.sh', '.github/workflows/service-relay.yml']
   pull_request:
-    paths: ['server/relay*.mjs', 'shared/routing-profiles.mjs', 'server/lan-workspaces.mjs', 'scripts/relay-fixture.mjs', 'scripts/routing-fixture.mjs', 'scripts/routing-windows-fixture.mjs', 'scripts/check-service-relay.sh', '.github/workflows/service-relay.yml']
+    paths: ['server/relay*.mjs', 'shared/routing-profiles.mjs', 'server/lan-workspaces.mjs', 'scripts/gateway-fixture.mjs', 'scripts/relay-fixture.mjs', 'scripts/routing-fixture.mjs', 'scripts/routing-windows-fixture.mjs', 'scripts/check-service-relay.sh', '.github/workflows/service-relay.yml']
 
 permissions:
   contents: read
@@ -33,6 +33,6 @@ jobs:
       - name: Install test SSH and FTP servers
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends openssh-server python3-pyftpdlib
+          sudo apt-get install -y --no-install-recommends openssh-server python3-pyftpdlib wireguard-tools iptables
       - name: Verify single-installation service relays and bidirectional IPv4 routing
         run: sudo unshare --mount --propagation private --net --pid --fork --mount-proc bash scripts/check-service-relay.sh "$(command -v node)" "$(id -un)"

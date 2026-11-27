@@ -1087,6 +1087,16 @@
   min-height: 38px; padding-inline: 14px; font-size: 15px;
 }
 .relay-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.gateway-address { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.gateway-workspace label { display: grid; gap: 5px; min-width: 0; }
+.gateway-workspace textarea { resize: vertical; min-height: 5em; max-height: 32vh; width: 100%; font-family: var(--font-mono); }
+.gateway-workspace input { font-size: 16px; max-width: 100%; }
+.gateway-links { max-height: 24vh; overflow: auto; margin: 0; padding-inline-start: 22px; }
+.gateway-workspace details label { margin-block: 8px; }
+@container collaboration (max-width: 460px) {
+  .collab-page[data-module='relay'] .relay-modes { display: flex; max-width: 100%; }
+  .collab-page[data-module='relay'] .relay-modes > button { flex: 1; white-space: normal; min-width: 0; padding-inline: 4px; }
+}
 .relay-topology {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 12px 20px; padding: 16px var(--panel-pad); border: 1px solid var(--line); border-radius: 12px;

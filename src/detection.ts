@@ -321,12 +321,17 @@ export function detectTools(input: string): Suggestion[] {
     if (text === '快速链接设置' || text === '快传链接设置') rules.workspace('transfer', '进入局域网快传管理快速链接');
     if (matches.size) return [...matches.values()];
   }
-  if (/^(?:跨网转发|服务转发|检测\s*A\s*的能力|B\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*C)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式');
+  if (/^(?:跨网转发|服务转发|检测\s*A\s*的能力)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式', undefined, 'services');
+  if (/^(?:网段互联|子网互通|跨网段互通|局域网互通|经\s*A\s*访问局域网|[BC]\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*(?:[BC]|对方网段)|访问\s*A\s*(?:能访问|可达)的(?:所有)?(?:网段|IP(?:和服务)?))$/i.test(text))
+    rules.workspace('relay', '经 A 访问局域网中的主机和服务', undefined, 'gateway');
+  const hubIp = /^(?:A\s*[:=：]\s*|(?:跳板机\s*A?|网段互联|跨网互联)\s+)([\d.]+)$/i.exec(text)?.[1];
+  const usableRelayIp = (ip:string) => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&
+    ip.split('.').every(n => Number(n) <= 255) && !/^(0|127)\./.test(ip) && Number(ip.split('.')[0]) < 224;
+  if (hubIp && usableRelayIp(hubIp)) rules.workspace('relay', '带入 A 的地址并读取网段', undefined, 'gateway/' + hubIp);
   if (/^(?:原\s*IP\s*(?:双向)?(?:整机)?互通|跨网互联\s*(?:补录|补全)\s*SSH\s*(?:管理)?档案|B\s*经\s*A\s*补录\s*C|C\s*经\s*A\s*补录\s*B|检测双向互通|双向路由|整机互通|B\s*(?:与|和|、|↔)\s*C\s*(?:(?:双向|双方)?互通|(?:想)?互相访问))$/i.test(text))
     rules.workspace('relay', '按原 IPv4 配置两端路由', undefined, 'routing');
   const triple = /^A\s*[:=：]\s*([\d.]+)[,，\s]+B\s*[:=：]\s*([\d.]+)[,，\s]+C\s*[:=：]\s*([\d.]+)$/i.exec(text)?.slice(1);
-  if (triple && new Set(triple).size === 3 && triple.every(ip => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&
-      ip.split('.').every(n => Number(n) <= 255) && !/^(0|127)\./.test(ip) && Number(ip.split('.')[0]) < 224))
+  if (triple && new Set(triple).size === 3 && triple.every(usableRelayIp))
     rules.workspace('relay', '带入三台设备并识别 A 的接口', undefined, 'routing/new/' + triple.join('/'));
   const relayTarget = /^(?:跨网互联|跨网转发|服务转发|转发)\s+([a-z\d][\w.-]{0,200}):(\d{1,5})$/i.exec(text);
   if (relayTarget && Number(relayTarget[2]) > 0 && Number(relayTarget[2]) <= 65535)

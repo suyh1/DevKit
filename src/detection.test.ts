@@ -73,7 +73,13 @@ describe('推荐顺序和打开方式', () => {
   });
   it('将服务地址带入单机转发，普通 SSH 命令继续匹配主机栏目', () => {
     expect(detectTools('跨网转发 c.example:8080')[0]).toMatchObject({ kind: 'workspace', id: 'relay', resourceId: 'new/c.example/8080' });
-    expect(detectTools('服务转发')[0]).toMatchObject({ kind:'workspace', id:'relay' });
+    expect(detectTools('服务转发')[0]).toMatchObject({ kind:'workspace', id:'relay', resourceId:'services' });
+    for (const source of ['网段互联', '局域网互通', 'B 通过 A 访问 C', '访问 A 可达的所有网段'])
+      expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'gateway' });
+    for (const source of ['A=192.0.2.1','跳板机 A 192.0.2.1','跨网互联 192.0.2.1'])
+      expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'gateway/192.0.2.1' });
+    for (const source of ['192.0.2.1','192.0.2.0/24','A=127.0.0.1','A=192.0.2.399'])
+      expect(detectTools(source).map(item => item.id)).not.toContain('relay');
     expect(detectTools('服务转发 c.example:22')[0]).toMatchObject({ id:'relay', resourceId:'new/c.example/22' });
     expect(detectTools('A=192.0.2.1 B=192.0.2.2 C=192.0.2.6')[0]).toMatchObject({ id:'relay', resourceId:'routing/new/192.0.2.1/192.0.2.2/192.0.2.6' });
     expect(detectTools('A=999.0.2.1 B=192.0.2.2 C=192.0.2.6').map(item => item.id)).not.toContain('relay');

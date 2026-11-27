@@ -337,6 +337,14 @@ app.whenReady().then(async () => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的请求。');
     try {
       if (!collab) throw new Error(collabError || '共享工具尚未准备好。');
+      if (module === 'relay' && action === 'exportgateway') {
+        const { gatewayArchive } = await import('./server/relay-gateway-config.mjs');
+        const { atomicFile } = await import('./server/atomic-file.mjs');
+        const result = await dialog.showSaveDialog(window, { title: '保存网段接入配置', defaultPath: value.mode === 'direct' ? '网关路由.zip' : 'WireGuard-私密配置.zip', filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+        if (result.canceled || !result.filePath) return { data: '已取消保存' };
+        await atomicFile(result.filePath, await gatewayArchive(value));
+        return { data: '配置已保存到 ' + result.filePath };
+      }
       if (module === 'transfer' && ['links-get', 'links-save'].includes(action)) {
         if (!transferLinks) throw new Error(transferLinksError || '快速链接尚未准备好。');
         return { data: action === 'links-get' ? transferLinks.status() : await transferLinks.save(value) };

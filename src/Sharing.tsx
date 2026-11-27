@@ -416,7 +416,7 @@ function SharingPanel({
                         permissions: [{ key: 'edit', label: '编辑开发文档', detail: '新建目录、编辑或删除开发文档、恢复历史版本。' }] },
                       { id: 'knowledge', name: '团队知识库', description: '查看共享主机上的全部手册与版本历史',
                         permissions: [{ key: 'edit', label: '编辑团队文档', detail: '可创建、编辑、恢复历史版本和删除文档。' }] },
-                      { id: 'relay', name: '跨网互联', description: '通过 A 中转连接 B 和 C',
+                      { id: 'relay', name: '跨网互联', description: '查看 A 可达的网段、主机路由与服务转发规则',
                         permissions: [{ key: 'edit', label: '维护转发规则', detail: '保存和移除已停止的规则。' }, { key: 'control', label: '检测与启停转发', detail: '从本机检测指定服务、建立和停止转发。使用 SSH 档案还需局域网主机终端授权。' }] },
                       { id: 'whiteboard', name: '截图协作白板', description: '截图与多人标注',
                         permissions: [{ key: 'edit', label: '创建与编辑白板', detail: '可上传截图、添加与移除标注，以及重命名或删除画板。' }] },

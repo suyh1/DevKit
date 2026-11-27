@@ -116,3 +116,64 @@ for role in A B C; do
   for ip in 192.0.2.1 192.0.2.5; do rm "/etc/sysctl.d/95-devkit-route-$ip.conf"; done
   for ip in 192.0.2.2 192.0.2.6; do rm "/etc/systemd/network/10-fixture.network.d/95-devkit-$ip.conf"; done
 done
+
+# A can already route to LAN hosts behind B and C. Two more clients reach A across a router.
+leaf() {
+  local name=$1 router=$2 gw=$3 ip=$4
+  ip netns add "$name"
+  ip link add "to-$name" type veth peer name "in-$name"
+  ip link set "to-$name" netns "$router"
+  ip link set "in-$name" netns "$name"
+  ip -n "$router" addr add "$gw/24" dev "to-$name"
+  ip -n "$router" link set "to-$name" up
+  ip -n "$name" addr add "$ip/24" dev "in-$name"
+  ip -n "$name" link set "in-$name" up
+  ip -n "$name" link set lo up
+  ip -n "$name" route add default via "$gw"
+}
+leaf LB B 198.51.100.1 198.51.100.42
+leaf LC C 203.0.113.1 203.0.113.42
+leaf TB B 172.25.11.1 172.25.11.2
+leaf TC C 172.25.12.1 172.25.12.2
+ip -n A route add 198.51.100.0/24 via 192.0.2.2
+ip -n A route add 203.0.113.0/24 via 192.0.2.6
+ip -n A route add 172.25.11.0/24 via 192.0.2.2
+ip -n A route add 172.25.12.0/24 via 192.0.2.6
+for router in B C; do ip netns exec "$router" sysctl -qw net.ipv4.ip_forward=1; done
+ip netns exec A "$node_bin" scripts/gateway-fixture.mjs "$scratch"
+for host in LB LC; do
+  ip netns exec "$host" /usr/bin/python3 -m http.server 18084 --directory "$scratch/files" >/dev/null 2>&1 &
+  ip netns exec "$host" /usr/bin/python3 -c '
+import socket
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("",18085))
+while True:
+ data, addr=s.recvfrom(1024); s.sendto(data,addr)' &
+done
+service_check() {
+  ip netns exec "$1" curl --noproxy '*' --retry 2 --retry-connrefused --max-time 5 -fsS "http://$2:18084/probe" | cmp - "$scratch/files/probe"
+  ip netns exec "$1" /usr/bin/python3 -c '
+import socket, sys
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(3)
+s.sendto(b"subnet",(sys.argv[1],18085)); assert s.recv(64)==b"subnet"' "$2"
+}
+ip netns exec A sh "$scratch/direct/A/forward.sh"
+for pass in 1 2; do
+  ip netns exec B sh "$scratch/direct/via-192.0.2.1/routes.sh"
+  ip netns exec C sh "$scratch/direct/via-192.0.2.5/routes.sh"
+done
+service_check B 203.0.113.42
+service_check C 198.51.100.42
+service_check LB 203.0.113.42
+service_check LC 198.51.100.42
+for prefix in 192.0.2.4/30 203.0.113.0/24 172.25.12.0/24; do ip -n B route del "$prefix" via 192.0.2.1; done
+for prefix in 192.0.2.0/30 198.51.100.0/24 172.25.11.0/24; do ip -n C route del "$prefix" via 192.0.2.5; done
+ip -n C route add 192.0.2.1/32 via 192.0.2.5
+if ip -n B route get 203.0.113.42 || ip -n C route get 198.51.100.42; then exit 1; fi
+ip netns exec A wg-quick up "$scratch/tunnel/A/devkit-a.conf"
+ip netns exec A sh "$scratch/tunnel/A/forward.sh"
+ip netns exec TB sh "$scratch/tunnel/B/prepare.sh"
+ip netns exec TC sh "$scratch/tunnel/C/prepare.sh"
+ip netns exec TB wg-quick up "$scratch/tunnel/B/ready/devkit-b.conf"
+ip netns exec TC wg-quick up "$scratch/tunnel/C/ready/devkit-c.conf"
+service_check TB 203.0.113.42
+service_check TC 198.51.100.42
