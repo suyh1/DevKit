@@ -403,7 +403,8 @@ export async function createLanWorkspaces(directory, transports = { share: share
     },
     async openRelay(hostname, port, user) {
       const matches = store.list().filter(host => host.mode === 'ssh' && host.address.toLowerCase() === hostname.toLowerCase() && host.port === port && (!user || host.user === user));
-      if (matches.length !== 1) throw new Error(matches.length ? '多个档案匹配，请填写 A 的 SSH 用户名。' : '请在局域网主机登记 A 的 SSH 地址、账号并确认指纹。');
+      if (!matches.length) throw Object.assign(new Error('请在局域网主机登记 A 的 SSH 地址、账号并确认指纹。'), { code:'NO_RELAY_PROFILE' });
+      if (matches.length > 1) throw new Error('多个档案匹配，请填写 A 的 SSH 用户名。');
       const host = matches[0], route = jumpRoute(host, find);
       if (!host.fingerprint) throw new Error('请在局域网主机核对并确认 A 的 SSH 指纹。');
       const client = await openHost(host, {}, route);

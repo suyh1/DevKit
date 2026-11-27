@@ -46,8 +46,8 @@ test('one hub address discovers connected and routed LANs without probing hosts 
     assert.equal(id, 'trusted'); assert.equal(elevated,false);
     return { platform:'linux', close() {}, async run(command) {
       calls.push(command);
-      return command.includes('address show') ? JSON.stringify([{ addr_info:[{ family:'inet',scope:'global', local:a,prefixlen:24 }] }]) :
-        JSON.stringify([{ dst:'default' },{ dst:'192.0.2.0/24' },{ dst:'198.51.100.0/24', gateway:'192.0.2.5' },{ dst:'10.5.0.6' },
+      return command.includes('address show') ? JSON.stringify([{ ifname:'eth0', addr_info:[{ family:'inet',scope:'global', local:a,prefixlen:24 }] }]) :
+        JSON.stringify([{ dst:'default',gateway:'192.0.2.254',dev:'eth0' },{ dst:'192.0.2.0/24',dev:'eth0' },{ dst:'198.51.100.0/24', gateway:'192.0.2.5',dev:'eth0' },{ dst:'10.5.0.6',dev:'eth1' },
           { dst:'239.0.0.0/8' },{ dst:'10.0.0.0/8',type:'blackhole' }]);
     }};
   };
@@ -56,7 +56,10 @@ test('one hub address discovers connected and routed LANs without probing hosts 
   await assert.rejects(request({ routingDiscovery:true }),/终端权限/);
   assert.equal(calls.length,0);
   assert.deepEqual(await request({ routingDiscovery:true, sshAllowed:true }),{
-    a, links:[{ address:a, network:'192.0.2.0/24' }], networks:['192.0.2.0/24','198.51.100.0/24','10.5.0.6/32'],
+    a, links:[{ address:a, network:'192.0.2.0/24', device:'eth0' }], networks:['192.0.2.0/24','198.51.100.0/24','10.5.0.6/32'],
+    routes:[{ network:'0.0.0.0/0',device:'eth0',gateway:'192.0.2.254',metric:0 },
+      { network:'192.0.2.0/24',device:'eth0',metric:0 },{ network:'198.51.100.0/24',device:'eth0',gateway:'192.0.2.5',metric:0 },
+      { network:'10.5.0.6/32',device:'eth1',metric:0 }],
   });
   assert.equal(calls.length,2);
 });
@@ -204,6 +207,14 @@ test('desktop SSH enrollment confirms identity before password login and commits
   let logins = 0;
   const server = new ssh.Server({ hostKeys:[hostKey] }, client => {
     client.on('error',() => {});
+    client.on('tcpip',(accept,reject,info) => {
+      if (info.destIP === 'inside.fixture.invalid' && info.destPort === port) relaySocket(accept(),port);
+      else reject();
+    });
+    client.on('request',(accept,reject,name) => {
+      if (name === 'tcpip-forward' || name === 'cancel-tcpip-forward') accept();
+      else reject?.();
+    });
     client.on('authentication',auth => {
       if (auth.method === 'password') logins++;
       if (auth.method === 'password' && auth.password === password && auth.username === 'operator') auth.accept();
@@ -230,6 +241,23 @@ test('desktop SSH enrollment confirms identity before password login and commits
   assert.equal((await lan.hostRequest('list')).length,1);
   assert.ok(!(await readFile(path.join(directory,'lan-hosts','connections.json'),'utf8')).includes(password));
   const client = await lan.routingSession(created.id); client.client.end();
+  await t.test('service probes follow the verified SSH jump in both forwarding directions', async () => {
+    const hub = 'inside.fixture.invalid';
+    const hosts = await lan.hostRequest('save',{ ...draft,address:hub,mode:'ssh',auth:'password',password,jumpHostId:created.id });
+    const privateId = hosts.find(h => h.address === hub).id;
+    const trust = await lan.hostRequest('test',{ id:privateId });
+    await lan.hostRequest('test',{ id:privateId, fingerprint:trust.fingerprint });
+    const relay = createRelay(lan,() => {});
+    try {
+      for (const role of ['B','C']) {
+        const rule = { id:'probe', revision:1, role, hub, sshPort:port, user:'operator', bind:'192.0.2.1', source:'192.0.2.2',
+          listenPort:2222, target:role === 'B' ? hub : '127.0.0.1', targetPort:port, httpPort:port, socksPort:port };
+        const results = await relay.request({ rows:[rule],action:'detect',input:rule,access:{ desktopAdmin:true } });
+        const result = results.find(r => r.mode === (role === 'B' ? 'ssh' : 'reverse'));
+        assert.ok(result.ok,result.message);
+      }
+    } finally { relay.close(); }
+  });
 });
 
 test('routing runs every preflight before writing and rolls back only its successful changes', async () => {

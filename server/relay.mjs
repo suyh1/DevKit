@@ -61,9 +61,12 @@ export function createRelay(lan, changed) {
       let stage = mode === 'direct' ? '目标服务' : mode === 'http' || mode === 'socks' ? 'A 的代理入口或代理至目标的路径' : 'A 的 SSH 入口';
       try {
         if (mode === 'ssh' || mode === 'reverse') {
-          await sshBanner(rule);
           try { client = await connectHub(rule, access); }
-          catch (error) { return { mode, ok: false, message: '已识别 SSH。' + error.message }; }
+          catch (error) {
+            if (error.code !== 'NO_RELAY_PROFILE') throw error;
+            await sshBanner(rule);
+            return { mode, ok:false, message:'已识别 SSH。' + error.message };
+          }
         }
         if (mode === 'reverse') {
           stage = 'C 至本地服务';

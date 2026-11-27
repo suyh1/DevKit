@@ -31,18 +31,27 @@ export function gatewayNetworks(values) {
 async function inventory(host) {
   if (host.platform === 'win32') {
     const json = await host.run(`
-      $up=@((Get-NetIPInterface -AddressFamily IPv4 | Where-Object ConnectionState -eq Connected).InterfaceIndex)
-      $ips=@(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceIndex -in $up -and $_.AddressState -eq 'Preferred' } | ForEach-Object { "$($_.IPAddress)/$($_.PrefixLength)" })
-      $routes=@(Get-NetRoute -AddressFamily IPv4 -PolicyStore ActiveStore | Where-Object { $_.InterfaceIndex -in $up -and $_.Protocol -ne 'Local' } | Select-Object -ExpandProperty DestinationPrefix)
-      @{ addresses=$ips; routes=$routes } | ConvertTo-Json -Compress`);
+      $up=@{}
+      Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.ConnectionState -eq 'Connected' -and $_.InterfaceAlias -ne 'devkit-a' } | ForEach-Object { $up[[int]$_.InterfaceIndex]=[long]$_.InterfaceMetric }
+      $activeIPs=@(Get-NetIPAddress -AddressFamily IPv4 | Where-Object AddressState -eq Preferred)
+      $ips=@($activeIPs | Where-Object { $up.ContainsKey([int]$_.InterfaceIndex) } | ForEach-Object { @{ cidr="$($_.IPAddress)/$($_.PrefixLength)"; device=[string]$_.InterfaceIndex } })
+      $previous=@($activeIPs | Where-Object InterfaceAlias -eq 'devkit-a' | ForEach-Object { "$($_.IPAddress)/$($_.PrefixLength)" })
+      $routes=@(Get-NetRoute -AddressFamily IPv4 -PolicyStore ActiveStore | Where-Object { $up.ContainsKey([int]$_.InterfaceIndex) } | ForEach-Object {
+        @{ network=$_.DestinationPrefix; device=[string]$_.InterfaceIndex; gateway=$_.NextHop; local=($_.Protocol -eq 'Local'); metric=([long]$_.RouteMetric + $up[[int]$_.InterfaceIndex]) }
+      })
+      @{ addresses=$ips; routes=$routes; previous=$previous } | ConvertTo-Json -Depth 4 -Compress`);
     return JSON.parse(json);
   }
   const links = JSON.parse(await host.run('ip -j -4 address show up'));
-  const addresses = links.flatMap(link => (link.addr_info || []).filter(a => a.family === 'inet' && a.scope === 'global')
-    .map(a => a.local + '/' + a.prefixlen));
+  const addresses = links.filter(link => link.ifname !== 'devkit-a').flatMap(link => (link.addr_info || []).filter(a => a.family === 'inet' && a.scope === 'global')
+    .map(a => ({ cidr:a.local + '/' + a.prefixlen, device:link.ifname })));
   const routes = JSON.parse(await host.run('ip -j -4 route show table main'));
-  return { addresses, routes: routes.filter(r => (!r.type || r.type === 'unicast') && !r.flags?.includes('linkdown'))
-    .map(r => isIPv4(r.dst) ? r.dst + '/32' : r.dst) };
+  const previous = (links.find(l => l.ifname === 'devkit-a')?.addr_info ?? []).map(a => a.local + '/' + a.prefixlen);
+  return { addresses, previous, routes: routes.filter(r => (!r.type || r.type === 'unicast') && !r.flags?.includes('linkdown'))
+    .flatMap(r => (r.nexthops || r.multipath || [r]).filter(hop => hop.dev !== 'devkit-a' && !hop.flags?.includes('linkdown')).map(hop => ({
+      network:r.dst === 'default' ? '0.0.0.0/0' : isIPv4(r.dst) ? r.dst + '/32' : r.dst,
+      device:hop.dev, gateway:hop.gateway, metric:r.metric || 0,
+    }))) };
 }
 
 export async function discoverGateway(input, lan, access, interfaces = networkInterfaces(), connect = routingManagementSession) {
@@ -62,12 +71,18 @@ export async function discoverGateway(input, lan, access, interfaces = networkIn
   access.authorize?.();
   const host = await connect(lan, profile?.id, { elevated: false, maxOutput: 2 * 1024 * 1024 });
   try {
-    const { addresses, routes } = await inventory(host);
-    const links = [...new Set(addresses)].filter(cidr => usable(cidr)).map(cidr => ({
-      address: cidr.split('/')[0], network: block(cidr).cidr,
+    const { addresses, routes, previous } = await inventory(host);
+    const links = addresses.filter(link => usable(link.cidr)).map(({cidr,device}) => ({
+      address: cidr.split('/')[0], network: block(cidr).cidr, device,
     }));
-    const networks = [...new Set([...links.map(l => l.network), ...routes.map(cidr => usable(cidr)?.cidr).filter(Boolean)])];
+    const connected = new Set(links.map(l => l.device + ':' + l.network));
+    const paths = routes.filter(r => (usable(r.network) || r.network === '0.0.0.0/0') &&
+      (!r.local || connected.has(r.device + ':' + r.network))).map(({network,device,gateway,metric}) => ({
+      network, device, ...(gateway && gateway !== '0.0.0.0' && { gateway }), metric,
+    }));
+    const networks = [...new Set([...links.map(l => l.network), ...paths.map(r => r.network).filter(n => n !== '0.0.0.0/0')])];
     access.authorize?.();
-    return { a, links, networks: gatewayNetworks(networks) };
+    const previousTunnel = previous?.find(cidr => cidr.endsWith('/29') && usable(cidr));
+    return { a, links, networks: gatewayNetworks(networks), routes:paths, ...(previousTunnel && { previousTunnel:block(previousTunnel).cidr }) };
   } finally { host.close(); }
 }

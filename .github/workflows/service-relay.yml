@@ -19,6 +19,7 @@ jobs:
         with:
           node-version: 24
       - run: node scripts/routing-windows-fixture.mjs
+      - run: node --test server/relay-gateway.check.mjs
   three-hosts:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -30,6 +31,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --no-audit
+      - run: node --test server/relay-gateway.check.mjs server/relay.check.mjs
       - name: Install test SSH and FTP servers
         run: |
           sudo apt-get update -qq

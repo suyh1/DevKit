@@ -177,3 +177,24 @@ ip netns exec TB wg-quick up "$scratch/tunnel/B/ready/devkit-b.conf"
 ip netns exec TC wg-quick up "$scratch/tunnel/C/ready/devkit-c.conf"
 service_check TB 203.0.113.42
 service_check TC 198.51.100.42
+
+# Re-prepare active clients. Their own tunnel must not count as a colliding LAN.
+ip netns exec TB sh "$scratch/tunnel/B/prepare.sh"
+ip netns exec TC sh "$scratch/tunnel/C/prepare.sh"
+# Put a smaller destination inside B's native LAN. A reaches it through C,
+# and C relies on a broader route to LC. Sending C back to A would loop.
+ip -n A addr add 172.16.0.10/12 dev to-B
+ip -n B addr add 172.16.0.2/12 dev from-B
+ip -n LC addr add 172.20.0.42/32 dev lo
+ip -n C route add 172.20.0.0/15 via 203.0.113.42
+ip -n C route add 172.16.0.0/12 via 192.0.2.5
+ip -n C route add 192.0.2.0/30 via 192.0.2.5
+ip -n A route add 172.20.0.0/16 via 192.0.2.6
+ip netns exec A "$node_bin" scripts/gateway-fixture.mjs "$scratch/recheck" 172.20.0.0/16
+cmp <(grep '^Address =' "$scratch/tunnel/A/devkit-a.conf") <(grep '^Address =' "$scratch/recheck/tunnel/A/devkit-a.conf")
+ip netns exec A sh "$scratch/recheck/tunnel/A/forward.sh"
+ip netns exec B sh "$scratch/recheck/direct/via-172.16.0.10/routes.sh"
+ip netns exec C sh "$scratch/recheck/direct/via-192.0.2.5/routes.sh"
+ip -n B route get 172.20.0.42 | grep -q 'via 172.16.0.10'
+test -z "$(ip -n C route show exact 172.20.0.0/16)"
+service_check B 172.20.0.42

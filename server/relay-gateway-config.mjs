@@ -2,8 +2,10 @@ import { generateKeyPairSync } from 'node:crypto';
 import { fail } from './collab-record.mjs';
 import { block, gatewayNetworks, ipv4, overlaps } from './relay-gateway.mjs';
 import { routingAddress } from './relay-routing.mjs';
+import { directRoutePlan } from './relay-gateway-routes.mjs';
+import { gatewayForwarding } from './relay-gateway-forward.mjs';
 
-function directRoutes(gateway, networks) {
+function directRoutes(gateway, entries) {
   const linux = `#!/bin/sh
 set -eu
 hop=$(ip -4 route get ${gateway} | head -1)
@@ -11,7 +13,16 @@ case " $hop " in *' via '*|*' local '*) echo '请选择从本机直达 A 的接�
 dev=$(printf '%s\\n' "$hop" | awk '{for(i=1;i<NF;i++) if($i=="dev") print $(i+1)}')
 test -n "$dev"
 pending=''
-for prefix in ${networks.join(' ')}; do
+addr=$(ip -o -4 address show)
+local_ips=$(printf '%s\\n' "$addr" | awk '{split($4,a,"/"); printf "%s ", a[1]}')
+# Each row contains a destination and any next hops that must keep their own route.
+for entry in ${entries.map(s => "'" + s + "'").join(' ')}; do
+  set -- $entry
+  prefix=$1
+  shift
+  for next_hop do
+    case " $local_ips " in *" $next_hop "*) continue 2;; esac
+  done
   current=$(ip -4 route show exact "$prefix")
   case " $current " in
     "  ") pending="$pending $prefix";;
@@ -34,7 +45,10 @@ trap - EXIT HUP INT TERM
 $hop = @(Find-NetRoute -RemoteIPAddress '${gateway}' | Where-Object { $_.PSObject.Properties['NextHop'] })
 if ($hop.Count -ne 1 -or $hop[0].NextHop -ne '0.0.0.0' -or (Get-NetIPAddress -IPAddress '${gateway}' -ErrorAction SilentlyContinue)) { throw '请选择从本机直达 A 的接口目录' }
 $pending = [Collections.Generic.List[string]]::new()
-foreach ($prefix in @(${networks.map(n => "'" + n + "'").join(', ')})) {
+$localIPs = @((Get-NetIPAddress -AddressFamily IPv4).IPAddress)
+foreach ($entry in @(${entries.map(s => "'" + s + "'").join(', ')})) {
+  $prefix, $nextHops = $entry.Split(' ')
+  if ($nextHops | Where-Object { $_ -in $localIPs }) { continue }
   $route = @(Get-NetRoute -AddressFamily IPv4 -DestinationPrefix $prefix -ErrorAction SilentlyContinue)
   if ($route.Count -eq 1 -and $route[0].NextHop -eq '0.0.0.0') { continue }
   $saved = @(Get-NetRoute -AddressFamily IPv4 -PolicyStore PersistentStore -DestinationPrefix $prefix -ErrorAction SilentlyContinue)
@@ -72,9 +86,13 @@ function allowedRoutes(networks, exceptions) {
   }
   return result;
 }
-function tunnelBase(occupied) {
+function tunnelBase(occupied, previous) {
   const used = occupied.map(block).sort((a,b) => a.start - b.start);
-  for (const pool of ['10.77.0.0/16','172.16.0.0/12','192.168.0.0/16','10.0.0.0/8','100.64.0.0/10'].map(block)) {
+  const pools = ['10.77.0.0/16','172.16.0.0/12','192.168.0.0/16','10.0.0.0/8','100.64.0.0/10'].map(block);
+  const prior = block(previous);
+  if (prior && prior.end - prior.start === 7 && pools.some(p => p.start <= prior.start && prior.end <= p.end) &&
+      used.every(r => !overlaps(r, prior))) return prior.start;
+  for (const pool of pools) {
     let start = pool.start;
     for (const r of used) {
       if (r.start > start + 7) break;
@@ -99,7 +117,7 @@ umask 077
 mkdir -p ready
 temp=$(mktemp ready/profile.XXXXXX)
 trap 'rm -f "$temp"' EXIT
-ip -o -4 address show up | awk '{print $4}' > "$temp"
+ip -o -4 address show up | awk '$2 != "${name}" {print $4}' > "$temp"
 awk -v tunnel='${tunnelNet}' '
   function bounds(c, v, oct, i, n, size) {
     split(c,v,"/"); split(v[1],oct,"."); n=0
@@ -135,7 +153,7 @@ function Get-Range([string]$cidr) {
   $low = [Math]::Floor([BitConverter]::ToUInt32($bytes, 0) / $size) * $size
   @{ low=$low; high=$low+$size-1 }
 }
-$up = @((Get-NetIPInterface -AddressFamily IPv4 | Where-Object ConnectionState -eq Connected).InterfaceIndex)
+$up = @((Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.ConnectionState -eq 'Connected' -and $_.InterfaceAlias -ne '${name}' }).InterfaceIndex)
 $local = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceIndex -in $up } | ForEach-Object { Get-Range "$($_.IPAddress)/$($_.PrefixLength)" })
 $vpn = Get-Range '${tunnelNet}'
 if ($local | Where-Object { $_.low -le $vpn.high -and $vpn.low -le $_.high }) { throw '隧道地址段与本机网络重叠，请在桌面补入本地优先网段后重新导出。' }
@@ -162,39 +180,22 @@ export function gatewayFiles(input) {
   const links = input.links.map(link => {
     const address = routingAddress(link.address), [network] = gatewayNetworks([link.network]);
     if (!overlaps(block(address + '/32'), block(network))) fail(400, 'A 的地址与接口网段不符。');
-    return { address, network };
+    return { address, network, device:link.device ?? address };
   });
   const files = {};
   const addresses = [...new Set(links.map(l => l.address))];
   const tunnel = input.mode === 'tunnel';
   if (!tunnel && input.mode !== 'direct') fail(400, '请选择接入方式。');
-  const linuxForward = `#!/bin/sh
-set -eu
-for address in ${addresses.join(' ')}; do
-  dev=$(ip -o -4 address show to "$address/32" | awk 'NR==1 { sub(/@.*/, "", $2); print $2 }')
-  test -n "$dev" || { echo "未找到 A 的接口地址 $address" >&2; exit 1; }
-  sysctl -qw "net/ipv4/conf/$dev/forwarding=1"
-done
-`;
-  const windowsForward = `$ErrorActionPreference = 'Stop'
-foreach ($address in @(${addresses.map(a => "'" + a + "'").join(', ')})) {
-  $index = (Get-NetIPAddress -AddressFamily IPv4 -IPAddress $address -ErrorAction Stop).InterfaceIndex
-  Set-NetIPInterface -AddressFamily IPv4 -InterfaceIndex $index -Forwarding Enabled
-}
-`;
   const instructions = [
     '经 A 访问局域网', 'A 的管理或接入地址 ' + a, '目的 IPv4 网段 ' + networks.join('、'), '',
     '请用管理员权限在标注的设备上应用配置。服务使用原 IP、原端口和原账号。A 与目标设备的防火墙须允许相应流量。',
   ];
   if (!tunnel) {
-    files['A/forward.sh'] = linuxForward;
-    files['A/forward.ps1'] = windowsForward;
-    for (const { address, network } of links) {
-      // A broader route still leaves the client's own more-specific connected LAN in place.
-      const lan = block(network);
-      const destinations = networks.filter(n => {
-        const r = block(n); return r.start < lan.start || r.end > lan.end;
-      });
+    Object.assign(files, gatewayForwarding(addresses));
+    const plan = directRoutePlan(networks, links, input.routes);
+    for (const link of links) {
+      const { address } = link;
+      const destinations = plan(link);
       if (!destinations.length) continue;
       const scripts = directRoutes(address, destinations);
       files['via-' + address + '/routes.sh'] = scripts.linux;
@@ -202,7 +203,7 @@ foreach ($address in @(${addresses.map(a => "'" + a + "'").join(', ')})) {
     }
     if (!Object.keys(files).some(p => p.startsWith('via-'))) fail(400, '没有需要经 A 转发的其他网段。请核对目的网段，或选择三层隧道。');
     instructions.push('', '1. 在 A 上运行 A/forward.sh 或 A/forward.ps1。',
-      '2. 在每一侧网关选择 via- 后面为该侧直连 A 地址的目录，按系统运行 routes.sh 或 routes.ps1。在硬件路由器上可按脚本中的目标前缀和下一跳登记静态路由。两侧网关都配置后，使用它们作为网关的主机即可互访。',
+      '2. 在每一侧网关选择 via- 后面为该侧直连 A 地址的目录，按系统运行 routes.sh 或 routes.ps1。手动配置硬件路由器时，逐行查看脚本的目的前缀：如果该行后续列出了本机的任一 IP，请保留原路由；其余前缀使用目录名中的 A 地址作为下一跳。两侧网关都配置后，使用它们作为网关的主机即可互访。',
       '3. 也可在 B 或 C 本机运行对应脚本，让该设备接入。在目标侧网关添加经 A 返回访问端网段的路由。目标主机以 A 为网关时已有回程。',
       '4. Windows 新增路由默认持久保存。Linux 脚本设置当前运行状态，重启后重新运行，或将等效静态路由保存到 NetworkManager / systemd-networkd，将接口转发设置保存到 sysctl.d。',
       '验证时在 B、C 各选择对方网段的一台普通主机，使用其原 IP 打开实际服务。用 ip route get 或 Find-NetRoute 核对去程与回程。');
@@ -210,7 +211,7 @@ foreach ($address in @(${addresses.map(a => "'" + a + "'").join(', ')})) {
     const port = input.port ?? 51820;
     if (!Number.isInteger(port) || port < 1 || port > 65535) fail(400, 'A 的 UDP 端口无效。');
     const local = ['B','C'].map(role => gatewayNetworks(input.local?.[role] ?? []));
-    const base = tunnelBase([...gatewayNetworks(input.discovered ?? []), ...networks, ...links.map(l => l.network), ...local.flat(), a + '/32']);
+    const base = tunnelBase([...gatewayNetworks(input.discovered ?? []), ...networks, ...links.map(l => l.network), ...local.flat(), a + '/32'], input.previousTunnel);
     const tunnelNet = ipv4(base) + '/29', hub = ipv4(base + 1);
     const keys = [wireGuardKeys(), wireGuardKeys(), wireGuardKeys()];
     const peers = ['B','C'].map((role,i) => {
@@ -232,21 +233,13 @@ PersistentKeepalive = 25
       return `[Peer]\nPublicKey = ${keys[i + 1].publicKey}\nAllowedIPs = ${ip}/32`;
     });
     files['A/devkit-a.conf'] = `[Interface]\nPrivateKey = ${keys[0].privateKey}\nAddress = ${hub}/29\nListenPort = ${port}\n\n${peers.join('\n\n')}\n`;
-    files['A/forward.sh'] = linuxForward + `sysctl -qw net/ipv4/conf/devkit-a/forwarding=1
-iptables -t nat -C POSTROUTING -s ${tunnelNet} ! -o devkit-a -j MASQUERADE 2>/dev/null ||
-  iptables -t nat -A POSTROUTING -s ${tunnelNet} ! -o devkit-a -j MASQUERADE
-`;
-    files['A/forward.ps1'] = windowsForward + `Set-NetIPInterface -InterfaceAlias 'devkit-a' -AddressFamily IPv4 -Forwarding Enabled
-$nat = @(Get-NetNat -ErrorAction Stop)
-if (!$nat.Count) { New-NetNat -Name 'DevKit-Gateway' -InternalIPInterfaceAddressPrefix '${tunnelNet}' }
-elseif (!($nat | Where-Object InternalIPInterfaceAddressPrefix -eq '${tunnelNet}')) { throw '已有其他 WinNAT。请保留该配置，在目标侧网关添加回程路由 ${tunnelNet} 经 A，或由管理员配置源 NAT。' }
-`;
+    Object.assign(files, gatewayForwarding(addresses, { address:hub, network:tunnelNet }));
     instructions.push('', `1. 整包包含三份私钥，请保存在管理员目录，只向每台设备分发自己的目录。同一部署使用同一次导出的配置。每次重新导出会生成新的密钥。`,
       `2. 在 A 和使用隧道的客户端安装 WireGuard。先在 A 导入并启用 devkit-a.conf，放行指向 A 的 UDP ${port}。A 位于 NAT 后时，将该 UDP 端口映射到 A，客户端 Endpoint 填写实际可达的外部地址。`,
       '3. 在 A 以管理员运行 forward.ps1，Linux 以 root 运行 sh forward.sh（需要 iproute2、sysctl 和 iptables）。脚本启用接口转发及隧道来源的 SNAT，使目标主机可以直接向 A 回包。沿途 ACL 和转发防火墙需允许隧道流量。Linux 重启后重新应用。已有 SNAT 或使用回程路由的现场，可按脚本核对转发并沿用现有网络策略。',
       `4. 在 B 和 C 各自运行本目录的 prepare.ps1 或 sh prepare.sh，自动保留本机直连路由。Windows 在 WireGuard 中导入生成的 ready 目录下的 .conf。Linux 将该文件以 0600 保存到 /etc/wireguard，使用 wg-quick up devkit-b 或 wg-quick up devkit-c。查看最近握手，先验证 A 的隧道地址 ${hub}，再从 B、C 分别访问目的网段中其他主机的原 IP 和服务。`,
       '混合现场可仅给隔着其他网关的一端分发隧道配置，另一端按直连网关方式部署。局域网中其他设备若也要主动经隧道访问，可在该侧网关部署客户端并为来自 LAN 的流量配置源 NAT，或规划站点间返回路由与 WireGuard 的来源前缀。',
-      '停用接入时关闭对应隧道。Linux 的 NAT 可用 forward.sh 最后一行的相同参数将 -A 换为 -D 撤回；Windows 可移除本次新建的 DevKit-Gateway NAT。接口转发按部署前状态恢复。');
+      '停用接入时关闭对应隧道。Linux 可按 forward.sh 中 nat_rule 的参数，用 -D 撤回本次新增的 MASQUERADE 规则；Windows 可移除本次新建的 DevKit-Gateway NAT。接口转发按部署前状态恢复。');
   }
   files['部署说明.txt'] = instructions.join('\n') + '\n';
   return files;

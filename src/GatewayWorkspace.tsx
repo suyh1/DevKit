@@ -5,7 +5,7 @@ import SegmentedControl from './SegmentedControl';
 import RoutingProfileDialog from './RoutingProfileDialog';
 import Skeleton from './Skeleton';
 
-type Snapshot = { a:string; links:{ address:string; network:string }[]; networks:string[] };
+type Snapshot = { a:string; links:{ address:string; network:string; device:string }[]; networks:string[]; routes:{ network:string; device:string; gateway?:string; metric:number }[]; previousTunnel?:string };
 type Profiles = { profiles:{ id:string; label:string }[] };
 const prefixes = (text:string) => [...new Set(text.trim().split(/[\s,，]+/).filter(Boolean))];
 
