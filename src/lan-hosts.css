@@ -44,11 +44,11 @@
 .lan-key-picker > span { flex:1; min-width:100px; overflow-wrap:anywhere; }
 .lan-key-picker > small { flex-basis:100%; color:var(--error); }
 .lan-import-fields { display:flex; flex-wrap:wrap; align-items:end; gap:8px; margin-bottom:9px; }
-.lan-import-results { max-height:30dvh; overflow:auto; list-style:none; padding:0; }
+.lan-import-results { list-style:none; padding:0; }
 .lan-import-results label { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:center; padding:8px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
 .lan-import-results label span { color:var(--muted); }
 .lan-scan-fields { display:grid; grid-template-columns:1fr 1fr 100px; gap:8px; }
-.lan-scan-results { max-height:36dvh; overflow:auto; list-style:none; padding:0; }
+.lan-scan-results { list-style:none; padding:0; }
 .lan-scan-results li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--line); font-size:11px; }
 .lan-scan-results strong,.lan-scan-results small { display:block; overflow-wrap:anywhere; }
 .lan-scan-results small,.lan-scan-results li > span { color:var(--muted); }
@@ -244,8 +244,6 @@
 .host-directory-current svg, .host-directory-list svg { flex-shrink: 0; color: var(--accent); }
 .host-directory-current code, .host-directory-list span { min-width: 0; overflow-wrap: anywhere; }
 .host-directory-list {
-  max-height: 42dvh;
-  overflow: auto;
   border-top: 1px solid var(--line);
   padding: 5px 3px;
 }
@@ -328,9 +326,10 @@
 .host-directory-list .path-next { margin-inline-start:auto; color:var(--muted); }
 .host-directory-list button:is(:hover,:focus-visible) { background:var(--tint); }
 .host-directory footer { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
-.lan-connections .lan-host-list { max-height: min(42dvh, 360px); overflow-y: auto; overscroll-behavior: contain; padding-inline: 2px; }
+.lan-connections .lan-host-list { padding-inline: 2px; }
+.lan-layout:not(.lan-layout-list) .lan-host-list { max-height: min(42dvh, 360px); overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 760px) {
-  .lan-connections .lan-host-list { max-height: min(30dvh, 240px); }
+  .lan-layout:not(.lan-layout-list) .lan-host-list { max-height: min(30dvh, 240px); overscroll-behavior-y: auto; }
 }
 
 .lan-host-actions { flex-wrap: wrap; justify-content: flex-end; }

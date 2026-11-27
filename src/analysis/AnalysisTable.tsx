@@ -73,7 +73,7 @@ export function ResultTable({ records, columnLimit }: { records: string[][]; col
           {header.length < columns.length && ' · 预览前 ' + header.length + ' 列'}
         </span>
       </div>
-      <div className="analysis-table-scroll">
+      <div className="analysis-table-scroll" key={current}>
         <table>
           <thead>
             <tr>

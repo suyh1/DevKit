@@ -116,7 +116,7 @@ module.exports = async function inventoryNavigation(window, output) {
     const display = '.jar-output-dialog[open] pre';
     await js(element(trigger) + ".scrollIntoView({block:'center'})");
     await wait(visible(trigger));
-    const position = () => js(`[${element(trigger)}.getBoundingClientRect().top, document.querySelector('.jar-table-scroll').scrollTop]`);
+    const position = () => js(`[${element(trigger)}.getBoundingClientRect().top, ${element(trigger)}.closest('.workspace').scrollTop]`);
     const before = await position();
     await click(trigger);
     await wait(element(display) + '?.textContent.includes("service-' + index + '") && document.activeElement === ' + element(display));
@@ -199,6 +199,8 @@ module.exports = async function inventoryNavigation(window, output) {
           for (let page = 1; page < 5; page++) { await click(next); await painted(); }
         }
         assert.equal(await js('document.querySelectorAll(".jar-instance").length'), Math.min(20, count));
+        const table = element('.jar-table-scroll');
+        assert.ok(await js(`${table}.scrollHeight <= ${table}.clientHeight + 1`), 'Service rows scroll with the workspace');
         await serviceOutput(count - 2);
         await serviceOutput(count - 1);
       }

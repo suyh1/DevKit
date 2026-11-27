@@ -144,7 +144,7 @@ function JarForm({ active, instance, seed, state, close, saved }: { seed?: Servi
     setPicker(null);
     void task(async () => { const files = await jarRequest<string[]>('pick', { kind: kind === 'program' ? 'executable' : kind }); if (files[0]) await pickFile(kind, files[0]); });
   }
-  return <dialog ref={dialog} className="jar-dialog jar-instance-editor" aria-labelledby={heading} onCancel={event => { event.preventDefault(); void cancel(); }} onKeyDown={event => { if (event.key === 'Escape' && !(event.target instanceof HTMLOptionElement)) { event.preventDefault(); event.stopPropagation(); void cancel(); } }}>
+  return <dialog ref={dialog} className="jar-dialog jar-instance-editor" aria-labelledby={heading} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); void cancel(); }} onKeyDown={event => { if (event.key === 'Escape' && event.target instanceof Element && event.target.closest('dialog') === event.currentTarget && !(event.target instanceof HTMLOptionElement)) { event.preventDefault(); event.stopPropagation(); void cancel(); } }}>
     <header><h2 id={heading}>{instance ? '编辑服务' : '添加服务'}</h2><button className="icon-button" aria-label="关闭服务设置" disabled={busy} onClick={() => void cancel()}><X size={18} /></button></header>
     <form onSubmit={event => { event.preventDefault(); void task(async () => {
       if (draft.kind === 'npm' && draft.nodePath && !supportsNodePath) throw new Error('请刷新主机信息，确认目标主机支持指定 Node.js 路径后再保存。');
@@ -250,7 +250,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
   const viewerTrigger = useRef<HTMLButtonElement | null>(null);
   const [auto, setAuto] = useState(true);
   const [requestedPage, setPage] = useState(0);
-  const rows = useRef<HTMLDivElement>(null);
+  const summary = useRef<HTMLDivElement>(null);
   const polling = useRef(false), operating = useRef(false), confirm = useConfirmation();
   const operationVersion = useRef(0);
   const desktop = !!window.devkitJar, available = desktop || !!remoteAccess(), write = canWriteWorkspace('jar'), control = canOperateJar();
@@ -372,12 +372,15 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
     {linkStatus === 'missing' && <p className="pc-notice" role="status">{missingResourceLink('应用服务')}</p>}
     {linkStatus === 'failed' && <p className="pc-notice" role="status">无法读取链接中的应用服务，请重试连接目标主机。</p>}
     {desktop && state && <LegacySshImport module="jar" groups={state.groups} disabled={busy} refresh={() => void task(refresh)} />}
-    <div className="jar-summary"><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>{auto ? `状态每 ${statusSeconds} 秒刷新` : '自动刷新已关闭'} · CPU 为采样间隔占用，可超过 100%</small></div>
+    <div className="jar-summary" ref={summary}><strong>{state?.instances.length || 0}</strong> 个应用<span>运行中 {statuses.filter(item => item.state === 'running').length}</span><span>已退出 {statuses.filter(item => item.state === 'exited').length}</span><small>{auto ? `状态每 ${statusSeconds} 秒刷新` : '自动刷新已关闭'} · CPU 为采样间隔占用，可超过 100%</small></div>
     {!state && available && !error && <Skeleton kind="list" label="正在读取服务列表…" />}
     {state && !state.instances.length && <div className="jar-empty"><ServerCog size={35} /><h2>添加第一个应用服务</h2><p>选择主机和启动方式，登记服务后即可启动并查看状态。</p><button className="secondary-button" disabled={!write} onClick={() => setForm('new')}><Plus size={15} />登记服务</button></div>}
     {!!state?.instances.length && !filtered.length && <p className="jar-help">没有匹配的服务。</p>}
-    <ResultPager label="服务列表分页" page={page} pages={pages} onPage={next => { setPage(next); if (rows.current) rows.current.scrollTop = 0; }} />
-    {!!filtered.length && <div className="jar-table-scroll" ref={rows}><table className="jar-table" aria-label="应用服务"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{pageGroups.filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
+    <ResultPager label="服务列表分页" page={page} pages={pages} onPage={next => {
+      setPage(next);
+      summary.current?.scrollIntoView({ block: 'nearest' });
+    }} />
+    {!!filtered.length && <div className="jar-table-scroll"><table className="jar-table" aria-label="应用服务"><thead><tr><th>应用 / 文件</th><th>健康与运行</th><th>运行时间 / PID</th><th>内存 / CPU</th><th>操作</th></tr></thead>{pageGroups.filter(group => group.items.length).map(group => <tbody key={group.id}><tr className="jar-host-group"><th colSpan={5} scope="rowgroup">{group.id ? <RelatedLink page="lan-hosts" id={group.id}>{hostRole(group)}</RelatedLink> : hostRole(group)}<small> · {hostAccessLabel(group)}</small></th></tr>{group.items.map(item => {
       const write = canEdit(item), control = canControl(item);
       const status = statusById.get(item.id), running = status?.state === 'running', stopped = status && ['stopped', 'exited'].includes(status.state), supervised = status?.supervision?.active;
       const hostName = targetGroup(state?.groups, item.hostId)?.name || (remoteAccess() ? '共享主机' : '本机');

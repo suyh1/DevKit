@@ -60,7 +60,7 @@ function TableView({ node, query }: { node: JsonNode; query: string }) {
   }
   return <div className="json-table-result">
     <p className="preview-note">共 {node.children.length} 行{query && ' · 匹配 ' + matches.length + ' 行'} · 每页最多 30 列 · 数字保持原始精度</p>
-    {notice ? <p className="preview-note">{notice}</p> : <div className="table-preview analysis-table-scroll">
+    {notice ? <p className="preview-note">{notice}</p> : <div className="table-preview analysis-table-scroll" key={current}>
       <table><thead><tr><th scope="col">#</th>{keys.map(key => <th scope="col" key={key}>{key}</th>)}</tr></thead>
         <tbody>{rows.map(({ key: index, node: row }) => <tr key={index}>
           <td>{Number(index) + 1}</td>{keys.map(key => <td key={key}>{row.children.find(child => child.key === key)?.node.raw ?? '—'}</td>)}

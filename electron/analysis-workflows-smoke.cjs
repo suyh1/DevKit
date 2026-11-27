@@ -52,6 +52,10 @@ module.exports = async function analysisWorkflows(window) {
   await js(find('.run-button') + '.click()');
   const nextPage = find('.analysis-data [aria-label=下一页]');
   await wait('表格分页', nextPage + ' && !' + nextPage + '.disabled');
+  assert.ok(await js(`(() => {
+    const preview = ${find('.result-preview')}, table = preview.querySelector('.analysis-table-scroll');
+    return preview.scrollHeight <= preview.clientHeight + 1 && table.scrollHeight > table.clientHeight;
+  })()`), 'Only the table scrolls inside a standalone results pane');
   await js(nextPage + '.click()');
   const inline = find('.analysis-row-toggle[aria-expanded]'), long = find('.analysis-row-toggle[aria-haspopup=dialog]');
   const size = window.getSize(), minimum = window.getMinimumSize();

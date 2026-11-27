@@ -34,7 +34,10 @@ export default function LanDiscovery({ close, onChoose }: { close: () => void; o
     catch (failure) { const message = (failure as Error).message; setError(/abort/i.test(message) ? '扫描已取消。' : message); }
     finally { activeScan.current = ''; setBusy(false); }
   }
-  return <Modal title="发现局域网主机" icon={<Radar size={18} />} closeLabel="关闭主机扫描" close={close} busy={busy}>
+  const actions = <footer>{busy ? <button className="secondary-button" onClick={() => void lanRequest('scan-cancel', { id: activeScan.current }).catch(error => setError(error.message))}>取消扫描</button> : <ModalCancel />}
+      <button type="submit" form="lan-scan-form" className="run-button" disabled={busy || !selected}>{busy ? '扫描中…' : '扫描网段'}</button>
+    </footer>;
+  return <Modal title="发现局域网主机" icon={<Radar size={18} />} closeLabel="关闭主机扫描" close={close} footer={actions}>
     <form id="lan-scan-form" className="lan-scan-fields" onSubmit={event => { event.preventDefault(); void scan(); }}>
       <label className="lan-field"><span>网卡</span><select value={selected} disabled={busy || !interfaces.length} onChange={event => {
         const network = interfaces.find(item => networkId(item) === event.target.value)!;
@@ -51,8 +54,5 @@ export default function LanDiscovery({ close, onChoose }: { close: () => void; o
         {onChoose && <button className="secondary-button" onClick={() => onChoose({ address: device.address, name: device.name || '', port, mac: device.mac })}><Plus size={14} />添加</button>}
       </li>)}</ul></>}
     {error && <p className="pc-error" role="alert">{error}</p>}
-    <footer>{busy ? <button className="secondary-button" onClick={() => void lanRequest('scan-cancel', { id: activeScan.current }).catch(error => setError(error.message))}>取消扫描</button> : <ModalCancel />}
-      <button type="submit" form="lan-scan-form" className="run-button" disabled={busy || !selected}>{busy ? '扫描中…' : '扫描网段'}</button>
-    </footer>
   </Modal>;
 }

@@ -169,8 +169,16 @@
   min-height: 0;
   overflow: auto;
 }
+.pc-modal-slot:has(> .http-collection) {
+  display: flex;
+  flex-direction: column;
+}
 .pc-dialog .http-collection {
+  min-height: 0;
   max-height: min(70dvh, 600px);
+}
+@media (max-height: 520px) {
+  .pc-dialog .http-collection { max-height: none; flex: none; }
 }
 .http-collection-toggle {
   display: none;

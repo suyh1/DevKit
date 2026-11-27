@@ -45,6 +45,9 @@
 .portal-content { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:12px 2px 24px; scrollbar-gutter:stable; scroll-padding-top:calc(var(--ng-dock-height,0px) + 12px); }
 .portal-content[data-page=nginx] { overflow-anchor:none; }
 .portal-page { min-width:0; }
+.portal-content[data-page=logs] { display:flex; flex-direction:column; }
+.portal-content[data-page=logs] > :not(.portal-page) { flex:none; }
+.portal-content[data-page=logs] > .portal-page:not([hidden]) { flex:1; min-height:0; }
 .portal-access { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 16px; margin:0 0 14px; color:var(--muted); font-size:12px; line-height:1.7; }
 .portal-notice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--tint); font-size:13px; line-height:1.6; }
 .portal-empty { padding:40px 20px; text-align:center; }

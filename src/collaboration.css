@@ -760,10 +760,6 @@
   gap: 10px;
   min-width: 0;
 }
-.board-index {
-  max-height: 320px;
-  overflow: auto;
-}
 .board-create {
   grid-template-columns: 1fr 1fr;
 }
@@ -989,8 +985,6 @@
     display: none;
   }
   .collab-page .collab-rail {
-    max-height: 250px;
-    overflow: auto;
     background: var(--soft);
     border-radius: 8px;
     padding: 12px;

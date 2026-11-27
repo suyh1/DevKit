@@ -109,6 +109,12 @@ module.exports = async (window, output) => {
     for (const width of [1440, 768, 390]) {
       remote.setContentSize(width, 900); await delay(250);
       assert.equal(await remote.webContents.executeJavaScript(`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.log-center').scrollWidth<=document.querySelector('.log-center').clientWidth`), true, 'Log layout fits ' + width);
+      if (width === 1440) {
+        assert.ok(await remote.webContents.executeJavaScript(`(() => {
+          const pane = document.querySelector('.portal-content'), output = pane.querySelector('.log-panels');
+          return pane.scrollHeight <= pane.clientHeight + 1 && output.scrollHeight <= output.clientHeight + 1;
+        })()`), 'The shared log view keeps scrolling inside its source list and individual streams');
+      }
       if (width <= 780) {
         await remote.webContents.executeJavaScript(`document.querySelector('[aria-label="打开共享导航"]').click()`, true); await wait(remote.webContents, `!!document.querySelector('.portal-drawer[open]')`);
         assert.equal(await remote.webContents.executeJavaScript(`document.querySelectorAll('.portal-drawer .portal-navigation button').length`), 7);

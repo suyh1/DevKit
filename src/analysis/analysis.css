@@ -62,7 +62,19 @@
 }
 .analysis-table-search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 .analysis-table-search input:focus { outline: none; }
-.analysis-table-scroll { overflow: auto; max-height: 55vh; border: 1px solid var(--line); border-radius: 8px; }
+.analysis-table-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+/* Standalone result tables share the available pane with their controls. */
+.result-preview > .analysis-data,
+.result-preview > .structured-preview:has(> .json-table-result),
+.result-preview > .structured-preview > .json-table-result {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+.result-preview :is(.analysis-data, .structured-preview, .json-table-result) > :is(.analysis-table-tools, .analysis-pagination, .preview-toolbar, .preview-note) {
+  flex: none;
+}
 .analysis-data table { border-spacing: 0; border-collapse: separate; }
 .analysis-data :is(thead, tbody) :is(td, th) { padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .analysis-data tbody tr:last-child td { border-bottom: 0; }
@@ -88,9 +100,11 @@
   align-content: start;
 }
 .analysis-file pre,
-.data-table dd pre {
+.analysis-row-detail dd pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.analysis-file pre {
   max-height: 22rem;
   overflow: auto;
 }
@@ -144,10 +158,6 @@
 @container upgrade (min-width: 33rem) and (max-width: 49rem) {
   .upgrade-documents > :last-child:nth-child(3) { grid-column: 1 / -1; }
 }
-.analysis-bars {
-  max-height: 18rem;
-  overflow: auto;
-}
 .analysis-bars > div {
   display: grid;
   grid-template-columns: minmax(8rem, 25%) 1fr;
@@ -168,8 +178,7 @@
 }
 .analysis-plan,
 .analysis-calendar {
-  max-height: 24rem;
-  overflow: auto;
+  overflow-x: auto;
 }
 .analysis-plan > div {
   border-inline-start: 2px solid var(--line);

@@ -17,7 +17,15 @@ export default function LanHostImport({ close, onImport }: { close: () => void; 
     try { await action(); } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
-  return <Modal title="导入主机连接" icon={<Upload size={18} />} closeLabel="关闭主机导入" close={close} busy={busy}>
+  const actions = <footer><ModalCancel />{rows ? <button className="run-button" disabled={busy || !selected.length} onClick={() => void run(async () => {
+      onImport(await lanRequest<LanHost[]>('import-connections', drafts.filter((_, index) => selected.includes(index))));
+    })}>导入选中的 {selected.length} 条</button> : <button className="run-button" disabled={busy || !source.trim()} onClick={() => void run(async () => {
+      const parsed = format === 'csv' ? parseHostCsv(source) : parseSshHosts(source);
+      if (!parsed.length) throw new Error('没有可导入的连接。');
+      const preview = await lanRequest<HostImportRow[]>('import-preview', parsed);
+      setDrafts(parsed); setRows(preview); setSelected(preview.filter(row => !row.error).map(row => row.index));
+    })}>预览导入</button>}</footer>;
+  return <Modal title="导入主机连接" icon={<Upload size={18} />} closeLabel="关闭主机导入" close={close} busy={busy} footer={actions}>
     <div className="lan-import-fields">
       <label className="lan-field"><span>文件格式</span><select value={format} disabled={busy} onChange={event => { setFormat(event.target.value); change(''); }}>
         <option value="csv">CSV</option><option value="ssh">OpenSSH config</option>
@@ -36,13 +44,5 @@ export default function LanHostImport({ close, onImport }: { close: () => void; 
       <strong>{row.host?.name || `第 ${row.index + 1} 条`}</strong><span>{row.host?.address} {row.error}</span></label>
     </li>)}</ul>}
     {error && <p className="pc-error" role="alert">{error}</p>}
-    <footer><ModalCancel />{rows ? <button className="run-button" disabled={busy || !selected.length} onClick={() => void run(async () => {
-      onImport(await lanRequest<LanHost[]>('import-connections', drafts.filter((_, index) => selected.includes(index))));
-    })}>导入选中的 {selected.length} 条</button> : <button className="run-button" disabled={busy || !source.trim()} onClick={() => void run(async () => {
-      const parsed = format === 'csv' ? parseHostCsv(source) : parseSshHosts(source);
-      if (!parsed.length) throw new Error('没有可导入的连接。');
-      const preview = await lanRequest<HostImportRow[]>('import-preview', parsed);
-      setDrafts(parsed); setRows(preview); setSelected(preview.filter(row => !row.error).map(row => row.index));
-    })}>预览导入</button>}</footer>
   </Modal>;
 }
