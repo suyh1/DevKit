@@ -401,7 +401,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
         <td><span>{bytes(status?.memory)}</span><small>CPU {status?.cpu === undefined ? '—' : `${status.cpu.toFixed(1)}%`}</small></td>
         <td><div className="jar-row-actions">
           <button className="text-button" disabled={busy || !control || !stopped || status.fileMissing} onClick={() => void command(item, 'start')}><Play size={14} />启动</button>
-          <button className="text-button" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
+          <button className="text-button" disabled={busy || !control || (!running && !supervised && !status?.canStopGroup)} onClick={() => void command(item, 'stop')}><Square size={14} />停止</button>
           {item.kind !== 'npm' && (item.hostId ? group.fileReplacement : state?.fileReplacement) && <button className="text-button" disabled={busy || !write || !control} onClick={() => setReplacement(item)}><Upload size={14} />替换服务文件</button>}
           {readLogs && <button className="text-button" disabled={busy} data-service-output={item.id} aria-haspopup="dialog" onClick={() => openViewer(item.id)}><FileText size={14} />{item.logMode === 'console' ? '控制台' : '日志'}</button>}
           {item.logMode !== 'silent' && <button className="text-button" onClick={() => guard('logs', 'jar') && openWorkspaceLink('logs', `instance:${item.id}`)}>日志中心</button>}
@@ -409,7 +409,7 @@ export default function JarCenter({ active, seed, consumeSeed }: { active: boole
           {!write && control && (!item.kind || item.kind === 'jar') && <JavaProbe key={item.executable} hostId={item.hostId || ''} executable={item.executable} disabled={busy} />}
           {status?.supervision?.lastError && <p className="jar-error">{status.supervision.lastError}</p>}{status?.supervision?.logError && <p className="jar-error">日志写入失败：{status.supervision.logError}</p>}
           <button className="text-button" disabled={busy || !control || !running || item.health.type === 'none'} onClick={() => void task(async () => { await jarRequest('health-check', { id: item.id }); await refresh(); })}>立即检查健康</button>
-          <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised)} onClick={() => void command(item, 'force-stop')}>强制终止</button>
+          <button className="text-button jar-danger" disabled={busy || !control || (!running && !supervised && !status?.canStopGroup)} onClick={() => void command(item, 'force-stop')}>强制终止</button>
           <RelatedLink page="knowledge" id={`related:jar:${item.id}`}>关联手册</RelatedLink>
           <ResourceLink page="jar" id={item.id} />
         </FloatingDetails></td>

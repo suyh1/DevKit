@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, copyFile, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
+import { chmod, copyFile, mkdtemp, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { once } from 'node:events';
+import { execFileSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -9,6 +10,7 @@ import { createJarManager } from './jar-manager.mjs';
 import { createLogCenter } from './log-center.mjs';
 import { createMonitorManager } from './monitor-manager.mjs';
 import { managedRequest } from './managed-workspace.mjs';
+import { inspectJava } from './jar-process.mjs';
 import { launchSpec } from './backend-launch.mjs';
 import { discoverRuntimes } from './runtime-discovery.mjs';
 
@@ -206,5 +208,88 @@ test('npm lifecycle, executable and simultaneous service trees survive reconnect
   } finally {
     try { for (const id of ids) await command(id, 'force-stop'); }
     finally { await manager.close(); await rm(root, { recursive: true, force: true, maxRetries: 4 }); }
+  }
+});
+
+test('Linux upgrade can reopen and stop services launched by the unlinked runtime', { skip: process.platform !== 'linux' }, async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-upgrade-')));
+  // This suffix is also legal in an actual executable name.
+  const binary = path.join(root, 'DevKit (deleted)');
+  let manager, launcher, worker, id;
+  try {
+    await copyFile(process.execPath, binary);
+    manager = await createJarManager(root, {
+      launchDetached: async (_executable, args, options) => {
+        worker = spawn(binary, args, { ...options, detached: true, stdio: 'ignore' });
+        await once(worker, 'spawn');
+        return () => worker.exitCode !== null || worker.signalCode !== null;
+      },
+    });
+    const state = await manager.request('upsert', { revision: 0, instance: {
+      name: 'update test', kind: 'program', program: process.execPath, workDir: root,
+      appArgs: ['-e', 'setInterval(() => {}, 1000)'], logMode: 'silent',
+    } });
+    id = state.instances[0].id;
+    const started = await manager.request('command', { id, command: 'start' });
+    launcher = started.status.pid;
+    assert.equal((await inspectJava(launcher)).executable, binary);
+    assert.equal((await inspectJava(launcher)).executableDeleted, false);
+    await manager.close(); manager = undefined;
+    await copyFile('/bin/true', binary + '.new');
+    await rename(binary + '.new', binary);
+    manager = await createJarManager(root);
+    const [status] = await manager.request('statuses');
+    assert.equal(status.state, 'running', status.detail);
+    assert.match(status.detail, /更新或移除/);
+    assert.equal(status.pid, launcher);
+    await assert.rejects(manager.request('command', { id, command: 'start' }), /已在运行/);
+    const stopped = await manager.request('command', { id, command: 'stop' });
+    assert.equal(stopped.status.state, 'stopped');
+    assert.equal(await inspectJava(started.status.businessPid), null);
+    assert.equal(await inspectJava(launcher), null);
+  } finally {
+    if (launcher && (await inspectJava(launcher))?.executable === binary) process.kill(launcher, 'SIGUSR2');
+    if (worker && worker.exitCode === null && worker.signalCode === null) worker.kill();
+    await manager?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Linux verifies a surviving business group and can force-stop it after its leader exits', { skip: process.platform !== 'linux' }, async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'devkit-orphan-')));
+  const dependencies = { supervised: false };
+  let manager = await createJarManager(root, dependencies), group;
+  try {
+    // The entry exits on TERM while its child delays shutdown indefinitely.
+    await writeFile(path.join(root, 'child.cjs'), "process.on('SIGTERM', () => {}); require('fs').writeFileSync('ready', String(process.pid)); setInterval(() => {}, 1000)");
+    const item = (await manager.request('upsert', { revision: 0, instance: {
+      name: 'test', kind: 'program', program: process.execPath, workDir: root, stopTimeout: 1, logMode: 'silent',
+      appArgs: ['-e', "require('child_process').spawn(process.execPath, ['child.cjs'], {stdio:'ignore'})"],
+    } })).instances[0];
+    const command = command => manager.request('command', { id: item.id, command });
+    const { status } = await command('start');
+    group = status.businessPid;
+    const child = Number(await readFile(path.join(root, 'ready'), 'utf8'));
+    process.kill(status.pid, 'SIGKILL');
+    for (let n = 0; n < 50 && await inspectJava(status.pid); n++) await delay(20);
+    const identityFile = status.identityPath, identity = JSON.parse(await readFile(identityFile));
+    await writeFile(identityFile, JSON.stringify({ ...identity, serviceId: 'different-service' }));
+    assert.equal((await manager.request('statuses'))[0].canStopGroup, undefined);
+    await assert.rejects(command('force-stop'));
+    await writeFile(identityFile, JSON.stringify(identity));
+    const [orphan] = await manager.request('statuses');
+    assert.equal(orphan.canStopGroup, true);
+    await assert.rejects(command('start'), /已核实业务进程组/);
+    await assert.rejects(command('stop'), /仍未退出/);
+    assert.equal(await inspectJava(group), null);
+    assert.ok(await inspectJava(child));
+    await manager.close(); manager = await createJarManager(root, dependencies);
+    assert.equal((await manager.request('statuses'))[0].canStopGroup, true);
+    assert.equal((await command('force-stop')).status.state, 'stopped');
+    assert.equal(await inspectJava(child), null);
+    group = undefined;
+  } finally {
+    if (group) { try { process.kill(-group, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
+    await manager.close(); await rm(root, { recursive: true, force: true });
   }
 });

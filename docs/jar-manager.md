@@ -113,6 +113,41 @@ console 启动成功后自动展开面板，也可以从列表“控制台”重
 
 “运行中”只说明进程存活，不代表端口已监听或业务健康。启动后会短暂观察，发现立即退出会报错；更慢的初始化失败由后续刷新和日志定位。
 
+<a id="linux-update-recovery"></a>
+
+### Linux 更新后本机服务显示“待核实”
+
+托盘退出会关闭管理界面，各服务的独立守护进程继续运行。覆盖安装时，Linux 可能给仍在运行的旧程序路径加上 ` (deleted)`。旧版可能将其误判为启动进程已经退出，同时发现 npm 或脚本业务进程仍存在。其他主机各自运行守护进程，本机安装包更新只替换本机文件。
+
+在含修复的版本中，点击“服务管理 → 刷新”。程序会按原 PID、创建标识、可执行路径和启动参数重新核对。显示“运行中”后，可以直接停止，超时可从“更多操作与运行详情”选择强制终止。
+
+**旧版 Debian 安装可先尝试在线恢复。** 在一项受影响服务的“更多操作与运行详情”复制 PID 文件完整路径，用当前桌面账号运行：
+
+```bash
+pid=$(cat -- "/实际路径/服务.pid")
+ps -ww -p "$pid" -o pid=,user=,args=
+readlink "/proc/$pid/exe"
+```
+
+如果进程属于该服务（npm、脚本或程序的启动命令含 `backend-job.mjs` 与实例 ID），且最后一行恰好为 `/opt/devkit/devkit (deleted)`，可请有权限的用户运行下方命令。它在安装目录创建一个临时符号链接，使旧版能够解析仍在运行的启动程序路径。
+
+```bash
+sudo ln -sT -- /opt/devkit/devkit '/opt/devkit/devkit (deleted)'
+```
+
+回到服务列表点“刷新”。使用同一路径的服务只需创建一次。旧服务重新启动或本机重启后，先用 `readlink '/opt/devkit/devkit (deleted)'` 确认指向 `/opt/devkit/devkit`，再用 `sudo unlink '/opt/devkit/devkit (deleted)'` 清理自己创建的链接。若进程已消失、路径不同或该名字已被占用，请保留原文件继续核对。
+
+也可以在本机使用修复源码里的恢复工具（Node.js 24+，Debian 安装也可用内置运行时，将下方命令中的 `node` 换成 `ELECTRON_RUN_AS_NODE=1 /opt/devkit/devkit`）。先从托盘退出 DevKit，以同一桌面用户执行：
+
+```bash
+node scripts/recover-linux-service.mjs
+node scripts/recover-linux-service.mjs --stop 'element-plus-docs'
+```
+
+第一条列出本机登记的服务，第二条按名称停止一个服务，也可填写列表中的 ID。同名服务需使用 ID。默认读取 Debian 安装目录 `/opt/devkit/configs`，自定义安装可追加 `--configs "/实际配置目录"`。结束后重新打开 DevKit 即可。
+
+如果启动进程确实消失，状态详情会显示业务进程组的核对结果。显示“已核实业务进程组”时可直接点“停止”，或使用恢复工具的 `--stop`。超时后，核对服务允许中断，再点“强制终止”或使用 `--force-stop`。如果身份仍无法核实，请在目标主机按提示的业务 PID 核对工作目录、启动命令和进程树，通过该服务自带的停止方式关闭后刷新。保留 PID 和身份文件供核对。
+
 Linux 从 `/proc` 读取进程身份与资源数据，使用 `getconf CLK_TCK` 换算 CPU 时间与运行时长。停止先发送 `SIGTERM`，等待设置的 1–120 秒；超时保留进程和 PID，不自动升级为强杀。重启只在确认停止后启动。强制终止使用 `SIGKILL`。
 
 Windows 使用系统自带 Windows PowerShell / CIM 查询进程，按 UTF-8 输出以支持中文路径。停止使用 `Stop-Process`，强制终止使用其 `-Force`，操作内再次核对进程创建时间。Windows 终止进程无法保证 Java shutdown hook 执行，界面会明确提示；需要业务级优雅关闭的应用应额外接入应用自己的关闭接口或服务机制。

@@ -9,6 +9,7 @@ import { normalizePolicies, effectiveEnvironment, probeHealth } from './jar-poli
 import { supervisorPath, supervisorRequest, launchSupervisor } from './jar-supervisor-client.mjs';
 import { createJarAutostart } from './jar-autostart.mjs';
 import { discoverRuntimes } from './runtime-discovery.mjs';
+import { groupMembers, hasGroupWitness, launchedThisBoot } from './backend-group.mjs';
 import { jarConfigs } from './jar-configs.mjs';
 import { createReplacements, replacementActions } from './jar-replacement.mjs';
 
@@ -154,21 +155,29 @@ export async function createJarManager(directory, dependencies = {}) {
       try { fileInfo = await stat(serviceEntry(item)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
       base.size = fileInfo?.size; base.fileMissing = !fileInfo?.isFile();
       const raw = await optional(paths.pidPath), identity = await optional(paths.identityPath, true);
-      if (raw === null) {
-        if (identity?.pid && !identity.stopped) {
-          const info = await runtime.inspect(identity.pid);
-          if (info) return { ...base, state: 'unknown', pid: identity.pid, detail: 'PID 文件丢失，但记录的进程仍存在；请核对文件后再操作。' };
+      if (raw !== null && (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) <= 1))
+        return { ...base, state: 'unknown', detail: 'PID 文件无效，拒绝运行操作。' };
+      const pid = raw === null ? identity?.pid : Number(raw);
+      const info = pid && await runtime.inspect(pid);
+      if (raw === null && info && !identity.stopped)
+        return { ...base, state: 'unknown', pid, detail: 'PID 文件丢失，但记录的进程仍存在；请核对文件后再操作。' };
+      if (!info && identity?.business && !identity.stopped) {
+        const businessPid = identity.business.pid, live = await runtime.inspect(businessPid);
+        if (raw !== null && process.platform === 'linux' && !isJar(item) && identity.pid === pid &&
+            identity.serviceId === item.id && identity.kind === item.kind && /^\d+$/.test(identity.business.created) &&
+            (!live || live.created === identity.business.created || identity.stopWitnesses)) {
+          const members = await groupMembers(businessPid);
+          if (hasGroupWitness(identity, members) && await launchedThisBoot(identity))
+            return { ...base, state: 'unknown', pid, businessPid, canStopGroup: true, detail: `启动进程已退出，已核实业务进程组 ${businessPid}。点击“停止”结束该组后即可重新启动。` };
+          if (members.length)
+            return { ...base, state: 'unknown', pid, businessPid, detail: `业务进程组 ${businessPid} 仍有成员，当前身份无法核实，请在目标主机检查进程树。` };
         }
-        return { ...base, state: identity && !identity.stopped ? 'exited' : 'stopped', detail: identity && !identity.stopped ? '进程已退出；请查看日志排查。' : '未运行' };
+        if (live && (live.unknown || live.created === identity.business.created))
+          return { ...base, state: 'unknown', pid, businessPid, detail: `启动进程已退出。请在目标主机核对业务进程 PID ${businessPid} 的工作目录与进程树，通过该服务的停止方式结束后刷新。` };
       }
-      if (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) <= 1) return { ...base, state: 'unknown', detail: 'PID 文件无效，拒绝运行操作。' };
-      const pid = Number(raw), info = await runtime.inspect(pid);
+      if (raw === null)
+        return { ...base, state: identity && !identity.stopped ? 'exited' : 'stopped', detail: identity && !identity.stopped ? '进程已退出；请查看日志排查。' : '未运行' };
       if (!info) {
-        if (identity?.business) {
-          const live = await runtime.inspect(identity.business.pid);
-          if (live && (live.unknown || live.created === identity.business.created))
-            return { ...base, state: 'unknown', detail: '启动进程已退出，业务进程仍存在。请核实后再启动。' };
-        }
         const exit = children.get(item.id)?.exit();
         return { ...base, state: identity?.stopped ? 'stopped' : 'exited', pid, exitCode: exit?.code, detail: `PID 对应的进程已退出${exit ? `（退出码 ${exit.code ?? exit.signal}）` : ''}；PID 文件已失效。` };
       }
@@ -179,7 +188,7 @@ export async function createJarManager(directory, dependencies = {}) {
       let cpu;
       if (previous && previous.created === sample.created && now > previous.at && Number.isFinite(sample.cpuSeconds)) cpu = Math.max(0, (sample.cpuSeconds - previous.seconds) / ((now - previous.at) / 1000) * 100);
       samples.set(item.id, { at: now, created: sample.created, seconds: sample.cpuSeconds });
-      return { ...base, state: 'running', pid, uptime: info.uptime, memory: sample.memory, cpu, businessPid: sample.pid, executable: sample.executable, startedAt: identity.startedAt, detail: '服务进程身份已确认；业务是否就绪请检查应用日志。' };
+      return { ...base, state: 'running', pid, uptime: info.uptime, memory: sample.memory, cpu, businessPid: sample.pid, executable: sample.executable, startedAt: identity.startedAt, detail: info.executableDeleted ? '运行程序文件已被更新或移除，原进程身份已确认，可正常停止。' : '服务进程身份已确认；业务是否就绪请检查应用日志。' };
     } catch (error) { return { ...base, state: 'unknown', detail: message(error) }; }
   }
   async function log(item) {
@@ -257,20 +266,49 @@ export async function createJarManager(directory, dependencies = {}) {
   }
   async function stop(item, force) {
     if (runtime.supervised) {
-      const supervised = await supervisorRequest(item, force ? 'force-stop' : 'stop', 150000);
-      if (supervised) return { status: await status(item), output: supervised.output };
+      const command = force ? 'force-stop' : 'stop';
+      let supervised;
+      try {
+        supervised = await supervisorRequest(item, command, 150000);
+      } catch (error) {
+        // Workers started before the Linux update fix already cancel retries on stop,
+        // but may then reject the still-running launcher because its inode is unlinked.
+        if (error.message !== '启动进程已退出，业务进程仍存在。请核实后再启动。') throw error;
+        const worker = await supervisorRequest(item);
+        if (worker?.supervision?.state !== 'blocked' || worker.supervision.lastError !== error.message) throw error;
+        await stopProcess(item, force, true);
+        supervised = await supervisorRequest(item, command, 150000);
+      }
+      if (supervised) {
+        const current = await status(item);
+        if (current.canStopGroup) return stopGroup(item, current, force);
+        if (current.state === 'running') return stopProcess(item, force, true);
+        if (current.state === 'unknown') throw new Error(current.detail);
+        return { status: current, output: supervised.output };
+      }
     }
+    return stopProcess(item, force);
+  }
+  async function stopProcess(item, force, requireDeletedExecutable = false) {
     const current = await status(item);
     if (['stopped', 'exited'].includes(current.state)) return { status: current, output: '进程已停止。' };
+    if (current.canStopGroup) return stopGroup(item, current, force);
     if (current.state !== 'running') throw new Error(current.detail);
     const paths = jarPaths(item), identity = await optional(paths.identityPath, true);
     const info = await runtime.inspect(current.pid);
     if (!matchesService(item, info, identity)) throw new Error('操作前进程身份已变化，已取消。');
+    if (requireDeletedExecutable && !info.executableDeleted) throw new Error('运行进程已变化，请刷新状态后重试。');
     await runtime.signal(current.pid, force, identity.created, !isJar(item));
     const deadline = Date.now() + item.stopTimeout * 1000;
     for (let attempt = 0; attempt < item.stopTimeout * 4 && Date.now() < deadline; attempt++) {
       const live = await runtime.inspect(current.pid);
       if (!live || (!live.unknown && live.created !== identity.created)) {
+        // A launcher may crash during a requested stop, leaving its group alive.
+        if (process.platform === 'linux' && identity.business && (await groupMembers(identity.business.pid)).length) {
+          const remaining = await status(item);
+          if (remaining.canStopGroup) return stopGroup(item, remaining, force);
+          throw new Error('业务进程组仍有成员，请核对目标主机后刷新。');
+        }
         identity.stopped = true; identity.stoppedAt = new Date().toISOString(); await atomic(paths.identityPath, identity);
         if (await optional(paths.pidPath) === String(current.pid)) await unlink(paths.pidPath);
         samples.delete(item.id);
@@ -279,6 +317,32 @@ export async function createJarManager(directory, dependencies = {}) {
       if (!matchesService(item, live, identity)) throw new Error('等待停止时进程身份无法核实，保留 PID 文件。');
       await runtime.delay(250);
     }
+    throw new Error(`等待 ${item.stopTimeout} 秒仍未退出；可核对日志后选择“强制终止”。`);
+  }
+  async function stopGroup(item, current, force) {
+    const paths = jarPaths(item), identity = await optional(paths.identityPath, true);
+    const group = current.businessPid;
+    if (identity?.serviceId !== item.id || identity.kind !== item.kind || identity.stopped || identity.pid !== current.pid ||
+        identity.business?.pid !== group || await optional(paths.pidPath) !== String(current.pid) || await runtime.inspect(current.pid))
+      throw new Error('启动记录已变化，请刷新状态。');
+    const members = await groupMembers(group);
+    if (!hasGroupWitness(identity, members) || !await launchedThisBoot(identity)) throw new Error('业务进程组身份已变化，请刷新状态。');
+    // Keep witnesses across a timeout or desktop restart when npm exits before its children.
+    identity.stopWitnesses = members.slice(0, 256);
+    await atomic(paths.identityPath, identity);
+    if (!hasGroupWitness(identity, await groupMembers(group))) throw new Error('业务进程组身份已变化，请刷新状态。');
+    process.kill(-group, force ? 'SIGKILL' : 'SIGTERM');
+    const deadline = Date.now() + item.stopTimeout * 1000;
+    do {
+      if (!(await groupMembers(group)).length) {
+        identity.stopped = true; identity.stoppedAt = new Date().toISOString(); delete identity.stopWitnesses;
+        await atomic(paths.identityPath, identity);
+        if (await optional(paths.pidPath) === String(identity.pid)) await unlink(paths.pidPath);
+        samples.delete(item.id);
+        return { status: await status(item), output: '业务进程组已停止。' };
+      }
+      await runtime.delay(250);
+    } while (Date.now() < deadline);
     throw new Error(`等待 ${item.stopTimeout} 秒仍未退出；可核对日志后选择“强制终止”。`);
   }
   const sessionKey = value => createHash('sha256').update(value || 'desktop').digest('hex');

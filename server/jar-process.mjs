@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, realpath, stat, access } from 'node:fs/promises';
+import { readFile, readlink, realpath, stat, access } from 'node:fs/promises';
 import path from 'node:path';
 
 const execute = promisify(execFile);
@@ -70,12 +70,18 @@ export async function inspectJava(pid) {
   try {
     process.kill(pid, 0);
     if (process.platform === 'linux') {
-      const [executable, cmd, raw, status, uptime] = await Promise.all([realpath(`/proc/${pid}/exe`), readFile(`/proc/${pid}/cmdline`, 'utf8'), readFile(`/proc/${pid}/stat`, 'utf8'), readFile(`/proc/${pid}/status`, 'utf8'), readFile('/proc/uptime', 'utf8')]);
+      const exeLink = `/proc/${pid}/exe`;
+      const [target, cmd, raw, status, uptime] = await Promise.all([readlink(exeLink), readFile(`/proc/${pid}/cmdline`, 'utf8'), readFile(`/proc/${pid}/stat`, 'utf8'), readFile(`/proc/${pid}/status`, 'utf8'), readFile('/proc/uptime', 'utf8')]);
       const fields = raw.slice(raw.lastIndexOf(')') + 2).trim().split(/\s+/);
       if (['Z', 'X'].includes(fields[0])) return null;
+      // Linux keeps the old inode executable after a package upgrade unlinks it.
+      // A real filename can also end in " (deleted)". Preserve it when still linked.
+      const marker = ' (deleted)';
+      const executableDeleted = target.endsWith(marker) && (await stat(exeLink)).nlink === 0;
+      const executable = executableDeleted ? target.slice(0, -marker.length) : target;
       // Linux exports start time in clock ticks; getconf provides the platform rate.
       const ticks = await clockTicks();
-      return { pid, executable, args: cmd.split('\0').slice(0, -1), created: fields[19], uptime: Math.max(0, Number(uptime.split(' ')[0]) - Number(fields[19]) / ticks), memory: Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] || 0) * 1024, cpuSeconds: (Number(fields[11]) + Number(fields[12])) / ticks };
+      return { pid, executable, executableDeleted, args: cmd.split('\0').slice(0, -1), created: fields[19], uptime: Math.max(0, Number(uptime.split(' ')[0]) - Number(fields[19]) / ticks), memory: Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] || 0) * 1024, cpuSeconds: (Number(fields[11]) + Number(fields[12])) / ticks };
     }
     if (process.platform === 'win32') {
       const { stdout } = await ps(`$ErrorActionPreference='Stop'; $p=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if($p){@{pid=[int]$p.ProcessId;executable=$p.ExecutablePath;command=$p.CommandLine;created=$p.CreationDate.ToUniversalTime().Ticks.ToString();uptime=([DateTime]::UtcNow-$p.CreationDate.ToUniversalTime()).TotalSeconds;memory=[double]$p.WorkingSetSize;cpuSeconds=([double]$p.KernelModeTime+[double]$p.UserModeTime)/10000000}|ConvertTo-Json -Compress}`);
