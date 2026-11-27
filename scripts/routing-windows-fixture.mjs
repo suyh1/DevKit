@@ -4,6 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { block, discoverGateway, overlaps } from '../server/relay-gateway.mjs';
+import { gatewayOperation } from '../server/relay-gateway-operations.mjs';
 import { gatewayFiles } from '../server/relay-gateway-config.mjs';
 import { discoverRouting } from '../server/relay-routing-discovery.mjs';
 import { applyRouting, routingManagementSession } from '../server/relay-routing-apply.mjs';
@@ -19,6 +20,16 @@ const localLink = inventory.links.find(link => link.address === config.local);
 assert.ok(localLink && inventory.networks.includes(localLink.network));
 const site = '198.51.100.0/28';
 const files = gatewayFiles({ a:config.gateway, links:[{ address:config.gateway, network:localLink.network }], networks:[localLink.network,site], mode:'direct' });
+const managedRoute = { kind:'route', cidr:'198.51.100.64/28', source:config.local, via:config.gateway, metric:17341 };
+const managed = action => host.run(gatewayOperation('win32',managedRoute,action));
+assert.equal(await managed('state'),'missing');
+try {
+  await managed('add');
+  assert.equal(await managed('owned'),'present');
+} finally {
+  if (await managed('owned') === 'present') await managed('undo');
+}
+assert.equal(await managed('state'),'missing');
 const script = files['via-' + config.gateway + '/routes.ps1'];
 const routeCheck = `@(Get-NetRoute -PolicyStore PersistentStore | Where-Object DestinationPrefix -eq '${site}').Count`;
 assert.equal(await host.run(routeCheck),'0');

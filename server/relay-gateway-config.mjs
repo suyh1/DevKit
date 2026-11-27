@@ -211,7 +211,7 @@ export function gatewayFiles(input) {
     const port = input.port ?? 51820;
     if (!Number.isInteger(port) || port < 1 || port > 65535) fail(400, 'A 的 UDP 端口无效。');
     const local = ['B','C'].map(role => gatewayNetworks(input.local?.[role] ?? []));
-    const base = tunnelBase([...gatewayNetworks(input.discovered ?? []), ...networks, ...links.map(l => l.network), ...local.flat(), a + '/32'], input.previousTunnel);
+    const base = tunnelBase([...gatewayNetworks(input.occupiedTunnels ?? []), ...gatewayNetworks(input.discovered ?? []), ...networks, ...links.map(l => l.network), ...local.flat(), a + '/32'], input.previousTunnel);
     const tunnelNet = ipv4(base) + '/29', hub = ipv4(base + 1);
     const keys = [wireGuardKeys(), wireGuardKeys(), wireGuardKeys()];
     const peers = ['B','C'].map((role,i) => {

@@ -168,6 +168,11 @@ import socket, sys
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(3)
 s.connect((sys.argv[1],18085)); s.send(b"subnet"); assert s.recv(64)==b"subnet"' "$2"
 }
+# Exercise the same apply/recovery controller used by the desktop, including SSH on A.
+ip -n C route add 192.0.2.0/30 via 192.0.2.5
+ip netns exec B "$node_bin" scripts/gateway-deployment-fixture.mjs "$scratch" "$ssh_user" direct
+ip netns exec TB "$node_bin" scripts/gateway-deployment-fixture.mjs "$scratch" "$ssh_user" tunnel
+ip -n C route del 192.0.2.0/30 via 192.0.2.5
 ip netns exec A sh "$scratch/direct/A/forward.sh"
 for pass in 1 2; do
   ip netns exec B sh "$scratch/direct/via-192.0.2.1/routes.sh"

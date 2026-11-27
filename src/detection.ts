@@ -322,7 +322,7 @@ export function detectTools(input: string): Suggestion[] {
     if (matches.size) return [...matches.values()];
   }
   if (/^(?:跨网转发|服务转发|检测\s*A\s*的能力)$/i.test(text)) rules.workspace('relay', '检测单机部署可用的转发方式', undefined, 'services');
-  if (/^(?:网段互联|子网互通|跨网段互通|局域网互通|经\s*A\s*访问局域网|[BC]\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*(?:[BC]|对方网段)|访问\s*A\s*(?:能访问|可达)的(?:所有)?(?:网段|IP(?:和服务)?))$/i.test(text))
+  if (/^(?:一键接入(?:网段|局域网)|取消网段部署|网段互联|子网互通|跨网段互通|局域网互通|经\s*A\s*访问局域网|[BC]\s*(?:经|通过)\s*A\s*(?:访问|连接)\s*(?:[BC]|对方网段)|访问\s*A\s*(?:能访问|可达)的(?:所有)?(?:网段|IP(?:和服务)?))$/i.test(text))
     rules.workspace('relay', '经 A 访问局域网中的主机和服务', undefined, 'gateway');
   const hubIp = /^(?:A\s*[:=：]\s*|(?:跳板机\s*A?|网段互联|跨网互联)\s+)([\d.]+)$/i.exec(text)?.[1];
   const usableRelayIp = (ip:string) => /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip) &&

@@ -74,7 +74,7 @@ describe('推荐顺序和打开方式', () => {
   it('将服务地址带入单机转发，普通 SSH 命令继续匹配主机栏目', () => {
     expect(detectTools('跨网转发 c.example:8080')[0]).toMatchObject({ kind: 'workspace', id: 'relay', resourceId: 'new/c.example/8080' });
     expect(detectTools('服务转发')[0]).toMatchObject({ kind:'workspace', id:'relay', resourceId:'services' });
-    for (const source of ['网段互联', '局域网互通', 'B 通过 A 访问 C', '访问 A 可达的所有网段'])
+    for (const source of ['一键接入网段', '取消网段部署', '网段互联', '局域网互通', 'B 通过 A 访问 C', '访问 A 可达的所有网段'])
       expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'gateway' });
     for (const source of ['A=192.0.2.1','跳板机 A 192.0.2.1','跨网互联 192.0.2.1'])
       expect(detectTools(source)[0]).toMatchObject({ id:'relay', resourceId:'gateway/192.0.2.1' });

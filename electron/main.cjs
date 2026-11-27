@@ -332,11 +332,25 @@ app.whenReady().then(async () => {
     } catch (error) { return { error: error.message || 'Nginx 操作失败。' }; }
   });
   const trustedDesktop = event => window && !window.isDestroyed() && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && isAppUrl(event.senderFrame.url);
-  let directSave;
+  let directSave, gatewayDeployment;
+  function getGatewayDeployment() {
+    gatewayDeployment ??= import('./server/relay-gateway-deployment.mjs').then(({ createGatewayDeployment }) =>
+      createGatewayDeployment(path.join(app.getPath('userData'), 'gateway-deployment.json'), lan)
+    ).catch(error => { gatewayDeployment = undefined; throw error; });
+    return gatewayDeployment;
+  }
+  // Resume interrupted recovery even if the user opens another workspace first.
+  void getGatewayDeployment().catch(error => console.error('网段部署恢复记录：',error.message));
   ipcMain.handle('devkit:collab', async (event, module, action, value) => {
     if (!trustedDesktop(event)) throw new Error('拒绝未知页面的请求。');
     try {
       if (!collab) throw new Error(collabError || '共享工具尚未准备好。');
+      if (module === 'relay' && ['gateway-status','gateway-start','gateway-cancel'].includes(action)) {
+        const service = await getGatewayDeployment();
+        if (action === 'gateway-start') return { data:service.start(value) };
+        if (action === 'gateway-cancel') return { data:service.cancel(value.id) };
+        return { data:service.status() };
+      }
       if (module === 'relay' && action === 'exportgateway') {
         const { gatewayArchive } = await import('./server/relay-gateway-config.mjs');
         const { atomicFile } = await import('./server/atomic-file.mjs');

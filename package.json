@@ -40,7 +40,7 @@
     "test:jar": "node --test server/backend.check.mjs server/jar.check.mjs server/jar-policies.check.mjs server/jar-supervisor.check.mjs server/jar-console.check.mjs server/jar-sharing.check.mjs",
     "serve:projects": "npm run prepare:ssh-node && node server/start.mjs",
     "bundle:project-server": "npm run build && node scripts/package-project-server.mjs",
-    "test:http": "node --test server/http-client.check.mjs server/api-workspace.check.mjs server/workspace-sharing.check.mjs server/sharing-policy.check.mjs server/lan-rdp.check.mjs server/planning-sharing.check.mjs server/git-workspace.check.mjs server/git-workflows.check.mjs server/collaboration.check.mjs server/relay.check.mjs server/relay-gateway.check.mjs",
+    "test:http": "node --test server/http-client.check.mjs server/api-workspace.check.mjs server/workspace-sharing.check.mjs server/sharing-policy.check.mjs server/lan-rdp.check.mjs server/planning-sharing.check.mjs server/git-workspace.check.mjs server/git-workflows.check.mjs server/collaboration.check.mjs server/relay.check.mjs server/relay-gateway.check.mjs server/relay-gateway-deployment.check.mjs",
     "test:portal": "npm run build && node scripts/smoke-portal.mjs"
   },
   "dependencies": {

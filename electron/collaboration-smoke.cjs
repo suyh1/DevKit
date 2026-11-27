@@ -117,6 +117,10 @@ module.exports = async function collaborationSmoke(window, output) {
     await click(web, '.portal-login ', '登录');
     await wait(web, '!!document.querySelector(".portal-page:not([hidden])")');
     await openWorkspace('跨网互联');
+    if (process.env.DEVKIT_TEST_COLLAB_ONLY === '1') {
+      await click(desktop,main,'取消部署');
+      await wait(desktop,'document.querySelector(".relay-deployment [role=status]")?.textContent.includes("已恢复")');
+    }
     await web('location.hash="relay"');
     // Use the real desktop reader and exporter, without changing any OS networking.
     const hostIp = Object.values(require('node:os').networkInterfaces()).flat().find(ip => ip.family === 'IPv4' && !ip.internal && !ip.address.startsWith('169.254.'))?.address;
@@ -129,16 +133,18 @@ module.exports = async function collaborationSmoke(window, output) {
       dialog.showSaveDialog = async () => ({ canceled:false, filePath:file });
       try {
         await fill(desktop, main + '.gateway-workspace textarea','198.51.100.0/24\n203.0.113.0/24');
+        await click(desktop,main,'直连网关');
         await click(desktop,main,'导出网关路由');
-        await wait(desktop,'document.querySelector(".gateway-workspace [role=status]")?.textContent.includes("配置已保存到")');
+        await wait(desktop,'document.querySelector(".gateway-workspace section [role=status]")?.textContent.includes("配置已保存到")');
         const JSZip = require('jszip');
         assert.ok((await JSZip.loadAsync(await fs.readFile(file))).file('A/forward.sh'));
         await click(desktop,main,'三层隧道');
         await click(desktop,main,'导出 A、B、C 隧道配置');
-        await wait(desktop,'document.querySelector(".gateway-workspace [role=status]")?.textContent.includes("配置已保存到")');
+        await wait(desktop,'document.querySelector(".gateway-workspace section [role=status]")?.textContent.includes("配置已保存到")');
         const archive = await JSZip.loadAsync(await fs.readFile(file));
         assert.ok(archive.file('B/devkit-b.conf') && archive.file('C/prepare.ps1'));
       } finally { dialog.showSaveDialog = originalDialog; await fs.rm(file,{force:true}); }
+      await fill(desktop,main + 'input[aria-label="访问设备的 IPv4 地址"]','192.0.2.42');
       const desktopBounds = window.getBounds();
       const prefixes = Array.from({length:4096},(_,i) => '10.' + (i >> 8) + '.' + (i & 255) + '.0/24').join('\n');
       for (const width of [desktopBounds.width,390]) {

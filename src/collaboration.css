@@ -1087,6 +1087,8 @@
   min-height: 38px; padding-inline: 14px; font-size: 15px;
 }
 .relay-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.relay-deployment { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.relay-deployment p { flex: 1 1 18em; overflow-wrap: anywhere; }
 .gateway-address { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
 .gateway-workspace label { display: grid; gap: 5px; min-width: 0; }
 .gateway-workspace textarea { resize: vertical; min-height: 5em; max-height: 32vh; width: 100%; font-family: var(--font-mono); }

@@ -13,6 +13,11 @@ const profile = path.join(installation, 'profile');
 process.env.DEVKIT_DEV_ROOT = installation;
 require('node:fs').mkdirSync(profile, { recursive: true });
 app.setPath('userData', profile);
+if (process.env.DEVKIT_TEST_COLLAB_ONLY === '1') {
+  require('node:fs').writeFileSync(path.join(profile,'gateway-deployment.json'), JSON.stringify({
+    id:'resume-connection', a:'192.0.2.1', phase:'active', mode:'direct', message:'上次的网段接入', pending:[], devices:{},
+  }));
+}
 let tested = false;
 dialog.showSaveDialog = async () => ({ canceled: false, filePath: path.join(output, 'saved.txt') });
 const timeout = setTimeout(() => { console.error('Electron smoke check timed out'); app.exit(1); }, 600_000);

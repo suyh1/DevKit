@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { windowsElevation } from './relay-gateway-elevation.mjs';
 import { Readable } from 'node:stream';
 import { sshExec } from './ssh-exec.mjs';
 import { normalizeRouting } from './relay-routing.mjs';
@@ -16,23 +17,26 @@ function localCommand(file, args, { input, timeout, maxBuffer = 65536 }) {
     child.stdin.end(input);
   });
 }
-export async function routingManagementSession(lan, id, { elevated = true, maxOutput } = {}) {
+export async function routingManagementSession(lan, id, { elevated = true, interactive = false, maxOutput } = {}) {
   const remote = id ? await lan.routingSession(id) : null;
   const platform = remote?.platform || process.platform;
   // Windows can spend the first query starting the NetTCPIP CIM provider.
-  const timeout = platform === 'win32' ? 45000 : 15000;
+  const defaultTimeout = platform === 'win32' ? 45000 : 15000;
   if (!['linux', 'win32'].includes(platform)) { remote?.client.destroy(); throw new Error('自动配置支持 Windows 和 Linux。'); }
   return {
     platform, close: () => remote?.client.destroy(),
-    run(script) {
+    run(script, { timeout = defaultTimeout, privileged = elevated } = {}) {
       if (platform === 'win32') {
-        const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; try { " + script + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
-        const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command, 'utf16le').toString('base64')];
-        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { timeout, maxOutput }) : localCommand('powershell.exe', args, { timeout, maxBuffer:maxOutput });
+        // Put the body on stdin to keep private configs out of process listings and avoid cmd.exe's length limit.
+        const input = Buffer.from(script, 'utf8').toString('base64');
+        const invoke = interactive && privileged && !remote ? windowsElevation : '& ([ScriptBlock]::Create($body))';
+        const command = "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; try { $body=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd())); " + invoke + " } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }";
+        const args = ['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command,'utf16le').toString('base64')];
+        return remote ? sshExec(remote.client, 'powershell.exe ' + args.join(' '), { input:Readable.from([input]), timeout, maxOutput }) : localCommand('powershell.exe', args, { input, timeout:interactive && privileged ? 0 : timeout, maxBuffer:maxOutput });
       }
       const input = 'set -eu\nexport LC_ALL=C\n' + script + '\n';
-      // Elevation must already be available to this explicitly selected management identity.
-      const command = elevated ? 'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi' : 'exec sh -s';
+      const elevate = interactive && !remote ? 'if sudo -n true 2>/dev/null; then exec sudo -n /bin/sh -s; else exec pkexec /bin/sh -s; fi' : 'exec sudo -n /bin/sh -s';
+      const command = privileged ? 'if [ "$(id -u)" = 0 ]; then exec /bin/sh -s; else ' + elevate + '; fi' : 'exec /bin/sh -s';
       return remote ? sshExec(remote.client, command, { input: Readable.from([input]), timeout, maxOutput }) : localCommand('sh', ['-c', command], { input, timeout, maxBuffer:maxOutput });
     },
   };
