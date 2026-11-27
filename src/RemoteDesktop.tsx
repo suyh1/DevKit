@@ -10,6 +10,7 @@ import type { LanHost } from './lan-api';
 export default function RemoteDesktop({ host, close, direct }: { host: LanHost; close: () => void; direct: () => void }) {
   const vnc = host.mode === 'vnc';
   const [route, setRoute] = useState<'direct' | 'gateway'>(vnc ? 'direct' : 'gateway');
+  const terminal = useRef(false);
   const picker = useRef<HTMLInputElement>(null);
   const [drive, setDrive] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export default function RemoteDesktop({ host, close, direct }: { host: LanHost; 
       setError(''); setPhase('connecting');
       session.current = openRemoteDesktop(viewport.current, host.id, {
         username: String(data.get('username') || ''), password: password.value, domain: String(data.get('domain') || ''), trustCertificate: data.has('trustCertificate'),
-      }, { resizeDesktop: !vnc, onConnect: () => setPhase('connected'), onError: message => {
+      }, { resizeDesktop: !vnc, terminalShortcuts: () => vnc && terminal.current, onConnect: () => setPhase('connected'), onError: message => {
         session.current = null;
         resetScreen(); setError(message); setPhase('idle');
       }, onDrive: setDrive, onClipboard: setRemote, onNotice: setNotice });
@@ -71,6 +72,7 @@ export default function RemoteDesktop({ host, close, direct }: { host: LanHost; 
           else setMaximized(true);
         }}>{full || maximized ? '退出全屏' : '会话全屏'}</button>
         {phase === 'connected' && <button type="button" className="text-button" onClick={() => session.current?.capture()}>复制画面</button>}
+        {vnc && phase === 'connected' && <label title="Ctrl+C 和 Ctrl+V 使用远端终端的复制粘贴快捷键"><input type="checkbox" defaultChecked={terminal.current} onChange={e => { terminal.current = e.target.checked; viewport.current?.querySelector<HTMLElement>('[tabindex]')?.focus(); }} />终端复制粘贴</label>}
         {drive && phase === 'connected' && <><input type="file" ref={picker} multiple hidden onChange={event => {
           const files = Array.from(event.target.files || []); event.target.value = '';
           if (files.length) void session.current?.sendFiles(files).catch(error => setNotice(error.message));

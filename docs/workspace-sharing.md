@@ -98,7 +98,7 @@ SSH、Telnet、串口、FTP、SFTP 和桌面 VNC 共用会话区。「保存的�
 
 Telnet 默认为 23 端口。FTP 支持被动传输，可选择明文（21）、显式 TLS（21）或隐式 TLS（990），配置用户名、密码与起始目录。串口可从桌面端枚举设备，按设备要求设置波特率、数据位、停止位、奇偶校验、流控和回车格式。
 
-点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。桌面 VNC 单次文本最多 4 MiB。中文和 emoji 需要服务端协商扩展文本，传统剪贴板使用 Latin-1。启用 DIB 位图的 VNC 服务支持双向复制截图（常见的 24/32 位 DIBv5，解码后含头部最多 40 MiB）。RFB 扩展中的文件格式仍为保留项，文件可用 SFTP 或 FTP 会话传输。网页 VNC 直连使用相同的剪贴板协商，经网关连接时可传递文本。「复制画面」可复制当前整个远端屏幕；浏览器禁止写入图片时会下载 PNG。[RFB 扩展剪贴板规范](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding)
+点击 VNC 或网页远程桌面使画面获得焦点。可在远端选中文本按 Ctrl+C，切回本机应用按 Ctrl+V；也可先在本机复制，再在远端画面按 Ctrl+V，文本会粘贴到远端当前输入位置。全屏时同样可用。远端 Linux 终端通常用 Ctrl+Shift+C 和 Ctrl+Shift+V 复制粘贴。也可在 VNC 工具栏勾选「终端复制粘贴」，用本机 Ctrl+C、Ctrl+V 触发这两个终端快捷键；回到图形编辑器时取消勾选。超限或格式异常的剪贴板消息会在会话内提示，之后可继续操作画面或复制较短的内容。浏览器限制系统剪贴板访问时，可展开「文本剪贴板」手动传递。桌面 VNC 单次文本最多 4 MiB。中文和 emoji 需要服务端协商扩展文本，传统剪贴板使用 Latin-1。启用 DIB 位图的 VNC 服务支持双向复制截图（常见的 24/32 位 DIBv5，解码后含头部最多 40 MiB）。RFB 扩展中的文件格式仍为保留项，文件可用 SFTP 或 FTP 会话传输。网页 VNC 直连使用相同的剪贴板协商，经网关连接时可传递文本。「复制画面」可复制当前整个远端屏幕；浏览器禁止写入图片时会下载 PNG。[RFB 扩展剪贴板规范](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding)
 
 网页 RDP 使用 guacd 1.6 的文本剪贴板。单次文本需放入 256 KiB 的 UTF-8 缓冲区，发往 Windows 时转换后的 UTF-16 也需放入 256 KiB（均计入结束符）。远端策略和网关也可能限制可复制的长度。[Guacamole RDP 剪贴板实现](https://github.com/apache/guacamole-server/blob/1.6.0/src/protocols/rdp/channels/cliprdr.c)
 

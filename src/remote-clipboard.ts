@@ -50,15 +50,18 @@ type Options = {
   protocol: ClipboardProtocol;
   sendLongText?: (text: string, usable: () => boolean) => Promise<void>;
   sendFiles: (files: File[], usable: () => boolean) => Promise<boolean>;
+  terminalShortcuts?: () => boolean;
   enabled: () => boolean;
   sendText: (text: string, usable: () => boolean) => void | Promise<void>;
   key: (symbol: number, code: string, down: boolean) => void;
   notice: (message: string) => void;
 };
 
-export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, sendText, sendFiles, sendLongText, key, notice }: Options) {
+export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, terminalShortcuts, sendText, sendFiles, sendLongText, key, notice }: Options) {
   const listeners = new AbortController(), capture = { capture: true, signal: listeners.signal };
-  let leftControl = false, interacted = false, generation = 0;
+  const held = new Set<string>();
+  const modifiers: Record<string, number> = { ControlLeft: 0xffe3, ControlRight: 0xffe4, ShiftLeft: 0xffe1, ShiftRight: 0xffe2 };
+  let interacted = false, generation = 0;
   const consumed = new Set<string>();
   let lastSent: string | undefined;
   let pasteQueue = Promise.resolve(), copyRevision = 0;
@@ -67,13 +70,18 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
   const focused = () => viewport.contains(document.activeElement) && viewport.getClientRects().length > 0;
   const active = () => !listeners.signal.aborted && enabled() && focused();
 
-  function chord(letter: 'c' | 'v') {
-    // Use the physical Ctrl state at delivery time. The user may have released it during the transfer.
-    key(0xffe3, 'ControlLeft', true);
+  function chord(letter: 'c' | 'v', shift: boolean) {
+    // Physical modifier events are already forwarded by the remote keyboard.
+    // Paste may finish after keyup, in which case synthesize just the missing keys.
+    const added: string[] = [];
+    if (!held.has('ControlLeft') && !held.has('ControlRight')) added.push('ControlLeft');
+    if (shift && !held.has('ShiftLeft') && !held.has('ShiftRight')) added.push('ShiftLeft');
+    for (const name of added) key(modifiers[name], name, true);
     const code = letter === 'c' ? 'KeyC' : 'KeyV';
-    key(letter.charCodeAt(0), code, true);
-    key(letter.charCodeAt(0), code, false);
-    if (!leftControl) key(0xffe3, 'ControlLeft', false);
+    const symbol = (shift ? letter.toUpperCase() : letter).charCodeAt(0);
+    key(symbol, code, true);
+    key(symbol, code, false);
+    for (const name of added.reverse()) key(modifiers[name], name, false);
   }
   function cancelCopy() {
     copyRevision++;
@@ -81,7 +89,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
     pending?.cancel();
     pending = undefined;
   }
-  function beginCopy() {
+  function beginCopy(shift: boolean) {
     cancelCopy();
     pending = { cancel() {} };
     // Start the secure-browser write while the key gesture is live. Resolve it with the new remote selection.
@@ -99,9 +107,9 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
       cancelCopy();
       if (active()) notice('未收到支持的剪贴板格式，请确认远端允许复制。');
     }, 5000);
-    chord('c');
+    chord('c', shift);
   }
-  function paste(read: Promise<PasteContent> | PasteContent) {
+  function paste(read: Promise<PasteContent> | PasteContent, shift: boolean) {
     cancelCopy();
     const current = generation;
     const usable = () => current === generation && active() && document.hasFocus();
@@ -111,7 +119,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
       if (!usable()) return;
       if (content.kind !== 'text') {
         const files = content.kind === 'png' ? [new File([content.bytes], '截图.png', { type: 'image/png' })] : content.files || [];
-        if (await sendFiles(files, usable) && usable()) chord('v');
+        if (await sendFiles(files, usable) && usable()) chord('v', shift);
         return;
       }
       const text = content.text;
@@ -124,38 +132,40 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
       }
       lastSent = text;
       await sendText(text, usable);
-      if (usable()) chord('v');
+      if (usable()) chord('v', shift);
     }).catch(error => { if (usable()) notice(error.message || '粘贴失败，请检查会话的剪贴板权限。'); });
   }
   viewport.addEventListener('pointerdown', () => { interacted = true; }, capture);
   viewport.addEventListener('keydown', event => {
     if (!event.isTrusted || !active()) return;
     interacted = true;
-    if (event.code === 'ControlLeft') leftControl = true;
+    if (event.code in modifiers) held.add(event.code);
     const letter = event.key.toLowerCase();
-    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || !['c','v'].includes(letter)) return;
+    if (!event.ctrlKey || (event.shiftKey && protocol === 'web-rdp') || event.altKey || event.metaKey || !['c','v'].includes(letter)) return;
     event.stopImmediatePropagation();
     consumed.add(event.code);
     if (event.repeat) { event.preventDefault(); return; }
     notice('');
-    if (letter === 'c') { event.preventDefault(); beginCopy(); }
-    else if (window.devkitDesktop?.lanHosts) { event.preventDefault(); paste(lanRequest<PasteContent>('clipboard-content')); }
+    const shift = event.shiftKey || !!terminalShortcuts?.();
+    if (letter === 'c') { event.preventDefault(); beginCopy(shift); }
+    else if (window.devkitDesktop?.lanHosts) { event.preventDefault(); paste(lanRequest<PasteContent>('clipboard-content'), shift); }
     // In a browser let Ctrl+V dispatch its trusted paste event, including on ordinary LAN HTTP.
   }, capture);
   viewport.addEventListener('keyup', event => {
-    if (event.code === 'ControlLeft') leftControl = false;
+    held.delete(event.code);
     if (consumed.delete(event.code)) { event.stopImmediatePropagation(); event.preventDefault(); }
   }, capture);
   viewport.addEventListener('paste', event => {
     if (!event.isTrusted || !active()) return;
     event.preventDefault(); event.stopImmediatePropagation();
     const data = event.clipboardData;
-    if (data?.files.length) paste({ kind: 'files', files: Array.from(data.files) });
-    else if (data?.types.includes('text/plain')) paste({ kind: 'text', text: data.getData('text/plain') });
+    const shift = !!terminalShortcuts?.() || (protocol !== 'web-rdp' && (held.has('ShiftLeft') || held.has('ShiftRight')));
+    if (data?.files.length) paste({ kind: 'files', files: Array.from(data.files) }, shift);
+    else if (data?.types.includes('text/plain')) paste({ kind: 'text', text: data.getData('text/plain') }, shift);
   }, capture);
   function reset() {
-    if (leftControl && enabled()) key(0xffe3, 'ControlLeft', false);
-    generation++; leftControl = false; interacted = false; lastSent = undefined; consumed.clear(); cancelCopy();
+    if (enabled()) for (const name of held) key(modifiers[name], name, false);
+    generation++; held.clear(); interacted = false; lastSent = undefined; consumed.clear(); cancelCopy();
   }
   viewport.addEventListener('focusout', event => {
     if (event.relatedTarget instanceof Node && !viewport.contains(event.relatedTarget)) reset();
@@ -164,7 +174,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
       queueMicrotask(() => { if (document.hasFocus() && !focused()) reset(); });
     }
   }, capture);
-  window.addEventListener('blur', () => { leftControl = false; consumed.clear(); interacted = false; generation++; }, { signal: listeners.signal });
+  window.addEventListener('blur', () => { held.clear(); consumed.clear(); interacted = false; generation++; }, { signal: listeners.signal });
 
   return {
     async receive(text: string) {
@@ -199,6 +209,7 @@ export function bindRemoteClipboard(viewport: HTMLElement, { protocol, enabled, 
         if (revision === copyRevision && enabled() && !listeners.signal.aborted) await writeSessionImage(png);
       } catch (error) { if (enabled()) notice((error as Error).message || '无法复制远端位图。'); }
     },
+    cancelCopy,
     reset,
     dispose() { reset(); listeners.abort(); },
   };

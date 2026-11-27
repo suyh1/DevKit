@@ -58,7 +58,9 @@ export async function rdpFixture() {
     });
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
-  return { port: server.address().port, pastes, messages, connections, sockets, sendFile(name, bytes) {
+  return { port: server.address().port, pastes, messages, connections, sockets, sendClipboardBlob(encoded) {
+    [...sockets].at(-1).write(encode('clipboard', 8, 'text/plain') + encode('blob', 8, encoded) + encode('end', 8));
+  }, sendFile(name, bytes) {
     const socket = [...sockets].at(-1);
     downloads.set(socket, bytes);
     socket.write(encode('file', 12, 'application/octet-stream', name));

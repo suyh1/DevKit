@@ -19,8 +19,8 @@ async function providePacket(format, bytes) {
   return packet;
 }
 
-// noVNC 1.7 exposes text in its public API. Extend only its ServerCutText handler;
-// framebuffer, authentication, key handling and classic clipboard stay upstream.
+// noVNC handles the display and keyboard. An oversized clipboard frame can span
+// several reads, so drain its declared payload before parsing the next RFB message.
 export default class ClipboardRFB extends RFB {
   clipboardPasteFrom(text, usable) {
     if (this._clipboardServerCapabilitiesFormats[TEXT] && this._clipboardServerCapabilitiesActions[PROVIDE]) {
@@ -49,31 +49,48 @@ export default class ClipboardRFB extends RFB {
     else RFB.messages.extendedClipboardNotify(this._sock, [format]);
   }
 
+  _normalMsg() {
+    if (this._discardClipboardBytes) return this._drainClipboard();
+    return super._normalMsg();
+  }
+
+  _drainClipboard() {
+    const count = Math.min(this._sock.rQlen(), this._discardClipboardBytes);
+    this._sock.rQskipBytes(count);
+    this._discardClipboardBytes -= count;
+    return this._discardClipboardBytes === 0;
+  }
+
+  _clipboardError(message) {
+    if (!this._viewOnly) this.dispatchEvent(new CustomEvent('clipboarderror', { detail: message }));
+    return true;
+  }
+
   _handleServerCutText() {
     const sock = this._sock;
     if (sock.rQwait('clipboard header', 7, 1)) return false;
     const length = word(sock.rQpeekBytes(7, false).subarray(3)) | 0;
-    if (Math.abs(length) + 8 > bitmapLimit) return this._fail('VNC clipboard packet exceeds receive limit');
-    if (length > desktopTextLimit) {
-      if (sock.rQwait('oversized clipboard', 7 + length, 1)) return false;
-      sock.rQskipBytes(7 + length);
-      if (!this._viewOnly) this.dispatchEvent(new CustomEvent('clipboarderror', { detail: '远端 VNC 文本超过 4 MiB。' }));
-      return true;
+    if (length > desktopTextLimit || Math.abs(length) + 8 > bitmapLimit || (length < 0 && length > -4)) {
+      sock.rQskipBytes(7);
+      this._discardClipboardBytes = Math.abs(length);
+      this._clipboardError(length > 0 ? '远端 VNC 文本超过 4 MiB。' :
+        length > -4 ? '远端剪贴板消息不完整。' : '远端剪贴板数据超过 40 MiB。');
+      return this._drainClipboard();
     }
     if (length >= 0) return super._handleServerCutText();
-    if (-length < 4) return this._fail('Invalid VNC clipboard header');
     if (sock.rQwait('extended clipboard', 7 - length, 1)) return false;
     sock.rQskipBytes(7);
     const flags = sock.rQshift32(), format = flags & 0xffff, action = flags & 0xff000000;
     const data = sock.rQshiftBytes(-length - 4, false);
     if (action & CAPS) {
-      this._unsolicitedSize = {};
+      const sizes = {};
       let offset = 0;
       for (let bit = 1; bit <= 0x8000; bit <<= 1) {
         if (!(format & bit)) continue;
-        if (offset + 4 > data.length) return this._fail('Invalid VNC clipboard capabilities');
-        this._unsolicitedSize[bit] = word(data.subarray(offset)); offset += 4;
+        if (offset + 4 > data.length) return this._clipboardError('远端剪贴板能力消息不完整。');
+        sizes[bit] = word(data.subarray(offset)); offset += 4;
       }
+      this._unsolicitedSize = sizes;
       this._clipboardServerCapabilitiesFormats = { [TEXT]: !!(format & TEXT), [DIB]: !!(format & DIB) };
       this._clipboardServerCapabilitiesActions = Object.fromEntries(actions.map(a => [a, !!(action & a)]));
       RFB.messages.extendedClipboardCaps(sock, actions, { 0: 0, 3: 0 });
@@ -84,7 +101,7 @@ export default class ClipboardRFB extends RFB {
     const localFormat = this._offerPacket ? this._offerFormat : 0;
     try {
       if (action === NOTIFY && can[REQUEST]) {
-        const preferred = format & DIB && this._clipboardServerCapabilitiesFormats[DIB] ? DIB : format & TEXT;
+        const preferred = (format & TEXT) || (format & DIB);
         if (preferred) RFB.messages.extendedClipboardRequest(sock, [preferred]);
       } else if (action === REQUEST && can[PROVIDE] && (localFormat & format)) {
         RFB.messages.clientCutText(sock, this._offerPacket, true);
@@ -101,7 +118,7 @@ export default class ClipboardRFB extends RFB {
           if (total > bitmapLimit + 2 * desktopTextLimit + 1 || size > (bit === TEXT ? 2 * desktopTextLimit + 1 : bitmapLimit)) throw new Error('远端剪贴板数据超过容量限制。');
           const chunk = size ? inflater.inflate(size) : new Uint8Array();
           if (bit === TEXT) text = new TextDecoder().decode(chunk).replace(/\0$/, '').replaceAll('\r\n', '\n');
-          if (bit === DIB && this._clipboardServerCapabilitiesFormats[DIB]) image = chunk.slice();
+          if (bit === DIB && text === undefined) image = chunk.slice();
         }
         this._offerPacket = null; this._offerToken = null;
         if (image) this.dispatchEvent(new CustomEvent('clipboardimage', { detail: image }));

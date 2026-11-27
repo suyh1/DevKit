@@ -5,6 +5,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 async function preserveClipboard() {
   const original = [];
   for (const item of await clipboard.read()) {
+    if (!item.types.length) continue; // A fresh X11 display may report an empty item.
     const formats = {};
     for (const type of item.types) formats[type] = await item.getType(type);
     original.push(new ClipboardItem(formats));

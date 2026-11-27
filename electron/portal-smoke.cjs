@@ -952,7 +952,7 @@ app
         const oversized = '长文本🙂'.repeat(44000);
         await clipboard.writeText(oversized);
         pressClipboardKey(window, 'V');
-        await wait('document.querySelector(".lan-rdp-toolbar [role=status]").textContent.endsWith(".txt")');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]").textContent.includes("已发送到远端") && document.querySelector(".lan-rdp-toolbar [role=status]").textContent.endsWith(".txt")');
         const textFile = (await fs.readdir(drive)).find(name => name.endsWith('.txt'));
         assert.equal(await fs.readFile(path.join(drive, textFile), 'utf8'), oversized);
         const downloaded = path.join(driveRoot, 'received.bin');
@@ -998,6 +998,13 @@ app
         await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent==="远程桌面已连接"');
         assert.deepEqual(rdp.messages.filter(([op]) => op === 'select').at(-1), ['select', 'vnc']);
         assert.equal(rdp.connections.at(-1).port, '5901');
+        rdp.sendClipboardBlob('invalid base64!');
+        await wait('document.querySelector(".lan-rdp-toolbar [role=status]")?.textContent.includes("剪贴板文本编码无效")');
+        const previousPastes = rdp.pastes.length;
+        await checkClipboard(window, '.lan-rdp-viewport > div', {
+          text: 'VNC 网关粘贴', selection: 'selected-remote'.repeat(3000),
+          pasted: () => rdp.pastes.length === previousPastes + 1 && rdp.pastes.at(-1) === 'VNC 网关粘贴',
+        });
         await selector('button[aria-label="关闭远程桌面"]');
       } finally {
         await rdp.close();

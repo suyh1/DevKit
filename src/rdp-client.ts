@@ -6,8 +6,8 @@ import { remoteRequest, remoteResponse } from './workspace-remote';
 export type RdpCredentials = { username: string; password: string; domain: string; trustCertificate: boolean };
 
 export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credentials: RdpCredentials, {
-  resizeDesktop, onConnect, onError, onClipboard, onNotice, onDrive,
-}: { onDrive: (value: boolean) => void; resizeDesktop: boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void; onNotice: (message: string) => void }) {
+  resizeDesktop, terminalShortcuts, onConnect, onError, onClipboard, onNotice, onDrive,
+}: { onDrive: (value: boolean) => void; resizeDesktop: boolean; terminalShortcuts?: () => boolean; onConnect: () => void; onError: (message: string) => void; onClipboard: (text: string) => void; onNotice: (message: string) => void }) {
   const controller = new AbortController(), tunnel = new Guacamole.Tunnel();
   const client = new Guacamole.Client(tunnel), parser = new Guacamole.Parser();
   const display = client.getDisplay(), screen = display.getElement();
@@ -42,7 +42,7 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   }
   const clipboard = bindRemoteClipboard(viewport, {
     enabled: () => connected && !disposed,
-    protocol: resizeDesktop ? 'web-rdp' : 'web-vnc', sendFiles,
+    terminalShortcuts, protocol: resizeDesktop ? 'web-rdp' : 'web-vnc', sendFiles,
     async sendLongText(text, usable) {
       if (!drive) throw new Error(checkText(text, resizeDesktop ? 'web-rdp' : 'web-vnc'));
       await sendFiles([new File([text], '剪贴板-' + Date.now() + '.txt', { type: 'text/plain;charset=utf-8' })], usable);
@@ -149,19 +149,27 @@ export function openRemoteDesktop(viewport: HTMLElement, hostId: string, credent
   };
   client.onclipboard = (stream, mime) => {
     if (mime.split(';')[0] !== 'text/plain') { stream.sendAck('Text only', 0x0100); return; }
-    let size = 0, overflow = false;
+    let size = 0, problem = '';
     const decoder = new TextDecoder(), parts: string[] = [];
     stream.onblob = data => {
-      if (overflow) return;
-      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
-      size += bytes.length;
-      if (size >= gatewayTextLimit) { overflow = true; stream.sendAck('Text too long', 0x030d); return; }
-      parts.push(decoder.decode(bytes, { stream: true }));
-      stream.sendAck('OK', 0);
+      if (problem) return;
+      try {
+        if (data.length > 4 * Math.ceil((gatewayTextLimit - size) / 3)) throw new RangeError();
+        const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+        size += bytes.length;
+        if (size >= gatewayTextLimit) throw new RangeError();
+        parts.push(decoder.decode(bytes, { stream: true }));
+        stream.sendAck('OK', 0);
+      } catch (error) {
+        problem = error instanceof RangeError ? '远端剪贴板文本超过网关的 256 KiB 缓冲区。' : '远端剪贴板文本编码无效。';
+        parts.length = 0;
+        clipboard.cancelCopy();
+        onNotice(problem);
+        stream.sendAck('Invalid clipboard data', error instanceof RangeError ? 0x030d : 0x0300);
+      }
     };
     stream.onend = () => {
-      if (disposed) return;
-      if (overflow) { clipboard.reset(); onClipboard(''); onNotice('远端剪贴板文本超过网关的 256 KiB 缓冲区'); return; }
+      if (disposed || problem) return;
       const text = parts.join('') + decoder.decode();
       onClipboard(text); void clipboard.receive(text);
     };

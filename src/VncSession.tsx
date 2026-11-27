@@ -17,9 +17,10 @@ export default function VncSession({ id, portal = false }: { id: string; portal?
   const [connected, setConnected] = useState(false), [message, setMessage] = useState('');
   const [fields, setFields] = useState<string[]>([]), [fingerprint, setFingerprint] = useState('');
   const [scale, setScale] = useState(true), [viewOnly, setViewOnly] = useState(false);
+  const [terminal, setTerminal] = useState(false);
   const shortcuts = useRef<ReturnType<typeof bindRemoteClipboard> | undefined>(undefined);
-  const options = useRef({ scale, viewOnly });
-  options.current = { scale, viewOnly };
+  const options = useRef({ scale, viewOnly, terminal });
+  options.current = { scale, viewOnly, terminal };
   useEffect(() => {
     if (!running || !viewport.current) return;
     let disposed = false, failure = '';
@@ -32,7 +33,7 @@ export default function VncSession({ id, portal = false }: { id: string; portal?
     let ready = false;
     const clipboard = bindRemoteClipboard(viewport.current, {
       enabled: () => ready && !disposed && !rfb.viewOnly,
-      protocol: 'desktop-vnc',
+      protocol: 'desktop-vnc', terminalShortcuts: () => options.current.terminal,
       async sendFiles(files, usable) {
         if (files.length !== 1 || files[0].type !== 'image/png') throw new Error('VNC 文件剪贴板未标准化，请使用 SFTP 或 FTP 会话传文件。');
         const dib = await pngToDib(files[0]);
@@ -66,7 +67,7 @@ export default function VncSession({ id, portal = false }: { id: string; portal?
       }
     });
     rfb.addEventListener('clipboardimage', event => { void clipboard.receiveImage(() => dibToPng((event as CustomEvent).detail)); });
-    rfb.addEventListener('clipboarderror', event => { if (!disposed) setMessage((event as CustomEvent).detail); });
+    rfb.addEventListener('clipboarderror', event => { if (!disposed) { clipboard.cancelCopy(); setMessage((event as CustomEvent).detail); } });
     rfb.addEventListener('credentialsrequired', event => {
       clearTimeout(timer);
       if (!disposed) { setFields((event as CustomEvent).detail.types); setMessage('目标要求登录'); }
@@ -100,6 +101,7 @@ export default function VncSession({ id, portal = false }: { id: string; portal?
       {running && connected && <>
         <SegmentedControl label="桌面缩放" value={scale ? 'fit' : 'original'} options={[{ value: 'fit', label: '适应窗口' }, { value: 'original', label: '原始大小' }]} onChange={value => setScale(value === 'fit')} />
         <label><input type="checkbox" checked={viewOnly} onChange={event => setViewOnly(event.target.checked)} />仅查看</label>
+        <label title="把 Ctrl+C 和 Ctrl+V 转为远端终端使用的 Ctrl+Shift+C 和 Ctrl+Shift+V"><input type="checkbox" checked={terminal} disabled={viewOnly} onChange={event => { setTerminal(event.target.checked); client.current?.focus(); }} />终端复制粘贴</label>
         <button className="text-button" onClick={() => {
           const rfb = client.current;
           if (rfb) void copyScreen(new Promise((resolve, reject) => rfb.toBlob(blob => blob ? resolve(blob) : reject(), 'image/png')), setMessage);

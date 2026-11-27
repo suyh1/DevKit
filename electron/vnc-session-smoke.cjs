@@ -17,7 +17,7 @@ module.exports = async function checkVncSession(window, waitFor) {
   const sockets = new Set(), keys = [], pasted = [];
   let connections = 0;
   const longText = 'long-line '.repeat(64000), selection = 'selected-remote'.repeat(4000);
-  const applications = [];
+  const applications = [], terminalChords = [];
   let offeredDib, remoteDib, bitmapPaste = false, supportsDib = false;
   const imageNotify = (1 << 27) | 8, imageRequest = (1 << 25) | 8, imageProvide = (1 << 28) | 8;
   const server = createServer(socket => {
@@ -25,7 +25,7 @@ module.exports = async function checkVncSession(window, waitFor) {
     socket.on('error', () => {});
     socket.on('close', () => sockets.delete(socket));
     socket.write('RFB 003.008\n');
-    let ctrl = false, clipboardText = '';
+    let ctrl = false, shift = false, clipboardText = '';
     let buffer = Buffer.alloc(0), step = 0, painted = false;
     socket.on('data', chunk => {
       buffer = Buffer.concat([buffer, chunk]);
@@ -55,6 +55,8 @@ module.exports = async function checkVncSession(window, waitFor) {
           const symbol = data.readUInt32BE(4), down = data[1] === 1;
           keys.push(symbol);
           if (symbol === 0xffe3) ctrl = down;
+          if (symbol === 0xffe1) shift = down;
+          if (ctrl && shift && down && [67, 86].includes(symbol)) terminalChords.push(symbol);
           if (ctrl && down && symbol === 118) {
             if (supportsDib) bitmapPaste = true;
             else applications.push(clipboardText);
@@ -115,6 +117,36 @@ module.exports = async function checkVncSession(window, waitFor) {
     await click('.lan-session-clipboard', '发送到远端');
     for (let i = 0; i < 40 && pasted.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 25));
     assert.deepEqual(pasted, [longText, 'local']);
+    // A clipboard error with a known frame length must not close the screen.
+    await js('document.querySelector(".lan-session-clipboard summary").click()');
+    const socket = [...sockets][0];
+    const truncatedCaps = extendedCut(0x1f000001);
+    socket.write(truncatedCaps.subarray(0, 6));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    socket.write(truncatedCaps.subarray(6));
+    await wait('document.querySelector(".lan-vnc-session [role=status]")?.textContent.includes("能力消息不完整")');
+    const oversized = 40 * 1024 * 1024, header = Buffer.alloc(8), chunk = Buffer.alloc(1024 * 1024);
+    header[0] = 3; header.writeUInt32BE(oversized, 4);
+    socket.write(header);
+    for (let sent = 0; sent < oversized; sent += chunk.length) {
+      if (!socket.write(chunk)) await once(socket, 'drain');
+    }
+    await wait('document.querySelector(".lan-vnc-session [role=status]")?.textContent.includes("超过 4 MiB")');
+    await require('./remote-clipboard-smoke.cjs').checkClipboard(window, '.lan-vnc-screen canvas', {
+      text: 'after oversized clipboard', selection, pasted: () => applications.at(-1) === 'after oversized clipboard',
+    });
+    const terminalMode = 'document.querySelectorAll(".lan-vnc-session input[type=checkbox]")[1]';
+    await js(terminalMode + '.click()');
+    const restoreTerminalClipboard = await preserveClipboard();
+    try {
+      await clipboard.writeText('terminal paste');
+      pressClipboardKey(window, 'C');
+      pressClipboardKey(window, 'V');
+      for (let i = 0; i < 100 && terminalChords.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 25));
+      assert.deepEqual(terminalChords, [67, 86]);
+      assert.equal(connections, 1);
+    } finally { await restoreTerminalClipboard(); }
+    await js(terminalMode + '.click()');
     // Real OS PNG -> negotiated DIBv5 -> a different remote selection -> OS PNG.
     const restoreImage = await preserveClipboard();
     try {
@@ -152,7 +184,7 @@ module.exports = async function checkVncSession(window, waitFor) {
     }
     await new Promise(resolve => setTimeout(resolve, 80));
     assert.equal(keys.length, readOnlyKeys);
-    assert.deepEqual(pasted, [longText, 'local']);
+    assert.deepEqual(pasted, [longText, 'local', 'after oversized clipboard', 'terminal paste']);
     await click('.lan-vnc-session', '断开连接');
     await click('.lan-vnc-session', '重新连接');
     await submitPassword();
