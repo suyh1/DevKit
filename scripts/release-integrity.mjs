@@ -11,6 +11,7 @@ export function releaseTargets(version) {
     { platform: 'win32', arch: 'x64', format: 'nsis', folder: 'windows-x64', name: `DevKit_${version}_x64-setup.exe` },
     { platform: 'linux', arch: 'x64', format: 'deb', folder: 'linux-x64', name: `DevKit_${version}-1_amd64.deb` },
     { platform: 'linux', arch: 'arm64', format: 'deb', folder: 'linux-arm64', name: `DevKit_${version}-1_arm64.deb` },
+    { platform: 'darwin', arch: 'arm64', format: 'dmg', folder: 'macos-arm64', name: `DevKit_${version}_arm64.dmg` },
   ];
 }
 export async function buildFingerprint(root, archive) {

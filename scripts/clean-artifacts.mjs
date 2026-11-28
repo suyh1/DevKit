@@ -8,11 +8,11 @@ import { root } from './desktop-files.mjs';
 const versionPattern = '(\\d+\\.\\d+\\.\\d+(?:-[\\da-zA-Z.-]+)?)';
 const releasePattern = new RegExp(`^release-${versionPattern}$`);
 const backupPattern = new RegExp(`^previous-release-${versionPattern}-\\d{8}-\\d{6}$`);
-const packagePattern = new RegExp(`^DevKit_${versionPattern}(?:_(x64|arm64)-setup\\.exe|-1_(amd64|arm64)\\.deb)$`);
-const targetPattern = /^(windows|linux)-(x64|arm64)$/;
+const packagePattern = new RegExp(`^DevKit_${versionPattern}(?:_(x64|arm64)-setup\\.exe|-1_(amd64|arm64)\\.deb|_(x64|arm64)\\.dmg)$`);
+const targetPattern = /^(windows|linux|macos)-(x64|arm64)$/;
 const workDirectories = new Set(['desktop-runtime', 'desktop-staging', 'electron-smoke', 'generated-java', 'portal-regression', 'sharing-smoke']);
 const targetMetadata = new Set(['docs', 'README.md', 'LICENSE', 'runtime-report.json', 'SHA256SUMS']);
-const builderFiles = new Set(['builder-debug.yml', 'builder-effective-config.yaml', 'latest.yml']);
+const builderFiles = new Set(['builder-debug.yml', 'builder-effective-config.yaml', 'latest.yml', 'latest-mac.yml']);
 const releaseMetadata = new Set([...targetMetadata, 'ALL-SHA256SUMS', 'PROJECT-SERVER-SHA256SUMS', 'release.json', 'project-server.json', 'project-server-verification.json']);
 
 function compareNumeric(left, right) {
@@ -41,15 +41,15 @@ function compareVersions(left, right) {
 function packageVersion(folder, name) {
   const match = name.match(packagePattern);
   if (!match) return undefined;
-  const [, version, windowsArch, debArch] = match;
-  const expected = windowsArch ? `windows-${windowsArch}` : `linux-${debArch === 'amd64' ? 'x64' : debArch}`;
+  const [, version, windowsArch, debArch, macosArch] = match;
+  const expected = windowsArch ? `windows-${windowsArch}` : macosArch ? `macos-${macosArch}` : `linux-${debArch === 'amd64' ? 'x64' : debArch}`;
   return folder === expected ? version : undefined;
 }
 
 function isReleaseOutput(entry, version) {
   return entry.isFile() && (entry.name.match(packagePattern)?.[1] === version
     || entry.name === `DevKit_ProjectCenter_${version}_node24.zip`)
-    || entry.isDirectory() && /^DevKit-(win32|linux)-(x64|arm64)$/.test(entry.name);
+    || entry.isDirectory() && /^DevKit-(win32|linux|darwin)-(x64|arm64)$/.test(entry.name);
 }
 
 function isReleaseMetadata(entry, version) {

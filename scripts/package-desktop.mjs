@@ -1,7 +1,7 @@
 import { packager } from '@electron/packager';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { root, prepareDesktop } from './desktop-files.mjs';
 import { sha256, verifyRuntime } from './release-integrity.mjs';
 import { copyReadme, updateReadme } from './update-readme.mjs';
@@ -9,7 +9,7 @@ import { cleanArtifacts } from './clean-artifacts.mjs';
 
 const argument = (name, fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) || fallback;
 const platform = argument('platform', process.platform), arch = argument('arch', process.arch), format = argument('format', 'dir');
-if (!['dir', 'deb', 'nsis'].includes(format) || format === 'deb' && platform !== 'linux' || format === 'nsis' && platform !== 'win32') throw new Error('Unsupported package format');
+if (!['dir', 'deb', 'nsis', 'dmg'].includes(format) || format === 'deb' && platform !== 'linux' || format === 'nsis' && platform !== 'win32' || format === 'dmg' && platform !== 'darwin') throw new Error('Unsupported package format');
 await updateReadme();
 const artifacts = path.join(await realpath(root), 'artifacts');
 await mkdir(artifacts, { recursive: true });
@@ -37,12 +37,15 @@ try {
   if (existing && (!existing.isDirectory() || path.relative(runtime, await realpath(runtime)))) throw new Error('Unsafe runtime replacement');
   const [destination] = await packager({
     dir: staging, out: output, name: 'DevKit',
-    executableName: 'devkit', platform, arch, electronVersion: manifest.devDependencies.electron,
+    executableName: platform === 'darwin' ? 'DevKit' : 'devkit', platform, arch, electronVersion: manifest.devDependencies.electron,
     ...(localZips ? { electronZipDir: localZips } : {}),
-    ...(platform === 'win32' ? { icon: path.join(root, 'build', 'icons', 'icon.ico') } : {}),
+    ...(platform === 'win32' ? { icon: path.join(root, 'build', 'icons', 'icon.ico') } : platform === 'darwin' ? { icon: path.join(root, 'build', 'icons', 'icon.icns') } : {}),
     asar: { unpack: '**/*.node' }, prune: false, overwrite: true,
   });
-  const buildSha256 = await verifyRuntime(root, path.join(destination, 'resources', 'app.asar'), manifest.version);
+  const asarPath = platform === 'darwin'
+    ? path.join(destination, 'DevKit.app', 'Contents', 'Resources', 'app.asar')
+    : path.join(destination, 'resources', 'app.asar');
+  const buildSha256 = await verifyRuntime(root, asarPath, manifest.version);
   await copyReadme(destination, 'LICENSE-DevKit');
   if (format === 'deb') {
     const python = process.env.DEVKIT_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
@@ -58,11 +61,44 @@ try {
     const name = `DevKit_${manifest.version}_${arch}-setup.exe`;
     const checksum = sha256(await readFile(path.join(root, 'artifacts', `windows-${arch}`, name)));
     await writeFile(path.join(root, 'artifacts', `windows-${arch}`, 'SHA256SUMS'), `${checksum}  ${name}\n`);
+  } else if (format === 'dmg') {
+    if (process.platform !== 'darwin') throw new Error('Building macOS .dmg requires a macOS host');
+    const appBundle = path.join(destination, 'DevKit.app');
+    const unpacked = path.join(appBundle, 'Contents', 'Resources', 'app.asar.unpacked');
+    for (const entry of await readdir(unpacked, { withFileTypes: true, recursive: true }).catch(() => [])) {
+      if (entry.isFile() && entry.name.endsWith('.node')) {
+        execFileSync('codesign', ['--force', '--sign', '-', path.join(entry.parentPath, entry.name)], { stdio: 'inherit' });
+      }
+    }
+    execFileSync('codesign', ['--force', '--deep', '--sign', '-', appBundle], { stdio: 'inherit' });
+    execFileSync('codesign', ['--verify', '--deep', '--strict', appBundle], { stdio: 'inherit' });
+    const folder = path.join(root, 'artifacts', `macos-${arch}`);
+    await mkdir(folder, { recursive: true });
+    const dmgRoot = path.join(scratch, 'dmg-root');
+    await mkdir(dmgRoot, { recursive: true });
+    execFileSync('ditto', [appBundle, path.join(dmgRoot, 'DevKit.app')], { stdio: 'inherit' });
+    await symlink('/Applications', path.join(dmgRoot, 'Applications'));
+    await writeFile(path.join(dmgRoot, '首次打开说明.txt'), [
+      `DevKit ${manifest.version} (macOS ${arch})`,
+      '',
+      '1. 将 DevKit.app 拖入 Applications（应用程序）文件夹。',
+      '2. 当前版本未配置 Apple 开发者签名；如果系统提示“已损坏”或“无法验证开发者”，请在终端执行一次：',
+      '   xattr -cr /Applications/DevKit.app',
+      '3. 配置与数据默认保存在 ~/Library/Application Support/DevKit/configs/，覆盖升级不会丢失。',
+      '',
+    ].join('\n'), 'utf8');
+    const name = `DevKit_${manifest.version}_${arch}.dmg`;
+    const dmgPath = path.join(folder, name);
+    await rm(dmgPath, { force: true });
+    execFileSync('hdiutil', ['create', '-volname', `DevKit ${manifest.version}`, '-srcfolder', dmgRoot, '-ov', '-format', 'UDZO', '-imagekey', 'zlib-level=1', dmgPath], { stdio: 'inherit' });
+    execFileSync('hdiutil', ['verify', dmgPath], { stdio: 'inherit' });
+    const checksum = sha256(await readFile(dmgPath));
+    await writeFile(path.join(folder, 'SHA256SUMS'), `${checksum}  ${name}\n`);
   } else console.log(`Desktop app: ${destination}`);
   if (format !== 'dir') {
-    const folder = path.join(root, 'artifacts', `${platform === 'win32' ? 'windows' : 'linux'}-${arch}`);
+    const folder = path.join(root, 'artifacts', `${platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : 'linux'}-${arch}`);
     await copyReadme(folder);
-    const name = format === 'nsis' ? `DevKit_${manifest.version}_${arch}-setup.exe` : `DevKit_${manifest.version}-1_${arch === 'x64' ? 'amd64' : 'arm64'}.deb`;
+    const name = format === 'nsis' ? `DevKit_${manifest.version}_${arch}-setup.exe` : format === 'dmg' ? `DevKit_${manifest.version}_${arch}.dmg` : `DevKit_${manifest.version}-1_${arch === 'x64' ? 'amd64' : 'arm64'}.deb`;
     const bytes = await readFile(path.join(folder, name));
     await writeFile(path.join(folder, `${name}.build.json`), JSON.stringify({ version: manifest.version, electron: manifest.devDependencies.electron, platform, arch, format, name, bytes: bytes.length, sha256: sha256(bytes), buildSha256 }, null, 2) + '\n');
   }

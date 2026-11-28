@@ -42,6 +42,11 @@ async function neighborMacs(source, signal) {
   if (process.platform === 'win32') {
     const { stdout } = await command('arp.exe', ['-a', '-N', source.address], { windowsHide: true, timeout: 3000, signal });
     for (const [, address, mac] of stdout.matchAll(/^\s*(\d+\.\d+\.\d+\.\d+)\s+([0-9a-f]{2}(?:-[0-9a-f]{2}){5})\s/gim)) macs.set(address, mac.replaceAll('-', ':').toLowerCase());
+  } else if (process.platform === 'darwin') {
+    const { stdout } = await command('arp', ['-an', '-i', source.name], { timeout: 3000, signal });
+    for (const [, address, mac] of stdout.matchAll(/\((\d+\.\d+\.\d+\.\d+)\)\s+at\s+([0-9a-f]{1,2}(?::[0-9a-f]{1,2}){5})\s/gi)) {
+      macs.set(address, mac.toLowerCase().split(':').map(part => part.padStart(2, '0')).join(':'));
+    }
   } else {
     for (const line of (await readFile('/proc/net/arp', 'utf8')).split('\n').slice(1)) {
       const [address, , flags, mac, , name] = line.trim().split(/\s+/);

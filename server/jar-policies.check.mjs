@@ -78,6 +78,22 @@ test('startup definitions keep exact paths and lifecycle ownership, including sp
   assert.match(decoded, /O''Brien/); assert.match(decoded, /ELECTRON_RUN_AS_NODE/); assert.match(decoded, /用户 \$x/);
   const linux = startupDefinition('/home/test/100% $value/instances.json', item, 'login', 'linux', '/opt/Dev Kit/devkit', '/opt/worker.mjs');
   assert.match(linux.unit, /100%% \$\$value/); assert.match(linux.unit, /KillMode=mixed/); assert.match(linux.unit, /Restart=no/);
+  const mac = startupDefinition('/Users/test/A & B/instances.json', item, 'login', 'darwin', '/Applications/DevKit.app/Contents/MacOS/DevKit', '/opt/worker.mjs');
+  assert.match(mac.plist, /A &amp; B/); assert.match(mac.plist, /<key>ELECTRON_RUN_AS_NODE<\/key>/); assert.match(mac.plist, /Managed by DevKit JAR/);
+  assert.throws(() => startupDefinition('/Users/test/instances.json', item, 'boot', 'darwin', '/Applications/DevKit.app/Contents/MacOS/DevKit', '/opt/worker.mjs'), /LaunchAgent/);
+});
+test('macOS install, query and remove use owned LaunchAgent plists only', async () => {
+  const folder = await mkdtemp(path.join(tmpdir(), 'devkit-mac-startup-')), registry = path.join(folder, 'instances.json');
+  const item = { id: '00000000-0000-0000-0000-000000000002', stopTimeout: 15 }, calls = [];
+  const tool = createJarAutostart(registry, { platform: 'darwin', uid: 501, launchAgentsDir: path.join(folder, 'LaunchAgents'), execute: async (cmd, args) => { calls.push([cmd, ...args]); return { stdout: '' }; } });
+  try {
+    assert.equal((await tool.get(item)).enabled, false);
+    const enabled = await tool.install(item, 'login'); assert.equal(enabled.enabled, true);
+    assert.match(await readFile(enabled.target, 'utf8'), /Managed by DevKit JAR/);
+    assert.ok(calls.some(call => call[0] === 'launchctl' && call[1] === 'enable' && call[2].startsWith('gui/501/')));
+    await tool.remove(item); assert.equal((await tool.get(item)).enabled, false);
+    assert.ok(calls.some(call => call[0] === 'launchctl' && call[1] === 'bootout'));
+  } finally { await rm(folder, { recursive: true, force: true }); }
 });
 test('Linux install, mode change, disable and error propagation use owned user units only', async () => {
   const folder = await mkdtemp(path.join(tmpdir(), 'devkit-startup-')), registry = path.join(folder, 'instances.json');

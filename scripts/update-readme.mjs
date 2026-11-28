@@ -46,13 +46,13 @@ export function renderReadme(template, { manifest, tools, categories, workspaceM
   }).join('\n\n');
   if (seen.size !== tools.length) throw new Error(`README 分类未收录工具：${tools.filter(tool => !seen.has(tool.id)).map(tool => tool.id).join(', ')}`);
 
-  const labels = ['Windows x64 安装包', 'Linux amd64 安装包', 'Linux ARM64 / 麒麟安装包'];
-  const commands = ['bundle:windows', 'bundle:linux', 'bundle:linux:arm64'];
+  const labels = ['Windows x64 安装包', 'Linux amd64 安装包', 'Linux ARM64 / 麒麟安装包', 'macOS Apple Silicon (ARM64) 安装包'];
+  const commands = ['bundle:windows', 'bundle:linux', 'bundle:linux:arm64', 'bundle:macos:arm64'];
   const packageRows = releaseTargets(manifest.version).map((target, index) => [labels[index], commands[index], `artifacts/${target.folder}/${target.name}`]);
   packageRows.push(
     ['麒麟 ARM64（命令别名）', 'bundle:kylin', '同 Linux ARM64'],
     ['当前系统解压版', 'bundle:host', `artifacts/release-${manifest.version}/DevKit-<platform>-<arch>/`],
-    ['三平台安装包合集', 'bundle:all', `artifacts/release-${manifest.version}/`],
+    ['多平台安装包合集', 'bundle:all', `artifacts/release-${manifest.version}/`],
     ['独立项目中心服务', 'bundle:project-server', `artifacts/release-${manifest.version}/DevKit_ProjectCenter_${manifest.version}_node24.zip`],
   );
   for (const [, command] of packageRows) {

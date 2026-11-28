@@ -19,7 +19,10 @@
 - 根目录 `README.md` 由 `scripts/update-readme.mjs` 生成，不直接编辑。
 - 新增、删除或调整工具时，维护工具注册表中的名称、description 和 `src/catalog.ts` 分类；生成器读取与界面相同的注册表。
 - 修改工作台、项目中心、存储、部署或打包功能时，同步更新 `docs/README.template.md` 中对应说明及相关专题文档。生成器不会从算法代码推断使用说明。
-- 正式发行统一由 GitHub Actions 打包、校验和发布。将版本更新提交到 `main`，再推送与 `package.json` 版本一致的附注标签（如 `1.23.0`）；从 GitHub Releases 下载安装包和独立服务 ZIP。本地开发使用源码预览，打包命令供构建和排查使用。
+- 正式发行统一由 GitHub Actions 打包、校验和发布，覆盖 **Windows x64（`.exe`）、Linux amd64（`.deb`）、Linux ARM64（`.deb`）、macOS Apple Silicon / M 系列 ARM64（`.dmg`，当前无签名附 ad-hoc 签名）** 四个桌面目标及 Node.js 24 独立服务 ZIP。将版本更新提交到 `main`，再推送与 `package.json` 版本一致的附注标签（如 `1.23.0`）；从 GitHub Releases 下载安装包和独立服务 ZIP。本地开发使用源码预览（`start-preview.cmd` / `start-preview-mac.command` / `start-preview-linux.sh`），打包命令供构建和排查使用。
+- 以后所有修改或新增功能，必须同时考虑 **Windows x64、Linux amd64、Linux ARM64、macOS Apple Silicon (ARM64)** 四个平台：
+  - 涉及路径、配置目录（macOS 打包版位于 `~/Library/Application Support/DevKit/configs/`，不写入 `.app` 内部）、进程探测与进程组管理（macOS 无 `/proc`，需使用 `ps`/`lsof`/`sysctl`）、可执行文件格式检查（PE / ELF / Mach-O）、系统自启（任务计划 / systemd / LaunchAgent）、原生依赖 prebuilds（如 `@serialport/bindings-cpp` 在 macOS 使用 `darwin-x64+arm64`）、托盘图标尺寸、系统快捷键及系统客户端调用时，必须在同一变更中补齐四平台分支或给出明确的平台提示与降级。
+  - 新增平台相关能力或调整打包流程后，同步检查并更新 `scripts/release-integrity.mjs`、`scripts/clean-artifacts.mjs`、`.github/workflows/build.yml`、对应单测及 `docs/README.template.md`。
 - 升版时在 `docs/releases/<版本号>.md` 编写面向使用者的中文更新介绍，随版本提交。GitHub Release 使用标签对应的这份正文，并自动附上完整变更对比链接。
 - 正式发行耗时目标为 5 分钟以内，以 GitHub Actions 收到版本标签触发工作流到 Release 可下载的时间为准。调整打包流程后按云端记录复核耗时。
 - 常规提交和发行默认执行无窗口检查。涉及桌面交互时，按改动范围运行对应的 Electron 测试；需要完整窗口回归时，在 GitHub Actions 手动启用 `full_regression`。

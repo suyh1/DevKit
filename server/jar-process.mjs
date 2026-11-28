@@ -65,6 +65,42 @@ export function matchesJar(item, info, identity) {
   if (index < 0 || !info.args[index + 1] || !path.isAbsolute(info.args[index + 1]) || pathKey(info.args[index + 1]) !== pathKey(item.jar)) return false;
   return !!identity && identity.pid === info.pid && identity.created === info.created && pathKey(identity.executable) === pathKey(info.executable) && pathKey(identity.jar) === pathKey(item.jar);
 }
+function parseDarwinCpuTime(value) {
+  const [daysPart, rest] = value.includes('-') ? value.split('-') : ['0', value];
+  const parts = rest.split(':').map(Number);
+  if (parts.some(Number.isNaN)) return 0;
+  const seconds = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
+  return Number(daysPart) * 86400 + seconds;
+}
+async function darwinExecutable(pid) {
+  try {
+    const { stdout } = await execute('lsof', ['-Fn', '-a', '-p', String(pid), '-d', 'txt'], { timeout: 3000, maxBuffer: 262144 });
+    let inText = false;
+    for (const line of stdout.split('\n')) {
+      if (line === 'ftxt') { inText = true; continue; }
+      if (line.startsWith('f')) { inText = false; continue; }
+      if (inText && line.startsWith('n/')) {
+        const candidate = line.slice(1).trim();
+        return await realpath(candidate).catch(() => candidate);
+      }
+    }
+  } catch { /* Fall back to ps comm=. */ }
+  const { stdout } = await execute('ps', ['-ww', '-p', String(pid), '-o', 'comm='], { timeout: 3000, maxBuffer: 65536, env: { ...process.env, LC_ALL: 'C' } });
+  const comm = stdout.trim();
+  return comm ? await realpath(comm).catch(() => comm) : '';
+}
+function splitDarwinArgs(commandLine, executable, comm) {
+  const trimmed = commandLine.trim();
+  if (!trimmed) return [];
+  for (const prefix of [comm, executable].filter(Boolean)) {
+    if (trimmed === prefix) return [executable || prefix];
+    if (trimmed.startsWith(`${prefix} `)) {
+      const rest = trimmed.slice(prefix.length + 1).trim();
+      return [executable || prefix, ...(rest ? rest.split(/\s+/) : [])];
+    }
+  }
+  return trimmed.split(/\s+/);
+}
 export async function inspectJava(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 1) return null;
   try {
@@ -82,6 +118,30 @@ export async function inspectJava(pid) {
       // Linux exports start time in clock ticks; getconf provides the platform rate.
       const ticks = await clockTicks();
       return { pid, executable, executableDeleted, args: cmd.split('\0').slice(0, -1), created: fields[19], uptime: Math.max(0, Number(uptime.split(' ')[0]) - Number(fields[19]) / ticks), memory: Number(status.match(/^VmRSS:\s+(\d+)/m)?.[1] || 0) * 1024, cpuSeconds: (Number(fields[11]) + Number(fields[12])) / ticks };
+    }
+    if (process.platform === 'darwin') {
+      const env = { ...process.env, LC_ALL: 'C' };
+      const [meta, cmd, comm, executable] = await Promise.all([
+        execute('ps', ['-ww', '-p', String(pid), '-o', 'stat=,rss=,cputime=,lstart='], { timeout: 3000, maxBuffer: 65536, env }),
+        execute('ps', ['-ww', '-p', String(pid), '-o', 'args='], { timeout: 3000, maxBuffer: 262144, env }),
+        execute('ps', ['-ww', '-p', String(pid), '-o', 'comm='], { timeout: 3000, maxBuffer: 65536, env }),
+        darwinExecutable(pid),
+      ]);
+      const match = /^\s*(\S+)\s+(\d+)\s+((?:\d+-)?(?:\d+:)?\d+:\d+(?:\.\d+)?)\s+([A-Z][a-z]{2}\s+[A-Z][a-z]{2}\s+\d+\s+\d+:\d+:\d+\s+\d{4})\s*$/.exec(meta.stdout.trim());
+      if (!match) return null;
+      if (match[1].startsWith('Z')) return null;
+      const startMs = Date.parse(match[4]);
+      if (!Number.isFinite(startMs)) return { pid, unknown: true };
+      const resolvedExec = executable || comm.stdout.trim();
+      return {
+        pid,
+        executable: resolvedExec,
+        args: splitDarwinArgs(cmd.stdout, resolvedExec, comm.stdout.trim()),
+        created: String(Math.floor(startMs / 1000)),
+        uptime: Math.max(0, (Date.now() - startMs) / 1000),
+        memory: Number(match[2]) * 1024,
+        cpuSeconds: parseDarwinCpuTime(match[3]),
+      };
     }
     if (process.platform === 'win32') {
       const { stdout } = await ps(`$ErrorActionPreference='Stop'; $p=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if($p){@{pid=[int]$p.ProcessId;executable=$p.ExecutablePath;command=$p.CommandLine;created=$p.CreationDate.ToUniversalTime().Ticks.ToString();uptime=([DateTime]::UtcNow-$p.CreationDate.ToUniversalTime()).TotalSeconds;memory=[double]$p.WorkingSetSize;cpuSeconds=([double]$p.KernelModeTime+[double]$p.UserModeTime)/10000000}|ConvertTo-Json -Compress}`);

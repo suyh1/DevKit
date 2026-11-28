@@ -14,6 +14,9 @@ test('release collection rejects modified, stale and wrong-architecture packages
   validateIdentity(identity, target, '1.4.0', bytes, 'build');
   for (const change of [{ arch: 'x64' }, { version: '1.3.0' }, { name: '../wrong.deb' }, { format: 'dir' }, { buildSha256: 'old' }, { bytes: 0 }, { sha256: 'corrupted' }]) assert.throws(() => validateIdentity({ ...identity, ...change }, target, '1.4.0', bytes, 'build'));
   assert.throws(() => validateIdentity(identity, target, '1.4.0', Buffer.from('changed'), 'build'));
+  const macTarget = releaseTargets('1.4.0')[3];
+  assert.deepEqual(macTarget, { platform: 'darwin', arch: 'arm64', format: 'dmg', folder: 'macos-arm64', name: 'DevKit_1.4.0_arm64.dmg' });
+  validateIdentity({ ...macTarget, version: '1.4.0', buildSha256: 'build', sha256: sha256(bytes), bytes: bytes.length }, macTarget, '1.4.0', bytes, 'build');
 });
 test('runtime inspection detects stale lazy chunks, desktop source and app versions in real ASAR archives', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'devkit-release-check-'));
@@ -87,6 +90,8 @@ test('artifact cleanup keeps the two newest versions and removes only managed ou
     const recent = await put('release-1.10.0/DevKit_1.10.0_x64-setup.exe', 'current binary');
     await put('release-1.10.0/DevKit_1.10.0_x64-setup.exe.build.json', 'current receipt');
     const previous = await put('linux-arm64/DevKit_1.9.0-1_arm64.deb');
+    const oldMac = await put('macos-arm64/DevKit_1.9.0_arm64.dmg');
+    const recentMac = await put('macos-arm64/DevKit_1.10.0_arm64.dmg', 'current dmg');
     const prerelease = await put('release-1.10.0-rc.1/DevKit_ProjectCenter_1.10.0-rc.1_node24.zip');
     const old = await put('release-1.8.0/DevKit_ProjectCenter_1.8.0_node24.zip');
     const oldBackup = await put('previous-release-1.8.0-20261117-130000/DevKit_ProjectCenter_1.8.0_node24.zip');
@@ -104,10 +109,10 @@ test('artifact cleanup keeps the two newest versions and removes only managed ou
     await readFile(old);
     const result = await cleanArtifacts(options);
     assert.deepEqual(result, preview);
-    for (const filename of [previous, old, oldBackup, duplicate, work, testData]) {
+    for (const filename of [previous, oldMac, old, oldBackup, duplicate, work, testData]) {
       await assert.rejects(readFile(filename), { code: 'ENOENT' });
     }
-    for (const filename of [recent, prerelease, unrelated, unknownReleaseFile, portableData, unrecognizedVersion]) await readFile(filename);
+    for (const filename of [recent, recentMac, prerelease, unrelated, unknownReleaseFile, portableData, unrecognizedVersion]) await readFile(filename);
     assert.deepEqual((await cleanArtifacts(options)).removed, []);
 
     const linked = path.join(fixture, 'linked-project');

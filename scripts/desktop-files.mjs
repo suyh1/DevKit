@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export async function prepareDesktop(platform, arch, stageRoot = path.join(root, 'artifacts', 'desktop-staging')) {
-  if (!['win32', 'linux'].includes(platform) || !['x64', 'arm64'].includes(arch)) throw new Error('Unsupported desktop target');
+  if (!['win32', 'linux', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) throw new Error('Unsupported desktop target');
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const staging = path.resolve(stageRoot, `${platform}-${arch}`);
   const relative = path.relative(stageRoot, staging);
@@ -25,7 +25,7 @@ export async function prepareDesktop(platform, arch, stageRoot = path.join(root,
     if (!/^(?:\.\/)?build\//.test(metadata.main || '')) excluded.add('build');
     await cp(source, path.join(staging, 'node_modules', name), { recursive: true, filter: filename => !path.relative(source, filename).split(path.sep).some(part => excluded.has(part) || part.endsWith('.node')) });
   }
-  const prebuild = path.join('node_modules', '@serialport', 'bindings-cpp', 'prebuilds', platform + '-' + arch);
+  const prebuild = path.join('node_modules', '@serialport', 'bindings-cpp', 'prebuilds', platform === 'darwin' ? 'darwin-x64+arm64' : `${platform}-${arch}`);
   await cp(path.join(root, prebuild), path.join(staging, prebuild), { recursive: true });
   await cp(path.join(root, 'dist'), path.join(staging, 'dist'), { recursive: true });
   await (await import('./stage-ssh-node.mjs')).stageSshNode(path.join(staging, 'ssh-node'));

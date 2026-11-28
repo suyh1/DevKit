@@ -29,7 +29,7 @@ export async function launchNginx(executable, args, prefix) {
 export async function detectNginx({ executable = '', main = '', prefix = '' } = {}) {
   const candidates = executable ? [executable] : [
     ...(process.env.PATH || '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir.replace(/^"|"$/g, ''), process.platform === 'win32' ? 'nginx.exe' : 'nginx')),
-    ...(process.platform === 'win32' ? [prefix && path.join(prefix, 'nginx.exe'), main && path.join(path.dirname(main), 'nginx.exe'), 'C:\\nginx\\nginx.exe', 'D:\\nginx\\nginx.exe'] : ['/usr/sbin/nginx', '/usr/local/nginx/sbin/nginx', '/usr/local/sbin/nginx', '/opt/nginx/sbin/nginx']),
+    ...(process.platform === 'win32' ? [prefix && path.join(prefix, 'nginx.exe'), main && path.join(path.dirname(main), 'nginx.exe'), 'C:\\nginx\\nginx.exe', 'D:\\nginx\\nginx.exe'] : ['/opt/homebrew/bin/nginx', '/usr/local/bin/nginx', '/usr/sbin/nginx', '/usr/local/nginx/sbin/nginx', '/usr/local/sbin/nginx', '/opt/nginx/sbin/nginx']),
   ].filter(Boolean);
   for (const candidate of [...new Set(candidates)]) {
     if (!path.isAbsolute(candidate) || /[\0\r\n]/.test(candidate)) continue;
@@ -56,6 +56,30 @@ export async function inspectNginxProcess(pid) {
       const executable = await realpath(`/proc/${pid}/exe`);
       const commandLine = (await readFile(`/proc/${pid}/cmdline`, 'utf8')).replaceAll('\0', ' ').trim();
       return { pid, executable, commandLine };
+    }
+    if (process.platform === 'darwin') {
+      const env = { ...process.env, LC_ALL: 'C' };
+      const [{ stdout: statOut }, { stdout: argsOut }] = await Promise.all([
+        execute('ps', ['-ww', '-p', String(pid), '-o', 'stat='], { timeout: 3000, maxBuffer: 16384, env }),
+        execute('ps', ['-ww', '-p', String(pid), '-o', 'args='], { timeout: 3000, maxBuffer: 262144, env }),
+      ]);
+      if (!statOut.trim() || statOut.trim().startsWith('Z')) return null;
+      let executable = '';
+      try {
+        const { stdout: lsofOut } = await execute('lsof', ['-Fn', '-a', '-p', String(pid), '-d', 'txt'], { timeout: 3000, maxBuffer: 262144 });
+        let inText = false;
+        for (const line of lsofOut.split('\n')) {
+          if (line === 'ftxt') { inText = true; continue; }
+          if (line.startsWith('f')) { inText = false; continue; }
+          if (inText && line.startsWith('n/')) { executable = await realpath(line.slice(1).trim()).catch(() => line.slice(1).trim()); break; }
+        }
+      } catch { /* Fall back to ps comm=. */ }
+      if (!executable) {
+        const { stdout: commOut } = await execute('ps', ['-ww', '-p', String(pid), '-o', 'comm='], { timeout: 3000, maxBuffer: 65536, env });
+        const comm = commOut.trim();
+        executable = comm ? await realpath(comm).catch(() => comm) : '';
+      }
+      return { pid, executable, commandLine: argsOut.trim() };
     }
     if (process.platform === 'win32') {
       // PID is validated as an integer; no user-supplied script or shell command is accepted.
@@ -84,6 +108,15 @@ export async function inspectNginxWorkers(pid, executable) {
         return /^nginx: worker process(?:\s|\0|$)/.test(line) ? Number(id) : null;
       }));
       return workers.filter(Boolean);
+    }
+    if (process.platform === 'darwin') {
+      const { stdout } = await execute('ps', ['-axo', 'pid=,ppid=,args='], { timeout: 3500, maxBuffer: 512 * 1024, env: { ...process.env, LC_ALL: 'C' } });
+      const workers = [];
+      for (const line of stdout.split('\n')) {
+        const match = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
+        if (match && Number(match[2]) === pid && /^nginx: worker process(?:\s|$)/.test(match[3])) workers.push(Number(match[1]));
+      }
+      return workers;
     }
   } catch { /* An unavailable process listing cannot verify a reload. */ }
   return null;

@@ -1,4 +1,4 @@
-const { app, clipboard, ClipboardItem, BrowserWindow, dialog, ipcMain, protocol, session, shell, Tray, Menu } = require('electron');
+const { app, clipboard, ClipboardItem, BrowserWindow, dialog, ipcMain, nativeImage, protocol, session, shell, Tray, Menu } = require('electron');
 const { readFile, writeFile } = require('node:fs/promises');
 const { createHash } = require('node:crypto');
 const path = require('node:path');
@@ -60,7 +60,9 @@ async function requestQuit() {
 }
 function hideToTray() {
   if (!tray || tray.isDestroyed()) {
-    const created = new Tray(path.join(__dirname, 'tray-icon.png'));
+    const iconPath = path.join(__dirname, 'tray-icon.png');
+    const trayIcon = process.platform === 'darwin' ? nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 }) : iconPath;
+    const created = new Tray(trayIcon);
     try {
       created.setToolTip('DevKit · 本地开发工作台');
       created.setContextMenu(Menu.buildFromTemplate([
@@ -74,7 +76,8 @@ function hideToTray() {
   }
   window.hide();
 }
-let projectStorage = { directory: path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: true, migratedFrom: '' };
+const packagedConfigsRoot = process.platform === 'darwin' ? app.getPath('userData') : path.dirname(app.getPath('exe'));
+let projectStorage = { directory: path.join(app.isPackaged ? packagedConfigsRoot : (process.env.DEVKIT_DEV_ROOT || app.getAppPath()), 'configs'), portable: !app.isPackaged || process.platform !== 'darwin', migratedFrom: '' };
 const primary = app.requestSingleInstanceLock();
 if (!primary) {
   if (previewProfile) {
@@ -191,7 +194,7 @@ app.whenReady().then(async () => {
     const { createProjectStore } = await import('./server/project-store.mjs');
     const { createProjectHost } = await import('./server/project-host.mjs');
     const { prepareProjectConfigs } = await import('./server/project-configs.mjs');
-    projectStorage = await prepareProjectConfigs(projectStorage.directory, [path.join(app.getPath('userData'), 'project-center')]);
+    projectStorage = { ...(await prepareProjectConfigs(projectStorage.directory, [path.join(app.getPath('userData'), 'project-center')])), portable: !app.isPackaged || process.platform !== 'darwin' };
     projectStore = await createProjectStore(projectStorage.directory);
     try { lan = await (await import('./server/lan-workspaces.mjs')).createLanWorkspaces(projectStorage.directory); }
     catch (error) { lanError = error.message; }
@@ -467,13 +470,16 @@ app.whenReady().then(async () => {
       }
       if (action === 'open-rdp') {
         const linux = process.platform === 'linux';
-        if (!linux && process.platform !== 'win32') throw new Error('当前平台不支持打开系统 RDP 客户端。');
+        const mac = process.platform === 'darwin';
+        if (!linux && !mac && process.platform !== 'win32') throw new Error('当前平台不支持打开系统 RDP 客户端。');
         const endpoint = await lan.hostRequest('rdp-target', value);
-        const executable = linux ? 'remmina' : path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
+        const executable = linux ? 'remmina' : mac ? 'open' : path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'mstsc.exe');
+        const args = linux ? ['-c', `rdp://${endpoint}`] : mac ? [`rdp://full%20address=s:${endpoint}`] : [`/v:${endpoint}`, '/f'];
         await new Promise((resolve, reject) => {
-          const child = spawn(executable, linux ? ['-c', `rdp://${endpoint}`] : [`/v:${endpoint}`, '/f'], { detached: true, stdio: 'ignore' });
-          child.once('error', error => reject(new Error(linux ? '无法打开 Remmina，请安装 Remmina 及其 RDP 插件。' : `无法打开 Windows 远程桌面：${error.message}`)));
-          child.once('spawn', () => { child.unref(); resolve(); });
+          const child = spawn(executable, args, { detached: true, stdio: 'ignore' });
+          child.once('error', error => reject(new Error(linux ? '无法打开 Remmina，请安装 Remmina 及其 RDP 插件。' : mac ? '无法打开系统 RDP 客户端，请安装 Windows App（Microsoft Remote Desktop）。' : `无法打开 Windows 远程桌面：${error.message}`)));
+          if (mac) child.once('exit', code => code === 0 ? resolve() : reject(new Error('未找到可用的 macOS RDP 客户端，请安装 Windows App（Microsoft Remote Desktop）。')));
+          else child.once('spawn', () => { child.unref(); resolve(); });
         });
         return { data: true };
       }

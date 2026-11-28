@@ -1,6 +1,6 @@
 import { remoteRequest } from './workspace-remote';
 import type { HostGroup } from './lan-api';
-export type NginxInstance = { id: string; hostId?: string; name: string; main: string; files: string[]; executable: string; prefix: string; platform: 'win32' | 'linux' | 'any' };
+export type NginxInstance = { id: string; hostId?: string; name: string; main: string; files: string[]; executable: string; prefix: string; platform: 'win32' | 'linux' | 'darwin' | 'any' };
 export type NginxState = { schemaVersion: number; revision: number; instances: NginxInstance[]; platform: string; directory: string; groups?: HostGroup[] };
 export type NginxDocument = { path: string; content: string; hash: string };
 export type NginxStatus = { id: string; state: 'running' | 'stopped' | 'unknown' | 'platform'; pid?: number; pidPath?: string; detail: string };

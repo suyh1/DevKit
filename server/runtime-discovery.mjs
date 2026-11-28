@@ -52,6 +52,12 @@ export async function discoverRuntimes(kind, { env = process.env, home = homedir
       }
     } else {
       for (const root of ['/usr/lib/jvm', '/usr/java', '/usr/local/java']) versions(root, 'bin');
+      if (process.platform === 'darwin') {
+        versions('/Library/Java/JavaVirtualMachines', 'Contents/Home/bin');
+        versions(below(home, 'Library/Java/JavaVirtualMachines'), 'Contents/Home/bin');
+        versions('/opt/homebrew/opt', 'bin');
+        versions('/usr/local/opt', 'bin');
+      }
     }
   } else {
     const bin = windows ? '' : 'bin';
@@ -64,12 +70,17 @@ export async function discoverRuntimes(kind, { env = process.env, home = homedir
     }
     versions(below(env.NVM_DIR || below(home, '.nvm'), 'versions/node'), bin);
     versions(below(env.FNM_DIR || below(windows ? env.APPDATA : data, 'fnm'), 'node-versions'), path.join('installation', bin));
+    if (process.platform === 'darwin') {
+      versions(below(home, 'Library/Application Support/fnm/node-versions'), path.join('installation', bin));
+      versions('/opt/homebrew/opt', 'bin');
+      versions('/usr/local/opt', 'bin');
+    }
     versions(below(env.VOLTA_HOME || (windows ? below(env.LOCALAPPDATA, 'Volta') : below(home, '.volta')), 'tools/image/node'), bin);
     versions(below(asdf, 'installs/nodejs'), bin);
     versions(below(mise, 'installs/node'), bin);
     add(below(env.NVM_SYMLINK, name));
     if (windows) add(below(env.ProgramFiles, 'nodejs', name));
-    else for (const dir of ['/usr/bin', '/usr/local/bin']) add(below(dir, name));
+    else for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) add(below(dir, name));
   }
 
   // A PATH link or JAVA_HOME can point to a versioned installation on another drive.

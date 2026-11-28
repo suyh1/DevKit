@@ -2,14 +2,14 @@ import type { NginxNode } from '../shared/nginx.mjs';
 
 export const instanceHints = {
   name: '给这套配置起一个便于识别的名字，例如“本地前端”。一套实例可以包含多个 server、监听端口和代理目标。',
-  platform: '选择配置实际运行的系统。Windows 和 Linux 都支持主文件加多个附属文件；可跨系统编辑，运行命令只能在匹配的系统执行。',
+  platform: '选择配置实际运行的系统。Windows、Linux 和 macOS 都支持主文件加多个附属文件；可跨系统编辑，运行命令只能在匹配的系统执行。',
   directory: '选择已有目录，用于生成主配置、附属配置和运行子目录；不会覆盖同名配置，也不会自动启动 nginx。',
   mainName: '只填主文件名，例如 nginx.conf，不填目录。它是启动时读取的入口，内部可以配置多个服务。',
   commonName: '只填不同的附属文件名，例如 common_proxy.conf。新模板在示例服务中 include 此文件，之后可让多个服务共用；初始 /api/ 代理到 http://127.0.0.1:9000，需按实际后端调整。',
   port: '仅用于生成第一个示例服务，例如 8080，访问地址为 http://127.0.0.1:8080。范围 1–65535；创建后可增加多个 server 和 listen。导入已有配置无需填写。',
   main: '选择已有主配置的绝对路径，例如 D:/nginx/nginx.conf 或 /etc/nginx/nginx.conf。已有端口、站点和代理规则会按原结构读取，无需重新填写。',
   prefix: '填写原来启动 nginx 时使用的运行目录，也可使用自定义配置目录。pid、error_log、root 等相对路径基于此目录，include 基于主配置所在目录。检查/启动/重载会自动补齐日志、PID、临时及缓存等运行目录；自动检测后请核对自定义目录。',
-  executable: '可留空，自动检测 PATH 和常见安装位置；找不到时选择 nginx.exe（Windows）或 nginx（Linux）可执行文件。此处填写程序文件路径。',
+  executable: '可留空，自动检测 PATH 和常见安装位置；找不到时选择 nginx.exe（Windows）或 nginx（Linux / macOS）可执行文件。此处填写程序文件路径。',
   files: '每行一个附属文件的绝对路径，可解析 include 或手动选择。登记只让文件可编辑；实际生效仍需 include。多个服务共用时，修改会影响所有引用它的服务。',
 } as const;
 

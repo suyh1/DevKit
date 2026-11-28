@@ -44,6 +44,14 @@ try {
 async function groupHasMembers(group) {
   try { process.kill(-group, 0); }
   catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+  if (process.platform === 'darwin') {
+    const { stdout } = await promisify(execFile)('ps', ['-axo', 'pgid=,stat='], { timeout: 3500, maxBuffer: 512 * 1024, env: { ...process.env, LC_ALL: 'C' } }).catch(() => ({ stdout: '' }));
+    for (const line of stdout.split('\n')) {
+      const [pgid, state] = line.trim().split(/\s+/);
+      if (Number(pgid) === group && state && !state.startsWith('Z')) return true;
+    }
+    return false;
+  }
   // A zombie can keep a process group visible although it holds no resources.
   for (const pid of await readdir('/proc')) {
     if (!/^\d+$/.test(pid)) continue;

@@ -73,7 +73,7 @@ export async function createNginxManager(directory, dependencies = {}) {
       if (state.schemaVersion !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 0 || !Array.isArray(state.instances) || state.instances.length > 100) throw new Error('实例注册表格式无效');
       const ids = new Set();
       for (const item of state.instances) {
-        if (typeof item.id !== 'string' || !/^[a-f0-9-]{36}$/.test(item.id) || ids.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || !Array.isArray(item.files) || item.files.length > 100 || !['win32', 'linux', 'any'].includes(item.platform)) throw new Error('实例定义无效');
+        if (typeof item.id !== 'string' || !/^[a-f0-9-]{36}$/.test(item.id) || ids.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || !Array.isArray(item.files) || item.files.length > 100 || !['win32', 'linux', 'darwin', 'any'].includes(item.platform)) throw new Error('实例定义无效');
         ids.add(item.id); absolute(item.main, '主文件'); absolute(item.prefix, '运行目录');
         if (item.executable) absolute(item.executable, 'nginx 路径');
         item.files.forEach(file => absolute(file, '附属文件'));
@@ -374,7 +374,7 @@ export async function createNginxManager(directory, dependencies = {}) {
   let queue = Promise.resolve(), closed = false;
   async function upsertInstance(input, revision) {
     checkRevision(revision);
-    if (!input || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || !['win32', 'linux', 'any'].includes(input.platform)) throw new Error('实例名称或目标系统无效。');
+    if (!input || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 100 || !['win32', 'linux', 'darwin', 'any'].includes(input.platform)) throw new Error('实例名称或目标系统无效。');
     const old = input.id ? find(input.id) : null;
     if (!old && state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
     const main = await configFile(input.main);
@@ -448,7 +448,7 @@ export async function createNginxManager(directory, dependencies = {}) {
         case 'reload-restored': return reloadRestored(find(payload.id), payload);
         case 'create': {
           checkRevision(payload.revision);
-          if (typeof payload.name !== 'string' || !payload.name.trim() || payload.name.length > 100 || !['win32', 'linux', 'any'].includes(payload.platform)) throw new Error('实例名称或目标系统无效。');
+          if (typeof payload.name !== 'string' || !payload.name.trim() || payload.name.length > 100 || !['win32', 'linux', 'darwin', 'any'].includes(payload.platform)) throw new Error('实例名称或目标系统无效。');
           if (state.instances.length >= 100) throw new Error('最多管理 100 个实例。');
           let executable = '';
           if (payload.executable) executable = await realpath(absolute(payload.executable, 'nginx 路径'));

@@ -121,6 +121,31 @@ export async function checkProgram(filename) {
           ![0x10b, 0x20b].includes(pe.readUInt16LE(24))) throw new Error('文件不是有效的 Windows PE 可执行程序。');
       detail = 'Windows .exe 文件格式检查通过';
       architecture = ({ 0x14c: 'ia32', 0x8664: 'x64', 0xaa64: 'arm64' })[pe.readUInt16LE(4)];
+    } else if (process.platform === 'darwin') {
+      const magic = bytesRead >= 8 ? head.readUInt32BE(0) : 0;
+      const machArch = cpu => ({ 0x0100000c: 'arm64', 0x01000007: 'x64', 7: 'ia32', 12: 'arm' })[cpu];
+      if (magic === 0xcffaedfe || magic === 0xcefaedfe) {
+        detail = 'Mach-O 程序格式和执行权限检查通过';
+        architecture = machArch(head.readUInt32LE(4));
+      } else if (magic === 0xfeedfacf || magic === 0xfeedface) {
+        detail = 'Mach-O 程序格式和执行权限检查通过';
+        architecture = machArch(head.readUInt32BE(4));
+      } else if ((magic === 0xcafebabe || magic === 0xcafebabf) && bytesRead >= 12) {
+        const count = head.readUInt32BE(4);
+        const stride = magic === 0xcafebabf ? 32 : 20;
+        if (count >= 1 && count <= 20 && 8 + count * stride <= bytesRead) {
+          detail = 'Mach-O 通用程序格式和执行权限检查通过';
+          const arches = Array.from({ length: count }, (_, index) => machArch(head.readUInt32BE(8 + index * stride))).filter(Boolean);
+          architecture = arches.includes(process.arch) ? process.arch : arches[0];
+        }
+      }
+      if (!detail) {
+        const interpreter = /^#![ \t]*(\/[^ \t\n\0]+)/.exec(head.toString('utf8', 0, bytesRead))?.[1];
+        if (!interpreter) throw new Error('文件有执行权限，但未识别为 Mach-O 程序或带解释器声明的脚本。');
+        if (!(await stat(interpreter).catch(() => null))?.isFile()) throw new Error('找不到脚本声明的解释器。');
+        await access(interpreter, constants.X_OK).catch(() => { throw new Error('脚本解释器缺少执行权限。'); });
+        detail = '脚本解释器和执行权限检查通过';
+      }
     } else {
       const elf = bytesRead >= 52 && head.readUInt32BE(0) === 0x7f454c46 && [1, 2].includes(head[4]) && [1, 2].includes(head[5]);
       if (elf && [2, 3].includes(head[5] === 1 ? head.readUInt16LE(16) : head.readUInt16BE(16))) {

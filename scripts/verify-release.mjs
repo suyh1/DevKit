@@ -19,4 +19,4 @@ for (const target of targets) {
   console.log(`Verified ${target.folder}: ${file.name} (${bytes.length} bytes)`);
 }
 if ((await readFile(path.join(folder, 'SHA256SUMS'), 'utf8')).trim() !== checksumLines.join('\n')) throw new Error('SHA256SUMS differs from release.json');
-console.log(`Release ${manifest.version}: three targets verified, shared build ${manifest.buildSha256}`);
+console.log(`Release ${manifest.version}: ${targets.length} targets verified, shared build ${manifest.buildSha256}`);

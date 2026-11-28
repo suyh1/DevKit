@@ -85,6 +85,11 @@ jobs:
             arch: arm64
             format: deb
             artifact: linux-arm64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+            format: dmg
+            artifact: macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
       # The release collector compares the actual packaged source bytes across platforms.
@@ -95,7 +100,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: ${{ runner.os == 'Linux' && 'npm' || '' }}
+          cache: ${{ runner.os != 'Windows' && 'npm' || '' }}
       - uses: actions/setup-python@v5
         if: runner.os == 'Linux'
         with:
@@ -106,7 +111,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install build dependencies
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         run: npm ci --ignore-scripts --no-audit
       - name: Install build dependencies and prepare SSH runtimes
         if: runner.os == 'Windows'
@@ -188,12 +193,20 @@ jobs:
             if dpkg-deb -f "$package" Depends | grep -qi webkit; then exit 1; fi
             sudo dpkg --unpack "$package"
           done
+      - name: Verify macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          for image in artifacts/${{ matrix.artifact }}/*.dmg; do
+            hdiutil verify "$image"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
             artifacts/${{ matrix.artifact }}/*.exe
             artifacts/${{ matrix.artifact }}/*.deb
+            artifacts/${{ matrix.artifact }}/*.dmg
             artifacts/${{ matrix.artifact }}/*.txt
             artifacts/${{ matrix.artifact }}/*.json
             artifacts/${{ matrix.artifact }}/README.md
@@ -297,7 +310,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           cd "artifacts/release-$VERSION"
-          assets=(*.exe *.deb *.zip SHA256SUMS PROJECT-SERVER-SHA256SUMS release.json project-server.json project-server-verification.json)
+          assets=(*.exe *.deb *.dmg *.zip SHA256SUMS PROJECT-SERVER-SHA256SUMS release.json project-server.json project-server-verification.json)
           if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
             if [[ "$is_draft" != true ]]; then
               echo "Release $GITHUB_REF_NAME is already published" >&2

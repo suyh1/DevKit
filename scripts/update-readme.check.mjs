@@ -58,6 +58,7 @@ test('README follows added/removed/renamed tools, categories, descriptions, vers
   const current = await readFile(filename, 'utf8');
   assert.match(current, /DevKit_9\.8\.7_x64-setup\.exe/);
   assert.match(current, /DevKit_9\.8\.7-1_arm64\.deb/);
+  assert.match(current, /DevKit_9\.8\.7_arm64\.dmg/);
   assert.match(current, /release-9\.8\.7/);
   assert.match(current, /Electron 99\.0\.0/);
   assert.match(current, /最多 3 个任务/);

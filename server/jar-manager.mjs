@@ -163,7 +163,7 @@ export async function createJarManager(directory, dependencies = {}) {
         return { ...base, state: 'unknown', pid, detail: 'PID 文件丢失，但记录的进程仍存在；请核对文件后再操作。' };
       if (!info && identity?.business && !identity.stopped) {
         const businessPid = identity.business.pid, live = await runtime.inspect(businessPid);
-        if (raw !== null && process.platform === 'linux' && !isJar(item) && identity.pid === pid &&
+        if (raw !== null && (process.platform === 'linux' || process.platform === 'darwin') && !isJar(item) && identity.pid === pid &&
             identity.serviceId === item.id && identity.kind === item.kind && /^\d+$/.test(identity.business.created) &&
             (!live || live.created === identity.business.created || identity.stopWitnesses)) {
           const members = await groupMembers(businessPid);
@@ -304,7 +304,7 @@ export async function createJarManager(directory, dependencies = {}) {
       const live = await runtime.inspect(current.pid);
       if (!live || (!live.unknown && live.created !== identity.created)) {
         // A launcher may crash during a requested stop, leaving its group alive.
-        if (process.platform === 'linux' && identity.business && (await groupMembers(identity.business.pid)).length) {
+        if ((process.platform === 'linux' || process.platform === 'darwin') && identity.business && (await groupMembers(identity.business.pid)).length) {
           const remaining = await status(item);
           if (remaining.canStopGroup) return stopGroup(item, remaining, force);
           throw new Error('业务进程组仍有成员，请核对目标主机后刷新。');

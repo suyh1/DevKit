@@ -11,19 +11,25 @@ const execute = promisify(execFile);
 const quote = value => `'${value.replaceAll("'", "''")}'`;
 const taskLookup = (name, variable = 't') => `$${variable}=$null; try {$${variable}=Get-ScheduledTask -TaskName ${quote(name)} -ErrorAction Stop} catch {if($_.CategoryInfo.Category -ne 'ObjectNotFound'){throw}}; `;
 const unitQuote = (value, command = true) => '"' + value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%').replaceAll('$', () => command ? '$$' : '$') + '"';
+const xmlEscape = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 export function startupDefinition(registry, item, mode, platform = process.platform, runner = process.execPath, worker = workerPath) {
-  if (!['login', 'boot'].includes(mode) || !['win32', 'linux'].includes(platform)) throw new Error('自启模式或操作系统不支持。');
+  if (!['login', 'boot'].includes(mode) || !['win32', 'linux', 'darwin'].includes(platform)) throw new Error('自启模式或操作系统不支持。');
+  if (platform === 'darwin' && mode === 'boot') throw new Error('macOS 用户自启仅支持“当前用户登录后启动”（LaunchAgent），系统开机启动需管理员配置 LaunchDaemon。');
   for (const value of [registry, runner, worker]) if (/[\0\r\n]/.test(value)) throw new Error('自启路径包含无效字符。');
   const hash = createHash('sha256').update(registry).digest('hex').slice(0, 12);
   const name = `devkit-jar-${hash}-${item.id}`, tag = `Managed by DevKit JAR ${hash} ${item.id}`;
   const javaArguments = item.executable ? ` '--java' ${quote(item.executable)}` : '';
   const launch = `$env:ELECTRON_RUN_AS_NODE='1'; & ${quote(runner)} ${quote(worker)} '--registry' ${quote(registry)} '--id' ${quote(item.id)}${javaArguments}; exit $LASTEXITCODE`;
-  return { name, tag, mode, taskArguments: `-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${Buffer.from(launch, 'utf16le').toString('base64')}`,
+  const plistArgs = [runner, worker, '--registry', registry, '--id', item.id, ...(item.executable ? ['--java', item.executable] : [])];
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- ${tag} -->\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>Label</key>\n  <string>${xmlEscape(name)}</string>\n  <key>ProgramArguments</key>\n  <array>\n${plistArgs.map(arg => `    <string>${xmlEscape(arg)}</string>`).join('\n')}\n  </array>\n  <key>EnvironmentVariables</key>\n  <dict>\n    <key>ELECTRON_RUN_AS_NODE</key>\n    <string>1</string>\n  </dict>\n  <key>WorkingDirectory</key>\n  <string>${xmlEscape(path.dirname(registry))}</string>\n  <key>RunAtLoad</key>\n  <true/>\n  <key>KeepAlive</key>\n  <false/>\n</dict>\n</plist>\n`;
+  return { name, tag, mode, plist, taskArguments: `-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${Buffer.from(launch, 'utf16le').toString('base64')}`,
     unit: `# ${tag}\n[Unit]\nDescription=DevKit backend service ${item.id}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nEnvironment=ELECTRON_RUN_AS_NODE=1\nExecStart=${unitQuote(runner)} ${unitQuote(worker)} --registry ${unitQuote(registry)} --id ${unitQuote(item.id)}${item.executable ? ` --java ${unitQuote(item.executable)}` : ''}\nWorkingDirectory=${unitQuote(path.dirname(registry), false)}\nRestart=no\nTimeoutStopSec=${item.stopTimeout + 15}\nKillMode=mixed\n\n[Install]\nWantedBy=${mode === 'boot' ? 'default.target' : 'graphical-session.target'}\n` };
 }
 export function createJarAutostart(registry, dependencies = {}) {
   const platform = dependencies.platform || process.platform, run = dependencies.execute || execute;
   const configHome = dependencies.configHome || process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config');
+  const launchAgentsDir = dependencies.launchAgentsDir || path.join(homedir(), 'Library', 'LaunchAgents');
+  const uid = dependencies.uid ?? (typeof process.getuid === 'function' ? process.getuid() : 0);
   const folder = path.join(path.dirname(registry), 'autostart');
   const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
   const command = async script => {
@@ -44,6 +50,12 @@ export function createJarAutostart(registry, dependencies = {}) {
         if (!result.owned) throw new Error('同名任务不属于此应用服务，拒绝修改。');
         return { ...record, enabled: result.enabled, platform, target: definition.name };
       }
+      if (platform === 'darwin') {
+        const target = path.join(launchAgentsDir, `${definition.name}.plist`);
+        const content = await readFile(target, 'utf8');
+        if (!content.includes(`<!-- ${definition.tag} -->`)) throw new Error('同名自启配置不属于此应用服务。');
+        return { ...record, enabled: true, platform, target };
+      }
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       const content = await readFile(target, 'utf8');
       if (!content.startsWith(`# ${definition.tag}\n`)) throw new Error('同名服务不属于此应用服务。');
@@ -60,6 +72,15 @@ export function createJarAutostart(registry, dependencies = {}) {
     try {
     if (platform === 'win32') {
       await command(`${taskLookup(definition.name, 'old')}if($old -and $old.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this service'}; $user=[Security.Principal.WindowsIdentity]::GetCurrent().Name; $action=New-ScheduledTaskAction -Execute ${quote(powershell)} -Argument ${quote(definition.taskArguments)}; $trigger=${mode === 'boot' ? 'New-ScheduledTaskTrigger -AtStartup' : 'New-ScheduledTaskTrigger -AtLogOn -User $user'}; $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType ${mode === 'boot' ? 'S4U' : 'Interactive'} -RunLevel Limited; $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; Register-ScheduledTask -TaskName ${quote(definition.name)} -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description ${quote(definition.tag)} -Force | Out-Null`);
+    } else if (platform === 'darwin') {
+      const target = path.join(launchAgentsDir, `${definition.name}.plist`);
+      try {
+        const existing = await readFile(target, 'utf8');
+        if (!existing.includes(`<!-- ${definition.tag} -->`)) throw new Error('同名自启配置不属于此应用服务。');
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, definition.plist, { mode: 0o600 });
+      await run('launchctl', ['enable', `gui/${uid}/${definition.name}`], { timeout: 10000 }).catch(() => {});
     } else {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
@@ -85,6 +106,13 @@ export function createJarAutostart(registry, dependencies = {}) {
     const definition = def(item, record.mode);
     if (platform === 'win32') {
       await command(`${taskLookup(definition.name)}if($t){if($t.Description -ne ${quote(definition.tag)}){throw 'Task is not owned by this service'}; Unregister-ScheduledTask -TaskName ${quote(definition.name)} -Confirm:$false}`);
+    } else if (platform === 'darwin') {
+      const target = path.join(launchAgentsDir, `${definition.name}.plist`);
+      try {
+        if (!(await readFile(target, 'utf8')).includes(`<!-- ${definition.tag} -->`)) throw new Error('同名自启配置不属于此应用服务。');
+        await run('launchctl', ['bootout', `gui/${uid}/${definition.name}`], { timeout: 10000 }).catch(() => {});
+        await unlink(target);
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
     } else {
       const target = path.join(configHome, 'systemd/user', `${definition.name}.service`);
       try {
